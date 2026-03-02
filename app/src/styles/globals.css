@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-start: #e8f1f2;
+  --bg-end: #bfd7ea;
+  --text-main: #0d1321;
+}
+
+body {
+  background: linear-gradient(155deg, var(--bg-start), var(--bg-end));
+  color: var(--text-main);
+  font-family: "Space Grotesk", "Avenir Next", sans-serif;
+  min-height: 100vh;
+}
