@@ -2,13 +2,27 @@ use anchor_lang::prelude::*;
 
 pub const MAX_HANDLE_LEN: usize = 32;
 pub const MAX_CANONICAL_URL_LEN: usize = 240;
+pub const DEFAULT_CREATOR_LEVEL: u8 = 1;
+pub const MIN_PROPOSAL_CREATOR_LEVEL: u8 = 2;
 
+#[allow(non_camel_case_types)]
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum CampaignStatus {
+pub enum ProposalStatus {
     Open = 0,
-    Settled = 1,
-    ExpiredRefunded = 2,
+    Funded = 1,
+    Resolved_Success = 2,
+    Resolved_Fail = 3,
+    Cancelled = 4,
+    Voided = 5,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CreatorUpgradeMetric {
+    Followers = 0,
+    ValidViews = 1,
 }
 
 #[account]
@@ -17,14 +31,14 @@ pub struct ProtocolConfig {
     pub oracle_authority: Pubkey,
     pub usdc_mint: Pubkey,
     pub spump_mint: Pubkey,
-    pub min_sponsor_burn_bps: u16,
-    pub default_predictor_pool_bps: u16,
-    pub max_campaign_duration_seconds: i64,
+    pub max_proposal_duration_seconds: i64,
+    pub s2_min_followers: u64,
+    pub s2_min_valid_views: u64,
     pub bump: u8,
 }
 
 impl ProtocolConfig {
-    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 2 + 2 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -32,13 +46,15 @@ pub struct CreatorProfile {
     pub authority: Pubkey,
     pub handle: String,
     pub payout_usdc_ata: Pubkey,
+    pub level: u8,
+    pub last_upgrade_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
     pub bump: u8,
 }
 
 impl CreatorProfile {
-    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -57,70 +73,53 @@ impl ContentHashAnchor {
 }
 
 #[account]
-pub struct CampaignEscrow {
-    pub sponsor: Pubkey,
-    pub creator_profile: Pubkey,
-    pub usdc_mint: Pubkey,
-    pub usdc_vault: Pubkey,
-    pub campaign_id: u64,
-    pub target_view_count: u64,
-    pub deadline_ts: i64,
-    pub total_deposited: u64,
-    pub predictor_pool_bps: u16,
-    pub creator_success_payout_bps: u16,
-    pub spump_burned_for_inventory: u64,
-    pub oracle_reported: bool,
-    pub oracle_final_views: u64,
-    pub oracle_outcome_yes: bool,
-    pub oracle_request_id: [u8; 32],
-    pub oracle_report_digest: [u8; 32],
-    pub oracle_reported_at: i64,
+pub struct Proposal {
+    pub creator: Pubkey,
+    pub sponsor: Option<Pubkey>,
+    pub target_views: u64,
+    pub deadline: i64,
+    pub status: ProposalStatus,
+    pub usdc_vault_bump: u8,
+    pub spump_vault_bump: u8,
+    pub total_spump_staked: u64,
+    pub sponsor_usdc_deposited: u64,
+    pub actual_views: Option<u64>,
     pub settled_at: i64,
-    pub market: Pubkey,
-    pub status: CampaignStatus,
-    pub vault_authority_bump: u8,
     pub bump: u8,
 }
 
-impl CampaignEscrow {
-    pub const INIT_SPACE: usize = 320;
+impl Proposal {
+    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1 + 1 + 1 + 8 + 8 + 9 + 8 + 1;
 }
 
 #[account]
-pub struct TrafficMarket {
-    pub campaign: Pubkey,
-    pub spump_mint: Pubkey,
-    pub usdc_mint: Pubkey,
-    pub spump_stake_vault: Pubkey,
-    pub usdc_rewards_vault: Pubkey,
-    pub close_ts: i64,
-    pub yes_total_stake: u64,
-    pub no_total_stake: u64,
-    pub rewards_usdc_total: u64,
-    pub rewards_usdc_distributed: u64,
-    pub stakes_redeemed_total: u64,
-    pub resolved: bool,
-    pub outcome_yes: bool,
-    pub voided: bool,
-    pub loser_burned: bool,
-    pub vault_authority_bump: u8,
-    pub bump: u8,
-}
-
-impl TrafficMarket {
-    pub const INIT_SPACE: usize = 224;
-}
-
-#[account]
-pub struct BetPosition {
-    pub market: Pubkey,
+pub struct EndorsementPosition {
     pub user: Pubkey,
-    pub yes_stake: u64,
-    pub no_stake: u64,
+    pub proposal: Pubkey,
+    pub staked_amount: u64,
     pub claimed: bool,
     pub bump: u8,
 }
 
-impl BetPosition {
-    pub const INIT_SPACE: usize = 96;
+impl EndorsementPosition {
+    pub const INIT_SPACE: usize = 32 + 32 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct UpgradeReceipt {
+    pub creator_profile: Pubkey,
+    pub upgraded_by: Pubkey,
+    pub previous_level: u8,
+    pub new_level: u8,
+    pub metric_type: CreatorUpgradeMetric,
+    pub metric_value: u64,
+    pub report_id: [u8; 32],
+    pub report_digest: [u8; 32],
+    pub observed_at: i64,
+    pub upgraded_at: i64,
+    pub bump: u8,
+}
+
+impl UpgradeReceipt {
+    pub const INIT_SPACE: usize = 32 + 32 + 1 + 1 + 1 + 8 + 32 + 32 + 8 + 8 + 1;
 }

@@ -14,9 +14,9 @@ interface ViewAccumulator {
 }
 
 export interface OracleSettlementReport {
-  campaignId: string;
+  proposalKey: string;
   videoId: string;
-  finalViews: number;
+  actualViews: number;
   reportDigestHex: string;
   generatedAtIso: string;
 }
@@ -77,28 +77,28 @@ export const getViewStats = (videoId: string) => {
 };
 
 export const buildOracleSettlementReport = (
-  campaignId: string,
+  proposalKey: string,
   videoId: string
 ): OracleSettlementReport => {
   const snapshot = getViewStats(videoId);
 
   // Conservative final count: only anti-cheat accepted views are submitted on-chain.
-  const finalViews = snapshot.acceptedViews;
+  const actualViews = snapshot.acceptedViews;
   const generatedAtIso = new Date().toISOString();
 
   const digestInput = JSON.stringify({
-    campaignId,
+    proposalKey,
     videoId,
-    finalViews,
+    actualViews,
     generatedAtIso,
   });
 
   const reportDigestHex = createHash("sha256").update(digestInput).digest("hex");
 
   return {
-    campaignId,
+    proposalKey,
     videoId,
-    finalViews,
+    actualViews,
     reportDigestHex,
     generatedAtIso,
   };

@@ -27,6 +27,13 @@ pub mod streampump_core {
         instructions::register_creator::handler(ctx, args)
     }
 
+    pub fn upgrade_creator(
+        ctx: Context<UpgradeCreator>,
+        args: UpgradeCreatorArgs,
+    ) -> Result<()> {
+        instructions::upgrade_creator::handler(ctx, args)
+    }
+
     pub fn anchor_content_hash(
         ctx: Context<AnchorContentHash>,
         args: AnchorContentHashArgs,
@@ -34,23 +41,22 @@ pub mod streampump_core {
         instructions::anchor_content_hash::handler(ctx, args)
     }
 
-    pub fn create_campaign(ctx: Context<CreateCampaign>, args: CreateCampaignArgs) -> Result<()> {
-        instructions::create_campaign::handler(ctx, args)
+    pub fn create_proposal(ctx: Context<CreateProposal>, args: CreateProposalArgs) -> Result<()> {
+        instructions::create_proposal::handler(ctx, args)
     }
 
-    pub fn sponsor_deposit(ctx: Context<SponsorDeposit>, args: SponsorDepositArgs) -> Result<()> {
-        instructions::sponsor_deposit::handler(ctx, args)
-    }
-
-    pub fn burn_spump_for_inventory(
-        ctx: Context<BurnSpumpForInventory>,
-        args: BurnSpumpForInventoryArgs,
+    pub fn endorse_proposal(
+        ctx: Context<EndorseProposal>,
+        args: EndorseProposalArgs,
     ) -> Result<()> {
-        instructions::burn_spump_for_inventory::handler(ctx, args)
+        instructions::endorse_proposal::handler(ctx, args)
     }
 
-    pub fn place_bet(ctx: Context<PlaceBet>, args: PlaceBetArgs) -> Result<()> {
-        instructions::place_bet::handler(ctx, args)
+    pub fn sponsor_fund(
+        ctx: Context<SponsorFund>,
+        args: SponsorFundArgs,
+    ) -> Result<()> {
+        instructions::sponsor_fund::handler(ctx, args)
     }
 
     pub fn submit_oracle_report(
@@ -60,11 +66,19 @@ pub mod streampump_core {
         instructions::submit_oracle_report::handler(ctx, args)
     }
 
-    pub fn settle_campaign(ctx: Context<SettleCampaign>) -> Result<()> {
-        instructions::settle_campaign::handler(ctx)
+    pub fn settle_proposal(ctx: Context<SettleProposal>) -> Result<()> {
+        instructions::settle_proposal::handler(ctx)
     }
 
-    pub fn claim_market_reward(ctx: Context<ClaimMarketReward>) -> Result<()> {
-        instructions::claim_market_reward::handler(ctx)
+    pub fn claim_endorsement(ctx: Context<ClaimEndorsement>) -> Result<()> {
+        instructions::claim_endorsement::handler(ctx)
+    }
+
+    pub fn cancel_proposal(ctx: Context<CancelProposal>) -> Result<()> {
+        instructions::cancel_proposal::handler(ctx)
+    }
+
+    pub fn emergency_void(ctx: Context<EmergencyVoid>) -> Result<()> {
+        instructions::emergency_void::handler(ctx)
     }
 }

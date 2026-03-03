@@ -1,55 +1,55 @@
-// EN: Oracle authority submits the final cleaned view count and report digest for a campaign.
-// ZH: 预言机权限账户为某个活动提交最终清洗后的观看量及报告摘要，用于结算。
+// EN: Oracle reports finalized view count and resolves proposal outcome.
+// ZH: 预言机上报最终播放量并裁决提案成功/失败。
 use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
-    state::{CampaignEscrow, CampaignStatus, ProtocolConfig},
+    state::{Proposal, ProposalStatus, ProtocolConfig},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SubmitOracleReportArgs {
-    pub final_views: u64,
-    pub request_id: [u8; 32],
-    pub report_digest: [u8; 32],
+    /// Final validated view count for this proposal.
+    pub actual_views: u64,
 }
 
 #[derive(Accounts)]
 pub struct SubmitOracleReport<'info> {
-    pub oracle_authority: Signer<'info>,
+    /// Oracle authority signer.
+    pub oracle: Signer<'info>,
+
+    /// Global protocol config used to verify oracle authority.
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
     pub protocol_config: Account<'info, ProtocolConfig>,
+
+    /// Proposal to resolve after deadline.
     #[account(
         mut,
-        seeds = [b"campaign", campaign.sponsor.as_ref(), &campaign.campaign_id.to_le_bytes()],
-        bump = campaign.bump,
-        constraint = campaign.status == CampaignStatus::Open @ StreamPumpError::CampaignClosed
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        bump = proposal.bump,
+        constraint = proposal.status == ProposalStatus::Funded @ StreamPumpError::ProposalNotFunded
     )]
-    pub campaign: Account<'info, CampaignEscrow>,
+    pub proposal: Account<'info, Proposal>,
 }
 
-pub(crate) fn handler(
-    ctx: Context<SubmitOracleReport>,
-    args: SubmitOracleReportArgs,
-) -> Result<()> {
+/// Records oracle result after deadline and transitions proposal to success/failure resolution state.
+pub(crate) fn handler(ctx: Context<SubmitOracleReport>, args: SubmitOracleReportArgs) -> Result<()> {
     require_keys_eq!(
-        ctx.accounts.oracle_authority.key(),
+        ctx.accounts.oracle.key(),
         ctx.accounts.protocol_config.oracle_authority,
         StreamPumpError::Unauthorized
     );
 
-    let campaign = &mut ctx.accounts.campaign;
-    require!(
-        !campaign.oracle_reported,
-        StreamPumpError::OracleAlreadyReported
-    );
+    let now = Clock::get()?.unix_timestamp;
+    let proposal = &mut ctx.accounts.proposal;
+    require!(now >= proposal.deadline, StreamPumpError::ProposalNotExpired);
 
-    campaign.oracle_reported = true;
-    campaign.oracle_final_views = args.final_views;
-    campaign.oracle_outcome_yes = args.final_views >= campaign.target_view_count;
-    campaign.oracle_request_id = args.request_id;
-    campaign.oracle_report_digest = args.report_digest;
-    campaign.oracle_reported_at = Clock::get()?.unix_timestamp;
+    proposal.actual_views = Some(args.actual_views);
+    proposal.status = if args.actual_views >= proposal.target_views {
+        ProposalStatus::Resolved_Success
+    } else {
+        ProposalStatus::Resolved_Fail
+    };
 
     Ok(())
 }

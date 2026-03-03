@@ -4,12 +4,14 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
-    state::{CreatorProfile, ProtocolConfig, MAX_HANDLE_LEN},
+    state::{CreatorProfile, ProtocolConfig, DEFAULT_CREATOR_LEVEL, MAX_HANDLE_LEN},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct RegisterCreatorArgs {
+    //创作者昵称
     pub handle: String,
+    //创作者 USDC 收款账户
     pub payout_usdc_ata: Pubkey,
 }
 
@@ -39,6 +41,8 @@ pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) 
     let profile = &mut ctx.accounts.creator_profile;
     if profile.authority == Pubkey::default() {
         profile.authority = ctx.accounts.authority.key();
+        profile.level = DEFAULT_CREATOR_LEVEL;
+        profile.last_upgrade_at = 0;
         profile.created_at = Clock::get()?.unix_timestamp;
         profile.bump = ctx.bumps.creator_profile;
     }

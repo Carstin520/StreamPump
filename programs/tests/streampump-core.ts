@@ -11,8 +11,11 @@ describe("streampump-core", () => {
     // TODO: Add v2 integration coverage for:
     // - initialize_protocol
     // - register_creator + anchor_content_hash
-    // - create_campaign + sponsor_deposit + burn_spump_for_inventory
-    // - place_bet + submit_oracle_report + settle_campaign + claim_market_reward
+    // - S1 gate: level=1 creator cannot create_proposal
+    // - upgrade_creator (oracle) to level>=2
+    // - create_proposal + endorse_proposal + sponsor_fund
+    // - submit_oracle_report + settle_proposal + claim_endorsement
+    // - cancel_proposal + emergency_void
     console.log("Program ID:", program.programId.toBase58());
   });
 });

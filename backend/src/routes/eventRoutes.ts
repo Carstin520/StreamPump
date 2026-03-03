@@ -10,6 +10,6 @@ const router = Router();
 
 router.post("/views", ingestViewEvent);
 router.get("/views/:videoId", viewStats);
-router.get("/reports/:campaignId/:videoId", buildSettlementReport);
+router.get("/reports/:proposalKey/:videoId", buildSettlementReport);
 
 export default router;

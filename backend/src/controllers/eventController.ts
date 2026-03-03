@@ -55,13 +55,13 @@ export const viewStats = (req: Request, res: Response) => {
 };
 
 export const buildSettlementReport = (req: Request, res: Response) => {
-  const campaignId = String(req.params.campaignId ?? "");
+  const proposalKey = String(req.params.proposalKey ?? "");
   const videoId = String(req.params.videoId ?? "");
 
-  if (!campaignId || !videoId) {
-    res.status(400).json({ error: "campaignId and videoId are required" });
+  if (!proposalKey || !videoId) {
+    res.status(400).json({ error: "proposalKey and videoId are required" });
     return;
   }
 
-  res.json(buildOracleSettlementReport(campaignId, videoId));
+  res.json(buildOracleSettlementReport(proposalKey, videoId));
 };

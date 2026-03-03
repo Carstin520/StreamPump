@@ -1,5 +1,5 @@
-// EN: Anchor a creator's content (canonical URL + content hash) on-chain for oracle and campaign reference.
-// ZH: 将创作者内容（规范化 URL 与内容哈希）锚定到链上，供预言机与活动引用使用。
+// EN: Anchor a creator's content (canonical URL + content hash) on-chain for oracle and proposal reference.
+// ZH: 将创作者内容（规范化 URL 与内容哈希）锚定到链上，供预言机与提案引用使用。
 use anchor_lang::prelude::*;
 
 use crate::{

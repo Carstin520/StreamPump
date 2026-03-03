@@ -3,23 +3,23 @@ import { randomBytes } from "crypto";
 import { buildOracleSettlementReport } from "../services/viewOracleAggregator";
 
 export interface OracleSettlementPayload {
-  campaignId: string;
+  proposalKey: string;
   videoId: string;
-  finalViews: number;
+  actualViews: number;
   requestIdHex: string;
   reportDigestHex: string;
 }
 
 export const buildOracleSettlementPayload = (
-  campaignId: string,
+  proposalKey: string,
   videoId: string
 ): OracleSettlementPayload => {
-  const report = buildOracleSettlementReport(campaignId, videoId);
+  const report = buildOracleSettlementReport(proposalKey, videoId);
 
   return {
-    campaignId,
+    proposalKey,
     videoId,
-    finalViews: report.finalViews,
+    actualViews: report.actualViews,
     requestIdHex: randomBytes(32).toString("hex"),
     reportDigestHex: report.reportDigestHex,
   };

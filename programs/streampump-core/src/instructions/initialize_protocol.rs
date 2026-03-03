@@ -9,9 +9,9 @@ pub struct InitializeProtocolArgs {
     pub oracle_authority: Pubkey,
     pub usdc_mint: Pubkey,
     pub spump_mint: Pubkey,
-    pub min_sponsor_burn_bps: u16,
-    pub default_predictor_pool_bps: u16,
-    pub max_campaign_duration_seconds: i64,
+    pub max_proposal_duration_seconds: i64,
+    pub s2_min_followers: u64,
+    pub s2_min_valid_views: u64,
 }
 
 #[derive(Accounts)]
@@ -34,11 +34,7 @@ pub(crate) fn handler(
     args: InitializeProtocolArgs,
 ) -> Result<()> {
     require!(
-        args.min_sponsor_burn_bps <= 10_000 && args.default_predictor_pool_bps <= 10_000,
-        StreamPumpError::InvalidBasisPoints
-    );
-    require!(
-        args.max_campaign_duration_seconds > 0,
+        args.max_proposal_duration_seconds > 0,
         StreamPumpError::InvalidDeadline
     );
 
@@ -47,9 +43,9 @@ pub(crate) fn handler(
     config.oracle_authority = args.oracle_authority;
     config.usdc_mint = args.usdc_mint;
     config.spump_mint = args.spump_mint;
-    config.min_sponsor_burn_bps = args.min_sponsor_burn_bps;
-    config.default_predictor_pool_bps = args.default_predictor_pool_bps;
-    config.max_campaign_duration_seconds = args.max_campaign_duration_seconds;
+    config.max_proposal_duration_seconds = args.max_proposal_duration_seconds;
+    config.s2_min_followers = args.s2_min_followers;
+    config.s2_min_valid_views = args.s2_min_valid_views;
     config.bump = ctx.bumps.protocol_config;
 
     Ok(())

@@ -15,7 +15,7 @@ export const VideoPlayer = ({ src, creatorHandle = "@creator" }: VideoPlayerProp
       )}
       <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
         <p className="text-sm font-semibold">{creatorHandle}</p>
-        <p className="text-xs text-white/80">Watch, earn energy, mint creator tokens.</p>
+        <p className="text-xs text-white/80">Watch, submit clean signals, and back proposals with SPUMP.</p>
       </div>
     </div>
   );

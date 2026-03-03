@@ -14,8 +14,8 @@ export default function HomePage() {
           <p className="text-xs uppercase tracking-[0.3em] text-ink/70">Solana Creator Economy</p>
           <h1 className="text-4xl font-bold tracking-tight">StreamPump</h1>
           <p className="max-w-2xl text-sm text-ink/80">
-            Web 2.5 creator incubation with sponsor-funded traffic futures, SPUMP utility staking,
-            and oracle-settled campaign escrow.
+            Web 2.5 creator incubation with sponsor-funded proposals, SPUMP endorsement staking,
+            and oracle-settled USDC/SPUMP payouts.
           </p>
         </header>
 
