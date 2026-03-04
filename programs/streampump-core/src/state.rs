@@ -20,6 +20,16 @@ pub enum ProposalStatus {
 #[allow(non_camel_case_types)]
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+pub enum CreatorStatus {
+    S1_Active = 0,
+    S1_Auction_Pending = 1,
+    S1_Execution_Pending = 2,
+    S2_Active = 3,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum CreatorUpgradeMetric {
     Followers = 0,
     ValidViews = 1,
@@ -32,13 +42,16 @@ pub struct ProtocolConfig {
     pub usdc_mint: Pubkey,
     pub spump_mint: Pubkey,
     pub max_proposal_duration_seconds: i64,
+    pub max_exit_tax_bps: u16,
+    pub min_exit_tax_bps: u16,
+    pub tax_decay_threshold_supply: u64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
     pub bump: u8,
 }
 
 impl ProtocolConfig {
-    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 8 + 2 + 2 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -47,6 +60,9 @@ pub struct CreatorProfile {
     pub handle: String,
     pub payout_usdc_ata: Pubkey,
     pub level: u8,
+    pub status: CreatorStatus,
+    pub s1_supply: u64,
+    pub s1_pool_spump: u64,
     pub last_upgrade_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -54,7 +70,7 @@ pub struct CreatorProfile {
 }
 
 impl CreatorProfile {
-    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 1 + 8 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -103,6 +119,44 @@ pub struct EndorsementPosition {
 
 impl EndorsementPosition {
     pub const INIT_SPACE: usize = 32 + 32 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct S1UserPosition {
+    pub user: Pubkey,
+    pub creator: Pubkey,
+    pub internal_token_balance: u64,
+    pub spump_cost_basis: u64,
+    pub bump: u8,
+}
+
+impl S1UserPosition {
+    pub const INIT_SPACE: usize = 32 + 32 + 8 + 8 + 1;
+}
+
+#[account]
+pub struct S1BuyoutState {
+    pub creator: Pubkey,
+    pub winning_sponsor: Option<Pubkey>,
+    pub usdc_deposited: u64,
+    pub rage_quit_deadline: i64,
+    pub bump: u8,
+}
+
+impl S1BuyoutState {
+    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1;
+}
+
+#[account]
+pub struct S1BuyoutOffer {
+    pub sponsor: Pubkey,
+    pub creator: Pubkey,
+    pub usdc_amount: u64,
+    pub bump: u8,
+}
+
+impl S1BuyoutOffer {
+    pub const INIT_SPACE: usize = 32 + 32 + 8 + 1 + 8;
 }
 
 #[account]

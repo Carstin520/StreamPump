@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::StreamPumpError,
     state::{
-        CreatorProfile, CreatorUpgradeMetric, ProtocolConfig, UpgradeReceipt,
+        CreatorProfile, CreatorStatus, CreatorUpgradeMetric, ProtocolConfig, UpgradeReceipt,
         MIN_PROPOSAL_CREATOR_LEVEL,
     },
 };
@@ -100,6 +100,9 @@ pub(crate) fn handler(ctx: Context<UpgradeCreator>, args: UpgradeCreatorArgs) ->
 
     let previous_level = profile.level;
     profile.level = args.new_level;
+    if profile.level >= MIN_PROPOSAL_CREATOR_LEVEL {
+        profile.status = CreatorStatus::S2_Active;
+    }
     profile.last_upgrade_at = now;
     profile.updated_at = now;
 

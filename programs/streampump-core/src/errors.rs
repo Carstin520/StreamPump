@@ -24,6 +24,30 @@ pub enum StreamPumpError {
     CreatorNotRegistered,
     #[msg("Creator level is below the minimum required threshold")]
     InsufficientCreatorLevel,
+    #[msg("Creator is not in required lifecycle status")]
+    InvalidCreatorStatus,
+    #[msg("S1 position account mismatch")]
+    S1PositionAccountMismatch,
+    #[msg("Insufficient internal S1 token balance")]
+    InsufficientInternalTokenBalance,
+    #[msg("Insufficient S1 SPUMP pool liquidity")]
+    InsufficientS1PoolLiquidity,
+    #[msg("S1 buyout offer account mismatch")]
+    BuyoutOfferMismatch,
+    #[msg("S1 buyout state account mismatch")]
+    BuyoutStateMismatch,
+    #[msg("Winning sponsor has not been selected")]
+    WinningSponsorNotSelected,
+    #[msg("Winning offer cannot be cancelled")]
+    WinningOfferCannotCancel,
+    #[msg("Rage quit window is not active")]
+    RageQuitWindowNotActive,
+    #[msg("Rage quit window is still open")]
+    RageQuitWindowStillOpen,
+    #[msg("Insufficient USDC liquidity in buyout vault")]
+    InsufficientBuyoutUsdcLiquidity,
+    #[msg("Invalid exit tax configuration")]
+    InvalidTaxConfig,
     #[msg("Creator level upgrade must increase current level")]
     CreatorLevelNotIncreasing,
     #[msg("Invalid creator level value")]
