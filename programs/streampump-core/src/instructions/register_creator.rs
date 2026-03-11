@@ -44,7 +44,6 @@ pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) 
         profile.level = DEFAULT_CREATOR_LEVEL;
         profile.status = CreatorStatus::S1_Active;
         profile.s1_supply = 0;
-        profile.s1_pool_spump = 0;
         profile.last_upgrade_at = 0;
         profile.created_at = Clock::get()?.unix_timestamp;
         profile.bump = ctx.bumps.creator_profile;

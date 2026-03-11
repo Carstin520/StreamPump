@@ -53,6 +53,7 @@ pub(crate) fn handler(
     config.oracle_authority = args.oracle_authority;
     config.usdc_mint = args.usdc_mint;
     config.spump_mint = args.spump_mint;
+    config.spump_mint_bump = ctx.bumps.protocol_config;
     config.max_proposal_duration_seconds = args.max_proposal_duration_seconds;
     config.max_exit_tax_bps = args.max_exit_tax_bps;
     config.min_exit_tax_bps = args.min_exit_tax_bps;

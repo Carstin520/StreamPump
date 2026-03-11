@@ -1,7 +1,10 @@
 // EN: Sell internal Season-1 creator tokens for SPUMP with dynamic exit tax.
 // ZH: 卖出创作者 Season-1 内部代币换回 SPUMP，并收取动态退出税。
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::{
+    token_2022::ID as TOKEN_2022_PROGRAM_ID,
+    token_interface::{self, Mint, MintTo, TokenAccount, TokenInterface},
+};
 
 use crate::{
     errors::StreamPumpError,
@@ -44,34 +47,20 @@ pub struct SellS1Token<'info> {
         constraint = user_spump_ata.owner == user.key() @ StreamPumpError::Unauthorized,
         constraint = user_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub user_spump_ata: Account<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        seeds = [b"creator_s1_spump_vault", creator_profile.key().as_ref()],
-        bump,
-        token::mint = spump_mint,
-        token::authority = creator_profile
-    )]
-    pub creator_s1_spump_vault: Account<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        constraint = protocol_burn_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
-    )]
-    pub protocol_burn_spump_ata: Account<'info, TokenAccount>,
+    pub user_spump_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
         constraint = creator_revenue_spump_ata.owner == creator_profile.authority @ StreamPumpError::InvalidPayoutAccount,
         constraint = creator_revenue_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub creator_revenue_spump_ata: Account<'info, TokenAccount>,
+    pub creator_revenue_spump_ata: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
-    pub spump_mint: Account<'info, Mint>,
+    #[account(mut, address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
+    pub spump_mint: InterfaceAccount<'info, Mint>,
 
-    pub token_program: Program<'info, Token>,
+    #[account(address = TOKEN_2022_PROGRAM_ID)]
+    pub spump_token_program: Interface<'info, TokenInterface>,
 }
 
 fn calculate_dynamic_tax_bps(
@@ -123,10 +112,6 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     );
 
     let gross_return = calculate_sell_return(creator_profile.s1_supply, args.amount)?;
-    require!(
-        creator_profile.s1_pool_spump >= gross_return,
-        StreamPumpError::InsufficientS1PoolLiquidity
-    );
 
     let tax_bps = calculate_dynamic_tax_bps(
         creator_profile.s1_supply,
@@ -141,39 +126,18 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     let protocol_burn_amount = tax_amount / 2;
     let creator_income_amount = checked_sub(tax_amount, protocol_burn_amount)?;
 
-    let creator_authority = ctx.accounts.creator_profile.authority;
-    let creator_bump = ctx.accounts.creator_profile.bump;
-    let bump_bytes = [creator_bump];
-    let signer_seeds: [&[u8]; 3] = [
-        b"creator",
-        creator_authority.as_ref(),
-        bump_bytes.as_ref(),
-    ];
+    let bump_bytes = [ctx.accounts.protocol_config.bump];
+    let signer_seeds: [&[u8]; 2] = [b"protocol_config", bump_bytes.as_ref()];
     let signer: &[&[&[u8]]] = &[&signer_seeds];
 
-    if protocol_burn_amount > 0 {
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.creator_s1_spump_vault.to_account_info(),
-                    to: ctx.accounts.protocol_burn_spump_ata.to_account_info(),
-                    authority: ctx.accounts.creator_profile.to_account_info(),
-                },
-                signer,
-            ),
-            protocol_burn_amount,
-        )?;
-    }
-
     if creator_income_amount > 0 {
-        token::transfer(
+        token_interface::mint_to(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.creator_s1_spump_vault.to_account_info(),
+                ctx.accounts.spump_token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.spump_mint.to_account_info(),
                     to: ctx.accounts.creator_revenue_spump_ata.to_account_info(),
-                    authority: ctx.accounts.creator_profile.to_account_info(),
+                    authority: ctx.accounts.protocol_config.to_account_info(),
                 },
                 signer,
             ),
@@ -182,13 +146,13 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     }
 
     if net_return > 0 {
-        token::transfer(
+        token_interface::mint_to(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.creator_s1_spump_vault.to_account_info(),
+                ctx.accounts.spump_token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.spump_mint.to_account_info(),
                     to: ctx.accounts.user_spump_ata.to_account_info(),
-                    authority: ctx.accounts.creator_profile.to_account_info(),
+                    authority: ctx.accounts.protocol_config.to_account_info(),
                 },
                 signer,
             ),
@@ -217,7 +181,6 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     position.spump_cost_basis = checked_sub(position.spump_cost_basis, released_cost_basis)?;
 
     creator_profile.s1_supply = checked_sub(creator_profile.s1_supply, args.amount)?;
-    creator_profile.s1_pool_spump = checked_sub(creator_profile.s1_pool_spump, gross_return)?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 
     Ok(())

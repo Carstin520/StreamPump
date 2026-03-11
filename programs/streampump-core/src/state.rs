@@ -40,7 +40,10 @@ pub struct ProtocolConfig {
     pub admin: Pubkey,
     pub oracle_authority: Pubkey,
     pub usdc_mint: Pubkey,
+    /// Token-2022 SPUMP mint (NonTransferable utility token).
     pub spump_mint: Pubkey,
+    /// Bump for protocol mint authority PDA used to mint SPUMP refunds/rewards.
+    pub spump_mint_bump: u8,
     pub max_proposal_duration_seconds: i64,
     pub max_exit_tax_bps: u16,
     pub min_exit_tax_bps: u16,
@@ -51,7 +54,7 @@ pub struct ProtocolConfig {
 }
 
 impl ProtocolConfig {
-    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 8 + 2 + 2 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 1 + 8 + 2 + 2 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -61,8 +64,8 @@ pub struct CreatorProfile {
     pub payout_usdc_ata: Pubkey,
     pub level: u8,
     pub status: CreatorStatus,
+    /// Virtual S1 internal token supply; backing SPUMP is burned on buy.
     pub s1_supply: u64,
-    pub s1_pool_spump: u64,
     pub last_upgrade_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -70,7 +73,7 @@ pub struct CreatorProfile {
 }
 
 impl CreatorProfile {
-    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 1 + 8 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 1 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -96,7 +99,7 @@ pub struct Proposal {
     pub deadline: i64,
     pub status: ProposalStatus,
     pub usdc_vault_bump: u8,
-    pub spump_vault_bump: u8,
+    /// Virtual SPUMP stake ledger; actual SPUMP is burned at endorsement time.
     pub total_spump_staked: u64,
     pub sponsor_usdc_deposited: u64,
     pub actual_views: Option<u64>,
@@ -105,7 +108,7 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1 + 1 + 1 + 8 + 8 + 9 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1 + 1 + 8 + 8 + 9 + 8 + 1;
 }
 
 #[account]

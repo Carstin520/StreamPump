@@ -1,13 +1,17 @@
 // EN: Finalize S1 buyout after rage-quit window and graduate creator to S2.
 // ZH: Rage Quit 窗口结束后完成 S1 买断并让创作者毕业到 S2。
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::{
+    token_2022::ID as TOKEN_2022_PROGRAM_ID,
+    token_interface::{self, Mint, MintTo, TokenAccount, TokenInterface},
+};
 
 use crate::{
     errors::StreamPumpError,
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, MIN_PROPOSAL_CREATOR_LEVEL,
     },
+    utils::calculate_sell_return,
 };
 
 #[derive(Accounts)]
@@ -34,30 +38,16 @@ pub struct ExecuteS1Graduation<'info> {
 
     #[account(
         mut,
-        seeds = [b"creator_s1_spump_vault", creator_profile.key().as_ref()],
-        bump,
-        token::mint = spump_mint,
-        token::authority = creator_profile
-    )]
-    pub creator_s1_spump_vault: Account<'info, TokenAccount>,
-
-    #[account(
-        mut,
         constraint = creator_revenue_spump_ata.owner == creator_profile.authority @ StreamPumpError::InvalidPayoutAccount,
         constraint = creator_revenue_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub creator_revenue_spump_ata: Account<'info, TokenAccount>,
+    pub creator_revenue_spump_ata: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(
-        mut,
-        constraint = protocol_burn_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
-    )]
-    pub protocol_burn_spump_ata: Account<'info, TokenAccount>,
+    #[account(mut, address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
+    pub spump_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
-    pub spump_mint: Account<'info, Mint>,
-
-    pub token_program: Program<'info, Token>,
+    #[account(address = TOKEN_2022_PROGRAM_ID)]
+    pub spump_token_program: Interface<'info, TokenInterface>,
 }
 
 pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
@@ -77,49 +67,31 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         StreamPumpError::WinningSponsorNotSelected
     );
 
-    let remaining_spump = ctx.accounts.creator_s1_spump_vault.amount;
-    let creator_amount = remaining_spump / 2;
-    let burn_amount = remaining_spump
-        .checked_sub(creator_amount)
-        .ok_or(StreamPumpError::MathOverflow)?;
+    // Virtual SPUMP locked in the curve equals the full sell return from current supply to zero.
+    let remaining_virtual_spump = if creator_profile.s1_supply == 0 {
+        0
+    } else {
+        calculate_sell_return(creator_profile.s1_supply, creator_profile.s1_supply)?
+    };
 
-    let creator_authority = creator_profile.authority;
-    let creator_bump = creator_profile.bump;
-    let bump_bytes = [creator_bump];
-    let signer_seeds: [&[u8]; 3] = [
-        b"creator",
-        creator_authority.as_ref(),
-        bump_bytes.as_ref(),
-    ];
-    let signer: &[&[&[u8]]] = &[&signer_seeds];
+    let creator_amount = remaining_virtual_spump / 2;
 
     if creator_amount > 0 {
-        token::transfer(
+        let bump_bytes = [ctx.accounts.protocol_config.bump];
+        let signer_seeds: [&[u8]; 2] = [b"protocol_config", bump_bytes.as_ref()];
+        let signer: &[&[&[u8]]] = &[&signer_seeds];
+
+        token_interface::mint_to(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.creator_s1_spump_vault.to_account_info(),
+                ctx.accounts.spump_token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.spump_mint.to_account_info(),
                     to: ctx.accounts.creator_revenue_spump_ata.to_account_info(),
-                    authority: ctx.accounts.creator_profile.to_account_info(),
+                    authority: ctx.accounts.protocol_config.to_account_info(),
                 },
                 signer,
             ),
             creator_amount,
-        )?;
-    }
-
-    if burn_amount > 0 {
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.creator_s1_spump_vault.to_account_info(),
-                    to: ctx.accounts.protocol_burn_spump_ata.to_account_info(),
-                    authority: ctx.accounts.creator_profile.to_account_info(),
-                },
-                signer,
-            ),
-            burn_amount,
         )?;
     }
 
@@ -129,7 +101,6 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         creator_profile.level = MIN_PROPOSAL_CREATOR_LEVEL;
         creator_profile.last_upgrade_at = now;
     }
-    creator_profile.s1_pool_spump = 0;
     creator_profile.updated_at = now;
 
     Ok(())

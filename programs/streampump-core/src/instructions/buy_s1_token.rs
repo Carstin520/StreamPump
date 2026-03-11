@@ -1,7 +1,10 @@
-// EN: Buy internal Season-1 creator tokens using SPUMP locked in creator S1 vault.
-// ZH: 使用 SPUMP 购买创作者 Season-1 内部代币，并锁定到创作者 S1 金库。
+// EN: Buy internal Season-1 creator tokens by burning non-transferable SPUMP.
+// ZH: 通过销毁不可转账 SPUMP，购买创作者 Season-1 内部代币。
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::{
+    token_2022::ID as TOKEN_2022_PROGRAM_ID,
+    token_interface::{self, Burn, Mint, TokenAccount, TokenInterface},
+};
 
 use crate::{
     errors::StreamPumpError,
@@ -44,22 +47,14 @@ pub struct BuyS1Token<'info> {
         constraint = user_spump_ata.owner == user.key() @ StreamPumpError::Unauthorized,
         constraint = user_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub user_spump_ata: Account<'info, TokenAccount>,
+    pub user_spump_ata: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(
-        init_if_needed,
-        payer = user,
-        seeds = [b"creator_s1_spump_vault", creator_profile.key().as_ref()],
-        bump,
-        token::mint = spump_mint,
-        token::authority = creator_profile
-    )]
-    pub creator_s1_spump_vault: Account<'info, TokenAccount>,
+    #[account(mut, address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
+    pub spump_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
-    pub spump_mint: Account<'info, Mint>,
+    #[account(address = TOKEN_2022_PROGRAM_ID)]
+    pub spump_token_program: Interface<'info, TokenInterface>,
 
-    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -74,12 +69,12 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     let current_supply = ctx.accounts.creator_profile.s1_supply;
     let spump_cost = calculate_buy_cost(current_supply, args.amount)?;
 
-    token::transfer(
+    token_interface::burn(
         CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            ctx.accounts.spump_token_program.to_account_info(),
+            Burn {
+                mint: ctx.accounts.spump_mint.to_account_info(),
                 from: ctx.accounts.user_spump_ata.to_account_info(),
-                to: ctx.accounts.creator_s1_spump_vault.to_account_info(),
                 authority: ctx.accounts.user.to_account_info(),
             },
         ),
@@ -113,7 +108,6 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
 
     let creator_profile = &mut ctx.accounts.creator_profile;
     creator_profile.s1_supply = checked_add(creator_profile.s1_supply, args.amount)?;
-    creator_profile.s1_pool_spump = checked_add(creator_profile.s1_pool_spump, spump_cost)?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 
     Ok(())

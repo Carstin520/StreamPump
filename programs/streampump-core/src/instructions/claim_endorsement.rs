@@ -1,11 +1,15 @@
 // EN: Endorser pull-claim for SPUMP principal and conditional USDC rewards.
 // ZH: 用户按需领取 SPUMP 本金及条件性 USDC 奖励。
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::{
+    token::{self, Token, TokenAccount, Transfer},
+    token_2022::ID as TOKEN_2022_PROGRAM_ID,
+    token_interface::{self, Mint, MintTo, TokenAccount as InterfaceTokenAccount, TokenInterface},
+};
 
 use crate::{
     errors::StreamPumpError,
-    state::{EndorsementPosition, Proposal, ProposalStatus},
+    state::{EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig},
     utils::{amount_from_bps, checked_sub},
 };
 
@@ -17,6 +21,9 @@ pub struct ClaimEndorsement<'info> {
     /// Endorser claiming funds.
     #[account(mut)]
     pub user: Signer<'info>,
+
+    #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
+    pub protocol_config: Account<'info, ProtocolConfig>,
 
     /// Proposal being claimed against.
     #[account(
@@ -40,18 +47,15 @@ pub struct ClaimEndorsement<'info> {
     #[account(
         mut,
         constraint = user_spump_ata.owner == user.key() @ StreamPumpError::Unauthorized,
-        constraint = user_spump_ata.mint == proposal_spump_vault.mint @ StreamPumpError::InvalidMint
+        constraint = user_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub user_spump_ata: Account<'info, TokenAccount>,
+    pub user_spump_ata: InterfaceAccount<'info, InterfaceTokenAccount>,
 
-    /// Proposal SPUMP vault PDA.
-    #[account(
-        mut,
-        seeds = [b"proposal_spump_vault", proposal.key().as_ref()],
-        bump = proposal.spump_vault_bump,
-        token::authority = proposal
-    )]
-    pub proposal_spump_vault: Account<'info, TokenAccount>,
+    #[account(mut, address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
+    pub spump_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(address = TOKEN_2022_PROGRAM_ID)]
+    pub spump_token_program: Interface<'info, TokenInterface>,
 
     /// User USDC ATA for success rewards.
     #[account(
@@ -70,19 +74,12 @@ pub struct ClaimEndorsement<'info> {
     )]
     pub proposal_usdc_vault: Account<'info, TokenAccount>,
 
-    /// Protocol SPUMP burn/treasury ATA receiving failed slashes.
-    #[account(
-        mut,
-        constraint = protocol_burn_spump_ata.mint == proposal_spump_vault.mint @ StreamPumpError::InvalidMint
-    )]
-    pub protocol_burn_spump_ata: Account<'info, TokenAccount>,
-
-    pub token_program: Program<'info, Token>,
+    pub usdc_token_program: Program<'info, Token>,
 }
 
 /// Claims user outcome based on proposal state:
 /// - Resolved_Success: 100% SPUMP principal + proportional USDC pool share.
-/// - Resolved_Fail: 95% SPUMP back, 5% SPUMP slash to protocol burn account.
+/// - Resolved_Fail: 95% SPUMP back, 5% remains un-minted (permanent burn).
 /// - Cancelled/Voided: 100% SPUMP principal back.
 pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     let proposal_status = ctx.accounts.proposal.status;
@@ -100,28 +97,32 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     }
 
     let deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
-    let bump_bytes = [ctx.accounts.proposal.bump];
-    let signer_seeds: [&[u8]; 4] = [
+    let proposal_bump_bytes = [ctx.accounts.proposal.bump];
+    let proposal_signer_seeds: [&[u8]; 4] = [
         b"proposal",
         ctx.accounts.proposal.creator.as_ref(),
         deadline_bytes.as_ref(),
-        bump_bytes.as_ref(),
+        proposal_bump_bytes.as_ref(),
     ];
-    let signer: &[&[&[u8]]] = &[&signer_seeds];
+    let proposal_signer: &[&[&[u8]]] = &[&proposal_signer_seeds];
+
+    let protocol_bump_bytes = [ctx.accounts.protocol_config.bump];
+    let protocol_signer_seeds: [&[u8]; 2] = [b"protocol_config", protocol_bump_bytes.as_ref()];
+    let protocol_signer: &[&[&[u8]]] = &[&protocol_signer_seeds];
 
     let staked_amount = position.staked_amount;
 
     match proposal_status {
         ProposalStatus::Resolved_Success => {
-            token::transfer(
+            token_interface::mint_to(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.proposal_spump_vault.to_account_info(),
+                    ctx.accounts.spump_token_program.to_account_info(),
+                    MintTo {
+                        mint: ctx.accounts.spump_mint.to_account_info(),
                         to: ctx.accounts.user_spump_ata.to_account_info(),
-                        authority: ctx.accounts.proposal.to_account_info(),
+                        authority: ctx.accounts.protocol_config.to_account_info(),
                     },
-                    signer,
+                    protocol_signer,
                 ),
                 staked_amount,
             )?;
@@ -143,13 +144,13 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
             if usdc_reward > 0 {
                 token::transfer(
                     CpiContext::new_with_signer(
-                        ctx.accounts.token_program.to_account_info(),
+                        ctx.accounts.usdc_token_program.to_account_info(),
                         Transfer {
                             from: ctx.accounts.proposal_usdc_vault.to_account_info(),
                             to: ctx.accounts.user_usdc_ata.to_account_info(),
                             authority: ctx.accounts.proposal.to_account_info(),
                         },
-                        signer,
+                        proposal_signer,
                     ),
                     usdc_reward,
                 )?;
@@ -160,45 +161,30 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
             let refund_amount = checked_sub(staked_amount, slash_amount)?;
 
             if refund_amount > 0 {
-                token::transfer(
+                token_interface::mint_to(
                     CpiContext::new_with_signer(
-                        ctx.accounts.token_program.to_account_info(),
-                        Transfer {
-                            from: ctx.accounts.proposal_spump_vault.to_account_info(),
+                        ctx.accounts.spump_token_program.to_account_info(),
+                        MintTo {
+                            mint: ctx.accounts.spump_mint.to_account_info(),
                             to: ctx.accounts.user_spump_ata.to_account_info(),
-                            authority: ctx.accounts.proposal.to_account_info(),
+                            authority: ctx.accounts.protocol_config.to_account_info(),
                         },
-                        signer,
+                        protocol_signer,
                     ),
                     refund_amount,
                 )?;
             }
-
-            if slash_amount > 0 {
-                token::transfer(
-                    CpiContext::new_with_signer(
-                        ctx.accounts.token_program.to_account_info(),
-                        Transfer {
-                            from: ctx.accounts.proposal_spump_vault.to_account_info(),
-                            to: ctx.accounts.protocol_burn_spump_ata.to_account_info(),
-                            authority: ctx.accounts.proposal.to_account_info(),
-                        },
-                        signer,
-                    ),
-                    slash_amount,
-                )?;
-            }
         }
         ProposalStatus::Cancelled | ProposalStatus::Voided => {
-            token::transfer(
+            token_interface::mint_to(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.proposal_spump_vault.to_account_info(),
+                    ctx.accounts.spump_token_program.to_account_info(),
+                    MintTo {
+                        mint: ctx.accounts.spump_mint.to_account_info(),
                         to: ctx.accounts.user_spump_ata.to_account_info(),
-                        authority: ctx.accounts.proposal.to_account_info(),
+                        authority: ctx.accounts.protocol_config.to_account_info(),
                     },
-                    signer,
+                    protocol_signer,
                 ),
                 staked_amount,
             )?;
