@@ -19,14 +19,14 @@ pub struct SubmitBuyoutOffer<'info> {
     pub sponsor: Signer<'info>,
 
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
-    pub protocol_config: Account<'info, ProtocolConfig>,
+    pub protocol_config: Box<Account<'info, ProtocolConfig>>,
 
     #[account(
         seeds = [b"creator", creator_profile.authority.as_ref()],
         bump = creator_profile.bump,
         constraint = creator_profile.authority != Pubkey::default() @ StreamPumpError::CreatorNotRegistered
     )]
-    pub creator_profile: Account<'info, CreatorProfile>,
+    pub creator_profile: Box<Account<'info, CreatorProfile>>,
 
     #[account(
         init,
@@ -35,14 +35,14 @@ pub struct SubmitBuyoutOffer<'info> {
         bump,
         space = 8 + S1BuyoutOffer::INIT_SPACE
     )]
-    pub buyout_offer: Account<'info, S1BuyoutOffer>,
+    pub buyout_offer: Box<Account<'info, S1BuyoutOffer>>,
 
     #[account(
         mut,
         constraint = sponsor_usdc_ata.owner == sponsor.key() @ StreamPumpError::Unauthorized,
         constraint = sponsor_usdc_ata.mint == usdc_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub sponsor_usdc_ata: Account<'info, TokenAccount>,
+    pub sponsor_usdc_ata: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init,
@@ -52,10 +52,10 @@ pub struct SubmitBuyoutOffer<'info> {
         token::mint = usdc_mint,
         token::authority = buyout_offer
     )]
-    pub offer_usdc_vault: Account<'info, TokenAccount>,
+    pub offer_usdc_vault: Box<Account<'info, TokenAccount>>,
 
     #[account(address = protocol_config.usdc_mint @ StreamPumpError::InvalidMint)]
-    pub usdc_mint: Account<'info, Mint>,
+    pub usdc_mint: Box<Account<'info, Mint>>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

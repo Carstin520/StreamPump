@@ -27,10 +27,7 @@ pub mod streampump_core {
         instructions::register_creator::handler(ctx, args)
     }
 
-    pub fn upgrade_creator(
-        ctx: Context<UpgradeCreator>,
-        args: UpgradeCreatorArgs,
-    ) -> Result<()> {
+    pub fn upgrade_creator(ctx: Context<UpgradeCreator>, args: UpgradeCreatorArgs) -> Result<()> {
         instructions::upgrade_creator::handler(ctx, args)
     }
 
@@ -91,22 +88,23 @@ pub mod streampump_core {
         instructions::endorse_proposal::handler(ctx, args)
     }
 
-    pub fn sponsor_fund(
-        ctx: Context<SponsorFund>,
-        args: SponsorFundArgs,
-    ) -> Result<()> {
+    pub fn sponsor_fund(ctx: Context<SponsorFund>, args: SponsorFundArgs) -> Result<()> {
         instructions::sponsor_fund::handler(ctx, args)
     }
 
-    pub fn submit_oracle_report(
-        ctx: Context<SubmitOracleReport>,
-        args: SubmitOracleReportArgs,
-    ) -> Result<()> {
-        instructions::submit_oracle_report::handler(ctx, args)
+    pub fn settle_track1_base(ctx: Context<SettleTrack1Base>) -> Result<()> {
+        instructions::settle_track1_base::handler(ctx)
     }
 
-    pub fn settle_proposal(ctx: Context<SettleProposal>) -> Result<()> {
-        instructions::settle_proposal::handler(ctx)
+    pub fn settle_track2(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Result<()> {
+        instructions::settle_track2::handler(ctx, args)
+    }
+
+    pub fn settle_track3_cps(
+        ctx: Context<SettleTrack3Cps>,
+        args: SettleTrack3CpsArgs,
+    ) -> Result<()> {
+        instructions::settle_track3_cps::handler(ctx, args)
     }
 
     pub fn claim_endorsement(ctx: Context<ClaimEndorsement>) -> Result<()> {

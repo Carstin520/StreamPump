@@ -72,7 +72,10 @@ pub(crate) fn handler(ctx: Context<UpgradeCreator>, args: UpgradeCreatorArgs) ->
 
     require!(args.new_level > 0, StreamPumpError::InvalidCreatorLevel);
     require!(args.metric_value > 0, StreamPumpError::InvalidAmount);
-    require!(args.report_digest != [0_u8; 32], StreamPumpError::InvalidReportDigest);
+    require!(
+        args.report_digest != [0_u8; 32],
+        StreamPumpError::InvalidReportDigest
+    );
 
     let now = Clock::get()?.unix_timestamp;
     require!(

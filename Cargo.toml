@@ -1,8 +1,25 @@
+[package]
+name = "streampump-workspace"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
 [workspace]
 members = ["programs/streampump-core"]
 resolver = "2"
+
+[dependencies]
+streampump-core = { path = "programs/streampump-core", optional = true }
+
+[features]
+idl-build = ["streampump-core/idl-build"]
 
 [profile.release]
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+
+[patch.crates-io]
+blake3 = { path = "third_party/blake3" }
+constant_time_eq = { path = "third_party/constant_time_eq" }
+anchor-syn = { path = "third_party/anchor-syn" }

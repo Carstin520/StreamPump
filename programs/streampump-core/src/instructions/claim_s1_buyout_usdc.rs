@@ -101,7 +101,8 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
     let share_u128 = numerator
         .checked_div(final_s1_supply as u128)
         .ok_or(StreamPumpError::MathOverflow)?;
-    let usdc_share = u64::try_from(share_u128).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+    let usdc_share =
+        u64::try_from(share_u128).map_err(|_| error!(StreamPumpError::MathOverflow))?;
 
     require!(
         ctx.accounts.offer_usdc_vault.amount >= usdc_share,

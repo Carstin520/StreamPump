@@ -35,6 +35,15 @@ pub enum CreatorUpgradeMetric {
     ValidViews = 1,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ProposalMetricType {
+    Views = 0,
+    Clicks = 1,
+    Saves = 2,
+}
+
 #[account]
 pub struct ProtocolConfig {
     pub admin: Pubkey,
@@ -95,20 +104,36 @@ impl ContentHashAnchor {
 pub struct Proposal {
     pub creator: Pubkey,
     pub sponsor: Option<Pubkey>,
-    pub target_views: u64,
+
+    // Track 1: Fixed Base Pay (Creator Only)
+    pub track1_base_usdc: u64,
+    pub track1_claimed: bool,
+
+    // Track 2: Performance Deal (Creator + Fans)
+    pub track2_metric_type: ProposalMetricType,
+    pub track2_target_value: u64,
+    pub track2_min_achievement_bps: u16,
+    pub track2_usdc_deposited: u64,
+    pub track2_actual_value: Option<u64>,
+    pub track2_settled_at: i64,
+
+    // Track 3: CPS Sales (Creator Only)
+    pub track3_usdc_deposited: u64,
+    pub track3_cps_payout: Option<u64>,
+    pub track3_delay_days: u16,
+    pub track3_settled_at: i64,
+
+    // General
     pub deadline: i64,
     pub status: ProposalStatus,
     pub usdc_vault_bump: u8,
-    /// Virtual SPUMP stake ledger; actual SPUMP is burned at endorsement time.
     pub total_spump_staked: u64,
-    pub sponsor_usdc_deposited: u64,
-    pub actual_views: Option<u64>,
-    pub settled_at: i64,
     pub bump: u8,
 }
 
 impl Proposal {
-    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1 + 1 + 8 + 8 + 9 + 8 + 1;
+    pub const INIT_SPACE: usize =
+        32 + 33 + 8 + 1 + 1 + 8 + 2 + 8 + 9 + 8 + 8 + 9 + 2 + 8 + 8 + 1 + 1 + 8 + 1;
 }
 
 #[account]
