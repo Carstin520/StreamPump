@@ -7,7 +7,7 @@ pub mod utils;
 
 use instructions::*;
 
-declare_id!("7V3f6AQMtkP8dwF5EYici3QnqTPZqyVv5JBy6s2fBfZW");
+declare_id!("EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre");
 
 #[program]
 pub mod streampump_core {

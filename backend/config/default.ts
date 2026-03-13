@@ -1,7 +1,7 @@
 export const config = {
   solana: {
     rpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com",
-    programId: process.env.STREAMPUMP_PROGRAM_ID ?? "7V3f6AQMtkP8dwF5EYici3QnqTPZqyVv5JBy6s2fBfZW",
+    programId: process.env.STREAMPUMP_PROGRAM_ID ?? "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre",
   },
   storage: {
     origin: {

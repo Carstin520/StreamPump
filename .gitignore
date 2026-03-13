@@ -7,3 +7,9 @@ target/
 *.log
 app/.next/
 backend/dist/
+.anchor/
+test-ledger/
+test-ledger-*/
+test-ledger-ci/
+test-ledger-ci-check/
+test-ledger-split/
