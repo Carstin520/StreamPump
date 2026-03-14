@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProposalStatus {
+  OPEN
+  FUNDED
+  RESOLVED_SUCCESS
+  RESOLVED_FAIL
+  CANCELLED
+  VOIDED
+}
+
+enum Track2MetricType {
+  VIEWS
+  CLICKS
+  SAVES
+}
+
+enum OracleSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum FraudStatus {
+  ACCEPTED
+  REVIEW
+  REJECTED
+}
+
+enum UploadStatus {
+  PENDING
+  UPLOADED
+  FAILED
+}
+
+enum MuxStatus {
+  NONE
+  PREPARING
+  READY
+  ERRORED
+}
+
+model Proposal {
+  id                         String          @id @default(cuid())
+  proposalPda                String          @unique
+  creatorWallet              String
+  sponsorWallet              String?
+  deadlineAt                 DateTime
+  status                     ProposalStatus  @default(OPEN)
+  track1BaseUsdc             BigInt
+  track1Claimed              Boolean         @default(false)
+  track2MetricType           Track2MetricType
+  track2TargetValue          BigInt
+  track2MinAchievementBps    Int
+  track2UsdcDeposited        BigInt
+  track2ActualValue          BigInt?
+  track2SettledAt            DateTime?
+  track3UsdcDeposited        BigInt
+  track3CpsPayout            BigInt?
+  track3DelayDays            Int
+  track3SettledAt            DateTime?
+  onChainTxSignature         String?
+  oracleSyncStatus           OracleSyncStatus @default(PENDING)
+  oracleLastError            String?
+  contentPublishedVerifiedAt DateTime?
+  metadata                   Json?
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  track2Events               Track2Event[]
+  videoContent               VideoContent?
+
+  @@index([status, track1Claimed])
+  @@index([status, deadlineAt, track2SettledAt])
+  @@index([deadlineAt, track3DelayDays, track3SettledAt])
+}
+
+model VideoContent {
+  id              String       @id @default(cuid())
+  creatorWallet   String
+  proposalId      String?      @unique
+  proposal        Proposal?    @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  s3ObjectKey     String       @unique
+  videoUrl        String?
+  contentHash     String       @unique
+  mimeType        String
+  fileSizeBytes   BigInt
+  durationSeconds Int?
+  uploadStatus    UploadStatus @default(PENDING)
+  muxAssetId      String?      @unique
+  muxPlaybackId   String?      @unique
+  muxStatus       MuxStatus    @default(NONE)
+  muxErrorMessage String?
+  onChainAnchorTx String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([creatorWallet])
+}
+
+model Track2Event {
+  id              String      @id @default(cuid())
+  proposalId      String
+  proposal        Proposal    @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  eventType       Track2MetricType
+  externalEventId String?
+  userId          String?
+  sessionId       String?
+  ipHash          String
+  userAgent       String?
+  fraudStatus     FraudStatus @default(ACCEPTED)
+  fraudScore      Int         @default(0)
+  occurredAt      DateTime    @default(now())
+  dedupeKey       String      @unique
+  rawPayload      Json?
+  createdAt       DateTime    @default(now())
+
+  @@index([proposalId, eventType, fraudStatus])
+  @@index([proposalId, occurredAt])
+}
