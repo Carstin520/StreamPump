@@ -1,4 +1,7 @@
 export const config = {
+  app: {
+    apiBaseUrl: process.env.API_BASE_URL ?? "http://localhost:4000/api/v1",
+  },
   solana: {
     rpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com",
     programId: process.env.STREAMPUMP_PROGRAM_ID ?? "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre",

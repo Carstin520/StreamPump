@@ -34,7 +34,11 @@ import {
   AuthorityType,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  ExtensionType,
+  createInitializeMintInstruction,
+  createInitializeNonTransferableMintInstruction,
   createMint,
+  getMintLen,
   getAccount,
   getOrCreateAssociatedTokenAccount,
   mintTo,
@@ -460,8 +464,8 @@ const buildContext = async (): Promise<TestContext> => {
   //
   //   - USDC: standard Token Program, 6 decimals
   //     USDC：标准 Token Program，6 位小数
-  //   - SPUMP: Token-2022 program, 6 decimals (NonTransferable in prod)
-  //     SPUMP：Token-2022 程序，6 位小数（生产环境中不可转让）
+  //   - SPUMP: Token-2022 program, 6 decimals, NonTransferable
+  //     SPUMP：Token-2022 程序，6 位小数，不可转让
   // ===========================================================================
 
   const usdcMint = await createMint(
@@ -475,16 +479,35 @@ const buildContext = async (): Promise<TestContext> => {
     TOKEN_PROGRAM_ID
   );
 
-  const spumpMint = await createMint(
+  const spumpMintKeypair = Keypair.generate();
+  const spumpMintSpace = getMintLen([ExtensionType.NonTransferable]);
+  const spumpMintLamports = await connection.getMinimumBalanceForRentExemption(spumpMintSpace);
+
+  await anchor.web3.sendAndConfirmTransaction(
     connection,
-    payer,
-    payer.publicKey,
-    null,
-    6,
-    undefined,
-    undefined,
-    TOKEN_2022_PROGRAM_ID
+    new anchor.web3.Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: spumpMintKeypair.publicKey,
+        lamports: spumpMintLamports,
+        space: spumpMintSpace,
+        programId: TOKEN_2022_PROGRAM_ID,
+      }),
+      createInitializeNonTransferableMintInstruction(
+        spumpMintKeypair.publicKey,
+        TOKEN_2022_PROGRAM_ID
+      ),
+      createInitializeMintInstruction(
+        spumpMintKeypair.publicKey,
+        6,
+        payer.publicKey,
+        null,
+        TOKEN_2022_PROGRAM_ID
+      )
+    ),
+    [payer, spumpMintKeypair]
   );
+  const spumpMint = spumpMintKeypair.publicKey;
 
   // ===========================================================================
   // SETUP PHASE 3: Create Associated Token Accounts (ATAs) for all roles
@@ -642,27 +665,8 @@ const buildContext = async (): Promise<TestContext> => {
   // 在生产环境中，这意味着只有经过验证的智能合约路径才能铸造 SPUMP。
   // ===========================================================================
 
-  await program.methods
-    .initializeProtocol({
-      oracleAuthority: oracle.publicKey,
-      usdcMint,
-      spumpMint,
-      maxProposalDurationSeconds: bn(7 * 24 * 3_600),  // 7 days / 7 天
-      maxExitTaxBps: 1_500,                             // 15% max exit tax / 最高 15% 退出税
-      minExitTaxBps: 500,                               // 5% min exit tax / 最低 5% 退出税
-      taxDecayThresholdSupply: bn(1_000_000),            // Supply at which tax decays to min / 税率衰减至最低时的供应量
-      s2MinFollowers: bn(100),                           // Min followers for S2 upgrade / S2 升级所需最低粉丝数
-      s2MinValidViews: bn(1_000),                        // Min views for S2 upgrade / S2 升级所需最低有效观看数
-    })
-    .accounts({
-      admin: payer.publicKey,
-      protocolConfig,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-
-  // Transfer SPUMP mint authority from payer → protocolConfig PDA
-  // 将 SPUMP 铸币权限从 payer 转移到 protocolConfig PDA
+  // Transfer SPUMP mint authority from payer → protocolConfig PDA before protocol init
+  // 在协议初始化前，将 SPUMP 铸币权限从 payer 转移到 protocolConfig PDA
   await setAuthority(
     connection,
     payer,
@@ -674,6 +678,26 @@ const buildContext = async (): Promise<TestContext> => {
     undefined,
     TOKEN_2022_PROGRAM_ID
   );
+
+  await program.methods
+    .initializeProtocol({
+      oracleAuthority: oracle.publicKey,
+      usdcMint,
+      spumpMint,
+      maxProposalDurationSeconds: bn(7 * 24 * 3_600),  // 7 days / 7 天
+      maxExitTaxBps: 1_500,                             // 15% max exit tax / 最高 15% 退出税
+      minExitTaxBps: 500,                               // 5% min exit tax / 最低 5% 退出税
+      taxDecayThresholdSupply: bn(1_000_000),          // Supply at which tax decays to min / 税率衰减至最低时的供应量
+      s2MinFollowers: bn(100),                         // Min followers for S2 upgrade / S2 升级所需最低粉丝数
+      s2MinValidViews: bn(1_000),                      // Min views for S2 upgrade / S2 升级所需最低有效观看数
+    })
+    .accounts({
+      admin: payer.publicKey,
+      protocolConfig,
+      spumpMint,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
 
   // ===========================================================================
   // SETUP PHASE 6: Register creators and upgrade creatorS2 to level 2
@@ -764,6 +788,7 @@ const buildContext = async (): Promise<TestContext> => {
     const deadline = nextDeadline(params.deadlineOffsetSeconds ?? 3);
     const proposal = deriveProposal(params.creator.publicKey, deadline);
     const proposalUsdcVault = deriveProposalUsdcVault(proposal);
+    const contentHash = Array.from(Keypair.generate().publicKey.toBytes());
 
     // Determine which sponsor's USDC ATA to use
     // 确定使用哪个赞助商的 USDC ATA
@@ -775,6 +800,9 @@ const buildContext = async (): Promise<TestContext> => {
     // 步骤 1：创作者使用三轨参数创建提案
     await program.methods
       .createProposal({
+        contentKind: { mixedMediaNote: {} },               // Xiaohongshu-style mixed note / 小红书风格混合笔记
+        contentHash,                                       // Canonical content-package digest / 内容包摘要
+        contentAnchorPda: null,                            // Tests use hash-only binding / 测试中使用仅哈希绑定
         track1BaseUsdc: bn(params.track1Base),               // Fixed base pay / 固定基础报酬
         track2MetricType: { views: {} },                     // Performance metric type / 绩效指标类型
         track2TargetValue: bn(params.track2Target),          // Target value (e.g. views) / 目标值（如观看数）

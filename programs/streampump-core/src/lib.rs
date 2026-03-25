@@ -61,6 +61,10 @@ pub mod streampump_core {
         instructions::accept_buyout_offer::handler(ctx)
     }
 
+    pub fn reclaim_expired_buyout_offer(ctx: Context<ReclaimExpiredBuyoutOffer>) -> Result<()> {
+        instructions::reclaim_expired_buyout_offer::handler(ctx)
+    }
+
     pub fn cancel_buyout_offer(ctx: Context<CancelBuyoutOffer>) -> Result<()> {
         instructions::cancel_buyout_offer::handler(ctx)
     }
@@ -117,5 +121,34 @@ pub mod streampump_core {
 
     pub fn emergency_void(ctx: Context<EmergencyVoid>) -> Result<()> {
         instructions::emergency_void::handler(ctx)
+    }
+
+    pub fn register_user(ctx: Context<RegisterUser>, args: RegisterUserArgs) -> Result<()> {
+        instructions::register_user::handler(ctx, args)
+    }
+
+    pub fn claim_daily_spump(ctx: Context<ClaimDailySpump>) -> Result<()> {
+        instructions::claim_daily_spump::handler(ctx)
+    }
+
+    pub fn claim_engagement_reward(
+        ctx: Context<ClaimEngagementReward>,
+        args: ClaimEngagementRewardArgs,
+    ) -> Result<()> {
+        instructions::claim_engagement_reward::handler(ctx, args)
+    }
+
+    pub fn create_organization(
+        ctx: Context<CreateOrganization>,
+        args: CreateOrganizationArgs,
+    ) -> Result<()> {
+        instructions::create_organization::handler(ctx, args)
+    }
+
+    pub fn add_organization_member(
+        ctx: Context<AddOrganizationMember>,
+        args: AddOrganizationMemberArgs,
+    ) -> Result<()> {
+        instructions::add_organization_member::handler(ctx, args)
     }
 }

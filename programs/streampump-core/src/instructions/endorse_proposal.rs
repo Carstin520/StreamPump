@@ -5,7 +5,7 @@
 //     them. The burned amount is recorded as a virtual stake in:
 //     - `EndorsementPosition.staked_amount` (per-user)
 //     - `Proposal.total_spump_staked` (aggregate)
-//     On claim, the protocol mints back SPUMP according to the outcome
+//     On settlement execution, the protocol mints back SPUMP according to the outcome
 //     (see claim_endorsement.rs).
 //
 // ZH: Endorser 销毁 SPUMP 来支持创作者的提案（仅限 Track2）。
@@ -13,7 +13,7 @@
 //     销毁金额以虚拟质押形式记录在：
 //     - `EndorsementPosition.staked_amount`（每用户）
 //     - `Proposal.total_spump_staked`（聚合）
-//     领取时，协议根据结果铸回 SPUMP（见 claim_endorsement.rs）。
+//     执行结算时，协议根据结果铸回 SPUMP（见 claim_endorsement.rs）。
 // ────────────────────────────────────────────────────────────────────────────────
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -124,7 +124,8 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
     // EN: Initialize or update the endorsement position.
     // ZH: 初始化或更新背书仓位。
     let position = &mut ctx.accounts.endorsement_position;
-    if position.user == Pubkey::default() {
+    let is_new_position = position.user == Pubkey::default();
+    if is_new_position {
         position.user = ctx.accounts.user.key();
         position.proposal = proposal_key;
         position.staked_amount = 0;
@@ -147,6 +148,12 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
     // ZH: 更新虚拟质押账本（用户级和聚合级）。
     position.staked_amount = checked_add(position.staked_amount, args.amount)?;
     let proposal = &mut ctx.accounts.proposal;
+    if is_new_position {
+        proposal.track2_endorser_count = proposal
+            .track2_endorser_count
+            .checked_add(1)
+            .ok_or(StreamPumpError::MathOverflow)?;
+    }
     proposal.total_spump_staked = checked_add(proposal.total_spump_staked, args.amount)?;
 
     Ok(())

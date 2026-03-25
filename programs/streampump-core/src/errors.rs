@@ -82,4 +82,34 @@ pub enum StreamPumpError {
     InvalidMint,
     #[msg("Invalid payout account")]
     InvalidPayoutAccount,
+    #[msg("Buyout offer is still locked")]
+    BuyoutOfferStillLocked,
+    #[msg("Buyout offer has expired")]
+    BuyoutOfferExpired,
+    #[msg("Proposal content must provide content hash or content anchor")]
+    InvalidContentBinding,
+    #[msg("Missing content anchor account")]
+    MissingContentAnchorAccount,
+    #[msg("Content anchor account mismatch")]
+    ContentAnchorMismatch,
+    #[msg("Content hash does not match anchored content")]
+    ContentHashMismatch,
+    #[msg("Invalid role flags")]
+    InvalidRoleFlags,
+    #[msg("User profile not initialized")]
+    UserNotRegistered,
+    #[msg("Daily reward already claimed for current day")]
+    DailyRewardAlreadyClaimed,
+    #[msg("User level must increase")]
+    UserLevelNotIncreasing,
+    #[msg("Invalid organization name")]
+    InvalidOrganizationName,
+    #[msg("Invalid organization seed")]
+    InvalidOrganizationSeed,
+    #[msg("SPUMP mint must use the configured decimals")]
+    InvalidSpumpMintDecimals,
+    #[msg("SPUMP mint must include the NonTransferable extension")]
+    MissingSpumpNonTransferableExtension,
+    #[msg("SPUMP mint authority must be the protocol config PDA")]
+    InvalidSpumpMintAuthority,
 }

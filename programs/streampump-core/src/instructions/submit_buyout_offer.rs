@@ -8,6 +8,8 @@ use crate::{
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer},
 };
 
+const BUYOUT_OFFER_SPONSOR_CANCEL_DELAY_SECONDS: i64 = 24 * 3600;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SubmitBuyoutOfferArgs {
     pub usdc_amount: u64,
@@ -69,6 +71,11 @@ pub(crate) fn handler(ctx: Context<SubmitBuyoutOffer>, args: SubmitBuyoutOfferAr
         StreamPumpError::InvalidCreatorStatus
     );
 
+    let now = Clock::get()?.unix_timestamp;
+    let sponsor_cancel_after = now
+        .checked_add(BUYOUT_OFFER_SPONSOR_CANCEL_DELAY_SECONDS)
+        .ok_or(StreamPumpError::MathOverflow)?;
+
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -85,6 +92,8 @@ pub(crate) fn handler(ctx: Context<SubmitBuyoutOffer>, args: SubmitBuyoutOfferAr
     buyout_offer.sponsor = ctx.accounts.sponsor.key();
     buyout_offer.creator = ctx.accounts.creator_profile.key();
     buyout_offer.usdc_amount = args.usdc_amount;
+    buyout_offer.created_at = now;
+    buyout_offer.sponsor_cancel_after = sponsor_cancel_after;
     buyout_offer.bump = ctx.bumps.buyout_offer;
 
     Ok(())

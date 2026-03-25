@@ -4,14 +4,49 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "../../config/default";
 
 const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 15 * 60;
-const ALLOWED_MIME_TYPES = new Set(["video/mp4", "video/quicktime"]);
+const ALLOWED_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+]);
 
 const normalizeMimeType = (mimeType: string): string => mimeType.trim().toLowerCase();
 
-const assertAllowedMimeType = (mimeType: string): void => {
+export const assertAllowedMimeType = (mimeType: string): void => {
   const normalized = normalizeMimeType(mimeType);
   if (!ALLOWED_MIME_TYPES.has(normalized)) {
-    throw new Error("mimeType must be video/mp4 or video/quicktime");
+    throw new Error(
+      "mimeType must be one of: video/mp4, video/quicktime, image/jpeg, image/png, image/webp, image/heic"
+    );
+  }
+};
+
+export const isVideoMimeType = (mimeType: string): boolean => {
+  const normalized = normalizeMimeType(mimeType);
+  return normalized === "video/mp4" || normalized === "video/quicktime";
+};
+
+export const extensionForMimeType = (mimeType: string): string => {
+  const normalized = normalizeMimeType(mimeType);
+
+  switch (normalized) {
+    case "video/mp4":
+      return "mp4";
+    case "video/quicktime":
+      return "mov";
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/heic":
+      return "heic";
+    default:
+      throw new Error(`unsupported mimeType: ${mimeType}`);
   }
 };
 

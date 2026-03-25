@@ -1,4 +1,4 @@
-import { MuxStatus } from "@prisma/client";
+import { AssetProcessingStatus } from "@prisma/client";
 import { Request, Response } from "express";
 
 import { muxService } from "../services/MuxService";
@@ -105,11 +105,11 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
     if (eventType === "video.asset.ready") {
       const playbackId = resolvePlaybackId(event);
       if (!playbackId) {
-        await prisma.videoContent.updateMany({
+        await prisma.contentAsset.updateMany({
           where: { muxAssetId },
           data: {
-            muxStatus: MuxStatus.ERRORED,
-            muxErrorMessage: "Mux ready event missing playback_id",
+            processingStatus: AssetProcessingStatus.ERRORED,
+            processingError: "Mux ready event missing playback_id",
           },
         });
 
@@ -122,12 +122,12 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
         return;
       }
 
-      await prisma.videoContent.updateMany({
+      await prisma.contentAsset.updateMany({
         where: { muxAssetId },
         data: {
-          muxStatus: MuxStatus.READY,
+          processingStatus: AssetProcessingStatus.READY,
           muxPlaybackId: playbackId,
-          muxErrorMessage: null,
+          processingError: null,
         },
       });
 
@@ -143,11 +143,11 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
     if (eventType === "video.asset.errored") {
       const errorMessage = resolveErrorMessage(event);
 
-      await prisma.videoContent.updateMany({
+      await prisma.contentAsset.updateMany({
         where: { muxAssetId },
         data: {
-          muxStatus: MuxStatus.ERRORED,
-          muxErrorMessage: errorMessage,
+          processingStatus: AssetProcessingStatus.ERRORED,
+          processingError: errorMessage,
         },
       });
 

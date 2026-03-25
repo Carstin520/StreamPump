@@ -1,9 +1,19 @@
 use anchor_lang::{prelude::*, solana_program::keccak};
 
-use crate::errors::StreamPumpError;
+use crate::{
+    errors::StreamPumpError,
+    state::{
+        OrganizationType, USER_ROLE_CREATOR, USER_ROLE_MCN_OPERATOR, USER_ROLE_SPONSOR_OPERATOR,
+        VALID_USER_ROLE_MASK,
+    },
+};
 
 /// Linear bonding curve slope factor (k) for S1 internal token pricing.
 pub const S1_BONDING_CURVE_K: u64 = 1_000;
+/// Protocol-required SPUMP decimals.
+pub const SPUMP_DECIMALS: u8 = 6;
+/// One whole SPUMP in base units.
+pub const ONE_SPUMP: u64 = 1_000_000;
 
 /// Calculate the amount from a base amount and basis points (bps).
 /// Formula: amount * bps / 10000
@@ -89,4 +99,34 @@ pub fn calculate_sell_return(current_supply: u64, amount: u64) -> Result<u64> {
     let gross = scaled.checked_div(2).ok_or(StreamPumpError::MathOverflow)?;
 
     u64::try_from(gross).map_err(|_| error!(StreamPumpError::MathOverflow))
+}
+
+pub fn validate_role_flags(role_flags: u16) -> Result<()> {
+    require!(
+        role_flags > 0 && role_flags & !VALID_USER_ROLE_MASK == 0,
+        StreamPumpError::InvalidRoleFlags
+    );
+    Ok(())
+}
+
+pub fn daily_spump_amount_for_level(level: u8) -> Result<u64> {
+    let multiplier: u64 = match level {
+        0 | 1 => 1,
+        2 => 2,
+        3 => 3,
+        4 => 5,
+        _ => 8,
+    };
+
+    ONE_SPUMP
+        .checked_mul(multiplier)
+        .ok_or_else(|| error!(StreamPumpError::MathOverflow))
+}
+
+pub fn role_flag_for_organization_type(organization_type: OrganizationType) -> u16 {
+    match organization_type {
+        OrganizationType::CreatorOpc => USER_ROLE_CREATOR,
+        OrganizationType::SponsorBrand => USER_ROLE_SPONSOR_OPERATOR,
+        OrganizationType::McnAgency => USER_ROLE_MCN_OPERATOR,
+    }
 }

@@ -238,7 +238,6 @@ describe("streampump-core S2 traffic market", function () {
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([ctx.fanA])
       .rpc();
 
     const fanSpumpAfterClaim = await ctx.tokenAmount(ctx.fanASpumpAta, TOKEN_2022_PROGRAM_ID);
@@ -368,7 +367,6 @@ describe("streampump-core S2 traffic market", function () {
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([ctx.fanA])
       .rpc();
 
     const fanSpumpAfterClaim = await ctx.tokenAmount(ctx.fanASpumpAta, TOKEN_2022_PROGRAM_ID);
@@ -390,8 +388,70 @@ describe("streampump-core S2 traffic market", function () {
   });
 
   // =====================================================================
-  // TEST 3: Track 3 CPS settlement → creator/sponsor split
-  // 测试 3：Track 3 CPS 结算 → 创作者/赞助商分配
+  // TEST 3: Track 2 success with no endorsers → fan pool swept back to sponsor
+  // 测试 3：Track 2 成功但无人背书 → 粉丝池返还给赞助商
+  //
+  // Scenario / 场景:
+  //   - No fan endorses Track 2
+  //     没有粉丝参与 Track 2 背书
+  //   - Oracle reports 80% achievement
+  //     预言机报告达成率 80%
+  //   - Sponsor receives both the unachieved refund and the fan-pool sweep
+  //     赞助商同时收到未达成退款和粉丝池返还
+  // =====================================================================
+  it("refunds the track2 fan pool to sponsor when nobody endorsed", async () => {
+    const track1Base = 40_000n;
+    const track2Budget = 1_000_000n;
+    const track3Budget = 150_000n;
+    const track2Target = 1_000n;
+
+    const { creatorProfile, proposal, proposalUsdcVault, deadline } =
+      await ctx.createFundedProposal({
+        creator: ctx.creatorS2,
+        sponsor: ctx.sponsorA,
+        track1Base,
+        track2Amount: track2Budget,
+        track3Amount: track3Budget,
+        track2Target,
+        track2MinAchievementBps: 5_000,
+      });
+
+    const sponsorUsdcBeforeSettle = await ctx.tokenAmount(ctx.sponsorAUsdcAta, TOKEN_PROGRAM_ID);
+
+    await ctx.waitUntilDeadline(deadline);
+
+    await ctx.program.methods
+      .settleTrack2({ actualValue: ctx.bn(800) })
+      .accounts({
+        oracle: ctx.oracle.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        proposalUsdcVault,
+        creatorProfile,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([ctx.oracle])
+      .rpc();
+
+    const sponsorUsdcAfterSettle = await ctx.tokenAmount(ctx.sponsorAUsdcAta, TOKEN_PROGRAM_ID);
+    const proposalAfterSettle = await ctx.program.account.proposal.fetch(proposal);
+
+    // 80% achievement:
+    // achieved = 800,000
+    // unachieved refund = 200,000
+    // creator payout = 640,000
+    // fan pool = 160,000, but since no endorsers exist it is swept to sponsor
+    // 总返还 sponsor = 200,000 + 160,000 = 360,000
+    expect(sponsorUsdcAfterSettle - sponsorUsdcBeforeSettle).to.equal(360_000n);
+    expect(proposalAfterSettle.track2UsdcDeposited.toString()).to.equal("0");
+    expect(ctx.enumKey(proposalAfterSettle.status)).to.equal("resolvedSuccess");
+  });
+
+  // =====================================================================
+  // TEST 4: Track 3 CPS settlement → creator/sponsor split
+  // 测试 4：Track 3 CPS 结算 → 创作者/赞助商分配
   //
   // Scenario / 场景:
   //   - Track 3 budget: 600,000 USDC, delay = 0 days (for fast tests)
@@ -475,8 +535,8 @@ describe("streampump-core S2 traffic market", function () {
   });
 
   // =====================================================================
-  // TEST 4: Emergency void → full vault refund + 100% SPUMP return
-  // 测试 4：紧急作废 → 完全退回资金库 + 100% SPUMP 退还
+  // TEST 5: Emergency void → full vault refund + 100% SPUMP return
+  // 测试 5：紧急作废 → 完全退回资金库 + 100% SPUMP 退还
   //
   // Scenario / 场景:
   //   - Admin triggers `emergency_void` on a funded proposal
@@ -578,7 +638,6 @@ describe("streampump-core S2 traffic market", function () {
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([ctx.fanA])
       .rpc();
 
     const fanSpumpAfterClaim = await ctx.tokenAmount(ctx.fanASpumpAta, TOKEN_2022_PROGRAM_ID);

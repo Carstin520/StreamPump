@@ -1,7 +1,7 @@
 // ────────────────────────────────────────────────────────────────────────────────
 // claim_endorsement.rs
-// EN: Endorser pull-claim for SPUMP principal and conditional Track 2 USDC rewards.
-//     After Track 2 is settled, endorsers can claim:
+// EN: Permissionless settlement execution for an endorsement position.
+//     After Track 2 is settled, anyone can execute settlement for an endorser:
 //     - Resolved_Success: 100% SPUMP principal minted back + pro-rata share
 //       of the Track 2 fan pool (20% of achieved budget).
 //     - Resolved_Fail: 95% SPUMP minted back; 5% permanently unissued (deflation).
@@ -9,8 +9,8 @@
 //     SPUMP is minted (not transferred from a vault) because endorsement burns
 //     SPUMP on entry. The protocol_config PDA is the mint authority.
 //
-// ZH: Endorser 按需领取 SPUMP 本金及条件性 Track2 USDC 奖励。
-//     Track2 结算完成后，Endorser 可领取：
+// ZH: 背书仓位的免签执行结算。
+//     Track2 结算完成后，任何人都可以为 Endorser 执行结算：
 //     - 成功：100% SPUMP 本金铸回 + 按比例分享 Track2 粉丝池（达成预算的 20%）。
 //     - 失败：95% SPUMP 铸回；5% 永久不铸造（通缩）。
 //     - 取消/作废：100% SPUMP 本金铸回。
@@ -38,10 +38,8 @@ pub const FAILED_SLASH_BPS: u16 = 500;
 
 #[derive(Accounts)]
 pub struct ClaimEndorsement<'info> {
-    /// EN: Endorser claiming funds.
-    /// ZH: 领取资金的 Endorser。
-    #[account(mut)]
-    pub user: Signer<'info>,
+    /// CHECK: Settlement is permissionless; funds only flow to ATAs owned by this pubkey.
+    pub user: UncheckedAccount<'info>,
 
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
     pub protocol_config: Account<'info, ProtocolConfig>,
@@ -109,11 +107,14 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     let proposal_status = ctx.accounts.proposal.status;
     let track2_settled_at = ctx.accounts.proposal.track2_settled_at;
 
-    let position = &mut ctx.accounts.endorsement_position;
-    // EN: Each position can only be claimed once.
-    // ZH: 每个仓位只能领取一次。
-    require!(!position.claimed, StreamPumpError::PositionAlreadyClaimed);
-    require!(position.staked_amount > 0, StreamPumpError::InvalidAmount);
+    let staked_amount = {
+        let position = &ctx.accounts.endorsement_position;
+        // EN: Each position can only be settled once.
+        // ZH: 每个仓位只能结算一次。
+        require!(!position.claimed, StreamPumpError::PositionAlreadyClaimed);
+        require!(position.staked_amount > 0, StreamPumpError::InvalidAmount);
+        position.staked_amount
+    };
 
     // EN: For resolved outcomes, Track 2 must be settled before claims.
     // ZH: 对于已决议的结果，Track2 必须在领取前完成结算。
@@ -126,11 +127,13 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
 
     // EN: Build PDA signers for both proposal (USDC vault) and protocol (SPUMP mint).
     // ZH: 构造提案 PDA 签名（USDC 金库转出）和协议 PDA 签名（SPUMP 铸造）。
+    let proposal_creator = ctx.accounts.proposal.creator;
     let deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
+    let proposal_account_info = ctx.accounts.proposal.to_account_info();
     let proposal_signer_seeds: [&[u8]; 4] = [
         b"proposal",
-        ctx.accounts.proposal.creator.as_ref(),
+        proposal_creator.as_ref(),
         deadline_bytes.as_ref(),
         proposal_bump_bytes.as_ref(),
     ];
@@ -139,8 +142,6 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     let protocol_bump_bytes = [ctx.accounts.protocol_config.bump];
     let protocol_signer_seeds: [&[u8]; 2] = [b"protocol_config", protocol_bump_bytes.as_ref()];
     let protocol_signer: &[&[&[u8]]] = &[&protocol_signer_seeds];
-
-    let staked_amount = position.staked_amount;
 
     match proposal_status {
         ProposalStatus::Resolved_Success => {
@@ -170,16 +171,22 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 staked_amount,
             )?;
 
-            let usdc_reward = if ctx.accounts.proposal.total_spump_staked == 0
-                || ctx.accounts.proposal.track2_usdc_deposited == 0
-            {
+            let proposal = &mut ctx.accounts.proposal;
+            require!(
+                proposal.track2_unsettled_endorser_count > 0,
+                StreamPumpError::InvalidAmount
+            );
+
+            let usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
+                proposal.track2_usdc_deposited
+            } else if proposal.track2_unsettled_spump == 0 || proposal.track2_usdc_deposited == 0 {
                 0
             } else {
                 let numerator = (staked_amount as u128)
-                    .checked_mul(ctx.accounts.proposal.track2_usdc_deposited as u128)
+                    .checked_mul(proposal.track2_usdc_deposited as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
                 let quotient = numerator
-                    .checked_div(ctx.accounts.proposal.total_spump_staked as u128)
+                    .checked_div(proposal.track2_unsettled_spump as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
                 u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?
             };
@@ -191,13 +198,22 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                         Transfer {
                             from: ctx.accounts.proposal_usdc_vault.to_account_info(),
                             to: ctx.accounts.user_usdc_ata.to_account_info(),
-                            authority: ctx.accounts.proposal.to_account_info(),
+                            authority: proposal_account_info.clone(),
                         },
                         proposal_signer,
                     ),
                     usdc_reward,
                 )?;
             }
+
+            proposal.track2_usdc_deposited =
+                checked_sub(proposal.track2_usdc_deposited, usdc_reward)?;
+            proposal.track2_unsettled_spump =
+                checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
+            proposal.track2_unsettled_endorser_count = proposal
+                .track2_unsettled_endorser_count
+                .checked_sub(1)
+                .ok_or(StreamPumpError::MathOverflow)?;
         }
         ProposalStatus::Resolved_Fail => {
             // ────────────────────────────────────────────────────────────────
@@ -227,6 +243,18 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                     refund_amount,
                 )?;
             }
+
+            let proposal = &mut ctx.accounts.proposal;
+            if proposal.track2_unsettled_endorser_count > 0 {
+                proposal.track2_unsettled_endorser_count = proposal
+                    .track2_unsettled_endorser_count
+                    .checked_sub(1)
+                    .ok_or(StreamPumpError::MathOverflow)?;
+            }
+            if proposal.track2_unsettled_spump > 0 {
+                proposal.track2_unsettled_spump =
+                    checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
+            }
         }
         ProposalStatus::Cancelled | ProposalStatus::Voided => {
             // EN: CANCEL/VOID PATH: Mint 100% SPUMP principal back (neutral).
@@ -243,10 +271,22 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 ),
                 staked_amount,
             )?;
+
+            let proposal = &mut ctx.accounts.proposal;
+            if proposal.track2_unsettled_endorser_count > 0 {
+                proposal.track2_unsettled_endorser_count = proposal
+                    .track2_unsettled_endorser_count
+                    .checked_sub(1)
+                    .ok_or(StreamPumpError::MathOverflow)?;
+            }
+            if proposal.track2_unsettled_spump > 0 {
+                proposal.track2_unsettled_spump =
+                    checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
+            }
         }
         _ => return err!(StreamPumpError::ProposalNotClaimable),
     }
 
-    position.claimed = true;
+    ctx.accounts.endorsement_position.claimed = true;
     Ok(())
 }

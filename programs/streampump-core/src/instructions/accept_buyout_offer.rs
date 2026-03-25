@@ -58,6 +58,7 @@ pub struct AcceptBuyoutOffer<'info> {
 }
 
 pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
     let creator_profile = &mut ctx.accounts.creator_profile;
     require!(
         creator_profile.status == CreatorStatus::S1_Auction_Pending,
@@ -67,11 +68,14 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     let buyout_offer = &ctx.accounts.buyout_offer;
     require!(buyout_offer.usdc_amount > 0, StreamPumpError::InvalidAmount);
     require!(
+        now < buyout_offer.sponsor_cancel_after,
+        StreamPumpError::BuyoutOfferExpired
+    );
+    require!(
         ctx.accounts.offer_usdc_vault.amount >= buyout_offer.usdc_amount,
         StreamPumpError::InsufficientBuyoutUsdcLiquidity
     );
 
-    let now = Clock::get()?.unix_timestamp;
     let rage_quit_deadline = now
         .checked_add(RAGE_QUIT_WINDOW_SECONDS)
         .ok_or(StreamPumpError::MathOverflow)?;

@@ -21,13 +21,24 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use crate::{
     errors::StreamPumpError,
     state::{
-        CreatorProfile, Proposal, ProposalMetricType, ProposalStatus, ProtocolConfig,
+        ContentHashAnchor, CreatorProfile, Proposal, ProposalContentKind, ProposalMetricType,
+        ProposalStatus, ProtocolConfig,
         MIN_PROPOSAL_CREATOR_LEVEL,
     },
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateProposalArgs {
+    /// EN: Content type for Xiaohongshu-like mixed notes.
+    /// ZH: 小红书式内容类型：短视频、图文轮播或混合笔记。
+    pub content_kind: ProposalContentKind,
+    /// EN: Canonical content-package digest. For mixed notes, hash a manifest
+    /// that includes note text hash plus ordered image/video digests.
+    /// ZH: 规范化内容包摘要。对于混合笔记，应对“文本摘要 + 有序图片/视频摘要”组成的 manifest 求哈希。
+    pub content_hash: Option<[u8; 32]>,
+    /// EN: Optional on-chain content anchor PDA. If provided, it must belong to the creator.
+    /// ZH: 可选的链上内容锚点 PDA；若提供，必须属于当前创作者。
+    pub content_anchor_pda: Option<Pubkey>,
     /// EN: Track 1 guaranteed base payment (USDC units).
     /// ZH: Track1 固定基础保底金额（USDC 最小单位）。
     pub track1_base_usdc: u64,
@@ -125,9 +136,57 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
         StreamPumpError::InvalidDeadline
     );
 
+    let mut resolved_content_hash = args.content_hash;
+    let mut resolved_content_anchor = None;
+
+    if let Some(content_anchor_pda) = args.content_anchor_pda {
+        let content_anchor_info = ctx
+            .remaining_accounts
+            .get(0)
+            .cloned()
+            .ok_or(error!(StreamPumpError::MissingContentAnchorAccount))?;
+        require_keys_eq!(
+            content_anchor_info.key(),
+            content_anchor_pda,
+            StreamPumpError::ContentAnchorMismatch
+        );
+        require!(
+            content_anchor_info.owner == &crate::ID,
+            StreamPumpError::ContentAnchorMismatch
+        );
+
+        let (anchored_creator_profile, anchored_content_digest) = {
+            let anchor_data = content_anchor_info.try_borrow_data()?;
+            let mut anchor_data_slice: &[u8] = &anchor_data;
+            let content_anchor = ContentHashAnchor::try_deserialize(&mut anchor_data_slice)?;
+            (content_anchor.creator_profile, content_anchor.content_digest)
+        };
+        require_keys_eq!(
+            anchored_creator_profile,
+            ctx.accounts.creator_profile.key(),
+            StreamPumpError::ContentAnchorMismatch
+        );
+
+        if let Some(content_hash) = args.content_hash {
+            require!(
+                content_hash == anchored_content_digest,
+                StreamPumpError::ContentHashMismatch
+            );
+        }
+
+        resolved_content_hash = Some(anchored_content_digest);
+        resolved_content_anchor = Some(content_anchor_pda);
+    }
+
+    let resolved_content_hash =
+        resolved_content_hash.ok_or(error!(StreamPumpError::InvalidContentBinding))?;
+
     let proposal = &mut ctx.accounts.proposal;
     proposal.creator = ctx.accounts.creator.key();
     proposal.sponsor = None;
+    proposal.content_kind = args.content_kind;
+    proposal.content_hash = resolved_content_hash;
+    proposal.content_anchor = resolved_content_anchor;
 
     // EN: Track 1 initialization — fixed creator base pay.
     // ZH: Track1 初始化——固定基础保底。
@@ -142,6 +201,9 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     proposal.track2_usdc_deposited = 0;
     proposal.track2_actual_value = None;
     proposal.track2_settled_at = 0;
+    proposal.track2_endorser_count = 0;
+    proposal.track2_unsettled_endorser_count = 0;
+    proposal.track2_unsettled_spump = 0;
 
     // EN: Track 3 initialization — delayed CPS settlement.
     // ZH: Track3 初始化——延迟 CPS 结算。

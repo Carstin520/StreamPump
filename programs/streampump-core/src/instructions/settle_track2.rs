@@ -159,6 +159,8 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
         }
 
         proposal.track2_usdc_deposited = 0;
+        proposal.track2_unsettled_endorser_count = proposal.track2_endorser_count;
+        proposal.track2_unsettled_spump = proposal.total_spump_staked;
         proposal.status = ProposalStatus::Resolved_Fail;
     } else {
         let actual_capped = std::cmp::min(args.actual_value, target);
@@ -204,7 +206,27 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
             )?;
         }
 
-        proposal.track2_usdc_deposited = fan_pool;
+        if fan_pool > 0 && proposal.total_spump_staked == 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.proposal_usdc_vault.to_account_info(),
+                        to: ctx.accounts.sponsor_usdc_ata.to_account_info(),
+                        authority: proposal.to_account_info(),
+                    },
+                    signer,
+                ),
+                fan_pool,
+            )?;
+            proposal.track2_usdc_deposited = 0;
+            proposal.track2_unsettled_endorser_count = 0;
+            proposal.track2_unsettled_spump = 0;
+        } else {
+            proposal.track2_usdc_deposited = fan_pool;
+            proposal.track2_unsettled_endorser_count = proposal.track2_endorser_count;
+            proposal.track2_unsettled_spump = proposal.total_spump_staked;
+        }
         proposal.status = ProposalStatus::Resolved_Success;
     }
 

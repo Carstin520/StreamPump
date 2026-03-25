@@ -34,28 +34,92 @@ enum FraudStatus {
   REJECTED
 }
 
-enum UploadStatus {
+enum ContentType {
+  SHORT_VIDEO
+  IMAGE_CAROUSEL
+  MIXED_MEDIA_NOTE
+}
+
+enum ContentManifestStatus {
+  DRAFT
+  UPLOADING
+  READY
+  LOCKED
+  ANCHORED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  COVER
+}
+
+enum AssetUploadStatus {
   PENDING
   UPLOADED
   FAILED
 }
 
-enum MuxStatus {
+enum AssetProcessingStatus {
   NONE
   PREPARING
   READY
   ERRORED
 }
 
+enum PublicationVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ProposalIntentStatus {
+  DRAFT
+  TERMS_LOCKED
+  BUNDLE_BUILT
+  CREATOR_PARTIALLY_SIGNED
+  SPONSOR_SIGNED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+
+enum BundleStatus {
+  BUILT
+  PARTIAL
+  FULLY_SIGNED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+
+enum BundleSubmitMode {
+  SERVER_RELAY
+  CLIENT_RELAY
+}
+
 model Proposal {
-  id                         String          @id @default(cuid())
-  proposalPda                String          @unique
+  id                         String           @id @default(cuid())
+  proposalPda                String           @unique
   creatorWallet              String
   sponsorWallet              String?
+  sponsorOrgId               String?
+  creatorOrgId               String?
+  manifestId                 String?
+  manifest                   ContentManifest? @relation(fields: [manifestId], references: [id], onDelete: SetNull)
+  intentId                   String?          @unique
+  intent                     ProposalIntent?  @relation(fields: [intentId], references: [id], onDelete: SetNull)
+  contentHashHex             String?
+  contentAnchorPda           String?
+  contentAnchorTx            String?
   deadlineAt                 DateTime
-  status                     ProposalStatus  @default(OPEN)
+  status                     ProposalStatus   @default(OPEN)
   track1BaseUsdc             BigInt
-  track1Claimed              Boolean         @default(false)
+  track1Claimed              Boolean          @default(false)
   track2MetricType           Track2MetricType
   track2TargetValue          BigInt
   track2MinAchievementBps    Int
@@ -71,55 +135,167 @@ model Proposal {
   oracleLastError            String?
   contentPublishedVerifiedAt DateTime?
   metadata                   Json?
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
   track2Events               Track2Event[]
-  videoContent               VideoContent?
 
   @@index([status, track1Claimed])
   @@index([status, deadlineAt, track2SettledAt])
   @@index([deadlineAt, track3DelayDays, track3SettledAt])
+  @@index([manifestId])
 }
 
-model VideoContent {
-  id              String       @id @default(cuid())
-  creatorWallet   String
-  proposalId      String?      @unique
-  proposal        Proposal?    @relation(fields: [proposalId], references: [id], onDelete: SetNull)
-  s3ObjectKey     String       @unique
-  videoUrl        String?
-  contentHash     String       @unique
-  mimeType        String
-  fileSizeBytes   BigInt
-  durationSeconds Int?
-  uploadStatus    UploadStatus @default(PENDING)
-  muxAssetId      String?      @unique
-  muxPlaybackId   String?      @unique
-  muxStatus       MuxStatus    @default(NONE)
-  muxErrorMessage String?
-  onChainAnchorTx String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+model ContentManifest {
+  id                    String                 @id @default(cuid())
+  creatorWallet         String
+  contentType           ContentType
+  status                ContentManifestStatus  @default(DRAFT)
+  version               Int                    @default(1)
+  title                 String?
+  captionText           String?
+  captionTextHash       String?
+  tagsJson              Json?
+  metadataJson          Json?
+  canonicalManifestJson Json?
+  manifestHashHex       String?                @unique
+  internalCanonicalUrl  String?                @unique
+  internalUrlDigestHex  String?
+  currentAnchorPda      String?                @unique
+  currentAnchorTx       String?
+  coverAssetId          String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  assets                ContentAsset[]
+  publications          ContentPublication[]
+  proposalIntents       ProposalIntent[]
+  proposals             Proposal[]
 
-  @@index([creatorWallet])
+  @@index([creatorWallet, status])
+  @@index([creatorWallet, version])
+}
+
+model ContentAsset {
+  id               String                @id @default(cuid())
+  manifestId       String
+  manifest         ContentManifest       @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  assetType        AssetType
+  orderIndex       Int
+  sha256Hex        String
+  mimeType         String
+  fileSizeBytes    BigInt
+  width            Int?
+  height           Int?
+  durationMs       Int?
+  storageKey       String                @unique
+  cdnUrl           String?
+  muxAssetId       String?               @unique
+  muxPlaybackId    String?               @unique
+  uploadStatus     AssetUploadStatus     @default(PENDING)
+  processingStatus AssetProcessingStatus @default(NONE)
+  processingError  String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@unique([manifestId, orderIndex])
+  @@index([manifestId, assetType])
+  @@index([uploadStatus, processingStatus])
+}
+
+model ContentPublication {
+  id                  String                        @id @default(cuid())
+  manifestId          String
+  manifest            ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  platform            String
+  externalPostIdHash  String?
+  externalUrl         String
+  externalUrlDigestHex String
+  verificationStatus  PublicationVerificationStatus @default(PENDING)
+  verificationSource  String?
+  verifiedAt          DateTime?
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+
+  @@unique([platform, externalUrl])
+  @@index([manifestId, platform, verificationStatus])
+}
+
+model ProposalIntent {
+  id                      String               @id @default(cuid())
+  status                  ProposalIntentStatus @default(DRAFT)
+  version                 Int                  @default(1)
+  creatorWallet           String
+  sponsorWallet           String
+  sponsorOrgId            String?
+  creatorOrgId            String?
+  manifestId              String
+  manifest                ContentManifest      @relation(fields: [manifestId], references: [id], onDelete: Restrict)
+  lockedManifestHashHex   String?
+  lockedAnchorPda         String?
+  deadlineUnix            BigInt
+  track1BaseUsdc          BigInt
+  track2MetricType        Track2MetricType
+  track2TargetValue       BigInt
+  track2MinAchievementBps Int
+  track3UsdcDeposited     BigInt
+  track3DelayDays         Int
+  plannedProposalPda      String?
+  plannedUsdcVaultPda     String?
+  creatorApprovedAt       DateTime?
+  sponsorApprovedAt       DateTime?
+  chainTxSignature        String?
+  chainSubmittedAt        DateTime?
+  chainConfirmedAt        DateTime?
+  failureReason           String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  proposal                Proposal?
+  txBundles               TxBundle[]
+
+  @@index([creatorWallet, status])
+  @@index([sponsorWallet, status])
+  @@index([manifestId, status])
+}
+
+model TxBundle {
+  id                    String           @id @default(cuid())
+  intentId              String
+  intent                ProposalIntent   @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  bundleType            String
+  instructionPlanJson   Json
+  messageBase64         String?
+  partiallySignedBase64 String?
+  fullySignedBase64     String?
+  recentBlockhash       String?
+  lastValidBlockHeight  BigInt?
+  requiredSignersJson   Json
+  expiresAt             DateTime
+  submitMode            BundleSubmitMode
+  status                BundleStatus     @default(BUILT)
+  chainTxSignature      String?
+  errorMessage          String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([intentId, status])
+  @@index([expiresAt, status])
 }
 
 model Track2Event {
-  id              String      @id @default(cuid())
+  id              String           @id @default(cuid())
   proposalId      String
-  proposal        Proposal    @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposal        Proposal         @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   eventType       Track2MetricType
   externalEventId String?
   userId          String?
   sessionId       String?
   ipHash          String
   userAgent       String?
-  fraudStatus     FraudStatus @default(ACCEPTED)
-  fraudScore      Int         @default(0)
-  occurredAt      DateTime    @default(now())
-  dedupeKey       String      @unique
+  fraudStatus     FraudStatus      @default(ACCEPTED)
+  fraudScore      Int              @default(0)
+  occurredAt      DateTime         @default(now())
+  dedupeKey       String           @unique
   rawPayload      Json?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime         @default(now())
 
   @@index([proposalId, eventType, fraudStatus])
   @@index([proposalId, occurredAt])
