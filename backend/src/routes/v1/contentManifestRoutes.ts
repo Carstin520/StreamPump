@@ -1,3 +1,7 @@
+/**
+ * CN: v1 内容清单路由，负责 manifest、资产上传与 publication 映射。
+ * EN: v1 content manifest routes for manifests, asset upload flow, and publication mapping.
+ */
 import { Router } from "express";
 
 import {

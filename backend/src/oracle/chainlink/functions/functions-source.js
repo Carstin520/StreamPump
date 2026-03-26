@@ -1,7 +1,10 @@
-// Chainlink Functions source script for StreamPump v2.
-// args[0]: platform (youtube | tiktok)
-// args[1]: content id
-// args[2]: API key or bearer token
+/**
+ * CN: Chainlink Functions 示例源码，按平台读取公开内容数据并输出观看量。
+ * EN: Example Chainlink Functions source that fetches public content stats by platform and returns views.
+ */
+// args[0]: platform / 平台 (youtube | tiktok)
+// args[1]: content id / 内容 ID
+// args[2]: API key or bearer token / API 密钥或 Bearer Token
 
 const platform = args[0];
 const contentId = args[1];

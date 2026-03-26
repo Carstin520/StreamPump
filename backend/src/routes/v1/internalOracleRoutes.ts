@@ -1,3 +1,7 @@
+/**
+ * CN: v1 内部 oracle 路由，预留给自动批量结算与进度查询。
+ * EN: v1 internal oracle routes reserved for automatic batch settlement and progress checks.
+ */
 import { Router } from "express";
 
 import {

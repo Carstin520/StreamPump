@@ -1,3 +1,7 @@
+/**
+ * CN: 原型期事件采集控制器，处理观看事件写入、聚合统计和结算报告输出。
+ * EN: Prototype event ingestion controller for view signals, aggregate stats, and settlement reports.
+ */
 import { Request, Response } from "express";
 
 import {

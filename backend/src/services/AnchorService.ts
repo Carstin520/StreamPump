@@ -1,3 +1,7 @@
+/**
+ * CN: Anchor 服务封装，负责 IDL 加载、PDA 推导和后端可代执行的链上结算调用。
+ * EN: Anchor service wrapper responsible for IDL loading, PDA derivation, and backend-driven on-chain settlement calls.
+ */
 import { existsSync, readFileSync } from "fs";
 import os from "os";
 import path from "path";
@@ -181,6 +185,7 @@ export class AnchorService {
       AnchorProvider.defaultOptions()
     );
 
+    // The backend reads the locally generated IDL so RPC method names stay aligned with the Rust program.
     const idlPath = resolveIdlPath();
     const rawIdl = readFileSync(idlPath, "utf8");
     const idl = JSON.parse(rawIdl) as Idl;
@@ -408,6 +413,7 @@ export class AnchorService {
       const urlDigest = keccak_256(new TextEncoder().encode(trimmedUrl));
       const creatorProfilePda = this.deriveCreatorProfilePda(creator);
       const contentAnchorPda = this.deriveContentAnchorPda(creatorProfilePda, urlDigest);
+      // In the current hybrid model, server-assisted anchoring works only when the backend controls a matching signer.
       const creatorSigner = this.resolveCreatorSigner(creator);
 
       const signature = (await this.withRpcTimeout(
@@ -523,6 +529,7 @@ export class AnchorService {
       return this.contentAnchorSigner;
     }
 
+    // If neither signer matches, the backend must fall back to a client-sign flow instead of server-assisted anchoring.
     throw new Error(
       `No backend signer available for creator ${creator.toBase58()}. Configure CONTENT_ANCHOR_SIGNER_SECRET_KEY or CONTENT_ANCHOR_SIGNER_KEYPAIR_PATH.`
     );

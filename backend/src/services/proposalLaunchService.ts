@@ -1,3 +1,7 @@
+/**
+ * CN: Proposal launch 服务骨架，负责指令规划、PDA 预推导和 bundle 元数据生成。
+ * EN: Proposal launch skeleton service responsible for instruction planning, PDA pre-derivation, and bundle metadata.
+ */
 import {
   BundleSubmitMode,
   BundleStatus,
@@ -14,6 +18,7 @@ export const buildInstructionPlan = (
   manifest: Pick<ContentManifest, "currentAnchorPda">,
   _intent: Pick<ProposalIntent, "id">
 ): string[] => {
+  // If content is already anchored, the launch bundle can skip the anchor step entirely.
   if (manifest.currentAnchorPda) {
     return ["create_proposal", "sponsor_fund"];
   }
@@ -45,6 +50,7 @@ export const buildBundleSkeletonRecord = (params: {
   submitMode: BundleSubmitMode;
   expiresAt: Date;
 }): Prisma.TxBundleUncheckedCreateInput => {
+  // This intentionally stores only bundle metadata for now; real VersionedTransaction assembly is a later step.
   return {
     intentId: params.intent.id,
     bundleType: "PROPOSAL_LAUNCH",

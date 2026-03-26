@@ -1,3 +1,7 @@
+/**
+ * CN: Webhook 路由入口，挂载点击事件与 Mux 转码回调。
+ * EN: Webhook route entry that mounts click events and Mux processing callbacks.
+ */
 import express, { Router } from "express";
 
 import { ingestMuxWebhook } from "../controllers/muxWebhookController";

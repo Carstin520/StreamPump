@@ -1,3 +1,7 @@
+/**
+ * CN: 旧版 Solana 结算辅助模块，部分地址推导仍基于历史设计，仅保留兼容参考价值。
+ * EN: Legacy Solana settlement helper module; some address derivations still follow historical design and remain for compatibility/reference only.
+ */
 import {
   Connection,
   PublicKey,
@@ -21,6 +25,7 @@ export interface SubmitCreatorUpgradeParams {
 export interface ProposalAddresses {
   proposal: PublicKey;
   proposalUsdcVault: PublicKey;
+  // Legacy field kept for backward compatibility with old backend code paths.
   proposalSpumpVault: PublicKey;
 }
 

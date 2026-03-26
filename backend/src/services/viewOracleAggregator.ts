@@ -1,3 +1,7 @@
+/**
+ * CN: 原型观看量聚合器，将反作弊结果汇总为结算报告。
+ * EN: Prototype view aggregator that turns anti-cheat verdicts into settlement-ready reports.
+ */
 import { createHash } from "crypto";
 
 import {

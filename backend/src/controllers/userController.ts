@@ -1,3 +1,7 @@
+/**
+ * CN: 用户原型控制器，提供示例 profile 查询和创作者升级 payload 生成。
+ * EN: Prototype user controller that exposes sample profile data and creator-upgrade payload generation.
+ */
 import { Request, Response } from "express";
 
 import { buildCreatorUpgradePayload } from "../oracle/buildCreatorUpgradePayload";

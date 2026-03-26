@@ -1,3 +1,7 @@
+/**
+ * CN: 旧版双存储上传服务，将文件写入 origin 存储与 edge 存储。
+ * EN: Legacy dual-storage upload service that writes files to both origin and edge object storage.
+ */
 import {
   PutObjectCommand,
   S3Client,
@@ -70,6 +74,7 @@ const buildPublicUrl = (storageConfig: StorageConfig, objectKey: string) => {
 export const uploadToHybridStorage = async (
   request: HybridUploadRequest
 ): Promise<HybridUploadResult> => {
+  // The same object is written to origin and edge buckets so prototype links resolve from both sides.
   const objectKey = buildObjectKey(request.creatorId, request.videoId, request.fileName);
   const contentSha256 = sha256(request.fileBuffer);
 

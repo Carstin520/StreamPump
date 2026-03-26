@@ -1,3 +1,7 @@
+/**
+ * CN: HTTP 控制器通用工具，统一解析参数、抛出业务错误并格式化响应。
+ * EN: Shared HTTP controller helpers for parsing input, throwing business errors, and formatting responses.
+ */
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import { Request, Response } from "express";

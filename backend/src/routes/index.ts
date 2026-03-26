@@ -1,3 +1,7 @@
+/**
+ * CN: Backend 根路由，将原型接口和 v1 接口统一挂载到 /api 下。
+ * EN: Root backend router that mounts both prototype and v1 APIs under /api.
+ */
 import { Router } from "express";
 
 import eventRoutes from "./eventRoutes";

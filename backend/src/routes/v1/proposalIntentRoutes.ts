@@ -1,3 +1,7 @@
+/**
+ * CN: v1 proposal intent 路由，承载单次签名发起 proposal 的后端状态机。
+ * EN: v1 proposal intent routes that drive the backend state machine for one-sign proposal launch.
+ */
 import { Router } from "express";
 
 import {

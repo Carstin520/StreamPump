@@ -1,3 +1,7 @@
+/**
+ * CN: v1 API 聚合路由，挂载内容、proposal-intent 与内部 oracle 子路由。
+ * EN: v1 API aggregator that mounts content, proposal-intent, and internal oracle sub-routes.
+ */
 import { Router } from "express";
 
 import contentManifestRoutes from "./contentManifestRoutes";

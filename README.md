@@ -230,6 +230,7 @@ npm run dev
 Useful env vars:
 
 - `DATABASE_URL`
+- `DIRECT_URL`
 - `PORT`
 - `API_BASE_URL`
 - `SOLANA_RPC_ENDPOINT`

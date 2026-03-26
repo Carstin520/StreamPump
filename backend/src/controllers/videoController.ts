@@ -1,3 +1,7 @@
+/**
+ * CN: 旧版视频上传原型控制器，保留给脚手架前端调试使用。
+ * EN: Legacy video upload prototype controller kept for scaffold frontend debugging.
+ */
 import { Request, Response } from "express";
 import { createHash, randomUUID } from "crypto";
 

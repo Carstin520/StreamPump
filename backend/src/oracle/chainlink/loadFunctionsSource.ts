@@ -1,3 +1,7 @@
+/**
+ * CN: Chainlink Functions 辅助加载器，读取源码脚本并封装请求参数。
+ * EN: Chainlink Functions helper that loads the source script and packages request arguments.
+ */
 import fs from "fs";
 import path from "path";
 

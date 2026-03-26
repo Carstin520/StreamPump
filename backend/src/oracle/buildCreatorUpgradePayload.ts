@@ -1,3 +1,7 @@
+/**
+ * CN: 构造创作者升级观察结果的离链 payload，供后端或 oracle worker 签名与提交。
+ * EN: Builds the off-chain creator-upgrade observation payload for backend or oracle-worker signing.
+ */
 import { createHash, randomBytes } from "crypto";
 
 export type CreatorUpgradeMetricType = "followers" | "valid_views";

@@ -1,3 +1,7 @@
+/**
+ * CN: 轻量级反作弊服务，用于原型阶段对观看事件做快速风险评分。
+ * EN: Lightweight anti-cheat service for assigning quick risk scores to prototype view events.
+ */
 import { config } from "../../config/default";
 
 export interface ViewEventInput {
@@ -65,6 +69,7 @@ export const evaluateViewEvent = (event: ViewEventInput): AntiCheatResult => {
   const now = event.timestampMs;
   gcStaleEntries(now);
 
+  // The prototype intentionally stays conservative: suspicious patterns accumulate score quickly.
   let riskScore = 0;
   const reasons: string[] = [];
 

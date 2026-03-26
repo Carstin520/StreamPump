@@ -1,3 +1,7 @@
+/**
+ * CN: Backend 运行时配置入口，集中读取环境变量并提供默认值。
+ * EN: Runtime backend configuration entry that reads environment variables and applies defaults.
+ */
 export const config = {
   app: {
     apiBaseUrl: process.env.API_BASE_URL ?? "http://localhost:4000/api/v1",

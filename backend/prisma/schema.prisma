@@ -1,3 +1,5 @@
+// CN: StreamPump backend Prisma schema，定义内容清单、proposal intent、链上投影和事件存储。
+// EN: StreamPump backend Prisma schema defining content manifests, proposal intents, on-chain projections, and event storage.
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,6 +7,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum ProposalStatus {
@@ -104,16 +107,26 @@ enum BundleSubmitMode {
 
 model Proposal {
   id                         String           @id @default(cuid())
+  /// CN: 链上 Proposal PDA，数据库用它和链上账户强绑定。
+  /// EN: On-chain Proposal PDA used as the canonical binding key between DB rows and chain accounts.
   proposalPda                String           @unique
   creatorWallet              String
   sponsorWallet              String?
   sponsorOrgId               String?
   creatorOrgId               String?
+  /// CN: 绑定的内容清单版本 ID。
+  /// EN: Bound content manifest version ID.
   manifestId                 String?
   manifest                   ContentManifest? @relation(fields: [manifestId], references: [id], onDelete: SetNull)
+  /// CN: 发起 proposal 前的业务草稿 ID。
+  /// EN: Business-draft intent ID created before the on-chain proposal exists.
   intentId                   String?          @unique
   intent                     ProposalIntent?  @relation(fields: [intentId], references: [id], onDelete: SetNull)
+  /// CN: 内容清单的 32-byte SHA-256 十六进制摘要。
+  /// EN: 32-byte SHA-256 hex digest of the bound content manifest.
   contentHashHex             String?
+  /// CN: 内容锚点 PDA，指向链上的 content anchor 账户。
+  /// EN: Content anchor PDA pointing to the on-chain content anchor account.
   contentAnchorPda           String?
   contentAnchorTx            String?
   deadlineAt                 DateTime
@@ -130,9 +143,13 @@ model Proposal {
   track3CpsPayout            BigInt?
   track3DelayDays            Int
   track3SettledAt            DateTime?
+  /// CN: 最近一次链上提交或结算交易签名。
+  /// EN: Most recent chain submission or settlement transaction signature.
   onChainTxSignature         String?
   oracleSyncStatus           OracleSyncStatus @default(PENDING)
   oracleLastError            String?
+  /// CN: 内容已发布且通过后端/人工核验的时间。
+  /// EN: Timestamp when content publication has been verified by backend/manual review.
   contentPublishedVerifiedAt DateTime?
   metadata                   Json?
   createdAt                  DateTime         @default(now())
@@ -150,18 +167,32 @@ model ContentManifest {
   creatorWallet         String
   contentType           ContentType
   status                ContentManifestStatus  @default(DRAFT)
+  /// CN: 内容版本号。草稿变更通过新版本推进，而不是覆盖已绑定版本。
+  /// EN: Content version number. Mutations should advance via new versions instead of mutating already-bound content.
   version               Int                    @default(1)
   title                 String?
   captionText           String?
   captionTextHash       String?
   tagsJson              Json?
   metadataJson          Json?
+  /// CN: 规范化后的 manifest JSON，用于计算内容摘要。
+  /// EN: Canonicalized manifest JSON used to derive the content digest.
   canonicalManifestJson Json?
+  /// CN: manifest 的 SHA-256 十六进制摘要，对应链上的 content_hash。
+  /// EN: SHA-256 hex digest of the manifest, matching the on-chain content_hash.
   manifestHashHex       String?                @unique
+  /// CN: 后端内部 canonical URL，不依赖外部平台发帖链接。
+  /// EN: Backend-owned canonical URL that does not depend on an external platform post URL.
   internalCanonicalUrl  String?                @unique
+  /// CN: internalCanonicalUrl 的 Keccak 摘要，对应链上 url_digest。
+  /// EN: Keccak digest of internalCanonicalUrl, matching the on-chain url_digest.
   internalUrlDigestHex  String?
+  /// CN: 当前版本 manifest 对应的链上内容锚点 PDA。
+  /// EN: On-chain content anchor PDA for the current manifest version.
   currentAnchorPda      String?                @unique
   currentAnchorTx       String?
+  /// CN: 封面资产 ID；未显式指定时通常回退到第一个素材。
+  /// EN: Cover asset ID; usually falls back to the first asset when unspecified.
   coverAssetId          String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -179,16 +210,26 @@ model ContentAsset {
   manifestId       String
   manifest         ContentManifest       @relation(fields: [manifestId], references: [id], onDelete: Cascade)
   assetType        AssetType
+  /// CN: 素材在 manifest 内的稳定顺序，用于生成 canonical manifest hash。
+  /// EN: Stable per-manifest ordering used when generating the canonical manifest hash.
   orderIndex       Int
+  /// CN: 原始文件内容的 SHA-256 十六进制摘要。
+  /// EN: SHA-256 hex digest of the raw uploaded file.
   sha256Hex        String
   mimeType         String
   fileSizeBytes    BigInt
   width            Int?
   height           Int?
   durationMs       Int?
+  /// CN: 对象存储中的稳定 key，作为 S3/R2 与 DB 的桥接主键。
+  /// EN: Stable object-storage key that bridges S3/R2 objects with DB state.
   storageKey       String                @unique
   cdnUrl           String?
+  /// CN: Mux 资产 ID，用于转码状态与播放地址回写。
+  /// EN: Mux asset ID used to reconcile processing status and playback info.
   muxAssetId       String?               @unique
+  /// CN: Mux playback ID，对应最终可播放资源。
+  /// EN: Mux playback ID for the final playable asset.
   muxPlaybackId    String?               @unique
   uploadStatus     AssetUploadStatus     @default(PENDING)
   processingStatus AssetProcessingStatus @default(NONE)
@@ -206,8 +247,12 @@ model ContentPublication {
   manifestId          String
   manifest            ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
   platform            String
+  /// CN: 外部平台帖子 ID 的摘要，避免在 DB 中直接依赖原始平台 ID。
+  /// EN: Digest of the external platform post ID to avoid coupling directly to raw platform identifiers.
   externalPostIdHash  String?
   externalUrl         String
+  /// CN: externalUrl 的摘要，可用于后续去重和链下证据比对。
+  /// EN: Digest of externalUrl for later dedupe and off-chain evidence matching.
   externalUrlDigestHex String
   verificationStatus  PublicationVerificationStatus @default(PENDING)
   verificationSource  String?
@@ -229,7 +274,11 @@ model ProposalIntent {
   creatorOrgId            String?
   manifestId              String
   manifest                ContentManifest      @relation(fields: [manifestId], references: [id], onDelete: Restrict)
+  /// CN: lock 时冻结的 manifest 摘要，确保 sponsor 和 creator 面对的是同一版内容。
+  /// EN: Manifest digest frozen at lock time so sponsor and creator operate on the exact same content version.
   lockedManifestHashHex   String?
+  /// CN: lock 时冻结的内容锚点 PDA；为空表示 launch bundle 里需要先 anchor。
+  /// EN: Content anchor PDA frozen at lock time; null means the launch bundle still needs an anchor step.
   lockedAnchorPda         String?
   deadlineUnix            BigInt
   track1BaseUsdc          BigInt
@@ -238,7 +287,11 @@ model ProposalIntent {
   track2MinAchievementBps Int
   track3UsdcDeposited     BigInt
   track3DelayDays         Int
+  /// CN: 预推导的 Proposal PDA，供 bundle 组装和后续链上投影使用。
+  /// EN: Pre-derived Proposal PDA used during bundle assembly and later on-chain projection.
   plannedProposalPda      String?
+  /// CN: 预推导的 proposal USDC 金库 PDA。
+  /// EN: Pre-derived proposal USDC vault PDA.
   plannedUsdcVaultPda     String?
   creatorApprovedAt       DateTime?
   sponsorApprovedAt       DateTime?
@@ -261,12 +314,18 @@ model TxBundle {
   intentId              String
   intent                ProposalIntent   @relation(fields: [intentId], references: [id], onDelete: Cascade)
   bundleType            String
+  /// CN: 计划打包进交易的 instruction 顺序。
+  /// EN: Ordered instruction plan intended for the transaction bundle.
   instructionPlanJson   Json
+  /// CN: 序列化后的 VersionedTransaction message，当前阶段可能为空 skeleton。
+  /// EN: Serialized VersionedTransaction message; may be null while the flow is still a skeleton.
   messageBase64         String?
   partiallySignedBase64 String?
   fullySignedBase64     String?
   recentBlockhash       String?
   lastValidBlockHeight  BigInt?
+  /// CN: 此 bundle 需要哪些签名者。
+  /// EN: The signer set required to make this bundle valid.
   requiredSignersJson   Json
   expiresAt             DateTime
   submitMode            BundleSubmitMode
@@ -293,7 +352,11 @@ model Track2Event {
   fraudStatus     FraudStatus      @default(ACCEPTED)
   fraudScore      Int              @default(0)
   occurredAt      DateTime         @default(now())
+  /// CN: 去重键，避免同一事件被重复记账。
+  /// EN: Dedupe key that prevents the same event from being counted multiple times.
   dedupeKey       String           @unique
+  /// CN: 原始 webhook/body 负载，供排障和风控回放使用。
+  /// EN: Raw webhook/body payload used for debugging and fraud-review replay.
   rawPayload      Json?
   createdAt       DateTime         @default(now())
 

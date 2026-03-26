@@ -1,3 +1,7 @@
+/**
+ * CN: Backend HTTP 入口，负责挂载路由、启动 indexer 和 oracle scheduler。
+ * EN: Backend HTTP entrypoint that mounts routes and starts the indexer and oracle scheduler.
+ */
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -16,6 +20,7 @@ const jsonParser = express.json();
 
 app.use(cors());
 app.use((req, res, next) => {
+  // Mux webhook needs the raw body for signature verification, so JSON parsing is skipped here.
   if (req.originalUrl.startsWith("/api/webhooks/mux")) {
     next();
     return;

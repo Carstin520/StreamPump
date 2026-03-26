@@ -1,3 +1,7 @@
+/**
+ * CN: 内容清单控制器，负责 manifest 创建、素材预签名上传、完成回调和 publication 映射。
+ * EN: Content manifest controller that handles manifest creation, asset presign/upload completion, and publication mapping.
+ */
 import {
   AssetProcessingStatus,
   AssetType,
@@ -117,6 +121,7 @@ const serializeAsset = (asset: {
 });
 
 const requireOwnedManifest = async (manifestId: string, creatorWallet: string) => {
+  // Ownership is enforced at the DB layer so a creator cannot mutate another creator's content state.
   const manifest = await prisma.contentManifest.findFirst({
     where: {
       id: manifestId,
@@ -215,6 +220,7 @@ export const presignManifestAssets = async (req: Request, res: Response) => {
       assertAssetAndMimeTypeMatch(assetType, mimeType);
 
       const extension = extensionForMimeType(mimeType);
+      // Storage keys remain deterministic inside one manifest version so asset hashing and audit traces stay stable.
       const storageKey = `content/${manifest.id}/v/${manifest.version}/${orderIndex}-${sha256HexDigest.slice(
         0,
         12
@@ -303,6 +309,7 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
       throw new HttpError(404, "ASSET_NOT_FOUND", "content asset not found");
     }
 
+    // Current MVP trusts the upload completion signal from the client; object existence verification can be added later.
     let updated = await prisma.contentAsset.update({
       where: { id: asset.id },
       data: {
@@ -313,6 +320,7 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
 
     if (isVideoMimeType(asset.mimeType)) {
       try {
+        // Video assets move into PREPARING while Mux asynchronously transcodes them and later calls back via webhook.
         const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 3600);
         const muxAssetId = await muxService.createAsset(downloadUrl);
 
@@ -389,6 +397,7 @@ export const finalizeContentManifest = async (req: Request, res: Response) => {
       );
     }
 
+    // Finalization freezes the current asset ordering and generates the canonical digest used by chain-facing flows.
     const finalized = computeManifestFinalizeState({
       manifest,
       assets: manifest.assets,

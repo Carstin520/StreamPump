@@ -1,3 +1,7 @@
+/**
+ * CN: 旧版 proposal 数据接口，主要用于原型层的类型表达。
+ * EN: Legacy proposal data interface used mainly by prototype-layer typings.
+ */
 export type ProposalStatus =
   | "OPEN"
   | "FUNDED"

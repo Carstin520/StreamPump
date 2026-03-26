@@ -1,3 +1,7 @@
+/**
+ * CN: S3 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
+ * EN: S3 origin-storage service responsible for content asset presigned upload and download URLs.
+ */
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -54,6 +58,7 @@ const buildS3Client = (): S3Client => {
   const { origin } = config.storage;
   const hasExplicitCredentials = Boolean(origin.accessKeyId && origin.secretAccessKey);
 
+  // The same client can target AWS S3 or any S3-compatible vendor by overriding endpoint and credentials.
   return new S3Client({
     region: origin.region,
     endpoint: origin.endpoint,

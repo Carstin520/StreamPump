@@ -1,3 +1,7 @@
+/**
+ * CN: Mux 服务封装，负责创建视频资产和校验 Mux webhook 签名。
+ * EN: Mux service wrapper that creates video assets and verifies Mux webhook signatures.
+ */
 import Mux from "@mux/mux-node";
 
 const MUX_TIMEOUT_MS = Number(process.env.MUX_REQUEST_TIMEOUT_MS ?? 20_000);
@@ -38,6 +42,7 @@ export class MuxService {
     this.assertApiCredentials();
 
     try {
+      // Public playback keeps the current prototype simple; access control can be layered on later.
       const asset = await this.withTimeout(
         this.client.video.assets.create({
           inputs: [{ url: trimmedUrl }],

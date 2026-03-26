@@ -1,3 +1,7 @@
+/**
+ * CN: Proposal intent 控制器，管理从业务草稿到 bundle skeleton 的后端状态机。
+ * EN: Proposal intent controller that manages the backend state machine from business draft to bundle skeleton.
+ */
 import {
   BundleStatus,
   BundleSubmitMode,
@@ -65,6 +69,7 @@ const getRequesterWallet = (req: Request): string => parseWallet(req.header("x-w
 const serializeIntent = (intent: ProposalIntent) => ({
   intentId: intent.id,
   status: intent.status,
+  // version / 版本: optimistic state version used for multi-step intent transitions.
   version: intent.version,
   creatorWallet: intent.creatorWallet,
   sponsorWallet: intent.sponsorWallet,
@@ -207,6 +212,7 @@ export const createProposalIntent = async (req: Request, res: Response) => {
       );
     }
 
+    // Intents are DB-first drafts and do not become settlement truth until the chain transaction confirms.
     const intent = await prisma.proposalIntent.create({
       data: {
         creatorWallet,
@@ -266,6 +272,7 @@ export const lockProposalIntent = async (req: Request, res: Response) => {
     });
 
     const locked = await prisma.$transaction(async (tx) => {
+      // Locking freezes the exact content hash and derived PDAs so both parties sign against stable terms.
       const updatedIntent = await tx.proposalIntent.update({
         where: { id: intent.id },
         data: {
@@ -322,6 +329,7 @@ export const buildProposalLaunchBundle = async (req: Request, res: Response) => 
       throw new HttpError(409, "INTENT_NOT_LOCKED", "proposal intent must be TERMS_LOCKED before build");
     }
 
+    // The launch plan changes depending on whether the manifest already has an on-chain content anchor.
     const instructionPlan = buildInstructionPlan(intent.manifest, intent);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -396,6 +404,7 @@ export const creatorPartialSignBundle = async (req: Request, res: Response) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Creator signs first because create_proposal still requires creator authority under the current program rules.
       const updatedBundle = await tx.txBundle.update({
         where: { id: bundle.id },
         data: {
@@ -461,6 +470,7 @@ export const submitProposalBundle = async (req: Request, res: Response) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Sponsor is the final signer in the current hybrid launch flow before relay/submission.
       const updatedBundle = await tx.txBundle.update({
         where: { id: bundle.id },
         data: {

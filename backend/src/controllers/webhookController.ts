@@ -1,3 +1,7 @@
+/**
+ * CN: Track2 点击回调控制器，负责去重、简单反作弊和事件落库。
+ * EN: Track2 click webhook controller responsible for dedupe, simple fraud checks, and event persistence.
+ */
 import { createHash } from "crypto";
 
 import { FraudStatus, Prisma, Track2MetricType } from "@prisma/client";
@@ -9,6 +13,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_EVENTS_PER_IP_WINDOW = 45;
 const DEDUPE_WINDOW_MS = 10 * 60_000;
 
+// Prototype-only in-memory ledgers. These need Redis or durable storage before multi-instance deployment.
 const ipBurstLedger = new Map<string, number[]>();
 const dedupeLedger = new Map<string, number>();
 

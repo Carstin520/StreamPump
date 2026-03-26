@@ -1,3 +1,7 @@
+/**
+ * CN: Oracle 定时调度器，负责按 Track1/2/3 拉取数据库候选项并触发链上结算。
+ * EN: Oracle scheduler that scans DB candidates by Track1/2/3 and triggers on-chain settlement flows.
+ */
 import {
   FraudStatus,
   OracleSyncStatus,
@@ -83,6 +87,7 @@ export class OracleScheduler {
     run: () => Promise<void>
   ): void {
     const task = cron.schedule(expression, () => {
+      // Each worker is serialized by runWithLock to prevent duplicate settlement attempts on the same process.
       void this.runWithLock(lockKey, run);
     });
 
@@ -281,6 +286,7 @@ export class OracleScheduler {
       return null;
     }
 
+    // DB proposal rows are treated as a cache/projection here; on-chain state wins whenever it is newer.
     const updates: Prisma.ProposalUpdateInput = {};
 
     if (onChain.track1Claimed && !proposal.track1Claimed) {
@@ -335,6 +341,7 @@ export class OracleScheduler {
     proposalId: string,
     metricType: Proposal["track2MetricType"]
   ): Promise<number> {
+    // Only accepted events contribute to the metric that is finally settled on-chain.
     const count = await prisma.track2Event.count({
       where: {
         proposalId,

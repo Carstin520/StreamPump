@@ -1,3 +1,7 @@
+/**
+ * CN: 内部 Oracle 结算路由骨架，为后续批量结算与 fan settlement worker 预留接口。
+ * EN: Internal oracle settlement route skeleton reserved for future batch settlement workers.
+ */
 import { Request, Response } from "express";
 
 import { handleControllerError, ok, parseNonEmptyString } from "./http";

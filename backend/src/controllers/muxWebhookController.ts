@@ -1,3 +1,7 @@
+/**
+ * CN: Mux Webhook 控制器，接收转码状态回调并回写 ContentAsset 处理状态。
+ * EN: Mux webhook controller that ingests processing callbacks and updates ContentAsset state.
+ */
 import { AssetProcessingStatus } from "@prisma/client";
 import { Request, Response } from "express";
 

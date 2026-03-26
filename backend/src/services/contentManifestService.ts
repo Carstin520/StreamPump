@@ -1,3 +1,7 @@
+/**
+ * CN: 内容清单服务，负责 canonical manifest 生成、摘要计算和 anchor 地址推导。
+ * EN: Content manifest service responsible for canonical manifest generation, digest computation, and anchor address derivation.
+ */
 import { createHash } from "crypto";
 
 import { ContentAsset, ContentManifest, ContentType } from "@prisma/client";
@@ -38,6 +42,7 @@ export const buildCanonicalManifestJson = (params: {
     >
   >;
 }): Record<string, unknown> => {
+  // Asset order must be deterministic, otherwise the same content package would hash to different digests.
   const orderedAssets = [...params.assets]
     .sort((left, right) => left.orderIndex - right.orderIndex)
     .map((asset) => ({
@@ -83,6 +88,7 @@ export const computeManifestFinalizeState = (params: {
   internalUrlDigestHex: string;
   plannedContentAnchorPda: string;
 } => {
+  // Finalization computes every artifact needed by the later hybrid proposal-launch flow.
   const canonicalManifestJson = buildCanonicalManifestJson(params);
   const canonicalManifestString = JSON.stringify(canonicalManifestJson);
   const internalCanonicalUrl = buildInternalCanonicalUrl(params.manifest.id, params.manifest.version);
