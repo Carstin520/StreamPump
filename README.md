@@ -227,6 +227,34 @@ npm run build
 npm run dev
 ```
 
+Install local Git safety hooks:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+Recommended local secret flow:
+
+```bash
+cp backend/.env.example backend/.env.local
+```
+
+Then fill real values into `backend/.env.local` only.
+
+Git safety notes:
+
+- `backend/.env.local` and other `.env.*` files are ignored by Git
+- `.env.example` is the only env template that should be committed
+- `pre-commit` checks staged files and blocks secret files or obvious credentials
+- `pre-push` re-checks the current `HEAD` as a second safety net
+- hooks are local Git config, so each new clone should run `./scripts/install-git-hooks.sh` once
+- if a secret file was already tracked before ignore rules were added, run `git rm --cached <file>`
+
+The shared hook logic lives in `scripts/git-hooks/secret-guard.sh`.
+It currently blocks common secret paths such as `.env`, `.env.*`, `*.pem`, `id.json`, wallet keypair JSON files,
+and scans file contents for connection strings with embedded credentials, secret-looking env assignments,
+and private key blocks.
+
 Useful env vars:
 
 - `DATABASE_URL`

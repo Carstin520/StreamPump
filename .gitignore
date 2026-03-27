@@ -4,6 +4,9 @@ target/
 .DS_Store
 .env
 .env.local
+.env.*
+!.env.example
+!**/.env.example
 *.log
 app/.next/
 backend/dist/

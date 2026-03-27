@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+"$ROOT_DIR/scripts/git-hooks/secret-guard.sh" --head
