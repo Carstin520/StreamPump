@@ -3,15 +3,12 @@
  * EN: Backend HTTP entrypoint that mounts routes and starts the indexer and oracle scheduler.
  */
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 
 import { config } from "./config/default";
 import routes from "./src/routes";
 import { startIndexer } from "./src/services/indexer";
 import { startOracleScheduler } from "./src/schedulers/OracleScheduler";
-
-dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);

@@ -107,22 +107,23 @@ const loadKeypairFromPath = (keypairPath: string, label: string): Keypair => {
 };
 
 const loadOracleAuthorityKeypair = (): Keypair => {
-  const inlineSecret = process.env.ORACLE_AUTHORITY_SECRET_KEY;
+  const inlineSecret = process.env.ORACLE_AUTHORITY_SECRET_KEY?.trim();
   if (inlineSecret) {
     return parseKeypairSecret(inlineSecret, "ORACLE_AUTHORITY_SECRET_KEY");
   }
 
-  const keypairPath = process.env.ORACLE_AUTHORITY_KEYPAIR_PATH ?? "~/.config/solana/id.json";
+  const keypairPath =
+    process.env.ORACLE_AUTHORITY_KEYPAIR_PATH?.trim() || "~/.config/solana/id.json";
   return loadKeypairFromPath(keypairPath, "Oracle authority");
 };
 
 const loadOptionalContentAnchorSigner = (): Keypair | null => {
-  const inlineSecret = process.env.CONTENT_ANCHOR_SIGNER_SECRET_KEY;
+  const inlineSecret = process.env.CONTENT_ANCHOR_SIGNER_SECRET_KEY?.trim();
   if (inlineSecret) {
     return parseKeypairSecret(inlineSecret, "CONTENT_ANCHOR_SIGNER_SECRET_KEY");
   }
 
-  const keypairPath = process.env.CONTENT_ANCHOR_SIGNER_KEYPAIR_PATH;
+  const keypairPath = process.env.CONTENT_ANCHOR_SIGNER_KEYPAIR_PATH?.trim();
   if (!keypairPath) {
     return null;
   }
@@ -140,7 +141,7 @@ const parseDigestHex = (digestHex: string, label: string): Uint8Array => {
 };
 
 const resolveIdlPath = (): string => {
-  const explicitPath = process.env.STREAMPUMP_IDL_PATH;
+  const explicitPath = process.env.STREAMPUMP_IDL_PATH?.trim();
   if (explicitPath) {
     const resolved = resolveHomePath(explicitPath);
     if (existsSync(resolved)) {
