@@ -20,7 +20,10 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_RENT_PUBKEY,
   SystemProgram,
+  TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 
 import { config } from "../../config/default";
@@ -258,6 +261,15 @@ export class AnchorService {
     return contentAnchor;
   }
 
+  async fetchProtocolConfigAccount(): Promise<any> {
+    const protocolConfigPda = this.deriveProtocolConfigPda();
+
+    return this.withRpcTimeout(
+      (this.program.account as any).protocolConfig.fetch(protocolConfigPda),
+      "fetch protocol_config account"
+    );
+  }
+
   async fetchProposalState(proposalPda: PublicKey): Promise<OnChainProposalState | null> {
     try {
       const proposal = (await this.withRpcTimeout(
@@ -426,6 +438,7 @@ export class AnchorService {
           })
           .accounts({
             creatorAuthority: creator,
+            payer: creator,
             creatorProfile: creatorProfilePda,
             contentAnchor: contentAnchorPda,
             systemProgram: SystemProgram.programId,
@@ -439,6 +452,184 @@ export class AnchorService {
       return signature;
     } catch (error) {
       throw this.wrapRpcError("executeAnchorContentHash", error);
+    }
+  }
+
+  async buildAnchorContentHashInstruction(params: {
+    creatorWallet: string;
+    payerWallet: string;
+    canonicalUrl: string;
+    contentHashHex: string;
+  }): Promise<TransactionInstruction> {
+    const trimmedUrl = params.canonicalUrl.trim();
+    if (!trimmedUrl) {
+      throw new Error("canonicalUrl is required");
+    }
+
+    const creator = new PublicKey(params.creatorWallet);
+    const payer = new PublicKey(params.payerWallet);
+    const creatorProfilePda = this.deriveCreatorProfilePda(creator);
+    const urlDigest = keccak_256(new TextEncoder().encode(trimmedUrl));
+    const contentDigest = parseDigestHex(params.contentHashHex, "contentHashHex");
+    const contentAnchorPda = this.deriveContentAnchorPda(creatorProfilePda, urlDigest);
+
+    return (this.program.methods as any)
+      .anchorContentHash({
+        canonicalUrl: trimmedUrl,
+        urlDigest: Array.from(urlDigest),
+        contentDigest: Array.from(contentDigest),
+      })
+      .accounts({
+        creatorAuthority: creator,
+        payer,
+        creatorProfile: creatorProfilePda,
+        contentAnchor: contentAnchorPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+  }
+
+  async buildCreateProposalInstruction(params: {
+    creatorWallet: string;
+    payerWallet: string;
+    proposalPda: string;
+    proposalUsdcVaultPda: string;
+    contentKind: Record<string, any>;
+    contentHashHex: string;
+    contentAnchorPda: string;
+    track1BaseUsdc: bigint;
+    track2MetricType: Record<string, any>;
+    track2TargetValue: bigint;
+    track2MinAchievementBps: number;
+    track3DelayDays: number;
+    deadlineUnix: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfigPda = this.deriveProtocolConfigPda();
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const creator = new PublicKey(params.creatorWallet);
+    const payer = new PublicKey(params.payerWallet);
+    const proposal = new PublicKey(params.proposalPda);
+    const proposalUsdcVault = new PublicKey(params.proposalUsdcVaultPda);
+    const creatorProfilePda = this.deriveCreatorProfilePda(creator);
+    const contentAnchorPda = new PublicKey(params.contentAnchorPda);
+
+    return (this.program.methods as any)
+      .createProposal({
+        contentKind: params.contentKind,
+        contentHash: Array.from(parseDigestHex(params.contentHashHex, "contentHashHex")),
+        contentAnchorPda,
+        track1BaseUsdc: new BN(params.track1BaseUsdc.toString()),
+        track2MetricType: params.track2MetricType,
+        track2TargetValue: new BN(params.track2TargetValue.toString()),
+        track2MinAchievementBps: params.track2MinAchievementBps,
+        track3DelayDays: params.track3DelayDays,
+        deadline: new BN(params.deadlineUnix.toString()),
+      })
+      .accounts({
+        creator,
+        payer,
+        protocolConfig: protocolConfigPda,
+        creatorProfile: creatorProfilePda,
+        proposal,
+        usdcVault: proposalUsdcVault,
+        usdcMint: protocolConfig.usdcMint as PublicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .remainingAccounts([
+        {
+          pubkey: contentAnchorPda,
+          isSigner: false,
+          isWritable: false,
+        },
+      ])
+      .instruction();
+  }
+
+  async buildSponsorFundInstruction(params: {
+    sponsorWallet: string;
+    proposalPda: string;
+    proposalUsdcVaultPda: string;
+    track1Amount: bigint;
+    track2Amount: bigint;
+    track3Amount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const proposal = new PublicKey(params.proposalPda);
+    const proposalUsdcVault = new PublicKey(params.proposalUsdcVaultPda);
+    const sponsorUsdcAta = getAssociatedTokenAddressSync(
+      protocolConfig.usdcMint as PublicKey,
+      sponsor
+    );
+
+    return (this.program.methods as any)
+      .sponsorFund({
+        track1Amount: new BN(params.track1Amount.toString()),
+        track2Amount: new BN(params.track2Amount.toString()),
+        track3Amount: new BN(params.track3Amount.toString()),
+      })
+      .accounts({
+        sponsor,
+        proposal,
+        sponsorUsdcAta,
+        proposalUsdcVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async sendAndConfirmVersionedTransaction(params: {
+    serializedTxBase64: string;
+    recentBlockhash: string;
+    lastValidBlockHeight: bigint;
+  }): Promise<string> {
+    const signature = await this.sendVersionedTransaction(params.serializedTxBase64);
+    await this.confirmSubmittedVersionedTransaction({
+      signature,
+      recentBlockhash: params.recentBlockhash,
+      lastValidBlockHeight: params.lastValidBlockHeight,
+    });
+
+    return signature;
+  }
+
+  async sendVersionedTransaction(serializedTxBase64: string): Promise<string> {
+    const transaction = VersionedTransaction.deserialize(
+      Buffer.from(serializedTxBase64, "base64")
+    );
+
+    return this.withRpcTimeout(
+      this.connection.sendRawTransaction(transaction.serialize(), {
+        preflightCommitment: PROGRAM_COMMITMENT,
+        maxRetries: 3,
+      }),
+      "send versioned transaction"
+    );
+  }
+
+  async confirmSubmittedVersionedTransaction(params: {
+    signature: string;
+    recentBlockhash: string;
+    lastValidBlockHeight: bigint;
+  }): Promise<void> {
+    const confirmation = await this.withRpcTimeout(
+      this.connection.confirmTransaction(
+        {
+          blockhash: params.recentBlockhash,
+          lastValidBlockHeight: Number(params.lastValidBlockHeight),
+          signature: params.signature,
+        },
+        PROGRAM_COMMITMENT
+      ),
+      "confirm versioned transaction"
+    );
+
+    if (confirmation.value.err) {
+      throw new Error(
+        `Transaction ${params.signature} failed during confirmation: ${JSON.stringify(confirmation.value.err)}`
+      );
     }
   }
 

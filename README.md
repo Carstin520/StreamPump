@@ -127,14 +127,18 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - Track 2 sweep and automatic-settlement primitives
 - user profile and organization role primitives on-chain
 - backend data model upgrade to `ContentManifest + ProposalIntent + TxBundle`
-- backend `v1` route skeleton for the new launch flow
+- backend `v1` routes for the new launch flow
+- real Phase 1 launch bundle assembly with creator approval separated from external rent payment
+- wallet challenge/signature auth with Bearer sessions for `v1` content and proposal launch routes
+- real local media flow verified across `Neon + AWS S3 + Mux`
+- real Mux webhook delivery verified in local development via `Cloudflare Tunnel`
 
 ### Still under construction
 
-- final `VersionedTransaction` bundle assembly for one-shot proposal launch
-- production-grade wallet authentication
+- bundle expiry rebuild, idempotent retry, and full launch-ops hardening
 - full backend task engine for daily SPUMP rewards and quests
 - dispute / review workflow
+- Mux reconciliation job for missed webhook recovery
 - real operator dashboards for creator, sponsor, MCN
 - actual frontend product experience
 
@@ -178,6 +182,21 @@ Instead of creating a chain-facing proposal draft too early, the backend now sep
 - `Proposal`: the confirmed on-chain projection
 
 That split is much closer to how the product really works.
+
+The current Phase 1 launch path already supports:
+
+- a real `VersionedTransaction`
+- creator signature as business approval
+- sponsor or external payer covering rent and transaction fee
+- atomic proposal creation plus sponsor funding
+- bundle reuse while active, bundle rebuild after expiry, and retry-safe submission keyed by the same signed transaction
+
+The current backend auth path supports:
+
+- `POST /api/v1/auth/challenge`
+- `POST /api/v1/auth/verify`
+- Bearer session auth on `v1/content/*` and `v1/proposal-intents/*`
+- optional legacy `x-wallet-address` fallback only when explicitly enabled in local env
 
 ## Who This Product Is For
 
@@ -240,6 +259,33 @@ cp backend/.env.example backend/.env.local
 ```
 
 Then fill real values into `backend/.env.local` only.
+
+Local video smoke test:
+
+```bash
+cd backend
+node scripts/muxVideoSmokeTest.js ../test_files/test_mux.mp4
+```
+
+Direct Mux asset inspection:
+
+```bash
+cd backend
+node scripts/muxAssetStatus.js <muxAssetId>
+```
+
+For local Mux webhook testing, the most reliable path we have verified is:
+
+1. run the backend on `:4000`
+2. expose it with Cloudflare Tunnel
+3. register the tunnel URL as a real Mux webhook endpoint
+4. use that endpoint secret as `MUX_WEBHOOK_SECRET`
+
+Quick Tunnel example:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:4000
+```
 
 Git safety notes:
 

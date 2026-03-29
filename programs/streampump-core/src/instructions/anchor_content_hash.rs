@@ -20,6 +20,8 @@ pub struct AnchorContentHashArgs {
 pub struct AnchorContentHash<'info> {
     #[account(mut)]
     pub creator_authority: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(
         seeds = [b"creator", creator_authority.key().as_ref()],
         bump = creator_profile.bump,
@@ -28,7 +30,7 @@ pub struct AnchorContentHash<'info> {
     pub creator_profile: Account<'info, CreatorProfile>,
     #[account(
         init,
-        payer = creator_authority,
+        payer = payer,
         seeds = [
             b"content_anchor",
             creator_profile.key().as_ref(),

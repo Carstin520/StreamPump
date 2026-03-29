@@ -12,8 +12,11 @@ import {
   submitProposalBundle,
   lockProposalIntent,
 } from "../../controllers/proposalIntentController";
+import { requireWalletAuth } from "../../middleware/walletAuth";
 
 const router = Router();
+
+router.use(requireWalletAuth);
 
 router.post("/", createProposalIntent);
 router.post("/:intentId/lock", lockProposalIntent);

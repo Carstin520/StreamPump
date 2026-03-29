@@ -1,16 +1,19 @@
 /**
- * CN: Proposal intent 控制器，管理从业务草稿到 bundle skeleton 的后端状态机。
- * EN: Proposal intent controller that manages the backend state machine from business draft to bundle skeleton.
+ * CN: Proposal intent 控制器，管理从业务草稿到真实 v0 launch bundle 的后端状态机。
+ * EN: Proposal intent controller that manages the backend state machine from business draft to a real v0 launch bundle.
  */
 import {
   BundleStatus,
   BundleSubmitMode,
   ContentManifestStatus,
+  OracleSyncStatus,
   Proposal,
+  ProposalStatus,
   ProposalIntent,
   ProposalIntentStatus,
   Track2MetricType,
 } from "@prisma/client";
+import bs58 from "bs58";
 import { Request, Response } from "express";
 
 import {
@@ -26,11 +29,17 @@ import {
   parseWallet,
 } from "./http";
 import {
-  buildBundleSkeletonRecord,
+  assertRequiredSignerPresent,
+  assertTransactionMessageMatches,
+  buildBundleRecord,
+  decodeVersionedTransaction,
+  buildLaunchBundleTransaction,
   buildInstructionPlan,
+  derivePlannedContentAnchorPda,
   deriveIntentAddresses,
 } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
+import { getAnchorService } from "../services/AnchorService";
 
 const parseTrack2MetricType = (value: unknown): Track2MetricType => {
   const normalized = String(value ?? "").trim().toUpperCase();
@@ -64,7 +73,48 @@ const parseBundleSubmitMode = (value: unknown): BundleSubmitMode => {
   throw new HttpError(400, "INVALID_INPUT", "submitMode must be SERVER_RELAY or CLIENT_RELAY");
 };
 
-const getRequesterWallet = (req: Request): string => parseWallet(req.header("x-wallet-address"), "x-wallet-address");
+const parseOptionalBoolean = (value: unknown): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+};
+
+const getRequesterWallet = (req: Request): string =>
+  req.auth?.wallet ?? parseWallet(req.header("x-wallet-address"), "x-wallet-address");
+
+export const isBundleExpired = (bundle: { expiresAt: Date }): boolean =>
+  bundle.expiresAt.getTime() <= Date.now();
+
+export const isBundleReusable = (bundle: { status: BundleStatus; expiresAt: Date }): boolean => {
+  if (bundle.status === BundleStatus.CONFIRMED) {
+    return true;
+  }
+
+  if (isBundleExpired(bundle)) {
+    return false;
+  }
+
+  return (
+    bundle.status === BundleStatus.BUILT ||
+    bundle.status === BundleStatus.PARTIAL ||
+    bundle.status === BundleStatus.FULLY_SIGNED ||
+    bundle.status === BundleStatus.SUBMITTED
+  );
+};
+
+export const extractTransactionSignature = (serializedTxBase64: string): string => {
+  const transaction = decodeVersionedTransaction(serializedTxBase64);
+  const firstSignature = transaction.signatures[0];
+
+  if (!firstSignature || firstSignature.every((byte) => byte === 0)) {
+    throw new Error("fully signed transaction is missing the sponsor signature");
+  }
+
+  return bs58.encode(firstSignature);
+};
 
 const serializeIntent = (intent: ProposalIntent) => ({
   intentId: intent.id,
@@ -83,6 +133,7 @@ const serializeIntent = (intent: ProposalIntent) => ({
   track2MetricType: intent.track2MetricType,
   track2TargetValue: intent.track2TargetValue.toString(),
   track2MinAchievementBps: intent.track2MinAchievementBps,
+  track2UsdcDeposited: intent.track2UsdcDeposited.toString(),
   track3UsdcDeposited: intent.track3UsdcDeposited.toString(),
   track3DelayDays: intent.track3DelayDays,
   plannedProposalPda: intent.plannedProposalPda,
@@ -160,6 +211,120 @@ const assertParticipant = (requesterWallet: string, intent: ProposalIntent): voi
   }
 };
 
+const finalizeConfirmedLaunchBundle = async (params: {
+  intentId: string;
+  bundleId: string;
+  fullySignedTxBase64: string;
+  chainTxSignature: string;
+}) => {
+  const latestIntent = await prisma.proposalIntent.findUnique({
+    where: { id: params.intentId },
+    include: {
+      manifest: true,
+    },
+  });
+
+  if (!latestIntent) {
+    throw new HttpError(404, "INTENT_NOT_FOUND", "proposal intent not found after submission");
+  }
+
+  const contentAnchorPda = derivePlannedContentAnchorPda({
+    creatorWallet: latestIntent.creatorWallet,
+    manifest: latestIntent.manifest,
+    lockedAnchorPda: latestIntent.lockedAnchorPda,
+  });
+
+  return prisma.$transaction(async (tx) => {
+    const updatedBundle = await tx.txBundle.update({
+      where: { id: params.bundleId },
+      data: {
+        fullySignedBase64: params.fullySignedTxBase64,
+        status: BundleStatus.CONFIRMED,
+        chainTxSignature: params.chainTxSignature,
+        errorMessage: null,
+      },
+    });
+
+    await tx.proposalIntent.update({
+      where: { id: latestIntent.id },
+      data: {
+        status: ProposalIntentStatus.CONFIRMED,
+        version: {
+          increment: 1,
+        },
+        sponsorApprovedAt: latestIntent.sponsorApprovedAt ?? new Date(),
+        chainTxSignature: params.chainTxSignature,
+        chainSubmittedAt: latestIntent.chainSubmittedAt ?? new Date(),
+        chainConfirmedAt: new Date(),
+        failureReason: null,
+      },
+    });
+
+    await tx.contentManifest.update({
+      where: { id: latestIntent.manifest.id },
+      data: {
+        currentAnchorPda: contentAnchorPda,
+        currentAnchorTx: params.chainTxSignature,
+        status: latestIntent.manifest.currentAnchorPda
+          ? latestIntent.manifest.status
+          : ContentManifestStatus.ANCHORED,
+      },
+    });
+
+    await tx.proposal.upsert({
+      where: {
+        proposalPda: latestIntent.plannedProposalPda!,
+      },
+      update: {
+        sponsorWallet: latestIntent.sponsorWallet,
+        sponsorOrgId: latestIntent.sponsorOrgId,
+        creatorOrgId: latestIntent.creatorOrgId,
+        manifestId: latestIntent.manifestId,
+        intentId: latestIntent.id,
+        contentHashHex: latestIntent.lockedManifestHashHex,
+        contentAnchorPda,
+        onChainTxSignature: params.chainTxSignature,
+        deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
+        status: ProposalStatus.FUNDED,
+        track1BaseUsdc: latestIntent.track1BaseUsdc,
+        track1Claimed: false,
+        track2MetricType: latestIntent.track2MetricType,
+        track2TargetValue: latestIntent.track2TargetValue,
+        track2MinAchievementBps: latestIntent.track2MinAchievementBps,
+        track2UsdcDeposited: latestIntent.track2UsdcDeposited,
+        track3UsdcDeposited: latestIntent.track3UsdcDeposited,
+        track3DelayDays: latestIntent.track3DelayDays,
+        oracleSyncStatus: OracleSyncStatus.PENDING,
+      },
+      create: {
+        proposalPda: latestIntent.plannedProposalPda!,
+        creatorWallet: latestIntent.creatorWallet,
+        sponsorWallet: latestIntent.sponsorWallet,
+        sponsorOrgId: latestIntent.sponsorOrgId,
+        creatorOrgId: latestIntent.creatorOrgId,
+        manifestId: latestIntent.manifestId,
+        intentId: latestIntent.id,
+        contentHashHex: latestIntent.lockedManifestHashHex,
+        contentAnchorPda,
+        deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
+        status: ProposalStatus.FUNDED,
+        track1BaseUsdc: latestIntent.track1BaseUsdc,
+        track1Claimed: false,
+        track2MetricType: latestIntent.track2MetricType,
+        track2TargetValue: latestIntent.track2TargetValue,
+        track2MinAchievementBps: latestIntent.track2MinAchievementBps,
+        track2UsdcDeposited: latestIntent.track2UsdcDeposited,
+        track3UsdcDeposited: latestIntent.track3UsdcDeposited,
+        track3DelayDays: latestIntent.track3DelayDays,
+        onChainTxSignature: params.chainTxSignature,
+        oracleSyncStatus: OracleSyncStatus.PENDING,
+      },
+    });
+
+    return updatedBundle;
+  });
+};
+
 export const createProposalIntent = async (req: Request, res: Response) => {
   try {
     ensureIdempotencyKey(req);
@@ -225,6 +390,10 @@ export const createProposalIntent = async (req: Request, res: Response) => {
         track2MetricType: parseTrack2MetricType(req.body.track2MetricType),
         track2TargetValue: parseNonNegativeBigInt(req.body.track2TargetValue, "track2TargetValue"),
         track2MinAchievementBps,
+        track2UsdcDeposited: parseNonNegativeBigInt(
+          req.body.track2UsdcDeposited,
+          "track2UsdcDeposited"
+        ),
         track3UsdcDeposited: parseNonNegativeBigInt(
           req.body.track3UsdcDeposited,
           "track3UsdcDeposited"
@@ -312,10 +481,17 @@ export const buildProposalLaunchBundle = async (req: Request, res: Response) => 
     const requesterWallet = getRequesterWallet(req);
     const intentId = parseNonEmptyString(req.params.intentId, "intentId");
     const submitMode = parseBundleSubmitMode(req.body.submitMode);
+    const forceRebuild = parseOptionalBoolean(req.body.forceRebuild);
     const intent = await prisma.proposalIntent.findUnique({
       where: { id: intentId },
       include: {
         manifest: true,
+        txBundles: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
       },
     });
 
@@ -325,21 +501,65 @@ export const buildProposalLaunchBundle = async (req: Request, res: Response) => 
 
     assertParticipant(requesterWallet, intent);
 
-    if (intent.status !== ProposalIntentStatus.TERMS_LOCKED) {
-      throw new HttpError(409, "INTENT_NOT_LOCKED", "proposal intent must be TERMS_LOCKED before build");
+    if (intent.txBundles[0] && !forceRebuild && isBundleReusable(intent.txBundles[0])) {
+      ok(res, {
+        intentId: intent.id,
+        plannedProposalPda: intent.plannedProposalPda,
+        plannedContentAnchorPda: derivePlannedContentAnchorPda({
+          creatorWallet: intent.creatorWallet,
+          manifest: intent.manifest,
+          lockedAnchorPda: intent.lockedAnchorPda,
+        }),
+        bundle: serializeBundle(intent.txBundles[0]),
+        reused: true,
+      });
+      return;
     }
 
-    // The launch plan changes depending on whether the manifest already has an on-chain content anchor.
-    const instructionPlan = buildInstructionPlan(intent.manifest, intent);
+    if (
+      intent.status !== ProposalIntentStatus.TERMS_LOCKED &&
+      intent.status !== ProposalIntentStatus.BUNDLE_BUILT &&
+      intent.status !== ProposalIntentStatus.CREATOR_PARTIALLY_SIGNED &&
+      intent.status !== ProposalIntentStatus.SPONSOR_SIGNED &&
+      intent.status !== ProposalIntentStatus.SUBMITTED &&
+      intent.status !== ProposalIntentStatus.FAILED &&
+      intent.status !== ProposalIntentStatus.EXPIRED
+    ) {
+      throw new HttpError(
+        409,
+        "INTENT_NOT_REBUILDABLE",
+        "proposal intent must be terms-locked or in a rebuildable launch state before build"
+      );
+    }
+
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const assembled = await buildLaunchBundleTransaction({
+      intent,
+      manifest: intent.manifest,
+    });
 
     const bundle = await prisma.$transaction(async (tx) => {
+      const latestBundle = intent.txBundles[0];
+
+      if (latestBundle && latestBundle.status !== BundleStatus.CONFIRMED && isBundleExpired(latestBundle)) {
+        await tx.txBundle.update({
+          where: { id: latestBundle.id },
+          data: {
+            status: BundleStatus.EXPIRED,
+            errorMessage: "bundle expired before submission completed",
+          },
+        });
+      }
+
       const createdBundle = await tx.txBundle.create({
-        data: buildBundleSkeletonRecord({
+        data: buildBundleRecord({
           intent,
-          instructionPlan,
+          instructionPlan: assembled.instructionPlan,
           submitMode,
           expiresAt,
+          versionedTxBase64: assembled.versionedTxBase64,
+          recentBlockhash: assembled.recentBlockhash,
+          lastValidBlockHeight: assembled.lastValidBlockHeight,
         }),
       });
 
@@ -350,6 +570,12 @@ export const buildProposalLaunchBundle = async (req: Request, res: Response) => 
           version: {
             increment: 1,
           },
+          creatorApprovedAt: null,
+          sponsorApprovedAt: null,
+          chainTxSignature: null,
+          chainSubmittedAt: null,
+          chainConfirmedAt: null,
+          failureReason: null,
         },
       });
 
@@ -359,9 +585,9 @@ export const buildProposalLaunchBundle = async (req: Request, res: Response) => 
     ok(res, {
       intentId: intent.id,
       plannedProposalPda: intent.plannedProposalPda,
-      plannedContentAnchorPda: intent.manifest.currentAnchorPda,
+      plannedContentAnchorPda: assembled.plannedContentAnchorPda,
       bundle: serializeBundle(bundle),
-      note: "This route is intentionally a skeleton. Atomic VersionedTransaction assembly is the next implementation step.",
+      reused: false,
     });
   } catch (error) {
     handleControllerError(res, error, "BUILD_PROPOSAL_BUNDLE_FAILED");
@@ -403,8 +629,35 @@ export const creatorPartialSignBundle = async (req: Request, res: Response) => {
       throw new HttpError(404, "BUNDLE_NOT_FOUND", "tx bundle not found");
     }
 
+    if (
+      bundle.status === BundleStatus.PARTIAL &&
+      bundle.partiallySignedBase64 === partiallySignedTxBase64
+    ) {
+      ok(res, {
+        intentId,
+        bundle: serializeBundle(bundle),
+        replayed: true,
+      });
+      return;
+    }
+
+    if (bundle.status !== BundleStatus.BUILT) {
+      throw new HttpError(409, "BUNDLE_NOT_BUILDABLE", "bundle must be in BUILT status");
+    }
+
+    if (!bundle.messageBase64) {
+      throw new HttpError(409, "BUNDLE_MESSAGE_MISSING", "bundle is missing serialized transaction data");
+    }
+
+    if (bundle.expiresAt.getTime() <= Date.now()) {
+      throw new HttpError(409, "BUNDLE_EXPIRED", "bundle has expired and must be rebuilt");
+    }
+
+    assertTransactionMessageMatches(bundle.messageBase64, partiallySignedTxBase64);
+    assertRequiredSignerPresent(partiallySignedTxBase64, intent.creatorWallet);
+
     const updated = await prisma.$transaction(async (tx) => {
-      // Creator signs first because create_proposal still requires creator authority under the current program rules.
+      // Creator approves the exact launch transaction message; payer responsibility is separated from author approval.
       const updatedBundle = await tx.txBundle.update({
         where: { id: bundle.id },
         data: {
@@ -431,6 +684,7 @@ export const creatorPartialSignBundle = async (req: Request, res: Response) => {
     ok(res, {
       intentId,
       bundle: serializeBundle(updated),
+      replayed: false,
     });
   } catch (error) {
     handleControllerError(res, error, "CREATOR_PARTIAL_SIGN_FAILED");
@@ -469,36 +723,245 @@ export const submitProposalBundle = async (req: Request, res: Response) => {
       throw new HttpError(404, "BUNDLE_NOT_FOUND", "tx bundle not found");
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      // Sponsor is the final signer in the current hybrid launch flow before relay/submission.
+    if (
+      bundle.status !== BundleStatus.PARTIAL &&
+      bundle.status !== BundleStatus.FAILED &&
+      bundle.status !== BundleStatus.FULLY_SIGNED &&
+      bundle.status !== BundleStatus.SUBMITTED &&
+      bundle.status !== BundleStatus.CONFIRMED
+    ) {
+      throw new HttpError(
+        409,
+        "BUNDLE_NOT_READY",
+        "bundle must be partial, failed, or already submitted before final sponsor submission"
+      );
+    }
+
+    if (!bundle.messageBase64 || !bundle.recentBlockhash || bundle.lastValidBlockHeight === null) {
+      throw new HttpError(409, "BUNDLE_MESSAGE_MISSING", "bundle is missing relay metadata");
+    }
+
+    if (bundle.expiresAt.getTime() <= Date.now()) {
+      throw new HttpError(409, "BUNDLE_EXPIRED", "bundle has expired and must be rebuilt");
+    }
+
+    const chainTxSignature = extractTransactionSignature(fullySignedTxBase64);
+
+    if (bundle.chainTxSignature && bundle.chainTxSignature !== chainTxSignature) {
+      throw new HttpError(
+        409,
+        "BUNDLE_SIGNATURE_MISMATCH",
+        "submitted transaction signature does not match the stored bundle signature"
+      );
+    }
+
+    if (bundle.chainTxSignature && bundle.status === BundleStatus.CONFIRMED) {
+      ok(res, {
+        intentId,
+        bundle: serializeBundle(bundle),
+        relayStatus: "ALREADY_CONFIRMED",
+        chainTxSignature: bundle.chainTxSignature,
+      });
+      return;
+    }
+
+    assertTransactionMessageMatches(bundle.messageBase64, fullySignedTxBase64);
+    assertRequiredSignerPresent(fullySignedTxBase64, intent.creatorWallet);
+    assertRequiredSignerPresent(fullySignedTxBase64, intent.sponsorWallet);
+
+    if (bundle.submitMode === BundleSubmitMode.CLIENT_RELAY) {
+      if (bundle.status === BundleStatus.FULLY_SIGNED && bundle.fullySignedBase64 === fullySignedTxBase64) {
+        ok(res, {
+          intentId,
+          bundle: serializeBundle(bundle),
+          relayStatus: "CLIENT_RELAY_PENDING",
+        });
+        return;
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const updatedBundle = await tx.txBundle.update({
+          where: { id: bundle.id },
+          data: {
+            fullySignedBase64: fullySignedTxBase64,
+            status: BundleStatus.FULLY_SIGNED,
+            chainTxSignature,
+            errorMessage: null,
+          },
+        });
+
+        await tx.proposalIntent.update({
+          where: { id: intent.id },
+          data: {
+            status: ProposalIntentStatus.SPONSOR_SIGNED,
+            version: {
+              increment: 1,
+            },
+            sponsorApprovedAt: new Date(),
+            chainTxSignature,
+          },
+        });
+
+        return updatedBundle;
+      });
+
+      ok(res, {
+        intentId,
+        bundle: serializeBundle(updated),
+        relayStatus: "CLIENT_RELAY_PENDING",
+      });
+      return;
+    }
+
+    const anchorService = getAnchorService();
+
+    if (bundle.status === BundleStatus.SUBMITTED && bundle.chainTxSignature === chainTxSignature) {
+      const signatureState = await anchorService.getSignatureState(chainTxSignature);
+
+      if (signatureState === "SUCCESS") {
+        const confirmedProposal = await finalizeConfirmedLaunchBundle({
+          intentId,
+          bundleId: bundle.id,
+          fullySignedTxBase64,
+          chainTxSignature,
+        });
+
+        ok(res, {
+          intentId,
+          bundle: serializeBundle(confirmedProposal),
+          relayStatus: "CONFIRMED",
+          chainTxSignature,
+        });
+        return;
+      }
+
+      if (signatureState === "PENDING") {
+        ok(res, {
+          intentId,
+          bundle: serializeBundle(bundle),
+          relayStatus: "SUBMITTED_PENDING",
+          chainTxSignature,
+        });
+        return;
+      }
+    }
+
+    const submittedBundle = await prisma.$transaction(async (tx) => {
       const updatedBundle = await tx.txBundle.update({
         where: { id: bundle.id },
         data: {
           fullySignedBase64: fullySignedTxBase64,
-          status: BundleStatus.FULLY_SIGNED,
-          errorMessage: "Relay submission is not implemented in this skeleton yet.",
+          status: BundleStatus.SUBMITTED,
+          chainTxSignature,
+          errorMessage: null,
         },
       });
 
       await tx.proposalIntent.update({
         where: { id: intent.id },
         data: {
-          status: ProposalIntentStatus.SPONSOR_SIGNED,
+          status: ProposalIntentStatus.SUBMITTED,
           version: {
             increment: 1,
           },
           sponsorApprovedAt: new Date(),
+          chainTxSignature,
+          chainSubmittedAt: new Date(),
+          failureReason: null,
         },
       });
 
       return updatedBundle;
     });
 
-    ok(res, {
-      intentId,
-      bundle: serializeBundle(updated),
-      relayStatus: "PENDING_IMPLEMENTATION",
-    });
+    try {
+      const submittedSignature = await anchorService.sendVersionedTransaction(fullySignedTxBase64);
+
+      if (submittedSignature !== chainTxSignature) {
+        throw new Error(
+          `submitted signature mismatch: expected ${chainTxSignature}, got ${submittedSignature}`
+        );
+      }
+
+      await anchorService.confirmSubmittedVersionedTransaction({
+        signature: chainTxSignature,
+        recentBlockhash: bundle.recentBlockhash,
+        lastValidBlockHeight: bundle.lastValidBlockHeight,
+      });
+
+      const confirmedProposal = await finalizeConfirmedLaunchBundle({
+        intentId,
+        bundleId: bundle.id,
+        fullySignedTxBase64,
+        chainTxSignature,
+      });
+
+      ok(res, {
+        intentId,
+        bundle: serializeBundle(confirmedProposal),
+        relayStatus: "CONFIRMED",
+        chainTxSignature,
+      });
+      return;
+    } catch (error) {
+      const signatureState = await anchorService.getSignatureState(chainTxSignature);
+
+      if (signatureState === "SUCCESS") {
+        const confirmedProposal = await finalizeConfirmedLaunchBundle({
+          intentId,
+          bundleId: bundle.id,
+          fullySignedTxBase64,
+          chainTxSignature,
+        });
+
+        ok(res, {
+          intentId,
+          bundle: serializeBundle(confirmedProposal),
+          relayStatus: "CONFIRMED",
+          chainTxSignature,
+        });
+        return;
+      }
+
+      if (signatureState === "PENDING") {
+        ok(res, {
+          intentId,
+          bundle: serializeBundle(submittedBundle),
+          relayStatus: "SUBMITTED_PENDING",
+          chainTxSignature,
+        });
+        return;
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.txBundle.update({
+          where: { id: bundle.id },
+          data: {
+            status: BundleStatus.FAILED,
+            chainTxSignature,
+            fullySignedBase64: fullySignedTxBase64,
+            errorMessage: error instanceof Error ? error.message : "bundle relay failed",
+          },
+        });
+
+        await tx.proposalIntent.update({
+          where: { id: intent.id },
+          data: {
+            status: ProposalIntentStatus.FAILED,
+            version: {
+              increment: 1,
+            },
+            failureReason: error instanceof Error ? error.message : "bundle relay failed",
+          },
+        });
+      });
+
+      throw new HttpError(
+        502,
+        "BUNDLE_RELAY_FAILED",
+        error instanceof Error ? error.message : "bundle relay failed"
+      );
+    }
   } catch (error) {
     handleControllerError(res, error, "SUBMIT_PROPOSAL_BUNDLE_FAILED");
   }
@@ -545,7 +1008,9 @@ export const getProposalById = async (req: Request, res: Response) => {
       throw new HttpError(404, "PROPOSAL_NOT_FOUND", "proposal not found");
     }
 
-    const requesterWallet = parseOptionalWallet(req.header("x-wallet-address"), "x-wallet-address");
+    const requesterWallet =
+      req.auth?.wallet ??
+      parseOptionalWallet(req.header("x-wallet-address"), "x-wallet-address");
     const isCreatorOrSponsor =
       requesterWallet !== null &&
       (requesterWallet === proposal.creatorWallet || requesterWallet === proposal.sponsorWallet);

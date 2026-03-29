@@ -11,8 +11,11 @@ import {
   finalizeContentManifest,
   presignManifestAssets,
 } from "../../controllers/contentManifestController";
+import { requireWalletAuth } from "../../middleware/walletAuth";
 
 const router = Router();
+
+router.use(requireWalletAuth);
 
 router.post("/manifests", createContentManifest);
 router.post("/manifests/:manifestId/assets/presign", presignManifestAssets);

@@ -8,8 +8,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node", "mocha"]
   },
-  "include": ["index.ts", "src/**/*.ts", "config/**/*.ts"],
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.d.ts", "config/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

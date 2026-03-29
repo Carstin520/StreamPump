@@ -285,6 +285,9 @@ model ProposalIntent {
   track2MetricType        Track2MetricType
   track2TargetValue       BigInt
   track2MinAchievementBps Int
+  /// CN: Track2 预算（USDC 最小单位），用于 sponsor_fund 真实注资。
+  /// EN: Track2 budget in USDC base units, used for the actual sponsor_fund instruction.
+  track2UsdcDeposited     BigInt               @default(0)
   track3UsdcDeposited     BigInt
   track3DelayDays         Int
   /// CN: 预推导的 Proposal PDA，供 bundle 组装和后续链上投影使用。
@@ -317,8 +320,8 @@ model TxBundle {
   /// CN: 计划打包进交易的 instruction 顺序。
   /// EN: Ordered instruction plan intended for the transaction bundle.
   instructionPlanJson   Json
-  /// CN: 序列化后的 VersionedTransaction message，当前阶段可能为空 skeleton。
-  /// EN: Serialized VersionedTransaction message; may be null while the flow is still a skeleton.
+  /// CN: 序列化后的真实 VersionedTransaction（base64）。
+  /// EN: Serialized real VersionedTransaction encoded as base64.
   messageBase64         String?
   partiallySignedBase64 String?
   fullySignedBase64     String?
@@ -337,6 +340,32 @@ model TxBundle {
 
   @@index([intentId, status])
   @@index([expiresAt, status])
+}
+
+model WalletAuthChallenge {
+  id         String   @id @default(cuid())
+  wallet     String
+  nonce      String   @unique
+  message    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([wallet, expiresAt])
+}
+
+model WalletSession {
+  id         String   @id
+  wallet     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([wallet, expiresAt])
 }
 
 model Track2Event {

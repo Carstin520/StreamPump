@@ -812,6 +812,7 @@ const buildContext = async (): Promise<TestContext> => {
       })
       .accounts({
         creator: params.creator.publicKey,
+        payer: params.sponsor.publicKey,
         protocolConfig,
         creatorProfile,
         proposal,
@@ -821,7 +822,7 @@ const buildContext = async (): Promise<TestContext> => {
         systemProgram: SystemProgram.programId,
         rent: SYSVAR_RENT_PUBKEY,
       })
-      .signers([params.creator])
+      .signers([params.creator, params.sponsor])
       .rpc();
 
     // Step 2: Sponsor funds all three tracks in one call

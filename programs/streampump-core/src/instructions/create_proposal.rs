@@ -62,10 +62,15 @@ pub struct CreateProposalArgs {
 #[derive(Accounts)]
 #[instruction(args: CreateProposalArgs)]
 pub struct CreateProposal<'info> {
-    /// EN: Creator signing the transaction and paying rent for new accounts.
-    /// ZH: 创作者签名并支付新账户租金。
+    /// EN: Creator signing the proposal terms and authorizing the on-chain launch.
+    /// ZH: 创作者签署提案条款并授权链上发起。
     #[account(mut)]
     pub creator: Signer<'info>,
+
+    /// EN: External payer funding rent for proposal state and vault creation.
+    /// ZH: 外部付款人，为提案状态账户和金库账户支付租金。
+    #[account(mut)]
+    pub payer: Signer<'info>,
 
     /// EN: Global protocol configuration containing canonical SPUMP/USDC mint addresses.
     /// ZH: 全局协议配置，包含 SPUMP/USDC 的 mint 地址。
@@ -86,7 +91,7 @@ pub struct CreateProposal<'info> {
     /// ZH: 提案状态 PDA，种子为 [创作者, 截止时间]。
     #[account(
         init,
-        payer = creator,
+        payer = payer,
         seeds = [b"proposal", creator.key().as_ref(), &args.deadline.to_le_bytes()],
         bump,
         space = 8 + Proposal::INIT_SPACE
@@ -97,7 +102,7 @@ pub struct CreateProposal<'info> {
     /// ZH: 提案所有的 USDC 金库 PDA，存放 Track1/2/3 的全部资金。
     #[account(
         init,
-        payer = creator,
+        payer = payer,
         seeds = [b"proposal_usdc_vault", proposal.key().as_ref()],
         bump,
         token::mint = usdc_mint,

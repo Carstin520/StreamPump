@@ -79,6 +79,10 @@ export const parseWalletFromRequest = (
   headerName: string,
   bodyField: string
 ): string => {
+  if (req.auth?.wallet) {
+    return req.auth.wallet;
+  }
+
   return parseWallet(req.header(headerName) ?? req.body[bodyField], bodyField);
 };
 

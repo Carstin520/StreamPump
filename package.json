@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "test:anchor": "anchor test"
+    "test:anchor": "anchor test",
+    "test:backend": "ts-mocha -p backend/tsconfig.json backend/tests/**/*.spec.ts"
   },
   "devDependencies": {
     "@coral-xyz/anchor": "^0.30.1",

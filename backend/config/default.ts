@@ -8,6 +8,14 @@ export const config = {
   app: {
     apiBaseUrl: process.env.API_BASE_URL ?? "http://localhost:4000/api/v1",
   },
+  auth: {
+    sessionSecret:
+      process.env.AUTH_SESSION_SECRET ?? "dev-only-session-secret-change-me",
+    challengeTtlSeconds: Number(process.env.AUTH_CHALLENGE_TTL_SECONDS ?? 600),
+    sessionTtlSeconds: Number(process.env.AUTH_SESSION_TTL_SECONDS ?? 60 * 60 * 24 * 7),
+    allowLegacyWalletHeader:
+      String(process.env.AUTH_ALLOW_LEGACY_WALLET_HEADER ?? "false").toLowerCase() === "true",
+  },
   solana: {
     rpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com",
     programId: process.env.STREAMPUMP_PROGRAM_ID ?? "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre",
