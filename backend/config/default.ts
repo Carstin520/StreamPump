@@ -20,6 +20,21 @@ export const config = {
     rpcEndpoint: process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com",
     programId: process.env.STREAMPUMP_PROGRAM_ID ?? "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre",
   },
+  indexer: {
+    enabled: String(process.env.INDEXER_ENABLED ?? "true").toLowerCase() === "true",
+    backfillLimit: Number(process.env.INDEXER_BACKFILL_LIMIT ?? 100),
+    consumerKey: process.env.INDEXER_CONSUMER_KEY ?? "streampump_core_logs",
+  },
+  mux: {
+    reconciliation: {
+      enabled: String(process.env.MUX_RECONCILIATION_ENABLED ?? "true").toLowerCase() === "true",
+      runOnBoot: String(process.env.MUX_RECONCILIATION_RUN_ON_BOOT ?? "true").toLowerCase() === "true",
+      cron: process.env.MUX_RECONCILIATION_CRON ?? "*/10 * * * *",
+      batchSize: Number(process.env.MUX_RECONCILIATION_BATCH_SIZE ?? 50),
+      staleMinutes: Number(process.env.MUX_RECONCILIATION_STALE_MINUTES ?? 5),
+      maxAttempts: Number(process.env.MUX_RECONCILIATION_MAX_ATTEMPTS ?? 24),
+    },
+  },
   storage: {
     origin: {
       region: process.env.S3_REGION ?? "us-east-1",

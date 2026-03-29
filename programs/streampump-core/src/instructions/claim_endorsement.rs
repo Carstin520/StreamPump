@@ -26,6 +26,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::EndorsementSettled,
     state::{EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig},
     utils::{amount_from_bps, checked_sub},
 };
@@ -127,6 +128,8 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
 
     // EN: Build PDA signers for both proposal (USDC vault) and protocol (SPUMP mint).
     // ZH: 构造提案 PDA 签名（USDC 金库转出）和协议 PDA 签名（SPUMP 铸造）。
+    let spump_refund;
+    let mut usdc_reward = 0u64;
     let proposal_creator = ctx.accounts.proposal.creator;
     let deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
@@ -170,6 +173,7 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 ),
                 staked_amount,
             )?;
+            spump_refund = staked_amount;
 
             let proposal = &mut ctx.accounts.proposal;
             require!(
@@ -177,7 +181,7 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 StreamPumpError::InvalidAmount
             );
 
-            let usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
+            usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
                 proposal.track2_usdc_deposited
             } else if proposal.track2_unsettled_spump == 0 || proposal.track2_usdc_deposited == 0 {
                 0
@@ -228,6 +232,7 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
             // ────────────────────────────────────────────────────────────────
             let slash_amount = amount_from_bps(staked_amount, FAILED_SLASH_BPS)?;
             let refund_amount = checked_sub(staked_amount, slash_amount)?;
+            spump_refund = refund_amount;
 
             if refund_amount > 0 {
                 token_interface::mint_to(
@@ -239,9 +244,9 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                             authority: ctx.accounts.protocol_config.to_account_info(),
                         },
                         protocol_signer,
-                    ),
-                    refund_amount,
-                )?;
+                ),
+                refund_amount,
+            )?;
             }
 
             let proposal = &mut ctx.accounts.proposal;
@@ -271,6 +276,7 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 ),
                 staked_amount,
             )?;
+            spump_refund = staked_amount;
 
             let proposal = &mut ctx.accounts.proposal;
             if proposal.track2_unsettled_endorser_count > 0 {
@@ -288,5 +294,16 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     }
 
     ctx.accounts.endorsement_position.claimed = true;
+
+    emit!(EndorsementSettled {
+        proposal: ctx.accounts.proposal.key(),
+        user: ctx.accounts.user.key(),
+        staked_amount,
+        spump_refund,
+        usdc_reward,
+        status: proposal_status as u8,
+        claimed: ctx.accounts.endorsement_position.claimed,
+    });
+
     Ok(())
 }

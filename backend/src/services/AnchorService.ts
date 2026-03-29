@@ -36,8 +36,21 @@ export type SignatureState = "SUCCESS" | "FAILED" | "PENDING" | "NOT_FOUND";
 export interface OnChainProposalState {
   creator: PublicKey;
   sponsor: PublicKey | null;
+  status: "OPEN" | "FUNDED" | "RESOLVED_SUCCESS" | "RESOLVED_FAIL" | "CANCELLED" | "VOIDED";
+  contentKind: "SHORT_VIDEO" | "IMAGE_CAROUSEL" | "MIXED_MEDIA_NOTE";
+  contentHashHex: string;
+  contentAnchorPda: string | null;
+  track1BaseUsdc: bigint;
   track1Claimed: boolean;
+  track2MetricType: "VIEWS" | "CLICKS" | "SAVES";
+  track2TargetValue: bigint;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: bigint;
+  track2ActualValue: bigint | null;
   track2SettledAtUnix: bigint;
+  track3UsdcDeposited: bigint;
+  track3CpsPayout: bigint | null;
+  track3DelayDays: number;
   track3SettledAtUnix: bigint;
   deadlineUnix: bigint;
 }
@@ -75,6 +88,83 @@ const toU64Bn = (value: number, fieldName: string): BN => {
   }
 
   return new BN(String(value));
+};
+
+const anchorEnumKey = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (value && typeof value === "object") {
+    const firstKey = Object.keys(value as Record<string, unknown>)[0];
+    if (firstKey) {
+      return firstKey;
+    }
+  }
+
+  throw new Error(`Unable to resolve Anchor enum key from value: ${String(value)}`);
+};
+
+const mapProposalStatus = (
+  value: unknown
+): OnChainProposalState["status"] => {
+  const normalized = anchorEnumKey(value).toLowerCase();
+
+  switch (normalized) {
+    case "open":
+      return "OPEN";
+    case "funded":
+      return "FUNDED";
+    case "resolved_success":
+    case "resolvedsuccess":
+      return "RESOLVED_SUCCESS";
+    case "resolved_fail":
+    case "resolvedfail":
+      return "RESOLVED_FAIL";
+    case "cancelled":
+      return "CANCELLED";
+    case "voided":
+      return "VOIDED";
+    default:
+      throw new Error(`Unsupported on-chain proposal status: ${normalized}`);
+  }
+};
+
+const mapProposalMetricType = (
+  value: unknown
+): OnChainProposalState["track2MetricType"] => {
+  const normalized = anchorEnumKey(value).toLowerCase();
+
+  switch (normalized) {
+    case "views":
+      return "VIEWS";
+    case "clicks":
+      return "CLICKS";
+    case "saves":
+      return "SAVES";
+    default:
+      throw new Error(`Unsupported on-chain proposal metric type: ${normalized}`);
+  }
+};
+
+const mapProposalContentKind = (
+  value: unknown
+): OnChainProposalState["contentKind"] => {
+  const normalized = anchorEnumKey(value).toLowerCase();
+
+  switch (normalized) {
+    case "short_video":
+    case "shortvideo":
+      return "SHORT_VIDEO";
+    case "image_carousel":
+    case "imagecarousel":
+      return "IMAGE_CAROUSEL";
+    case "mixed_media_note":
+    case "mixedmedianote":
+      return "MIXED_MEDIA_NOTE";
+    default:
+      throw new Error(`Unsupported on-chain proposal content kind: ${normalized}`);
+  }
 };
 
 const resolveHomePath = (inputPath: string): string => {
@@ -280,8 +370,29 @@ export class AnchorService {
       return {
         creator: proposal.creator as PublicKey,
         sponsor: (proposal.sponsor as PublicKey | null) ?? null,
+        status: mapProposalStatus(proposal.status),
+        contentKind: mapProposalContentKind(proposal.contentKind),
+        contentHashHex: Buffer.from(proposal.contentHash as number[]).toString("hex"),
+        contentAnchorPda: proposal.contentAnchor
+          ? (proposal.contentAnchor as PublicKey).toBase58()
+          : null,
+        track1BaseUsdc: toBigInt(proposal.track1BaseUsdc),
         track1Claimed: Boolean(proposal.track1Claimed),
+        track2MetricType: mapProposalMetricType(proposal.track2MetricType),
+        track2TargetValue: toBigInt(proposal.track2TargetValue),
+        track2MinAchievementBps: Number(proposal.track2MinAchievementBps ?? 0),
+        track2UsdcDeposited: toBigInt(proposal.track2UsdcDeposited),
+        track2ActualValue:
+          proposal.track2ActualValue === null || proposal.track2ActualValue === undefined
+            ? null
+            : toBigInt(proposal.track2ActualValue),
         track2SettledAtUnix: toBigInt(proposal.track2SettledAt),
+        track3UsdcDeposited: toBigInt(proposal.track3UsdcDeposited),
+        track3CpsPayout:
+          proposal.track3CpsPayout === null || proposal.track3CpsPayout === undefined
+            ? null
+            : toBigInt(proposal.track3CpsPayout),
+        track3DelayDays: Number(proposal.track3DelayDays ?? 0),
         track3SettledAtUnix: toBigInt(proposal.track3SettledAt),
         deadlineUnix: toBigInt(proposal.deadline),
       };

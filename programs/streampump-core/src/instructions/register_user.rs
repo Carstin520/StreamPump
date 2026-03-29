@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
+    events::UserProfileRegistered,
     state::{ProtocolConfig, UserProfile, DEFAULT_USER_LEVEL},
     utils::validate_role_flags,
 };
@@ -38,7 +39,8 @@ pub(crate) fn handler(ctx: Context<RegisterUser>, args: RegisterUserArgs) -> Res
 
     let now = Clock::get()?.unix_timestamp;
     let user_profile = &mut ctx.accounts.user_profile;
-    if user_profile.authority == Pubkey::default() {
+    let created = user_profile.authority == Pubkey::default();
+    if created {
         user_profile.authority = ctx.accounts.authority.key();
         user_profile.level = DEFAULT_USER_LEVEL;
         user_profile.role_flags = args.role_flags;
@@ -59,5 +61,14 @@ pub(crate) fn handler(ctx: Context<RegisterUser>, args: RegisterUserArgs) -> Res
     }
 
     user_profile.updated_at = now;
+
+    emit!(UserProfileRegistered {
+        authority: ctx.accounts.authority.key(),
+        user_profile: user_profile.key(),
+        role_flags: user_profile.role_flags,
+        level: user_profile.level,
+        created,
+    });
+
     Ok(())
 }

@@ -16,6 +16,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::ProposalFunded,
     state::{Proposal, ProposalStatus},
     utils::checked_add,
 };
@@ -113,6 +114,15 @@ pub(crate) fn handler(ctx: Context<SponsorFund>, args: SponsorFundArgs) -> Resul
         checked_add(proposal.track3_usdc_deposited, args.track3_amount)?;
     proposal.sponsor = Some(ctx.accounts.sponsor.key());
     proposal.status = ProposalStatus::Funded;
+
+    emit!(ProposalFunded {
+        proposal: proposal.key(),
+        sponsor: ctx.accounts.sponsor.key(),
+        track1_amount: args.track1_amount,
+        track2_amount: args.track2_amount,
+        track3_amount: args.track3_amount,
+        status: proposal.status as u8,
+    });
 
     Ok(())
 }

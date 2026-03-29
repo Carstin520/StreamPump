@@ -5,6 +5,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     errors::StreamPumpError,
+    events::S1BuyoutOfferAccepted,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState},
 };
 
@@ -89,6 +90,17 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
 
     creator_profile.status = CreatorStatus::S1_Execution_Pending;
     creator_profile.updated_at = now;
+
+    emit!(S1BuyoutOfferAccepted {
+        creator_profile: creator_profile.key(),
+        creator: ctx.accounts.creator.key(),
+        buyout_offer: ctx.accounts.buyout_offer.key(),
+        s1_buyout_state: buyout_state.key(),
+        sponsor: buyout_offer.sponsor,
+        usdc_amount: buyout_offer.usdc_amount,
+        rage_quit_deadline: buyout_state.rage_quit_deadline,
+        status: creator_profile.status as u8,
+    });
 
     Ok(())
 }

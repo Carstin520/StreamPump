@@ -2,7 +2,7 @@
  * CN: Mux Webhook 控制器，接收转码状态回调并回写 ContentAsset 处理状态。
  * EN: Mux webhook controller that ingests processing callbacks and updates ContentAsset state.
  */
-import { AssetProcessingStatus } from "@prisma/client";
+import { AssetProcessingSource, AssetProcessingStatus } from "@prisma/client";
 import { Request, Response } from "express";
 
 import { muxService } from "../services/MuxService";
@@ -107,12 +107,16 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
     }
 
     if (eventType === "video.asset.ready") {
+      const webhookReceivedAt = new Date();
       const playbackId = resolvePlaybackId(event);
       if (!playbackId) {
         await prisma.contentAsset.updateMany({
           where: { muxAssetId },
           data: {
             processingStatus: AssetProcessingStatus.ERRORED,
+            processingSource: AssetProcessingSource.MUX_WEBHOOK,
+            muxLastKnownStatus: "ready",
+            muxWebhookReceivedAt: webhookReceivedAt,
             processingError: "Mux ready event missing playback_id",
           },
         });
@@ -130,7 +134,11 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
         where: { muxAssetId },
         data: {
           processingStatus: AssetProcessingStatus.READY,
+          processingSource: AssetProcessingSource.MUX_WEBHOOK,
           muxPlaybackId: playbackId,
+          muxLastKnownStatus: "ready",
+          muxWebhookReceivedAt: webhookReceivedAt,
+          muxReadyAt: webhookReceivedAt,
           processingError: null,
         },
       });
@@ -145,12 +153,21 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
     }
 
     if (eventType === "video.asset.errored") {
+      const webhookReceivedAt = new Date();
       const errorMessage = resolveErrorMessage(event);
 
       await prisma.contentAsset.updateMany({
-        where: { muxAssetId },
+        where: {
+          muxAssetId,
+          processingStatus: {
+            not: AssetProcessingStatus.READY,
+          },
+        },
         data: {
           processingStatus: AssetProcessingStatus.ERRORED,
+          processingSource: AssetProcessingSource.MUX_WEBHOOK,
+          muxLastKnownStatus: "errored",
+          muxWebhookReceivedAt: webhookReceivedAt,
           processingError: errorMessage,
         },
       });

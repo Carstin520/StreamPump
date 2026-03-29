@@ -8,6 +8,7 @@ import express from "express";
 import { config } from "./config/default";
 import routes from "./src/routes";
 import { startIndexer } from "./src/services/indexer";
+import { startMuxReconciliationScheduler } from "./src/schedulers/MuxReconciliationScheduler";
 import { startOracleScheduler } from "./src/schedulers/OracleScheduler";
 
 const app = express();
@@ -35,5 +36,6 @@ app.use("/api", routes);
 app.listen(port, () => {
   console.log(`[backend] listening on :${port}`);
   void startIndexer(config.solana.rpcEndpoint, programId);
+  startMuxReconciliationScheduler();
   startOracleScheduler();
 });

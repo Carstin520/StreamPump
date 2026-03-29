@@ -16,6 +16,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::Track2Settled,
     state::{CreatorProfile, Proposal, ProposalStatus, ProtocolConfig},
     utils::{amount_from_bps, checked_sub},
 };
@@ -131,6 +132,9 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
     let achieved_bps_u128 = std::cmp::min(achieved_bps_u128, 10_000);
     let achieved_bps =
         u16::try_from(achieved_bps_u128).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+    let mut sponsor_refund;
+    let mut creator_payout = 0u64;
+    let mut fan_pool_remaining = 0u64;
 
     let deadline_bytes = proposal.deadline.to_le_bytes();
     let proposal_bump_bytes = [proposal.bump];
@@ -157,6 +161,7 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
                 deposited,
             )?;
         }
+        sponsor_refund = deposited;
 
         proposal.track2_usdc_deposited = 0;
         proposal.track2_unsettled_endorser_count = proposal.track2_endorser_count;
@@ -187,8 +192,9 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
                 unachieved_usdc,
             )?;
         }
+        sponsor_refund = unachieved_usdc;
 
-        let creator_payout = amount_from_bps(achieved_usdc, TRACK2_CREATOR_PAYOUT_BPS)?;
+        creator_payout = amount_from_bps(achieved_usdc, TRACK2_CREATOR_PAYOUT_BPS)?;
         let fan_pool = checked_sub(achieved_usdc, creator_payout)?;
 
         if creator_payout > 0 {
@@ -219,6 +225,9 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
                 ),
                 fan_pool,
             )?;
+            sponsor_refund = sponsor_refund
+                .checked_add(fan_pool)
+                .ok_or(StreamPumpError::MathOverflow)?;
             proposal.track2_usdc_deposited = 0;
             proposal.track2_unsettled_endorser_count = 0;
             proposal.track2_unsettled_spump = 0;
@@ -226,12 +235,26 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
             proposal.track2_usdc_deposited = fan_pool;
             proposal.track2_unsettled_endorser_count = proposal.track2_endorser_count;
             proposal.track2_unsettled_spump = proposal.total_spump_staked;
+            fan_pool_remaining = fan_pool;
         }
         proposal.status = ProposalStatus::Resolved_Success;
     }
 
     proposal.track2_actual_value = Some(args.actual_value);
     proposal.track2_settled_at = now;
+
+    emit!(Track2Settled {
+        proposal: proposal.key(),
+        sponsor,
+        creator: proposal.creator,
+        actual_value: args.actual_value,
+        achieved_bps,
+        creator_payout,
+        sponsor_refund,
+        fan_pool_remaining,
+        status: proposal.status as u8,
+        settled_at: proposal.track2_settled_at,
+    });
 
     Ok(())
 }

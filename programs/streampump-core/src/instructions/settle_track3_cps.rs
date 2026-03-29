@@ -16,6 +16,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::Track3Settled,
     state::{CreatorProfile, Proposal, ProposalStatus, ProtocolConfig},
     utils::checked_sub,
 };
@@ -168,6 +169,15 @@ pub(crate) fn handler(ctx: Context<SettleTrack3Cps>, args: SettleTrack3CpsArgs) 
 
     proposal.track3_cps_payout = Some(args.approved_cps_payout);
     proposal.track3_settled_at = now;
+
+    emit!(Track3Settled {
+        proposal: proposal.key(),
+        sponsor,
+        creator: proposal.creator,
+        approved_cps_payout: args.approved_cps_payout,
+        sponsor_refund: refund_amount,
+        settled_at: proposal.track3_settled_at,
+    });
 
     Ok(())
 }

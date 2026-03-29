@@ -4,6 +4,7 @@
  */
 import {
   AssetProcessingStatus,
+  AssetProcessingSource,
   AssetType,
   AssetUploadStatus,
   ContentManifestStatus,
@@ -107,6 +108,7 @@ const serializeAsset = (asset: {
   processingStatus: string;
   muxAssetId: string | null;
   muxPlaybackId: string | null;
+  muxLastKnownStatus: string | null;
   updatedAt: Date;
 }) => ({
   assetId: asset.id,
@@ -117,6 +119,7 @@ const serializeAsset = (asset: {
   processingStatus: asset.processingStatus,
   muxAssetId: asset.muxAssetId,
   muxPlaybackId: asset.muxPlaybackId,
+  muxLastKnownStatus: asset.muxLastKnownStatus,
   updatedAt: asset.updatedAt.toISOString(),
 });
 
@@ -328,7 +331,12 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
           where: { id: asset.id },
           data: {
             processingStatus: AssetProcessingStatus.PREPARING,
+            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
             muxAssetId,
+            muxLastKnownStatus: "created",
+            muxLastCheckedAt: null,
+            muxReadyAt: null,
+            muxReconcileAttempts: 0,
             processingError: null,
           },
         });
@@ -337,18 +345,21 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
           where: { id: asset.id },
           data: {
             processingStatus: AssetProcessingStatus.ERRORED,
+            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
+            muxLastKnownStatus: "errored",
             processingError: error instanceof Error ? error.message : "failed to create mux asset",
           },
         });
       }
     } else {
-      updated = await prisma.contentAsset.update({
-        where: { id: asset.id },
-        data: {
-          processingStatus: AssetProcessingStatus.READY,
-          processingError: null,
-        },
-      });
+        updated = await prisma.contentAsset.update({
+          where: { id: asset.id },
+          data: {
+            processingStatus: AssetProcessingStatus.READY,
+            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
+            processingError: null,
+          },
+        });
     }
 
     ok(res, {

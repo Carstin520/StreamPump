@@ -10,6 +10,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::Track1Settled,
     state::{CreatorProfile, Proposal, ProposalStatus, ProtocolConfig},
 };
 
@@ -105,5 +106,13 @@ pub(crate) fn handler(ctx: Context<SettleTrack1Base>) -> Result<()> {
     }
 
     proposal.track1_claimed = true;
+
+    emit!(Track1Settled {
+        proposal: proposal.key(),
+        creator: proposal.creator,
+        creator_payout: proposal.track1_base_usdc,
+        track1_claimed: proposal.track1_claimed,
+    });
+
     Ok(())
 }

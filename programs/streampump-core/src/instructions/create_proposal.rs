@@ -20,6 +20,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     errors::StreamPumpError,
+    events::ProposalCreated,
     state::{
         ContentHashAnchor, CreatorProfile, Proposal, ProposalContentKind, ProposalMetricType,
         ProposalStatus, ProtocolConfig,
@@ -224,6 +225,22 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     proposal.usdc_vault_bump = ctx.bumps.usdc_vault;
     proposal.total_spump_staked = 0;
     proposal.bump = ctx.bumps.proposal;
+
+    emit!(ProposalCreated {
+        proposal: proposal.key(),
+        creator: ctx.accounts.creator.key(),
+        payer: ctx.accounts.payer.key(),
+        deadline: proposal.deadline,
+        content_kind: proposal.content_kind as u8,
+        content_hash: proposal.content_hash,
+        content_anchor: proposal.content_anchor,
+        track1_base_usdc: proposal.track1_base_usdc,
+        track2_metric_type: proposal.track2_metric_type as u8,
+        track2_target_value: proposal.track2_target_value,
+        track2_min_achievement_bps: proposal.track2_min_achievement_bps,
+        track3_delay_days: proposal.track3_delay_days,
+        status: proposal.status as u8,
+    });
 
     Ok(())
 }

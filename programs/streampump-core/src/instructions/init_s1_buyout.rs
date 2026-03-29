@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
+    events::S1BuyoutAuctionOpened,
     state::{CreatorProfile, CreatorStatus},
 };
 
@@ -30,6 +31,13 @@ pub(crate) fn handler(ctx: Context<InitS1Buyout>) -> Result<()> {
 
     creator_profile.status = CreatorStatus::S1_Auction_Pending;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(S1BuyoutAuctionOpened {
+        creator_profile: creator_profile.key(),
+        creator: ctx.accounts.creator.key(),
+        status: creator_profile.status as u8,
+        updated_at: creator_profile.updated_at,
+    });
 
     Ok(())
 }

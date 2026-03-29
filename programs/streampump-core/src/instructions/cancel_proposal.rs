@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
+    events::ProposalCancelled,
     state::{Proposal, ProposalStatus},
 };
 
@@ -24,5 +25,12 @@ pub struct CancelProposal<'info> {
 /// Marks proposal as cancelled. Endorsers can later claim full SPUMP principal back.
 pub(crate) fn handler(ctx: Context<CancelProposal>) -> Result<()> {
     ctx.accounts.proposal.status = ProposalStatus::Cancelled;
+
+    emit!(ProposalCancelled {
+        proposal: ctx.accounts.proposal.key(),
+        creator: ctx.accounts.creator.key(),
+        status: ctx.accounts.proposal.status as u8,
+    });
+
     Ok(())
 }

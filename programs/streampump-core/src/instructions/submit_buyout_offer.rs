@@ -5,6 +5,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::S1BuyoutOfferSubmitted,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer},
 };
 
@@ -95,6 +96,15 @@ pub(crate) fn handler(ctx: Context<SubmitBuyoutOffer>, args: SubmitBuyoutOfferAr
     buyout_offer.created_at = now;
     buyout_offer.sponsor_cancel_after = sponsor_cancel_after;
     buyout_offer.bump = ctx.bumps.buyout_offer;
+
+    emit!(S1BuyoutOfferSubmitted {
+        buyout_offer: buyout_offer.key(),
+        creator_profile: ctx.accounts.creator_profile.key(),
+        sponsor: ctx.accounts.sponsor.key(),
+        usdc_amount: buyout_offer.usdc_amount,
+        created_at: buyout_offer.created_at,
+        sponsor_cancel_after: buyout_offer.sponsor_cancel_after,
+    });
 
     Ok(())
 }

@@ -21,6 +21,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
+    events::ProposalVoided,
     state::{Proposal, ProposalStatus, ProtocolConfig},
 };
 
@@ -74,6 +75,7 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
     let proposal_deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
     let sponsor = ctx.accounts.proposal.sponsor;
+    let mut sponsor_refund = 0u64;
 
     if let Some(sponsor_key) = sponsor {
         // EN: Verify the sponsor_usdc_ata belongs to the correct sponsor.
@@ -109,6 +111,7 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
                 refund_amount,
             )?;
         }
+        sponsor_refund = refund_amount;
     } else {
         // EN: No sponsor — vault should already be empty.
         // ZH: 没有 Sponsor——金库应该已为空。
@@ -124,5 +127,14 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
     ctx.accounts.proposal.track2_usdc_deposited = 0;
     ctx.accounts.proposal.track3_usdc_deposited = 0;
     ctx.accounts.proposal.status = ProposalStatus::Voided;
+
+    emit!(ProposalVoided {
+        proposal: ctx.accounts.proposal.key(),
+        admin: ctx.accounts.admin.key(),
+        sponsor,
+        sponsor_refund,
+        status: ctx.accounts.proposal.status as u8,
+    });
+
     Ok(())
 }

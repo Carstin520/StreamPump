@@ -72,6 +72,12 @@ enum AssetProcessingStatus {
   ERRORED
 }
 
+enum AssetProcessingSource {
+  CLIENT_COMPLETE
+  MUX_WEBHOOK
+  MUX_RECONCILIATION
+}
+
 enum PublicationVerificationStatus {
   PENDING
   VERIFIED
@@ -231,8 +237,26 @@ model ContentAsset {
   /// CN: Mux playback ID，对应最终可播放资源。
   /// EN: Mux playback ID for the final playable asset.
   muxPlaybackId    String?               @unique
+  /// CN: 最近一次从 Mux 观察到的原始状态，如 preparing / ready / errored。
+  /// EN: Last raw status observed from Mux, such as preparing / ready / errored.
+  muxLastKnownStatus String?
+  /// CN: 最近一次收到 Mux webhook 的时间。
+  /// EN: Timestamp when the most recent Mux webhook was received.
+  muxWebhookReceivedAt DateTime?
+  /// CN: 最近一次主动向 Mux 查询资产状态的时间。
+  /// EN: Timestamp of the most recent active reconciliation query against Mux.
+  muxLastCheckedAt DateTime?
+  /// CN: 主动 reconciliation 已尝试的次数。
+  /// EN: Number of active reconciliation attempts executed so far.
+  muxReconcileAttempts Int               @default(0)
+  /// CN: 视频被确认为 ready 的时间，无论来源是 webhook 还是补偿任务。
+  /// EN: Timestamp when the video was confirmed ready, whether by webhook or reconciliation.
+  muxReadyAt       DateTime?
   uploadStatus     AssetUploadStatus     @default(PENDING)
   processingStatus AssetProcessingStatus @default(NONE)
+  /// CN: 当前 processing 状态是由哪条链路推进的。
+  /// EN: Source that most recently advanced the processing state.
+  processingSource AssetProcessingSource?
   processingError  String?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
@@ -340,6 +364,41 @@ model TxBundle {
 
   @@index([intentId, status])
   @@index([expiresAt, status])
+}
+
+model ChainEvent {
+  id              String   @id @default(cuid())
+  /// CN: 对应链上交易签名；一笔交易内可能产生多条事件记录。
+  /// EN: On-chain transaction signature; one transaction may yield multiple event rows.
+  signature       String
+  /// CN: 指令在交易消息内的顺序，用来和 signature 一起保证唯一性。
+  /// EN: Instruction order inside the transaction message, used with the signature for uniqueness.
+  instructionIndex Int
+  slot            BigInt
+  programId       String
+  /// CN: 通过 IDL 指令解码得到的指令名。
+  /// EN: Instruction name decoded from the IDL.
+  instructionName String
+  proposalPda     String?
+  /// CN: 事件主实体地址；没有 proposal 时可回落到 creator_profile/content_anchor 等地址。
+  /// EN: Primary entity address for the event; falls back to creator_profile/content_anchor when no proposal exists.
+  entityPda       String?
+  payloadJson     Json?
+  observedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([signature, instructionIndex])
+  @@index([proposalPda, observedAt])
+  @@index([instructionName, observedAt])
+}
+
+model IndexerCursor {
+  /// CN: cursor 的消费者键，例如 streampump_core_logs。
+  /// EN: Consumer key for the cursor, for example streampump_core_logs.
+  consumerKey       String   @id
+  lastSeenSlot      BigInt   @default(0)
+  lastSeenSignature String?
+  updatedAt         DateTime @updatedAt
 }
 
 model WalletAuthChallenge {

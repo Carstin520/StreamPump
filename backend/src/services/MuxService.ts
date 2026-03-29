@@ -6,6 +6,13 @@ import Mux from "@mux/mux-node";
 
 const MUX_TIMEOUT_MS = Number(process.env.MUX_REQUEST_TIMEOUT_MS ?? 20_000);
 
+export interface NormalizedMuxAssetStatus {
+  muxAssetId: string;
+  status: string;
+  playbackId: string | null;
+  errorMessage: string | null;
+}
+
 class MuxTimeoutError extends Error {
   constructor(operation: string, timeoutMs: number) {
     super(`Mux timeout after ${timeoutMs}ms (${operation})`);
@@ -60,6 +67,45 @@ export class MuxService {
     } catch (error) {
       throw this.wrapMuxError("createAsset", error);
     }
+  }
+
+  async getAsset(muxAssetId: string): Promise<any> {
+    const trimmedMuxAssetId = muxAssetId.trim();
+    if (!trimmedMuxAssetId) {
+      throw new Error("muxAssetId is required");
+    }
+
+    this.assertApiCredentials();
+
+    try {
+      return await this.withTimeout(
+        (this.client.video.assets as any).retrieve(trimmedMuxAssetId),
+        "get asset"
+      );
+    } catch (error) {
+      throw this.wrapMuxError("getAsset", error);
+    }
+  }
+
+  async getAssetStatus(muxAssetId: string): Promise<NormalizedMuxAssetStatus> {
+    const asset = await this.getAsset(muxAssetId);
+    return this.normalizeAssetStatus(asset, muxAssetId);
+  }
+
+  normalizeAssetStatus(asset: any, fallbackMuxAssetId?: string): NormalizedMuxAssetStatus {
+    const playbackId = Array.isArray(asset?.playback_ids)
+      ? String(asset.playback_ids.find((candidate: any) => candidate?.id)?.id ?? "").trim() || null
+      : null;
+    const errorMessages = Array.isArray(asset?.errors?.messages)
+      ? asset.errors.messages.map((message: unknown) => String(message))
+      : [];
+
+    return {
+      muxAssetId: String(asset?.id ?? fallbackMuxAssetId ?? "").trim(),
+      status: String(asset?.status ?? "").trim().toLowerCase() || "unknown",
+      playbackId,
+      errorMessage: errorMessages.length > 0 ? errorMessages.join(",") : null,
+    };
   }
 
   verifyWebhookSignature(rawBody: string | Buffer, signatureHeader: string): void {

@@ -130,15 +130,18 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - backend `v1` routes for the new launch flow
 - real Phase 1 launch bundle assembly with creator approval separated from external rent payment
 - wallet challenge/signature auth with Bearer sessions for `v1` content and proposal launch routes
+- bundle expiry rebuild and retry-safe launch submission recovery
 - real local media flow verified across `Neon + AWS S3 + Mux`
 - real Mux webhook delivery verified in local development via `Cloudflare Tunnel`
+- Mux reconciliation worker for missed-webhook recovery
+- explicit on-chain events emitted for proposal lifecycle, content anchoring, S1 buyout lifecycle, endorsement settlement, and user registration
+- EventParser-first chain indexer with persisted `ChainEvent` records and proposal projection sync
 
 ### Still under construction
 
-- bundle expiry rebuild, idempotent retry, and full launch-ops hardening
 - full backend task engine for daily SPUMP rewards and quests
 - dispute / review workflow
-- Mux reconciliation job for missed webhook recovery
+- remaining explicit event coverage for the rest of the protocol surface
 - real operator dashboards for creator, sponsor, MCN
 - actual frontend product experience
 

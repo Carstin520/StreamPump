@@ -5,6 +5,7 @@ use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer}
 
 use crate::{
     errors::StreamPumpError,
+    events::S1BuyoutOfferCancelled,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState},
 };
 
@@ -110,6 +111,13 @@ pub(crate) fn handler(ctx: Context<CancelBuyoutOffer>) -> Result<()> {
         },
         signer,
     ))?;
+
+    emit!(S1BuyoutOfferCancelled {
+        buyout_offer: ctx.accounts.buyout_offer.key(),
+        creator_profile: ctx.accounts.creator_profile.key(),
+        sponsor: ctx.accounts.sponsor.key(),
+        refund_amount: vault_amount,
+    });
 
     Ok(())
 }

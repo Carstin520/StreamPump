@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
+    events::ContentAnchored,
     state::{ContentHashAnchor, CreatorProfile, MAX_CANONICAL_URL_LEN},
     utils::keccak_digest,
 };
@@ -64,6 +65,16 @@ pub(crate) fn handler(ctx: Context<AnchorContentHash>, args: AnchorContentHashAr
     content_anchor.content_digest = args.content_digest;
     content_anchor.anchored_at = now;
     content_anchor.bump = ctx.bumps.content_anchor;
+
+    emit!(ContentAnchored {
+        content_anchor: content_anchor.key(),
+        creator_profile: ctx.accounts.creator_profile.key(),
+        authority: ctx.accounts.creator_authority.key(),
+        payer: ctx.accounts.payer.key(),
+        url_digest: content_anchor.url_digest,
+        content_digest: content_anchor.content_digest,
+        anchored_at: content_anchor.anchored_at,
+    });
 
     Ok(())
 }
