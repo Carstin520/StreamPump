@@ -1,0 +1,35 @@
+<svg width="1200" height="1600" viewBox="0 0 1200 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1600" fill="#2A0D0F"/>
+  <rect width="1200" height="780" fill="url(#ceiling)"/>
+  <rect y="780" width="1200" height="820" fill="url(#carpet)"/>
+  <path d="M160 920C160 846 220 786 294 786H934C1010 786 1070 846 1070 920V1016C1070 1092 1010 1152 934 1152H294C220 1152 160 1092 160 1016V920Z" fill="#151313"/>
+  <path d="M122 996C122 888 210 800 318 800H880C988 800 1076 888 1076 996V1022C1076 1130 988 1218 880 1218H318C210 1218 122 1130 122 1022V996Z" fill="#0C0C0C"/>
+  <ellipse cx="600" cy="1004" rx="418" ry="154" fill="#090909"/>
+  <ellipse cx="950" cy="1024" rx="64" ry="72" fill="#74422A"/>
+  <ellipse cx="258" cy="1004" rx="80" ry="82" fill="#161616"/>
+  <ellipse cx="182" cy="1012" rx="42" ry="52" fill="#A17154"/>
+  <rect x="82" y="654" width="1036" height="18" rx="9" fill="#EFE4C7" fill-opacity="0.88"/>
+  <g fill="#26201D" fill-opacity="0.72">
+    <rect x="58" y="690" width="22" height="108" rx="11"/>
+    <rect x="148" y="690" width="22" height="108" rx="11"/>
+    <rect x="1040" y="690" width="22" height="108" rx="11"/>
+    <rect x="1130" y="690" width="22" height="108" rx="11"/>
+  </g>
+  <g fill="#1B1B1B" fill-opacity="0.58">
+    <circle cx="140" cy="760" r="34"/>
+    <circle cx="196" cy="782" r="26"/>
+    <circle cx="1020" cy="760" r="34"/>
+    <circle cx="1072" cy="792" r="26"/>
+    <circle cx="1108" cy="768" r="24"/>
+  </g>
+  <defs>
+    <linearGradient id="ceiling" x1="600" y1="0" x2="600" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6F0DE"/>
+      <stop offset="1" stop-color="#BDAF9A"/>
+    </linearGradient>
+    <linearGradient id="carpet" x1="600" y1="780" x2="600" y2="1600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9C1118"/>
+      <stop offset="1" stop-color="#52080D"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -3,14 +3,61 @@
 @tailwind utilities;
 
 :root {
-  --bg-start: #e8f1f2;
-  --bg-end: #bfd7ea;
-  --text-main: #0d1321;
+  --bg-start: #090d14;
+  --bg-end: #0b1118;
+  --text-main: #edf2fb;
+}
+
+html {
+  min-height: 100%;
 }
 
 body {
-  background: linear-gradient(155deg, var(--bg-start), var(--bg-end));
+  background:
+    radial-gradient(circle at top left, rgba(60, 90, 154, 0.16), transparent 24%),
+    radial-gradient(circle at top right, rgba(42, 72, 126, 0.14), transparent 20%),
+    radial-gradient(circle at bottom right, rgba(255, 88, 132, 0.05), transparent 18%),
+    linear-gradient(180deg, var(--bg-start), var(--bg-end));
   color: var(--text-main);
   font-family: "Space Grotesk", "Avenir Next", sans-serif;
   min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@layer components {
+  .liquid-panel {
+    background: linear-gradient(180deg, rgba(18, 25, 37, 0.82) 0%, rgba(11, 17, 27, 0.74) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 24px 70px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(22px) saturate(130%);
+    -webkit-backdrop-filter: blur(22px) saturate(130%);
+  }
+
+  .liquid-card {
+    background: linear-gradient(180deg, rgba(18, 25, 37, 0.64) 0%, rgba(11, 17, 27, 0.54) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.02),
+      0 20px 44px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+  }
+
+  .liquid-pill {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+  }
 }

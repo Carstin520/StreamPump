@@ -10,6 +10,18 @@ interface WalletContextProviderProps {
 
 export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children }) => {
   const endpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT ?? clusterApiUrl("devnet");
+  const SafeConnectionProvider = ConnectionProvider as unknown as FC<{
+    endpoint: string;
+    children: ReactNode;
+  }>;
+  const SafeWalletProvider = WalletProvider as unknown as FC<{
+    wallets: unknown[];
+    autoConnect?: boolean;
+    children: ReactNode;
+  }>;
+  const SafeWalletModalProvider = WalletModalProvider as unknown as FC<{
+    children: ReactNode;
+  }>;
 
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
@@ -17,10 +29,10 @@ export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children
   );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <SafeConnectionProvider endpoint={endpoint}>
+      <SafeWalletProvider autoConnect wallets={wallets}>
+        <SafeWalletModalProvider>{children}</SafeWalletModalProvider>
+      </SafeWalletProvider>
+    </SafeConnectionProvider>
   );
 };

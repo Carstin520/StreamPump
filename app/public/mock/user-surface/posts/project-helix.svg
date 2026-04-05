@@ -1,0 +1,17 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#02050B"/>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="800" cy="274" r="92" stroke="white" stroke-width="18"/>
+  <path d="M744 224C786 188 842 188 884 224" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <path d="M744 324C786 360 842 360 884 324" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <path d="M602 468H672L724 610L782 468H850L906 610L958 468H1028" stroke="white" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M520 618H1080" stroke="white" stroke-width="4" stroke-opacity="0.16"/>
+  <text x="508" y="742" fill="white" font-family="Arial, sans-serif" font-size="94" font-weight="700" letter-spacing="18">PROJECT HELIX</text>
+  <text x="462" y="828" fill="#F3F4F6" font-family="Arial, sans-serif" font-size="54" font-weight="700">An Xbox-compatible system? The whole room stopped.</text>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(800 280) rotate(90) scale(520 880)">
+      <stop stop-color="#0E1622"/>
+      <stop offset="1" stop-color="#02050B"/>
+    </radialGradient>
+  </defs>
+</svg>

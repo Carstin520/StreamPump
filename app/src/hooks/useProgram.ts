@@ -18,6 +18,9 @@ export const useProgram = (idl?: Idl) => {
       commitment: "confirmed",
     });
 
-    return new Program(idl, PROGRAM_ID, provider);
+    return new (Program as any)(idl, {
+      programId: PROGRAM_ID,
+      provider,
+    }) as Program<Idl>;
   }, [connection, idl, wallet]);
 };

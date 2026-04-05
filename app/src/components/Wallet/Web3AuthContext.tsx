@@ -4,6 +4,7 @@ import {
   WEB3AUTH_NETWORK,
 } from "@web3auth/base";
 import { Web3Auth } from "@web3auth/modal";
+import { SolanaPrivateKeyProvider } from "@web3auth/solana-provider";
 import { FC, ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
 
 interface Web3AuthContextValue {
@@ -13,7 +14,14 @@ interface Web3AuthContextValue {
   disconnect: () => Promise<void>;
 }
 
-const Web3AuthContext = createContext<Web3AuthContextValue | undefined>(undefined);
+const fallbackContextValue: Web3AuthContextValue = {
+  provider: null,
+  isReady: false,
+  connect: async () => undefined,
+  disconnect: async () => undefined,
+};
+
+const Web3AuthContext = createContext<Web3AuthContextValue>(fallbackContextValue);
 
 interface Web3AuthProviderProps {
   children: ReactNode;
@@ -36,9 +44,23 @@ export const Web3AuthProvider: FC<Web3AuthProviderProps> = ({ children }) => {
         return;
       }
 
+      const privateKeyProvider = new SolanaPrivateKeyProvider({
+        config: {
+          chainConfig: {
+            chainNamespace: CHAIN_NAMESPACES.SOLANA,
+            chainId: "0x3",
+            rpcTarget,
+            displayName: "Solana Devnet",
+            ticker: "SOL",
+            tickerName: "Solana",
+          },
+        },
+      });
+
       const instance = new Web3Auth({
         clientId,
         web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
+        privateKeyProvider,
         chainConfig: {
           chainNamespace: CHAIN_NAMESPACES.SOLANA,
           chainId: "0x3",
@@ -92,9 +114,5 @@ export const Web3AuthProvider: FC<Web3AuthProviderProps> = ({ children }) => {
 };
 
 export const useWeb3Auth = (): Web3AuthContextValue => {
-  const ctx = useContext(Web3AuthContext);
-  if (!ctx) {
-    throw new Error("useWeb3Auth must be used inside Web3AuthProvider");
-  }
-  return ctx;
+  return useContext(Web3AuthContext);
 };
