@@ -104,7 +104,7 @@
 
 - Build Command
 ```bash
-npm install && npm run prisma:generate && npm run build
+npm ci --include=dev && npm run prisma:generate && npm run build
 ```
 
 - Start Command
