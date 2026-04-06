@@ -3,10 +3,10 @@ import { useMemo, useState } from "react";
 
 import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock-data";
 
-type ProfileTab = "作品" | "Investment" | "Signals";
+type ProfileTab = "作品" | "投资档案" | "Signals";
 
 const shellCard =
-  "rounded-[32px] border border-white/8 bg-[linear-gradient(180deg,#0e1521_0%,#0a1119_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.32)]";
+  "overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,rgba(14,21,33,0.92)_0%,rgba(10,17,25,0.88)_100%)] shadow-[0_26px_88px_rgba(0,0,0,0.34)] backdrop-blur-2xl";
 
 export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
@@ -15,45 +15,58 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
 
   return (
     <div className="space-y-6">
-      <section className={`${shellCard} px-6 py-10 md:px-10`}>
-        <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-          <div className="mb-5 h-28 w-28 overflow-hidden rounded-full border-2 border-white/12 shadow-[0_22px_48px_rgba(0,0,0,0.35)]">
-            <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
-          </div>
-          <h1 className="text-4xl font-semibold tracking-[-0.04em] text-white">{creator.name}</h1>
-          <p className="mt-2 text-sm text-[#93a3bc]">
-            {creator.handle} · IP属地: {creator.city}
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <StageBadge creator={creator} />
-            <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#8ca0ba]">
-              {creator.level}
-            </span>
-          </div>
+      <section className={shellCard}>
+        <div className="relative h-52 overflow-hidden md:h-60">
+          <img
+            alt={`${creator.name} banner`}
+            className="h-full w-full object-cover"
+            src={creator.heroSrc}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.18)_0%,rgba(7,11,18,0.52)_48%,rgba(7,11,18,0.96)_100%)]" />
+        </div>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-7 text-center">
-            <ProfileStat label="关注" value={compactNumber(creator.followingCount)} />
-            <div className="h-8 w-px bg-white/8" />
-            <ProfileStat label="粉丝" value={compactNumber(creator.followersCount)} />
-            <div className="h-8 w-px bg-white/8" />
-            <ProfileStat label="获赞与收藏" value={compactNumber(creator.totalLikesAndSavesCount)} />
-          </div>
+        <div className="relative px-6 pb-9 md:px-10">
+          <div className="-mt-16 flex flex-col items-center text-center md:-mt-20">
+            <div className="h-28 w-28 overflow-hidden rounded-full border-[4px] border-[#09111b] shadow-[0_24px_56px_rgba(0,0,0,0.38)] md:h-32 md:w-32">
+              <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
+            </div>
 
-          <p className="mt-6 max-w-xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
+            <h1 className="mt-5 text-[38px] font-semibold tracking-[-0.05em] text-white">{creator.name}</h1>
+            <p className="mt-2 text-sm text-[#92a3bc]">
+              {creator.handle} · IP属地: {creator.city}
+            </p>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <button
-              className="rounded-full border border-white/12 bg-white/4 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/7"
-              type="button"
-            >
-              私信
-            </button>
-            <button
-              className="rounded-full bg-white px-7 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
-              type="button"
-            >
-              + 关注
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <StageBadge creator={creator} />
+              <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#dce6f8]">
+                {creator.level}
+              </span>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-8 text-center">
+              <ProfileStat label="关注" value={compactNumber(creator.followingCount)} />
+              <div className="h-8 w-px bg-white/8" />
+              <ProfileStat label="粉丝" value={compactNumber(creator.followersCount)} />
+              <div className="h-8 w-px bg-white/8" />
+              <ProfileStat label="获赞与收藏" value={compactNumber(creator.totalLikesAndSavesCount)} />
+            </div>
+
+            <p className="mt-6 max-w-2xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
+
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+              <button
+                className="liquid-pill rounded-full px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                type="button"
+              >
+                私信
+              </button>
+              <button
+                className="rounded-full bg-white px-7 py-2.5 text-sm font-semibold text-black transition hover:bg-white/92"
+                type="button"
+              >
+                + 关注
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -63,12 +76,12 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Investment Profile</h2>
-              <StageBadge creator={creator} compact />
+              <StageBadge compact creator={creator} />
             </div>
-            <p className="mt-2 text-sm text-[#93a3bc]">{getInvestmentSubtitle(creator)}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#93a3bc]">{getInvestmentSubtitle(creator)}</p>
           </div>
           <button
-            className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90"
+            className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/92"
             type="button"
           >
             {getPrimaryActionLabel(creator)}
@@ -77,19 +90,19 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
 
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {metrics.map((metric) => (
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.04] p-4" key={metric.label}>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-[#70809a]">{metric.label}</p>
+            <div className="glass-card p-4" key={metric.label}>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#71819b]">{metric.label}</p>
               <p className={`mt-2 text-2xl font-semibold tracking-[-0.03em] ${metric.tone}`}>{metric.value}</p>
-              {metric.help ? <p className="mt-1 text-xs text-[#8897ad]">{metric.help}</p> : null}
+              {metric.help ? <p className="mt-1 text-xs text-[#8a99ae]">{metric.help}</p> : null}
             </div>
           ))}
         </div>
       </section>
 
-      <section className={`${shellCard} overflow-hidden`}>
+      <section className={shellCard}>
         <div className="border-b border-white/8 px-6 pt-5 md:px-8">
           <div className="flex items-center gap-7">
-            {(["作品", "Investment", "Signals"] as ProfileTab[]).map((tab) => (
+            {(["作品", "投资档案", "Signals"] as ProfileTab[]).map((tab) => (
               <button
                 className={`relative pb-4 text-sm transition ${
                   activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
@@ -107,23 +120,25 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
 
         <div className="px-6 py-6 md:px-8">
           {activeTab === "作品" ? (
-            <div className="columns-1 gap-4 md:columns-2 xl:columns-4">
+            <div className="masonry-grid">
               {creatorPosts.map((post) => (
-                <Link className="mb-4 block break-inside-avoid" href={`/posts/${post.id}`} key={post.id}>
-                  <div className="overflow-hidden rounded-[24px] border border-white/8 bg-[#111a27] transition hover:-translate-y-0.5 hover:border-white/14 hover:shadow-[0_18px_40px_rgba(0,0,0,0.25)]">
-                    <div className="relative">
+                <Link className="block" href={`/posts/${post.id}`} key={post.id}>
+                  <div className="glass-card">
+                    <div className="relative overflow-hidden rounded-t-[24px]">
                       <img
                         alt={post.title}
-                        className={`w-full object-cover ${post.mediaHeightClass}`}
+                        className={`w-full object-cover transition-transform duration-500 hover:scale-[1.02] ${post.mediaHeightClass}`}
                         src={post.coverSrc}
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/36 to-transparent" />
                       {post.type === "VIDEO" ? (
-                        <div className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] text-white">
-                          ▶ Video
+                        <div className="liquid-pill absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
+                          Video
                         </div>
                       ) : null}
                     </div>
-                    <div className="p-3">
+
+                    <div className="glass-card-footer px-4 pb-4 pt-4">
                       <h3 className="line-clamp-2 text-sm font-medium leading-6 text-white">{post.title}</h3>
                       <div className="mt-3 flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -143,7 +158,7 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
             </div>
           ) : null}
 
-          {activeTab === "Investment" ? <InvestmentPanels creator={creator} /> : null}
+          {activeTab === "投资档案" ? <InvestmentPanels creator={creator} /> : null}
 
           {activeTab === "Signals" ? <SignalPanels creator={creator} /> : null}
         </div>
@@ -164,7 +179,9 @@ const StageBadge = ({ creator, compact = false }: { creator: CreatorMarketRecord
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone} ${compact ? "" : ""}`}
+      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone} ${
+        compact ? "text-[10px]" : ""
+      }`}
     >
       {label}
     </span>
@@ -172,7 +189,7 @@ const StageBadge = ({ creator, compact = false }: { creator: CreatorMarketRecord
 };
 
 const ProfileStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-[88px]">
+  <div className="min-w-[92px]">
     <p className="text-xl font-semibold tracking-[-0.03em] text-white">{value}</p>
     <p className="mt-1 text-xs text-[#8797ae]">{label}</p>
   </div>
@@ -182,7 +199,7 @@ const InvestmentPanels = ({ creator }: { creator: CreatorMarketRecord }) => {
   if (creator.state === "S1_DISCOVERY") {
     return (
       <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-        <div className="rounded-[26px] border border-white/8 bg-white/[0.03] p-5">
+        <div className="glass-card p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-white">Creator growth curve</h3>
             <span className="text-sm text-[#ffb987]">{creator.graduationProgress}% to graduation</span>
@@ -219,7 +236,7 @@ const InvestmentPanels = ({ creator }: { creator: CreatorMarketRecord }) => {
         <InfoCard
           eyebrow="Supporter outcome"
           title={`${formatUsd(creator.supporterDistributableUsd ?? 0)} distributable to supporters`}
-          body="The UI should explain supporter payout timing, current window state, and what happens after the rage-quit window closes."
+          body="The profile should explain payout timing, window state, and what supporters receive when settlement closes."
         />
         <InfoCard
           eyebrow="Settlement timeline"
@@ -240,7 +257,7 @@ const InvestmentPanels = ({ creator }: { creator: CreatorMarketRecord }) => {
       <InfoCard
         eyebrow="Execution state"
         title={`${creator.activeCampaignCount ?? 0} active campaigns · activity score ${creator.activityScore ?? 0}`}
-        body="This creator is already operating inside S2, so the page should feel like an investment profile plus an operating profile."
+        body="This creator has moved into S2 and should read like an operating profile layered on top of a creator profile."
       />
     </div>
   );
@@ -248,7 +265,7 @@ const InvestmentPanels = ({ creator }: { creator: CreatorMarketRecord }) => {
 
 const SignalPanels = ({ creator }: { creator: CreatorMarketRecord }) => (
   <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-    <div className="rounded-[26px] border border-white/8 bg-white/[0.03] p-5">
+    <div className="glass-card p-5">
       <p className="text-[11px] uppercase tracking-[0.2em] text-[#7385a2]">Top holders</p>
       <div className="mt-4 space-y-3">
         {creator.topHolders.map((holder) => (
@@ -278,7 +295,7 @@ const SignalPanels = ({ creator }: { creator: CreatorMarketRecord }) => (
 );
 
 const InfoCard = ({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) => (
-  <div className="rounded-[26px] border border-white/8 bg-white/[0.03] p-5">
+  <div className="glass-card p-5">
     <p className="text-[11px] uppercase tracking-[0.2em] text-[#7385a2]">{eyebrow}</p>
     <h3 className="mt-3 text-xl font-semibold leading-8 tracking-[-0.03em] text-white">{title}</h3>
     <p className="mt-3 text-sm leading-7 text-[#cdd7e7]">{body}</p>
@@ -297,7 +314,7 @@ const getInvestmentSubtitle = (creator: CreatorMarketRecord) => {
   }
 
   if (creator.state === "S1_BUYOUT") {
-    return `This creator has entered buyout resolution. Focus the profile on supporter outcome and next-step clarity.`;
+    return `This creator is inside buyout resolution. Emphasize supporter outcome and what happens next.`;
   }
 
   return `This creator has moved into sponsor-backed execution and should read like an operating profile, not just a token page.`;

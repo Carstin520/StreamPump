@@ -1,9 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { WorkspaceTabs } from "@/components/layout/WorkspaceTabs";
-import { Panel } from "@/components/shared/Panel";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { findManifest } from "@/lib/mock-data";
 
 export default function ManifestDetailPage() {
@@ -15,14 +13,14 @@ export default function ManifestDetailPage() {
       <Head>
         <title>{`StreamPump | ${manifest.title}`}</title>
       </Head>
-      <AppShell
-        action={<WorkspaceTabs />}
+      <WorkspaceShell
         subtitle="This view is where upload, processing, and finalize status need to feel operationally clear without looking like an ops dashboard."
         title={manifest.title}
       >
         <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
           <div className="space-y-5">
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Manifest state</p>
@@ -39,9 +37,11 @@ export default function ManifestDetailPage() {
                   </div>
                 ))}
               </div>
-            </Panel>
+              </div>
+            </section>
 
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Finalize state</p>
               <div className="rounded-2xl bg-white/5 p-4">
                 <p className="text-sm text-slate-300">`manifestHashHex` and planned content anchor will appear here once every asset is fully ready and the manifest is frozen.</p>
@@ -54,17 +54,20 @@ export default function ManifestDetailPage() {
                   Add publication URL
                 </button>
               </div>
-            </Panel>
+              </div>
+            </section>
           </div>
 
-          <Panel className="space-y-4">
+          <section className="glass-card p-5">
+            <div className="space-y-4">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phase 1 note</p>
             <p className="text-sm leading-7 text-slate-300">
               Production wiring here should use presigned uploads, Mux processing state, and manifest finalize status from the backend. This preview page already models the expected interaction pattern.
             </p>
-          </Panel>
+            </div>
+          </section>
         </div>
-      </AppShell>
+      </WorkspaceShell>
     </>
   );
 }

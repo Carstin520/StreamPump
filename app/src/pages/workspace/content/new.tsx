@@ -1,8 +1,6 @@
 import Head from "next/head";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { WorkspaceTabs } from "@/components/layout/WorkspaceTabs";
-import { Panel } from "@/components/shared/Panel";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 export default function NewContentPage() {
   return (
@@ -10,13 +8,13 @@ export default function NewContentPage() {
       <Head>
         <title>StreamPump | New Content Manifest</title>
       </Head>
-      <AppShell
-        action={<WorkspaceTabs />}
+      <WorkspaceShell
         subtitle="Content starts here. The user decides when to publish, what media package to bind, and when that package becomes the exact object later referenced by a launch bundle."
         title="Create a content manifest"
       >
         <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-          <Panel className="space-y-5">
+          <section className="glass-card p-5">
+            <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Content type</span>
@@ -47,16 +45,19 @@ export default function NewContentPage() {
                 Save for later
               </button>
             </div>
-          </Panel>
+            </div>
+          </section>
 
-          <Panel className="space-y-4">
+          <section className="glass-card p-5">
+            <div className="space-y-4">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Why this page matters</p>
             <p className="text-sm leading-7 text-slate-300">
               The content manifest is the off-chain preparation surface for a later content hash and content anchor. Users should feel like they are packaging media, not filling out blockchain forms.
             </p>
-          </Panel>
+            </div>
+          </section>
         </div>
-      </AppShell>
+      </WorkspaceShell>
     </>
   );
 }

@@ -1,9 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { WorkspaceTabs } from "@/components/layout/WorkspaceTabs";
-import { Panel } from "@/components/shared/Panel";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { intents, manifests } from "@/lib/mock-data";
 
 export default function WorkspacePage() {
@@ -12,18 +10,18 @@ export default function WorkspacePage() {
       <Head>
         <title>StreamPump | Workspace</title>
       </Head>
-      <AppShell
-        action={<WorkspaceTabs />}
+      <WorkspaceShell
         subtitle="The workspace is not role-based. It is where users create content, follow launch state, and handle the next signature or review action that belongs to them."
         title="Unified workspace"
       >
         <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="space-y-5">
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Create</p>
               <div className="space-y-3">
                 {manifests.map((manifest) => (
-                  <Link className="block rounded-2xl bg-white/5 p-4 hover:bg-white/8" href={`/workspace/content/${manifest.id}`} key={manifest.id}>
+                  <Link className="block rounded-2xl border border-white/8 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]" href={`/workspace/content/${manifest.id}`} key={manifest.id}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-white">{manifest.title}</p>
@@ -37,15 +35,17 @@ export default function WorkspacePage() {
               <Link className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950" href="/workspace/content/new">
                 Start new content manifest
               </Link>
-            </Panel>
+              </div>
+            </section>
           </div>
 
           <div className="space-y-5">
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Needs your action</p>
               <div className="space-y-3">
                 {intents.map((intent) => (
-                  <Link className="block rounded-2xl bg-white/5 p-4 hover:bg-white/8" href={`/workspace/intents/${intent.id}`} key={intent.id}>
+                  <Link className="block rounded-2xl border border-white/8 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]" href={`/workspace/intents/${intent.id}`} key={intent.id}>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-white">{intent.creatorName} × {intent.sponsorName}</p>
@@ -59,10 +59,11 @@ export default function WorkspacePage() {
                   </Link>
                 ))}
               </div>
-            </Panel>
+              </div>
+            </section>
           </div>
         </div>
-      </AppShell>
+      </WorkspaceShell>
     </>
   );
 }

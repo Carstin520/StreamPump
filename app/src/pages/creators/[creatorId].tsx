@@ -16,13 +16,7 @@ export default function CreatorDetailPage() {
       <Head>
         <title>{`StreamPump | ${creator.name}`}</title>
       </Head>
-      <UserShell
-        header={
-          <UserTopbar
-            subtitle="Creator profile"
-          />
-        }
-      >
+      <UserShell header={<UserTopbar />}>
         <div className="mb-1">
           <Link className="inline-flex rounded-full border border-white/8 bg-white/4 px-4 py-2 text-sm text-[#d9e3f2]" href="/trending">
             返回 Trending Creators

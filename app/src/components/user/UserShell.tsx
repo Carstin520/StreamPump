@@ -9,7 +9,6 @@ const primaryNav = [
   { href: "/trending", label: "Trending", match: ["/trending"] },
   { href: "/portfolio", label: "投资组合", match: ["/portfolio"] },
   { href: "/workspace", label: "创作中心", match: ["/workspace"] },
-  { href: "/me", label: "我", match: ["/me"] },
 ];
 
 export const UserShell = ({
@@ -22,52 +21,65 @@ export const UserShell = ({
   const router = useRouter();
 
   const isActive = (href: string, match: string[]) =>
-    match.some((prefix) => (prefix === "/" ? router.pathname === "/" || router.pathname === "/discover" : router.pathname.startsWith(prefix))) || router.asPath === href;
+    match.some((prefix) => (prefix === "/" ? router.pathname === "/" || router.pathname === "/discover" : router.pathname.startsWith(prefix))) ||
+    router.asPath === href;
 
   return (
-    <main className="min-h-screen bg-[#090d14] text-[#f5f7fb]">
-      <div className="mx-auto grid min-h-screen max-w-[1540px] grid-cols-1 gap-6 px-4 py-4 lg:grid-cols-[168px_minmax(0,1fr)]">
-        <aside className="hidden rounded-[32px] border border-white/8 bg-[linear-gradient(180deg,#0d1420_0%,#0a111b_100%)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.3)] lg:flex lg:flex-col">
+    <main className="min-h-[100dvh] bg-[#090d14] text-[#f5f7fb]">
+      <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-16 border-r border-white/6 bg-[#090f17]/94 backdrop-blur-xl lg:flex lg:w-64 lg:flex-col">
+        <div className="flex h-16 items-center justify-center border-b border-white/6 lg:justify-start lg:px-6">
           <Link
-            className="mb-8 inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,#243a64_0%,#172740_100%)] text-2xl font-semibold text-[#d8ecff] shadow-[0_18px_40px_rgba(32,80,162,0.24)]"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff516d] text-sm font-semibold text-white"
             href="/explore"
           >
             SP
           </Link>
-          <nav className="space-y-2.5">
-            {primaryNav.map((item) => (
-              <Link
-                className={`block rounded-[18px] px-4 py-3 text-[15px] transition ${
-                  isActive(item.href, item.match)
-                    ? "border border-white/8 bg-[#182336] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                    : "border border-transparent text-[#92a0b9] hover:border-white/6 hover:bg-white/4 hover:text-white"
-                }`}
-                href={item.href}
-                key={item.href}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <span className="ml-3 hidden text-lg font-semibold tracking-[-0.03em] text-white lg:block">
+            StreamPump
+          </span>
+        </div>
 
-          <div className="mt-auto rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#101726_0%,#0b121b_100%)] p-4 backdrop-blur">
-            <p className="text-[11px] tracking-[0.24em] text-[#7385a3]">SESSION</p>
-            <div className="mt-3 flex items-center gap-3">
+        <nav className="flex-1 space-y-2 px-2 py-6 lg:px-4">
+          {primaryNav.map((item) => (
+            <Link
+              className={`flex h-12 items-center justify-center rounded-xl px-3 text-sm transition lg:justify-start ${
+                isActive(item.href, item.match)
+                  ? "bg-[#171f2d] text-white"
+                  : "text-[#8f9eb7] hover:bg-white/5 hover:text-white"
+              }`}
+              href={item.href}
+              key={item.href}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="border-t border-white/6 p-2 lg:p-4">
+          <Link href="/me">
+            <div
+              className={`flex h-12 items-center justify-center rounded-xl border px-1 transition lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
+                router.pathname.startsWith("/me")
+                  ? "border-[#2d446a] bg-[#171f2d] text-white"
+                  : "border-white/6 bg-white/[0.03] text-white/80 hover:bg-white/5"
+              }`}
+            >
               <img
                 alt={currentUser.name}
-                className="h-10 w-10 rounded-full border border-white/12 object-cover"
+                className="h-8 w-8 rounded-full object-cover"
                 src={currentUser.avatarSrc}
               />
-              <div>
-                <p className="text-sm font-medium text-white">{currentUser.name}</p>
-                <p className="text-xs text-[#8fa1bd]">{currentUser.handle}</p>
+              <div className="ml-3 hidden min-w-0 lg:block">
+                <p className="truncate text-sm font-medium text-white">{currentUser.name}</p>
+                <p className="truncate text-xs text-[#8fa1bd]">{currentUser.handle}</p>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-5 text-[#8d9cb3]">{currentUser.sessionMode}</p>
-          </div>
-        </aside>
+          </Link>
+        </div>
+      </aside>
 
-        <div className="space-y-5">
+      <div className="lg:ml-16 xl:ml-64">
+        <div className="space-y-6 px-4 py-4 lg:px-6 lg:py-0">
           {header}
           {children}
         </div>

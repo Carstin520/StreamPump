@@ -16,18 +16,14 @@ export default function PortfolioPage() {
       <Head>
         <title>StreamPump | Portfolio</title>
       </Head>
-      <UserShell
-        header={
-          <UserTopbar
-            title="Your S1 exposure and next actions"
-            subtitle="Manage your creator token holdings and upcoming claims."
-          />
-        }
-      >
+      <UserShell header={<UserTopbar />}>
         <div className="space-y-5">
           <section className="rounded-[30px] border border-white/6 bg-[linear-gradient(180deg,#0d1727_0%,#0b111d_100%)] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
             <p className="text-xs uppercase tracking-[0.22em] text-[#6c7d97]">Portfolio overview</p>
             <h1 className="mt-2 text-4xl font-semibold text-white">Investment Cards</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#97a7be]">
+              Your S1 exposure and next actions should stay readable here, especially buyout claim windows and paths back into S2 content pools.
+            </p>
 
             <div className="mt-6 flex items-center gap-6 border-b border-white/8">
               {["Portfolio", "Claim queue", "Re-entry"].map((tab, index) => (

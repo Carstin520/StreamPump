@@ -3,83 +3,97 @@ import Link from "next/link";
 import { compactNumber, CreatorMarketRecord, formatUsd } from "@/lib/mock-data";
 
 const stateTone: Record<CreatorMarketRecord["state"], string> = {
-  S1_DISCOVERY: "bg-[#13291f] text-[#82f1a1]",
-  S1_BUYOUT: "bg-[#2a1b1b] text-[#ff8a8a]",
-  S2_ACTIVE: "bg-[#142233] text-[#8cc6ff]",
+  S1_DISCOVERY: "bg-[#13291f]/80 text-[#90efac]",
+  S1_BUYOUT: "bg-[#2d1621]/80 text-[#ff9fc4]",
+  S2_ACTIVE: "bg-[#15263e]/80 text-[#93c8ff]",
 };
 
 export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
-  <Link className="mb-4 inline-block w-full break-inside-avoid rounded-[24px] border border-white/6 bg-[linear-gradient(180deg,#0f1725_0%,#0b111b_100%)] p-2 transition hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(0,0,0,0.3)]" href={`/creators/${creator.id}`}>
-    <div className="relative overflow-hidden rounded-[18px]">
-      <img
-        alt={creator.name}
-        className="h-[220px] w-full object-cover"
-        src={creator.heroSrc}
-      />
-      <div className="absolute left-4 top-4">
-        <span className={`rounded-full px-3 py-1 text-[11px] font-medium shadow-[0_10px_24px_rgba(0,0,0,0.18)] ${stateTone[creator.state]}`}>
-          {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
-        </span>
-      </div>
-    </div>
-
-    <div className="px-3 pb-3 pt-4">
-      <div className="flex items-start gap-3">
+  <Link className="block" href={`/creators/${creator.id}`}>
+    <div className="glass-card group cursor-pointer">
+      <div className="relative h-28 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#08101a] via-transparent to-transparent z-[1]" />
         <img
           alt={creator.name}
-          className="mt-0.5 h-11 w-11 rounded-full border border-white/10 object-cover"
-          src={creator.avatarSrc}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          src={creator.heroSrc}
         />
-        <div className="min-w-0 flex-1">
-          <p className="text-xs uppercase tracking-[0.22em] text-[#6f7f98]">{creator.niche}</p>
-          <h3 className="mt-1 text-lg font-semibold text-white">{creator.name}</h3>
-          <p className="mt-1 text-sm text-[#9eb0c8]">{creator.handle} · {creator.city}</p>
+        <div className="absolute left-4 top-4 z-[2]">
+          <span
+            className={`liquid-pill rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${stateTone[creator.state]}`}
+          >
+            {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
+          </span>
+        </div>
+        <div className="absolute right-4 top-4 z-[2] rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/82 backdrop-blur-md">
+          {creator.niche}
         </div>
       </div>
 
-      <p className="mt-4 text-sm leading-7 text-[#d4dcea]">{creator.teaser}</p>
-
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-      <Metric label="Current price" value={formatUsd(creator.tokenPrice)} />
-      <Metric label="Holders" value={compactNumber(creator.holderCount)} />
-      {creator.state === "S1_DISCOVERY" ? (
-        <>
-          <Metric label="Graduation" value={`${creator.graduationProgress}%`} />
-          <Metric label="Target price" value={formatUsd(creator.targetGraduationPrice)} />
-        </>
-      ) : null}
-      {creator.state === "S1_BUYOUT" ? (
-        <>
-          <Metric label="Supporter pool" value={formatUsd(creator.supporterDistributableUsd ?? 0)} />
-          <Metric label="Offer value" value={formatUsd(creator.buyoutOfferUsd ?? 0)} />
-        </>
-      ) : null}
-      {creator.state === "S2_ACTIVE" ? (
-        <>
-          <Metric label="Activity" value={String(creator.activityScore ?? 0)} />
-          <Metric label="Valuation" value={formatUsd(creator.valuationUsd ?? 0)} />
-        </>
-      ) : null}
-      </div>
-
-      {creator.state === "S1_DISCOVERY" ? (
-        <div className="mt-5">
-          <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.16em] text-[#7b8ca5]">
-            <span>Graduation pressure</span>
-            <span>{creator.graduationProgress}%</span>
+      <div className="relative z-[2] px-4 pb-4 pt-0">
+        <div className="-mt-7 mb-3 flex items-end justify-between">
+          <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1420] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.34)]">
+            <img
+              alt={creator.name}
+              className="h-full w-full rounded-xl object-cover"
+              src={creator.avatarSrc}
+            />
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/8">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#ff6a5e] to-[#ffaf6d]" style={{ width: `${creator.graduationProgress}%` }} />
-          </div>
+          <p className="pb-1 text-xs text-[#90a0b9]">{creator.city}</p>
         </div>
-      ) : null}
+
+        <div className="mb-1">
+          <h3 className="text-xl font-semibold tracking-[-0.03em] text-white">{creator.name}</h3>
+          <p className="mt-1 text-sm text-[#93a4bc]">{creator.handle}</p>
+        </div>
+
+        <p className="mb-4 mt-3 line-clamp-2 text-sm leading-6 text-[#d3dceb]">{creator.teaser}</p>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label="Price" value={formatUsd(creator.tokenPrice)} />
+          <Metric label="Holders" value={compactNumber(creator.holderCount)} />
+          {creator.state === "S1_DISCOVERY" ? (
+            <>
+              <Metric label="Graduation" value={`${creator.graduationProgress}%`} />
+              <Metric label="Target" value={formatUsd(creator.targetGraduationPrice)} />
+            </>
+          ) : null}
+          {creator.state === "S1_BUYOUT" ? (
+            <>
+              <Metric label="Pool" value={formatUsd(creator.supporterDistributableUsd ?? 0)} />
+              <Metric label="Offer" value={formatUsd(creator.buyoutOfferUsd ?? 0)} />
+            </>
+          ) : null}
+          {creator.state === "S2_ACTIVE" ? (
+            <>
+              <Metric label="Activity" value={String(creator.activityScore ?? 0)} />
+              <Metric label="Valuation" value={formatUsd(creator.valuationUsd ?? 0)} />
+            </>
+          ) : null}
+        </div>
+
+        {creator.state === "S1_DISCOVERY" ? (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-[#7d8ea7]">
+              <span>Graduation pressure</span>
+              <span>{creator.graduationProgress}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/8">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#ff6f90] via-[#8c86ff] to-[#71b8ff]"
+                style={{ width: `${creator.graduationProgress}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   </Link>
 );
 
 const Metric = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl bg-white/5 p-4">
-    <p className="text-xs uppercase tracking-[0.18em] text-[#6e7e98]">{label}</p>
-    <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+  <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-3.5">
+    <p className="text-[10px] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
+    <p className="mt-2 text-base font-semibold text-white">{value}</p>
   </div>
 );

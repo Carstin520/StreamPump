@@ -540,6 +540,7 @@ export const currentUser = {
   sessionMode: "Social login + embedded wallet ready",
   primaryWallet: "4NwF...q8Yz",
   avatarSrc: "/mock/user-surface/avatars/james-li.svg",
+  bannerSrc: "/mock/user-surface/posts/project-helix.svg",
 };
 
 export const currentUserNotes: UserNoteRecord[] = [

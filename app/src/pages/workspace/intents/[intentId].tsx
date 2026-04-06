@@ -1,9 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { WorkspaceTabs } from "@/components/layout/WorkspaceTabs";
-import { Panel } from "@/components/shared/Panel";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { findIntent, formatUsd } from "@/lib/mock-data";
 
 export default function IntentDetailPage() {
@@ -15,14 +13,14 @@ export default function IntentDetailPage() {
       <Head>
         <title>{`StreamPump | ${intent.id}`}</title>
       </Head>
-      <AppShell
-        action={<WorkspaceTabs />}
+      <WorkspaceShell
         subtitle="This page is intentionally single-surface. The same intent detail should reveal creator actions or sponsor actions based on the current session context instead of splitting the product into separate portals."
         title="Launch intent detail"
       >
         <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
           <div className="space-y-5">
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Intent</p>
@@ -53,9 +51,11 @@ export default function IntentDetailPage() {
                   Current action owner: <span className="font-medium text-white">{intent.actionOwner}</span>. In production this page should adapt buttons and copy by session context, while preserving the same underlying state timeline for everyone.
                 </p>
               </div>
-            </Panel>
+              </div>
+            </section>
 
-            <Panel className="space-y-4">
+            <section className="glass-card p-5">
+              <div className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Available actions</p>
               <div className="flex flex-wrap gap-3">
                 <button className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950" type="button">
@@ -71,10 +71,12 @@ export default function IntentDetailPage() {
                   Sponsor submit
                 </button>
               </div>
-            </Panel>
+              </div>
+            </section>
           </div>
 
-          <Panel className="space-y-4">
+          <section className="glass-card p-5">
+            <div className="space-y-4">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Bundle notes</p>
             <p className="text-sm leading-7 text-slate-300">
               This panel becomes the place for blockhash expiry, bundle reuse, signature presence, and retry-safe submission feedback. It should feel like clear workflow guidance, not a raw transaction debugger.
@@ -83,9 +85,10 @@ export default function IntentDetailPage() {
               <p>Metric target: {intent.metric} / {intent.targetValue}</p>
               <p className="mt-2">Deadline: {intent.deadlineLabel}</p>
             </div>
-          </Panel>
+            </div>
+          </section>
         </div>
-      </AppShell>
+      </WorkspaceShell>
     </>
   );
 }

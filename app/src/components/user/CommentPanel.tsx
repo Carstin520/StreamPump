@@ -12,7 +12,7 @@ export const CommentPanel = ({
   <aside
     className={`flex h-full flex-col ${
       variant === "sidebar"
-        ? "border-l border-white/8 bg-[linear-gradient(180deg,#0f1520_0%,#0a1018_100%)]"
+        ? "bg-[linear-gradient(180deg,rgba(14,21,33,0.96)_0%,rgba(10,16,24,0.98)_100%)]"
         : "bg-transparent"
     }`}
   >
@@ -22,18 +22,25 @@ export const CommentPanel = ({
           <Link href={`/creators/${post.creatorId}`}>
             <img
               alt={post.creatorName}
-              className="h-10 w-10 cursor-pointer rounded-full object-cover"
+              className="h-10 w-10 cursor-pointer rounded-full object-cover ring-1 ring-white/16"
               src={post.creatorAvatarSrc}
             />
           </Link>
           <div>
-            <Link className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
-              {post.creatorName}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
+                {post.creatorName}
+              </Link>
+              {post.stage !== "NONE" ? (
+                <span className="liquid-pill rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
+                  {post.stage === "S1_DISCOVERY" ? "S1" : post.stage === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
+                </span>
+              ) : null}
+            </div>
             <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
           </div>
         </div>
-        <button className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/90" type="button">
+        <button className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/92" type="button">
           关注
         </button>
       </div>
@@ -44,7 +51,7 @@ export const CommentPanel = ({
       <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {post.tags.map((tag) => (
-          <span className="text-xs text-[#85b9ff]" key={tag}>
+          <span className="text-xs text-[#89bcff]" key={tag}>
             #{tag}
           </span>
         ))}
@@ -79,10 +86,10 @@ export const CommentPanel = ({
         </button>
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex-1 rounded-full border border-white/8 bg-white/4 px-4 py-3 text-sm text-[#6f829d]">
+        <div className="liquid-pill flex-1 rounded-full px-4 py-3 text-sm text-[#6f829d]">
           说点什么...
         </div>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/90" type="button">
+        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/92" type="button">
           ↑
         </button>
       </div>
@@ -92,7 +99,7 @@ export const CommentPanel = ({
 
 const CommentRow = ({ comment }: { comment: CommentRecord }) => (
   <div className="flex gap-3">
-    <img alt={comment.author} className="mt-0.5 h-8 w-8 rounded-full object-cover" src={comment.avatarSrc} />
+    <img alt={comment.author} className="mt-0.5 h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={comment.avatarSrc} />
     <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-xs font-medium text-white">{comment.author}</span>
