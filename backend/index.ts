@@ -15,8 +15,22 @@ const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const programId = config.solana.programId;
 const jsonParser = express.json();
+const allowedOrigins = config.app.corsAllowedOrigins;
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow same-origin server calls, curl/Postman, and webhook traffic without an Origin header.
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use((req, res, next) => {
   // Mux webhook needs the raw body for signature verification, so JSON parsing is skipped here.
   if (req.originalUrl.startsWith("/api/webhooks/mux")) {
