@@ -1,4 +1,5 @@
-use anchor_lang::{prelude::*, solana_program::keccak};
+use anchor_lang::prelude::*;
+use solana_keccak_hasher::hash as keccak_hash;
 
 use crate::{
     errors::StreamPumpError,
@@ -48,7 +49,7 @@ pub fn checked_sub(left: u64, right: u64) -> Result<u64> {
 /// Used for content/URL hashing in content anchoring.
 /// 计算输入字节的 Keccak-256 哈希摘要，返回 32 字节数组。用于内容锚定中的内容/URL 哈希。
 pub fn keccak_digest(input: &[u8]) -> [u8; 32] {
-    keccak::hash(input).0
+    keccak_hash(input).to_bytes()
 }
 
 /// Calculates buy cost for S1 internal tokens using:

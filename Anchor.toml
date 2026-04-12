@@ -1,12 +1,13 @@
+[toolchain]
+package_manager = "npm"
+solana_version = "2.3.0"
+
 [features]
 seeds = false
 skip-lint = false
 
 [programs.localnet]
 streampump_core = "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre"
-
-[registry]
-url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
