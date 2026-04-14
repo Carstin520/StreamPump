@@ -193,7 +193,7 @@ const ProfileNoteCard = ({
   onOpen: () => void;
 }) => (
   <button className="block w-full text-left" onClick={onOpen} type="button">
-    <div className="overflow-hidden rounded-[22px] border border-white/[0.06] bg-[#101621] shadow-[0_16px_44px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
+    <div className="card-radius overflow-hidden border border-white/[0.06] bg-[#101621] shadow-[0_16px_44px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
       <div className="relative overflow-hidden">
         <img alt={item.title} className={`w-full object-cover transition duration-500 hover:scale-[1.02] ${item.mediaHeightClass}`} src={item.coverSrc} />
         <div className="absolute left-3 top-3">

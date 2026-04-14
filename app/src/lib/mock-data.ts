@@ -118,12 +118,33 @@ export type CampaignRecord = {
   chainTxShort: string;
 };
 
+export type LoginPreviewMode = "welcome" | "switch";
+
+export type LoginMethodRecord = {
+  id: "email" | "google" | "apple" | "wallet";
+  label: string;
+  subtitle: string;
+  tone?: "default" | "wallet";
+};
+
+export type LoginAccountRecord = {
+  id: string;
+  name: string;
+  handle: string;
+  avatarSrc: string;
+  sessionLabel: string;
+  methodLabel: string;
+  isCurrent?: boolean;
+};
+
 export type PortfolioHoldingRecord = {
   creatorId: string;
   tokenCount: number;
   avgEntryUsd: number;
   unrealizedChangePct: number;
   note: string;
+  currentPriceUsd?: number;
+  trend: number[];
 };
 
 export type PortfolioActionRecord = {
@@ -133,6 +154,89 @@ export type PortfolioActionRecord = {
   tone: "neutral" | "buyout" | "opportunity";
   creatorId?: string;
   actionLabel?: string;
+};
+
+export type PortfolioExposurePointRecord = {
+  label: string;
+  value: number;
+};
+
+export type PortfolioClaimWindowRecord = {
+  id: string;
+  creatorId: string;
+  eligibleTokens: number;
+  claimPriceUsd: number;
+  payoutUsd: number;
+  closesInLabel: string;
+  statusLabel: string;
+};
+
+export type PortfolioUpcomingClaimRecord = {
+  id: string;
+  creatorId: string;
+  eligibleTokens: number;
+  expectedPriceUsd: number;
+  opensInLabel: string;
+  estimatedPayoutUsd: number;
+};
+
+export type PortfolioReentryRecord = {
+  id: string;
+  creatorId: string;
+  exitPriceUsd: number;
+  currentPriceUsd: number;
+  exitedAtLabel: string;
+  sinceExitPerformancePct: number;
+  thesis: string;
+};
+
+export type ActivityTab = "overview" | "video";
+
+export type ActivityFeedTabRecord = {
+  id: ActivityTab;
+  label: string;
+};
+
+export type ActivityAuthorRecord = {
+  creatorId: string;
+  note: string;
+  hasUnread?: boolean;
+};
+
+export type ActivityFeedItemRecord = {
+  id: string;
+  kind: "post" | "status";
+  creatorId: string;
+  postId: string;
+  postedAtLabel: string;
+  title?: string;
+  body: string;
+  actionSummary: string;
+  commentsCount: number;
+  likesCount: number;
+  sharesCount: number;
+  coverSrc?: string;
+  mediaType?: PostType;
+  durationLabel?: string;
+  stage: CreatorSeasonState | "NONE";
+};
+
+export type ActivityVideoItemRecord = {
+  id: string;
+  creatorId: string;
+  postId: string;
+  title: string;
+  coverSrc: string;
+  durationLabel: string;
+  viewsCount: number;
+  commentsCount: number;
+  timeLabel: string;
+};
+
+export type ActivitySidebarHighlightRecord = {
+  creatorId: string;
+  headline: string;
+  statusLabel: string;
 };
 
 export type UserNoteRecord = {
@@ -732,6 +836,60 @@ export const currentUser = {
   bannerSrc: assetPath("2026-04-13-cyberpunk-night-cities", "02.jpg"),
 };
 
+export const loginPreviewDefaultMode: LoginPreviewMode = "welcome";
+
+export const loginMethods: LoginMethodRecord[] = [
+  {
+    id: "email",
+    label: "邮箱登录 / 注册",
+    subtitle: "最轻量的账户入口",
+  },
+  {
+    id: "google",
+    label: "使用 Google 登录",
+    subtitle: "默认社交登录路径",
+  },
+  {
+    id: "apple",
+    label: "使用 Apple 登录",
+    subtitle: "适合 iPhone 与 Mac 用户",
+  },
+  {
+    id: "wallet",
+    label: "钱包登录",
+    subtitle: "面向签名和高控制权用户",
+    tone: "wallet",
+  },
+];
+
+export const loginAccounts: LoginAccountRecord[] = [
+  {
+    id: currentUser.id,
+    name: currentUser.name,
+    handle: currentUser.handle,
+    avatarSrc: currentUser.avatarSrc,
+    sessionLabel: "当前会话",
+    methodLabel: "Google + Embedded Wallet",
+    isCurrent: true,
+  },
+  {
+    id: "neo-preview-account",
+    name: "Neo Park",
+    handle: "@midnightsave",
+    avatarSrc: avatars.midnight,
+    sessionLabel: "最近登录",
+    methodLabel: "Apple Login",
+  },
+  {
+    id: "wallet-preview-account",
+    name: "Luna Cai",
+    handle: "@wanxinrk",
+    avatarSrc: avatars.wanxin,
+    sessionLabel: "钱包身份",
+    methodLabel: "Phantom",
+  },
+];
+
 export const currentUserNotes: UserNoteRecord[] = [
   {
     id: "me-note-1",
@@ -830,6 +988,8 @@ export const portfolioHoldings: PortfolioHoldingRecord[] = [
     avgEntryUsd: 2.64,
     unrealizedChangePct: 18.4,
     note: "Buyout already accepted. This holding is about claim visibility and supporter payout timing.",
+    currentPriceUsd: 3.24,
+    trend: [2.72, 2.84, 2.76, 2.91, 3.03, 3.14, 3.2, 3.24],
   },
   {
     creatorId: "neo-park",
@@ -837,13 +997,72 @@ export const portfolioHoldings: PortfolioHoldingRecord[] = [
     avgEntryUsd: 4.38,
     unrealizedChangePct: 32.8,
     note: "This creator already crossed into S2. The next step is campaign continuity, not discovery risk.",
+    currentPriceUsd: 5.82,
+    trend: [4.92, 5.18, 5.46, 5.08, 5.24, 5.49, 5.68, 5.82],
   },
   {
     creatorId: "mika-zhou",
     tokenCount: 94,
     avgEntryUsd: 1.87,
-    unrealizedChangePct: 15.5,
+    unrealizedChangePct: 0,
     note: "Still in S1 discovery. Watch graduation pressure and category momentum before adding more.",
+    currentPriceUsd: 1.87,
+    trend: [2.26, 2.18, 2.08, 1.99, 1.92, 1.88, 1.87, 1.87],
+  },
+];
+
+export const portfolioExposureTrend: PortfolioExposurePointRecord[] = [
+  { label: "Apr 7", value: 1528.4 },
+  { label: "Apr 8", value: 1606.1 },
+  { label: "Apr 9", value: 1642.8 },
+  { label: "Apr 10", value: 1708.2 },
+  { label: "Apr 11", value: 1765.9 },
+  { label: "Apr 12", value: 1788.6 },
+  { label: "Apr 13", value: 1812.4 },
+  { label: "Apr 14", value: 1827.1 },
+];
+
+export const portfolioClaimWindows: PortfolioClaimWindowRecord[] = [
+  {
+    id: "claim-luna",
+    creatorId: "luna-cai",
+    eligibleTokens: 154,
+    claimPriceUsd: 3.24,
+    payoutUsd: 498.96,
+    closesInLabel: "2d 0h left",
+    statusLabel: "Claim window approaching",
+  },
+];
+
+export const portfolioUpcomingClaims: PortfolioUpcomingClaimRecord[] = [
+  {
+    id: "upcoming-mika",
+    creatorId: "mika-zhou",
+    eligibleTokens: 94,
+    expectedPriceUsd: 2.1,
+    opensInLabel: "in 14 days",
+    estimatedPayoutUsd: 197.4,
+  },
+];
+
+export const portfolioReentryPositions: PortfolioReentryRecord[] = [
+  {
+    id: "reentry-neo",
+    creatorId: "neo-park",
+    exitPriceUsd: 3.9,
+    currentPriceUsd: 5.82,
+    exitedAtLabel: "Exited Feb 15, 2026",
+    sinceExitPerformancePct: 49.2,
+    thesis: "S1 → S2 transition",
+  },
+  {
+    id: "reentry-luna",
+    creatorId: "luna-cai",
+    exitPriceUsd: 2.2,
+    currentPriceUsd: 3.24,
+    exitedAtLabel: "Exited Dec 8, 2025",
+    sinceExitPerformancePct: 47.3,
+    thesis: "Pre-S1 early exit",
   },
 ];
 
@@ -873,6 +1092,210 @@ export const portfolioActions: PortfolioActionRecord[] = [
 ];
 
 export const discoverCategories = ["推荐", "赛车", "游戏", "电影", "科技", "城市", "氛围", "创作者观察"];
+
+const activityPost = (postId: string) => posts.find((post) => post.id === postId) ?? posts[0];
+
+export const followedCreatorIds = ["neo-park", "luna-cai", "mika-zhou", "low-orbit"];
+
+export const activityFeedTabs: ActivityFeedTabRecord[] = [
+  { id: "overview", label: "综合" },
+  { id: "video", label: "视频" },
+];
+
+export const activityAuthors: ActivityAuthorRecord[] = [
+  {
+    creatorId: "neo-park",
+    note: "预告氛围和主机发布片更新很快",
+    hasUnread: true,
+  },
+  {
+    creatorId: "luna-cai",
+    note: "F1 视觉向内容在持续冒头",
+  },
+  {
+    creatorId: "mika-zhou",
+    note: "偏电影感长文和克制图文",
+  },
+  {
+    creatorId: "low-orbit",
+    note: "工程与航天类内容保持稳定更新",
+  },
+];
+
+export const activityFeedItems: ActivityFeedItemRecord[] = [
+  {
+    id: "activity-post-console-cut",
+    kind: "post",
+    creatorId: "neo-park",
+    postId: "post-midnight-console-cut",
+    postedAtLabel: "6小时前",
+    title: "新的主机 launch cut 一出来，我又被那种“世界现在要被打开了”的气场打回来了。",
+    body: "有些设备不是先靠规格让人上头，而是先靠一段发布片把气氛立住。冷光、空间感和克制的声音设计，一下就把消费电子拉进文化物件的语境里。",
+    actionSummary: "#主机发布 #视觉叙事 #设备氛围",
+    commentsCount: 8,
+    likesCount: 365,
+    sharesCount: 52,
+    coverSrc: activityPost("post-midnight-console-cut").coverSrc,
+    mediaType: "VIDEO",
+    durationLabel: activityPost("post-midnight-console-cut").durationLabel,
+    stage: "S2_ACTIVE",
+  },
+  {
+    id: "activity-status-rain",
+    kind: "status",
+    creatorId: "luna-cai",
+    postId: "post-trackside-rain-cut",
+    postedAtLabel: "3小时前",
+    body: "雨战镜头真正可怕的地方，是它会把速度、危险和审美同时拉满。今天又把那段水雾和尾灯的画面翻出来循环了一遍。",
+    actionSummary: "更新了一个短动态 · 点击进入帖子详情",
+    commentsCount: 16,
+    likesCount: 148,
+    sharesCount: 19,
+    coverSrc: activityPost("post-trackside-rain-cut").coverSrc,
+    mediaType: "VIDEO",
+    durationLabel: activityPost("post-trackside-rain-cut").durationLabel,
+    stage: "S1_BUYOUT",
+  },
+  {
+    id: "activity-post-dune",
+    kind: "post",
+    creatorId: "mika-zhou",
+    postId: "post-dune-afterglow",
+    postedAtLabel: "昨晚",
+    title: "《沙丘》最厉害的不是大场面，而是它能让人安静下来，被一个世界慢慢压进去。",
+    body: "这类电影不是很吵、很满的视觉刺激，而是一种极度克制，但压迫感强到离谱的美。沙漠、秩序感和命运感会把人整个人吞进去。",
+    actionSummary: "#电影美学 #沙漠科幻 #镜头情绪",
+    commentsCount: 6,
+    likesCount: 212,
+    sharesCount: 27,
+    coverSrc: activityPost("post-dune-afterglow").coverSrc,
+    mediaType: "IMAGE",
+    stage: "S1_DISCOVERY",
+  },
+  {
+    id: "activity-status-rocket",
+    kind: "status",
+    creatorId: "low-orbit",
+    postId: "post-rocket-dream",
+    postedAtLabel: "昨天",
+    body: "有些震撼不是因为它很大，而是你知道它真的想去很远的地方。海岸线上的火箭还没起飞，浪漫已经先立住了。",
+    actionSummary: "来自关注创作者的近况更新",
+    commentsCount: 11,
+    likesCount: 126,
+    sharesCount: 14,
+    coverSrc: activityPost("post-rocket-dream").coverSrc,
+    mediaType: "IMAGE",
+    stage: "S1_DISCOVERY",
+  },
+  {
+    id: "activity-post-game",
+    kind: "post",
+    creatorId: "neo-park",
+    postId: "post-game-trailer-moodboard",
+    postedAtLabel: "9小时前",
+    title: "这几款游戏还没全玩到，我的精神状态已经先被预告片拿捏了。",
+    body: "现在让我上头的游戏，已经不只是好不好玩了，而是它们有没有一种一眼就把你拽进世界里的能力。风格不同，但共同点都是沉浸感先抵达。",
+    actionSummary: "#游戏预告 #世界观海报 #情绪板",
+    commentsCount: 12,
+    likesCount: 468,
+    sharesCount: 71,
+    coverSrc: activityPost("post-game-trailer-moodboard").coverSrc,
+    mediaType: "IMAGE",
+    stage: "S2_ACTIVE",
+  },
+];
+
+export const activityVideoItems: ActivityVideoItemRecord[] = [
+  {
+    id: "activity-video-console",
+    creatorId: "neo-park",
+    postId: "post-midnight-console-cut",
+    title: "主机发布片这种东西，很多时候先卖的是世界观，不是参数表。",
+    coverSrc: activityPost("post-midnight-console-cut").coverSrc,
+    durationLabel: "00:38",
+    viewsCount: 12800,
+    commentsCount: 8,
+    timeLabel: "6小时前",
+  },
+  {
+    id: "activity-video-rain",
+    creatorId: "luna-cai",
+    postId: "post-trackside-rain-cut",
+    title: "雨战镜头会把速度、危险和审美一次性拉满。",
+    coverSrc: activityPost("post-trackside-rain-cut").coverSrc,
+    durationLabel: "00:27",
+    viewsCount: 6240,
+    commentsCount: 7,
+    timeLabel: "3小时前",
+  },
+  {
+    id: "activity-video-game",
+    creatorId: "neo-park",
+    postId: "post-game-trailer-moodboard",
+    title: "这些游戏还没全玩到，但预告片已经先把情绪做满了。",
+    coverSrc: activityPost("post-game-trailer-moodboard").coverSrc,
+    durationLabel: "02:29",
+    viewsCount: 20800,
+    commentsCount: 12,
+    timeLabel: "9小时前",
+  },
+  {
+    id: "activity-video-f1",
+    creatorId: "luna-cai",
+    postId: "post-f1-aesthetics",
+    title: "喜欢 F1 的起点，也可能只是被一台车的外形瞬间击中。",
+    coverSrc: activityPost("post-f1-aesthetics").coverSrc,
+    durationLabel: "01:18",
+    viewsCount: 8420,
+    commentsCount: 9,
+    timeLabel: "1天前",
+  },
+  {
+    id: "activity-video-dune",
+    creatorId: "mika-zhou",
+    postId: "post-dune-afterglow",
+    title: "《沙丘》这种片子最狠的不是热闹，是那种安静但很重的压迫感。",
+    coverSrc: activityPost("post-dune-afterglow").coverSrc,
+    durationLabel: "01:42",
+    viewsCount: 4140,
+    commentsCount: 6,
+    timeLabel: "昨晚",
+  },
+  {
+    id: "activity-video-rocket",
+    creatorId: "low-orbit",
+    postId: "post-rocket-dream",
+    title: "看火箭的时候最先冒出来的情绪，常常不是参数而是浪漫。",
+    coverSrc: activityPost("post-rocket-dream").coverSrc,
+    durationLabel: "00:54",
+    viewsCount: 3820,
+    commentsCount: 6,
+    timeLabel: "昨天",
+  },
+];
+
+export const activitySidebarHighlights: ActivitySidebarHighlightRecord[] = [
+  {
+    creatorId: "neo-park",
+    headline: "新一轮主机与 3A 预告内容继续带动互动。",
+    statusLabel: "S2 campaign cadence",
+  },
+  {
+    creatorId: "luna-cai",
+    headline: "F1 雨战短视频和美学图文都在涨评论深度。",
+    statusLabel: "Buyout window in focus",
+  },
+  {
+    creatorId: "mika-zhou",
+    headline: "长文类电影美学内容停留时间稳定。",
+    statusLabel: "S1 discovery retained",
+  },
+  {
+    creatorId: "low-orbit",
+    headline: "航天与工程浪漫题材在持续刷新收藏率。",
+    statusLabel: "Quiet but compounding",
+  },
+];
 
 export const formatUsd = (value: number) =>
   new Intl.NumberFormat("en-US", {

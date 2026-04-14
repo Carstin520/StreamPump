@@ -8,7 +8,7 @@ export const Panel = ({
   className?: string;
 }) => (
   <section
-    className={`app-shell-frame rounded-[28px] p-5 text-slate-100 ${className}`}
+    className={`app-shell-frame p-5 text-slate-100 ${className}`}
   >
     {children}
   </section>

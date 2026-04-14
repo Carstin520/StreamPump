@@ -9,7 +9,7 @@ import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock
 type ProfileTab = "作品" | "投资档案" | "Signals";
 
 const shellCard =
-  "app-shell-frame overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)]";
+  "app-shell-frame overflow-hidden border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)]";
 
 export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");

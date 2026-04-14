@@ -5,7 +5,7 @@ import { compactNumber, CreatorMarketRecord, formatUsd } from "@/lib/mock-data";
 
 export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
   <Link className="block" href={`/creators/${creator.id}`}>
-    <div className="group cursor-pointer overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#121826] shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
+    <div className="card-radius group cursor-pointer overflow-hidden border border-white/[0.06] bg-[#121826] shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
       <div className="relative h-24 overflow-hidden">
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-[#121826] via-transparent to-transparent" />
         <img

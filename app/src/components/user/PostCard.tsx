@@ -17,7 +17,7 @@ export const PostCard = ({ post }: { post: PostRecord }) => {
       className={`mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
       href={`/posts/${post.id}`}
     >
-      <article className="glass-card relative overflow-hidden rounded-[26px] border-white/[0.06] bg-[#101621]">
+      <article className="glass-card relative overflow-hidden border-white/[0.06] bg-[#101621]">
         <div className={`relative overflow-hidden ${post.mediaHeightClass} ${post.mediaStyle}`}>
           <ProgressiveImage
             alt={post.title}

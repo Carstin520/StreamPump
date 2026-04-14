@@ -138,7 +138,10 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - EventParser-first chain indexer with persisted `ChainEvent` records and proposal projection sync
 - a much stronger frontend experience prototype built on the existing `pages` router
 - immersive `Discover` feed with animated background, progressive image loading, and unified glassmorphism system
-- refined `Trending`, `Portfolio`, and `Profile` surfaces with a more coherent visual language
+- refined `Trending`, `Portfolio`, `Profile`, `Login`, and `Activity` surfaces with a more coherent visual language
+- dual-state login preview covering both first-time entry and account switching
+- supporter-facing `Portfolio` with exposure curve, row-level sparklines, claim queue, and re-entry prototype flows
+- new follow-first `Activity` page with `综合 / 视频` tabs, creator filtering, and bilibili-inspired subscription-feed information architecture
 - floating post-detail modal for both image and video posts with wheel-based post switching and preserved resize state
 
 ### Still under construction
@@ -169,10 +172,13 @@ The frontend moved forward substantially in the latest iteration.
 
 What is now in place:
 
-- a unified visual system across `Discover`, `Trending`, `Portfolio`, `Profile`, workspace pages, and post detail
+- a unified visual system across `Discover`, `Activity`, `Trending`, `Portfolio`, `Profile`, login, workspace pages, and post detail
 - startup-only branded loading, with progressive blur-up media loading for large images instead of repeated full-page loaders
 - an animated background layer so the app surface feels alive even behind floating detail views
 - a floating post-detail modal with shared navigation for image and video posts, vertical wheel switching, lighter separators, and preserved resize state
+- a dual-state login surface for first-time access and account switching previews
+- a supporter portfolio flow with trend charts, claim queue, and re-entry action prototypes
+- a follow-first activity feed with creator filtering, mixed post/update cards, and compact video-grid mode
 
 What is still intentionally prototype-grade:
 
@@ -189,6 +195,10 @@ These screenshots reflect the current frontend direction inside the repo.
 The main feed now behaves more like an immersive content surface than a static mockup. It uses a stronger poster-style hero, stage-aware post cards, and a subtle animated page layer in the background.
 
 ![Discover feed](docs/readme-assets/frontend-explore-surface.png)
+
+### Activity Feed
+
+The new `Activity` surface adds a follow-first subscription layer inspired by bilibili-style dynamics. It introduces a left-side followed-creator rail, a central `综合 / 视频` content switcher, and a lighter right-side highlight column without breaking StreamPump's existing visual language.
 
 ### Floating Post Detail
 
@@ -282,7 +292,7 @@ The current backend auth path supports:
 programs/streampump-core     Anchor program (Rust)
 programs/tests               Anchor TypeScript tests
 backend/                     API, storage, manifest flow, proposal-intent flow
-app/                         Next.js frontend scaffold
+app/                         Next.js product prototype for discover, activity, portfolio, profile, and workspace UX
 docs/                        Architecture notes and backend contracts
 scripts/                     Local helpers
 ```

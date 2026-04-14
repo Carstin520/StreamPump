@@ -1,37 +1,86 @@
 import dynamic from "next/dynamic";
 import Head from "next/head";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { Panel } from "@/components/shared/Panel";
+import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { LoginPreviewMode, loginPreviewDefaultMode } from "@/lib/mock-data";
 
 const DynamicAuthOptionsPanel = dynamic(
   () => import("@/components/auth/AuthOptionsPanel").then((mod) => mod.AuthOptionsPanel),
   { ssr: false },
 );
 
+const getPreviewMode = (value: string | string[] | undefined): LoginPreviewMode =>
+  value === "switch" ? "switch" : "welcome";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [previewMode, setPreviewMode] = useState<LoginPreviewMode>(loginPreviewDefaultMode);
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    setPreviewMode(getPreviewMode(router.query.preview));
+  }, [router.isReady, router.query.preview]);
+
+  const handleModeChange = (mode: LoginPreviewMode) => {
+    setPreviewMode(mode);
+    void router.replace(
+      {
+        pathname: "/login",
+        query: mode === "switch" ? { preview: "switch" } : {},
+      },
+      undefined,
+      { shallow: true, scroll: false },
+    );
+  };
+
   return (
     <>
       <Head>
         <title>StreamPump | Login</title>
       </Head>
-      <AppShell
-        subtitle="This preview keeps social login and wallet entry in the same place, but makes social + embedded wallet the default product story."
-        title="Account access without forcing wallet-first UX"
-      >
-        <div className="space-y-5">
-          <DynamicAuthOptionsPanel />
-          <Panel className="grid gap-5 lg:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phase 1 intent</p>
-              <h3 className="mt-3 text-xl font-semibold text-white">Reduce onboarding intimidation</h3>
+      <main className="relative min-h-screen overflow-hidden bg-[#080c14] text-white">
+        <AnimatedFeedBackdrop className="opacity-[0.85]" />
+        <div className="pointer-events-none absolute inset-[8%] rounded-[54px] border border-white/[0.03] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_36%)] backdrop-blur-[2px]" />
+
+        <div className="relative flex min-h-screen flex-col px-5 py-5 lg:px-8">
+          <div className="flex items-center justify-between">
+            <Link className="flex items-center gap-3" href="/explore">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold shadow-[0_12px_30px_rgba(222,64,42,0.32)]">
+                SP
+              </span>
+              <span className="text-lg font-semibold tracking-[-0.04em] text-white">StreamPump</span>
+            </Link>
+
+            <div className="hidden rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-[#8ea0ba] md:block">
+              Preview state syncs with <code className="text-white/80">?preview=</code>
             </div>
-            <p className="text-sm leading-7 text-slate-300 lg:col-span-2">
-              The production direction is social login, managed or embedded wallet setup, and a StreamPump session that can later authorize S1 trades and S2 launch actions. External wallet connect remains available for power users and sign-heavy flows.
-            </p>
-          </Panel>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center py-10">
+            <div className="w-full max-w-[1040px]">
+              <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]">
+                <div className="hidden px-6 lg:block">
+                  <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">Access Layer</p>
+                  <h1 className="mt-5 max-w-[520px] text-[56px] font-semibold leading-[0.94] tracking-[-0.06em] text-white">
+                    Accounts that feel native to the product, not bolted on later.
+                  </h1>
+                  <p className="mt-6 max-w-[440px] text-base leading-8 text-[#95a6bf]">
+                    This preview keeps creator investing, social identity, and wallet power in one coherent entry flow. Start simple, then reveal control only when the user needs it.
+                  </p>
+                </div>
+
+                <DynamicAuthOptionsPanel mode={previewMode} onModeChange={handleModeChange} />
+              </div>
+            </div>
+          </div>
         </div>
-      </AppShell>
+      </main>
     </>
   );
 }

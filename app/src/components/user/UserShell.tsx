@@ -3,10 +3,12 @@ import { useRouter } from "next/router";
 import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { SwitchAccountIcon } from "@/components/shared/AppIcons";
 import { currentUser } from "@/lib/mock-data";
 
 const primaryNav = [
   { href: "/explore", label: "发现", match: ["/", "/explore", "/discover", "/posts"] },
+  { href: "/activity", label: "动态", match: ["/activity"] },
   { href: "/trending", label: "Trending", match: ["/trending"] },
   { href: "/portfolio", label: "投资组合", match: ["/portfolio"] },
 ];
@@ -57,7 +59,7 @@ export const UserShell = ({
           ))}
         </nav>
 
-        <div className="border-t border-white/[0.05] p-2 lg:p-4">
+        <div className="space-y-2 border-t border-white/[0.05] p-2 lg:p-4">
           <Link href="/me">
             <div
               className={`surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 transition duration-200 lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
@@ -75,6 +77,15 @@ export const UserShell = ({
                 <p className="truncate text-sm font-medium text-white">{currentUser.name}</p>
                 <p className="truncate text-xs text-[#8fa1bd]">{currentUser.handle}</p>
               </div>
+            </div>
+          </Link>
+
+          <Link href="/login?preview=switch">
+            <div className="surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 text-white/80 transition duration-200 hover:bg-white/[0.07] lg:justify-start lg:px-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-[#9dadc6]">
+                <SwitchAccountIcon className="h-4 w-4" />
+              </span>
+              <span className="ml-3 hidden text-sm font-medium text-white lg:block">切换账号</span>
             </div>
           </Link>
         </div>
