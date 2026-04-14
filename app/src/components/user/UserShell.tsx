@@ -26,15 +26,15 @@ export const UserShell = ({
 
   return (
     <main className="min-h-[100dvh] bg-[#090d14] text-[#f5f7fb]">
-      <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-16 border-r border-white/6 bg-[#090f17]/94 backdrop-blur-xl lg:flex lg:w-64 lg:flex-col">
-        <div className="flex h-16 items-center justify-center border-b border-white/6 lg:justify-start lg:px-6">
+      <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-16 border-r border-white/[0.045] bg-[#090d14]/96 lg:flex lg:w-64 lg:flex-col">
+        <div className="flex h-16 items-center justify-center border-b border-white/[0.04] lg:justify-start lg:px-6">
           <Link
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff516d] text-sm font-semibold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold text-white"
             href="/explore"
           >
             SP
           </Link>
-          <span className="ml-3 hidden text-lg font-semibold tracking-[-0.03em] text-white lg:block">
+          <span className="ml-3 hidden font-['DM_Sans'] text-lg font-bold tracking-[-0.03em] text-white lg:block">
             StreamPump
           </span>
         </div>
@@ -42,10 +42,10 @@ export const UserShell = ({
         <nav className="flex-1 space-y-2 px-2 py-6 lg:px-4">
           {primaryNav.map((item) => (
             <Link
-              className={`flex h-12 items-center justify-center rounded-xl px-3 text-sm transition lg:justify-start ${
+              className={`group flex h-12 items-center justify-center rounded-xl px-3 text-sm transition lg:justify-start ${
                 isActive(item.href, item.match)
                   ? "bg-[#171f2d] text-white"
-                  : "text-[#8f9eb7] hover:bg-white/5 hover:text-white"
+                  : "text-[#8f9eb7] hover:bg-[#141b27] hover:text-white"
               }`}
               href={item.href}
               key={item.href}
@@ -55,13 +55,13 @@ export const UserShell = ({
           ))}
         </nav>
 
-        <div className="border-t border-white/6 p-2 lg:p-4">
+        <div className="border-t border-white/[0.04] p-2 lg:p-4">
           <Link href="/me">
             <div
               className={`flex h-12 items-center justify-center rounded-xl border px-1 transition lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
                 router.pathname.startsWith("/me")
-                  ? "border-[#2d446a] bg-[#171f2d] text-white"
-                  : "border-white/6 bg-white/[0.03] text-white/80 hover:bg-white/5"
+                  ? "border-white/[0.08] bg-[#171f2d] text-white"
+                  : "border-white/[0.05] bg-[#111827] text-white/80 hover:bg-[#141b27]"
               }`}
             >
               <img
@@ -78,7 +78,7 @@ export const UserShell = ({
         </div>
       </aside>
 
-      <div className="lg:ml-16 xl:ml-64">
+      <div className="lg:ml-64">
         <div className="space-y-6 px-4 py-4 lg:px-6 lg:py-0">
           {header}
           {children}

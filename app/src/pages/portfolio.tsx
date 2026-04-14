@@ -1,15 +1,19 @@
 import Head from "next/head";
 import Link from "next/link";
+import { useState } from "react";
 
 import { UserShell } from "@/components/user/UserShell";
 import { UserTopbar } from "@/components/user/UserTopbar";
-import { compactNumber, findCreator, formatUsd, portfolioActions, portfolioHoldings } from "@/lib/mock-data";
+import { findCreator, formatUsd, portfolioActions, portfolioHoldings } from "@/lib/mock-data";
 
 export default function PortfolioPage() {
+  const [activeTab, setActiveTab] = useState("Portfolio");
   const totalExposure = portfolioHoldings.reduce((sum, holding) => {
     const creator = findCreator(holding.creatorId);
     return sum + creator.tokenPrice * holding.tokenCount;
   }, 0);
+  const primaryAction = portfolioActions[0];
+  const actionCreator = primaryAction.creatorId ? findCreator(primaryAction.creatorId) : null;
 
   return (
     <>
@@ -17,58 +21,61 @@ export default function PortfolioPage() {
         <title>StreamPump | Portfolio</title>
       </Head>
       <UserShell header={<UserTopbar />}>
-        <div className="space-y-5">
-          <section className="rounded-[30px] border border-white/6 bg-[linear-gradient(180deg,#0d1727_0%,#0b111d_100%)] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
-            <p className="text-xs uppercase tracking-[0.22em] text-[#6c7d97]">Portfolio overview</p>
-            <h1 className="mt-2 text-4xl font-semibold text-white">Investment Cards</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#97a7be]">
-              Your S1 exposure and next actions should stay readable here, especially buyout claim windows and paths back into S2 content pools.
-            </p>
+        <div className="mx-auto max-w-[1120px] space-y-8 py-6">
+          <section>
+            <h1 className="text-[42px] font-semibold tracking-[-0.05em] text-white">Your S1 exposure and next actions</h1>
+            <p className="mt-2 text-sm text-[#95a6be]">Manage your creator token holdings and upcoming claims.</p>
 
             <div className="mt-6 flex items-center gap-6 border-b border-white/8">
-              {["Portfolio", "Claim queue", "Re-entry"].map((tab, index) => (
+              {["Portfolio", "Claim queue", "Re-entry"].map((tab) => (
                 <button
-                  className={`relative pb-4 text-sm font-medium ${index === 0 ? "text-white" : "text-[#8798b2]"}`}
+                  className={`relative pb-4 text-sm font-medium ${
+                    activeTab === tab ? "text-white" : "text-[#8798b2]"
+                  }`}
                   key={tab}
+                  onClick={() => setActiveTab(tab)}
                   type="button"
                 >
                   {tab}
-                  {index === 0 ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#4d8fff]" /> : null}
+                  {activeTab === tab ? (
+                    <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#de402a]" />
+                  ) : null}
                 </button>
               ))}
             </div>
           </section>
 
-          <section className="grid gap-3 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-3">
             <MetricCard glow="blue" label="Active holdings" value={String(portfolioHoldings.length)} />
             <MetricCard glow="green" label="Exposure value" value={formatUsd(totalExposure)} />
-            <MetricCard glow="pink" label="Waiting actions" value={String(portfolioActions.length)} />
+            <MetricCard glow="pink" label="Waiting actions" value="1" />
           </section>
 
-          <section className="rounded-[30px] border border-white/6 bg-[linear-gradient(180deg,#0d1624_0%,#0a1019_100%)] px-5 py-5 shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="space-y-4">
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-white">Holdings</h2>
+              <div className="space-y-3">
                 {portfolioHoldings.map((holding) => {
                   const creator = findCreator(holding.creatorId);
 
                   return (
                     <Link
-                      className="block rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#10192a_0%,#0b111b_100%)] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
+                      className="block rounded-[18px] border border-white/[0.06] bg-[#121826] p-4 shadow-[0_12px_36px_rgba(0,0,0,0.18)] transition hover:border-white/[0.1] hover:bg-[#141b2a]"
                       href={`/creators/${creator.id}`}
                       key={holding.creatorId}
                     >
-                      <div className="flex items-center gap-4">
-                        <img alt={creator.name} className="h-14 w-14 rounded-xl border border-white/10 object-cover" src={creator.avatarSrc} />
+                      <div className="flex flex-wrap items-center gap-4 xl:flex-nowrap">
+                        <img alt={creator.name} className="h-12 w-12 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="text-base font-semibold text-white">{creator.name}</p>
-                            <span className="rounded-full bg-white/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-[#d8e1ee]">
+                            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#aebad0]">
                               {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
                             </span>
                           </div>
-                          <p className="text-sm text-[#8ea0ba]">{holding.tokenCount} held</p>
+                          <p className="text-sm text-[#8ea0ba]">{holding.tokenCount} HELD</p>
                         </div>
-                        <div className="grid grid-cols-3 gap-6 text-right">
+                        <div className="ml-auto grid grid-cols-3 gap-4 text-right md:gap-8">
                           <HoldingMetric label="Price" value={formatUsd(creator.tokenPrice)} />
                           <HoldingMetric label="Avg entry" value={formatUsd(holding.avgEntryUsd)} />
                           <HoldingMetric
@@ -77,53 +84,48 @@ export default function PortfolioPage() {
                             value={`${holding.unrealizedChangePct > 0 ? "+" : ""}${holding.unrealizedChangePct.toFixed(1)}%`}
                           />
                         </div>
+                        <div className="ml-auto flex overflow-hidden rounded-full border border-white/10">
+                          <button className="border-r border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/6" type="button">
+                            Buy
+                          </button>
+                          <button className="px-4 py-2 text-sm text-white transition hover:bg-white/6" type="button">
+                            Sell
+                          </button>
+                        </div>
                       </div>
                     </Link>
                   );
                 })}
               </div>
+            </div>
 
-              <div className="space-y-4">
-                {portfolioActions.map((card) => {
-                  const creator = card.creatorId ? findCreator(card.creatorId) : null;
-                  const toneClass =
-                    card.tone === "buyout"
-                      ? "from-[#3a1520] via-[#28131c] to-[#16121a]"
-                      : card.tone === "opportunity"
-                        ? "from-[#10253b] via-[#0f1d31] to-[#0b121c]"
-                        : "from-[#121d2d] via-[#111827] to-[#0b111b]";
-                  const buttonClass =
-                    card.tone === "buyout"
-                      ? "bg-[linear-gradient(90deg,#ff6b8b_0%,#ff476d_100%)] text-white"
-                      : "bg-[linear-gradient(90deg,#3ea8ff_0%,#2795ff_100%)] text-[#04101b]";
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-white">Pending Actions</h2>
+              <div className="rounded-[22px] border border-[#8d6120]/34 bg-[linear-gradient(180deg,rgba(77,49,20,0.3)_0%,rgba(24,17,12,0.95)_100%)] p-5 shadow-[0_18px_44px_rgba(0,0,0,0.24)]">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f3b33e]">
+                  <span className="h-2 w-2 rounded-full bg-[#f3b33e]" />
+                  Claim window approaching
+                </div>
 
-                  return (
-                    <div
-                      className={`rounded-[24px] border border-white/8 bg-gradient-to-b ${toneClass} p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]`}
-                      key={card.id}
-                    >
-                      <p className="text-xs uppercase tracking-[0.2em] text-[#7f90ab]">Pending action</p>
-                      <h3 className="mt-3 text-[32px] font-semibold leading-10 text-white">{card.title}</h3>
-                      <p className="mt-3 text-sm leading-7 text-[#ced7e5]">{card.body}</p>
+                <h3 className="mt-4 text-xl font-semibold text-white">Luna Cai S1 Buyout</h3>
+                <p className="mt-3 text-sm leading-7 text-[#c8d3e2]">
+                  Your 154 tokens are eligible for buyout at {formatUsd(findCreator("luna-cai").tokenPrice)}/token. Claim window closes in 48 hours.
+                </p>
 
-                      {creator ? (
-                        <div className="mt-5 flex items-center gap-3 rounded-[18px] bg-black/18 p-3">
-                          <img alt={creator.name} className="h-10 w-10 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-white">{creator.name}</p>
-                            <p className="text-xs text-[#8ea0ba]">{compactNumber(creator.holderCount)} holders · {formatUsd(creator.tokenPrice)}</p>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {card.actionLabel ? (
-                        <button className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-medium shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${buttonClass}`} type="button">
-                          {card.actionLabel}
-                        </button>
-                      ) : null}
+                {actionCreator ? (
+                  <div className="mt-5 flex items-center gap-3 rounded-[14px] border border-white/8 bg-[#111722] p-3">
+                    <img alt={actionCreator.name} className="h-10 w-10 rounded-full object-cover" src={actionCreator.avatarSrc} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-white">{actionCreator.name}</p>
+                      <p className="text-xs text-[#8ea0ba]">Estimated payout: {formatUsd(actionCreator.tokenPrice * portfolioHoldings[0].tokenCount)}</p>
                     </div>
-                  );
-                })}
+                  </div>
+                ) : null}
+
+                <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90" type="button">
+                  Claim Now
+                  <span aria-hidden>→</span>
+                </button>
               </div>
             </div>
           </section>
@@ -143,16 +145,16 @@ const MetricCard = ({
   glow: "blue" | "green" | "pink";
 }) => (
   <div
-    className={`rounded-[20px] border bg-white/5 px-4 py-4 ${
+    className={`rounded-[18px] border bg-[#121826] px-4 py-4 ${
       glow === "blue"
-        ? "border-[#95bfff]/30 shadow-[0_0_22px_rgba(103,156,255,0.18)]"
+        ? "border-white/[0.08]"
         : glow === "green"
-          ? "border-[#66f0b1]/28 shadow-[0_0_22px_rgba(58,223,138,0.18)]"
-          : "border-[#ff8aa6]/28 shadow-[0_0_22px_rgba(255,91,133,0.18)]"
+          ? "border-white/[0.08]"
+          : "border-white/[0.08]"
     }`}
   >
     <p className="text-xs uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
-    <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+    <p className={`mt-2 text-[38px] font-semibold tracking-[-0.04em] ${glow === "green" ? "text-[#de402a]" : "text-white"}`}>{value}</p>
   </div>
 );
 

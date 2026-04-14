@@ -6,7 +6,7 @@ import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock
 type ProfileTab = "作品" | "投资档案" | "Signals";
 
 const shellCard =
-  "overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,rgba(14,21,33,0.92)_0%,rgba(10,17,25,0.88)_100%)] shadow-[0_26px_88px_rgba(0,0,0,0.34)] backdrop-blur-2xl";
+  "overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)] shadow-[0_26px_88px_rgba(0,0,0,0.34)] backdrop-blur-2xl";
 
 export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
@@ -54,14 +54,11 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
             <p className="mt-6 max-w-2xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
 
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <button
-                className="liquid-pill rounded-full px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-                type="button"
-              >
+              <button className="liquid-glass-btn rounded-full px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/10" type="button">
                 私信
               </button>
               <button
-                className="rounded-full bg-white px-7 py-2.5 text-sm font-semibold text-black transition hover:bg-white/92"
+                className="rounded-full bg-[#de402a] px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-[#ea523e]"
                 type="button"
               >
                 + 关注
@@ -81,7 +78,7 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[#93a3bc]">{getInvestmentSubtitle(creator)}</p>
           </div>
           <button
-            className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/92"
+            className="rounded-full bg-[#de402a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#ea523e]"
             type="button"
           >
             {getPrimaryActionLabel(creator)}

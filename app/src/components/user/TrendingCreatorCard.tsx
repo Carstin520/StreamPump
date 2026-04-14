@@ -10,9 +10,9 @@ const stateTone: Record<CreatorMarketRecord["state"], string> = {
 
 export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
   <Link className="block" href={`/creators/${creator.id}`}>
-    <div className="glass-card group cursor-pointer">
-      <div className="relative h-28 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-[#08101a] via-transparent to-transparent z-[1]" />
+    <div className="group cursor-pointer overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#121826] shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
+      <div className="relative h-24 overflow-hidden">
+        <div className="absolute inset-0 z-[1] bg-gradient-to-t from-[#121826] via-transparent to-transparent" />
         <img
           alt={creator.name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -20,80 +20,61 @@ export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord 
         />
         <div className="absolute left-4 top-4 z-[2]">
           <span
-            className={`liquid-pill rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${stateTone[creator.state]}`}
+            className={`rounded-full border border-white/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] ${stateTone[creator.state]}`}
           >
             {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
           </span>
         </div>
-        <div className="absolute right-4 top-4 z-[2] rounded-full border border-white/10 bg-black/28 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/82 backdrop-blur-md">
+        <div className="absolute right-4 top-4 z-[2] rounded-full border border-white/10 bg-black/24 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/82 backdrop-blur-md">
           {creator.niche}
         </div>
       </div>
 
-      <div className="relative z-[2] px-4 pb-4 pt-0">
-        <div className="-mt-7 mb-3 flex items-end justify-between">
-          <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1420] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.34)]">
+      <div className="relative z-[2] -mt-3 px-4 pb-4 pt-0">
+        <div className="mb-3 flex items-start justify-between">
+          <div className="h-12 w-12 overflow-hidden rounded-[14px] border border-white/10 bg-[#0d1420] p-0.5 shadow-[0_16px_34px_rgba(0,0,0,0.26)]">
             <img
               alt={creator.name}
-              className="h-full w-full rounded-xl object-cover"
+              className="h-full w-full rounded-[12px] object-cover"
               src={creator.avatarSrc}
             />
           </div>
-          <p className="pb-1 text-xs text-[#90a0b9]">{creator.city}</p>
+          <p className="pt-3 text-xs text-[#90a0b9]">{creator.city}</p>
         </div>
 
-        <div className="mb-1">
-          <h3 className="text-xl font-semibold tracking-[-0.03em] text-white">{creator.name}</h3>
-          <p className="mt-1 text-sm text-[#93a4bc]">{creator.handle}</p>
+        <div className="mb-1 space-y-1">
+          <h3 className="text-2xl font-semibold tracking-[-0.05em] text-white">{creator.name}</h3>
+          <p className="text-sm text-[#93a4bc]">{creator.handle}</p>
         </div>
 
         <p className="mb-4 mt-3 line-clamp-2 text-sm leading-6 text-[#d3dceb]">{creator.teaser}</p>
 
         <div className="grid grid-cols-2 gap-2">
-          <Metric label="Price" value={formatUsd(creator.tokenPrice)} />
+          <Metric accent label="Current price" value={formatUsd(creator.tokenPrice)} />
           <Metric label="Holders" value={compactNumber(creator.holderCount)} />
-          {creator.state === "S1_DISCOVERY" ? (
-            <>
-              <Metric label="Graduation" value={`${creator.graduationProgress}%`} />
-              <Metric label="Target" value={formatUsd(creator.targetGraduationPrice)} />
-            </>
-          ) : null}
-          {creator.state === "S1_BUYOUT" ? (
-            <>
-              <Metric label="Pool" value={formatUsd(creator.supporterDistributableUsd ?? 0)} />
-              <Metric label="Offer" value={formatUsd(creator.buyoutOfferUsd ?? 0)} />
-            </>
-          ) : null}
-          {creator.state === "S2_ACTIVE" ? (
-            <>
-              <Metric label="Activity" value={String(creator.activityScore ?? 0)} />
-              <Metric label="Valuation" value={formatUsd(creator.valuationUsd ?? 0)} />
-            </>
-          ) : null}
+          <Metric label="Supporter pool" value={formatUsd(resolveSupporterPool(creator))} />
+          <Metric label="Offer value" value={formatUsd(resolveOfferValue(creator))} />
         </div>
-
-        {creator.state === "S1_DISCOVERY" ? (
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-[#7d8ea7]">
-              <span>Graduation pressure</span>
-              <span>{creator.graduationProgress}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white/8">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#ff6f90] via-[#8c86ff] to-[#71b8ff]"
-                style={{ width: `${creator.graduationProgress}%` }}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   </Link>
 );
 
-const Metric = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-3.5">
+const resolveSupporterPool = (creator: CreatorMarketRecord) => {
+  if (creator.supporterDistributableUsd) return creator.supporterDistributableUsd;
+  if (creator.valuationUsd) return Math.round(creator.valuationUsd * 0.74);
+  return Math.round(creator.targetGraduationPrice * 14500);
+};
+
+const resolveOfferValue = (creator: CreatorMarketRecord) => {
+  if (creator.buyoutOfferUsd) return creator.buyoutOfferUsd;
+  if (creator.valuationUsd) return creator.valuationUsd;
+  return Math.round(creator.targetGraduationPrice * 64500);
+};
+
+const Metric = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (
+  <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.03] p-3">
     <p className="text-[10px] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
-    <p className="mt-2 text-base font-semibold text-white">{value}</p>
+    <p className={`mt-2 text-base font-semibold ${accent ? "text-[#de402a]" : "text-white"}`}>{value}</p>
   </div>
 );

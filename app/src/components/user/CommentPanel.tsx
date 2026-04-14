@@ -12,7 +12,7 @@ export const CommentPanel = ({
   <aside
     className={`flex h-full flex-col ${
       variant === "sidebar"
-        ? "bg-[linear-gradient(180deg,rgba(14,21,33,0.96)_0%,rgba(10,16,24,0.98)_100%)]"
+        ? "bg-[linear-gradient(180deg,rgba(16,23,34,0.98)_0%,rgba(12,18,28,0.98)_100%)]"
         : "bg-transparent"
     }`}
   >
@@ -40,18 +40,18 @@ export const CommentPanel = ({
             <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
           </div>
         </div>
-        <button className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/92" type="button">
+        <button className="liquid-glass-btn rounded-full px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10" type="button">
           关注
         </button>
       </div>
     </div>
 
     <div className="flex-1 overflow-y-auto px-5 py-5">
-      <h1 className="text-[26px] font-semibold leading-9 tracking-[-0.03em] text-white">{post.title}</h1>
+      <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.03em] text-white">{post.title}</h1>
       <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {post.tags.map((tag) => (
-          <span className="text-xs text-[#89bcff]" key={tag}>
+          <span className="text-xs text-[#de725f]" key={tag}>
             #{tag}
           </span>
         ))}
@@ -89,8 +89,8 @@ export const CommentPanel = ({
         <div className="liquid-pill flex-1 rounded-full px-4 py-3 text-sm text-[#6f829d]">
           说点什么...
         </div>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/92" type="button">
-          ↑
+        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-white transition hover:bg-[#ea523e]" type="button">
+          ➤
         </button>
       </div>
     </div>

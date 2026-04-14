@@ -61,19 +61,19 @@ const ImagePostView = () => {
 
   return (
     <main className="min-h-screen bg-[#070b11] text-white">
-      <div className="mx-auto flex min-h-screen max-w-[1680px] items-center p-3 lg:p-6">
+      <div className="mx-auto flex min-h-screen max-w-[1720px] items-center p-3 lg:p-5">
         <section
-          className={`glass-card grid min-h-[88vh] w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] ${
+          className={`liquid-glass-surface grid min-h-[88vh] w-full overflow-hidden rounded-[26px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] ${
             transitionDirection === "up" ? "content-slide-up" : "content-slide-down"
           }`}
           key={`${post.id}-${transitionKey}`}
         >
           <div className="relative flex min-h-[60vh] items-center justify-center bg-black/34 px-4 py-6 lg:px-8">
             <Link
-              className="liquid-pill absolute left-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
+              className="liquid-glass-icon-btn absolute left-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
               href="/explore"
             >
-              ←
+              ×
             </Link>
 
             {post.stage !== "NONE" ? (
@@ -88,7 +88,7 @@ const ImagePostView = () => {
 
             <div className="absolute right-4 top-16 z-20 flex flex-col items-center gap-2">
               <button
-                className={`liquid-pill flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
+                className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
                   previousPost ? "hover:bg-white/10" : "cursor-not-allowed opacity-30"
                 }`}
                 onClick={() => switchPost("down", displayIndex - 1)}
@@ -100,7 +100,7 @@ const ImagePostView = () => {
                 {displayIndex + 1}/{imagePosts.length}
               </span>
               <button
-                className={`liquid-pill flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
+                className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
                   nextPost ? "hover:bg-white/10" : "cursor-not-allowed opacity-30"
                 }`}
                 onClick={() => switchPost("up", displayIndex + 1)}
@@ -135,7 +135,7 @@ const ImagePostView = () => {
                 <>
                   {currentImage > 0 ? (
                     <button
-                      className="liquid-pill absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                      className="liquid-glass-icon-btn absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
                       onClick={goPrev}
                       type="button"
                     >
@@ -144,7 +144,7 @@ const ImagePostView = () => {
                   ) : null}
                   {currentImage < images.length - 1 ? (
                     <button
-                      className="liquid-pill absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                      className="liquid-glass-icon-btn absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
                       onClick={goNext}
                       type="button"
                     >
@@ -221,7 +221,7 @@ const VideoPostView = () => {
   return (
     <main className="fixed inset-0 z-50 overflow-hidden bg-black text-white">
       <Link
-        className="liquid-pill absolute left-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
+        className="liquid-glass-icon-btn absolute left-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
         href="/explore"
       >
         ←
@@ -229,7 +229,7 @@ const VideoPostView = () => {
 
       <div className="absolute right-5 top-5 z-40 flex flex-col items-center gap-2">
         <Link
-          className={`liquid-pill flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
+          className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
             previousPost ? "hover:bg-white/10" : "pointer-events-none opacity-30"
           }`}
           href={previousPost ? `/posts/${previousPost.id}` : "#"}
@@ -245,7 +245,7 @@ const VideoPostView = () => {
           {displayIndex + 1}/{videoPosts.length}
         </span>
         <Link
-          className={`liquid-pill flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
+          className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
             nextPost ? "hover:bg-white/10" : "pointer-events-none opacity-30"
           }`}
           href={nextPost ? `/posts/${nextPost.id}` : "#"}
@@ -325,7 +325,7 @@ const VideoPostView = () => {
           </div>
         </div>
 
-        <div className="hidden h-full w-[420px] border-l border-white/8 bg-[linear-gradient(180deg,rgba(14,21,33,0.96)_0%,rgba(10,16,24,0.98)_100%)] xl:flex xl:flex-col">
+        <div className="hidden h-full w-[400px] border-l border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.98)_0%,rgba(12,18,28,0.98)_100%)] xl:flex xl:flex-col">
           <div className="border-b border-white/8 px-4 pt-4">
             <div className="flex items-center gap-4">
               {(["详情", "评论", "相关"] as VideoTab[]).map((tab) => (
@@ -338,7 +338,7 @@ const VideoPostView = () => {
                   type="button"
                 >
                   {tab}
-                  {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-white" /> : null}
+                  {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#de402a]" /> : null}
                 </button>
               ))}
             </div>
@@ -350,10 +350,10 @@ const VideoPostView = () => {
                 <div className="flex items-center gap-3">
                   <img alt={creator.name} className="h-11 w-11 rounded-full object-cover" src={creator.avatarSrc} />
                   <div>
-                    <p className="text-sm font-semibold text-white">{creator.name}</p>
-                    <p className="text-xs text-[#8799b3]">{compactNumber(creator.followersCount)} 粉丝</p>
-                  </div>
+                  <p className="text-sm font-semibold text-white">{creator.name}</p>
+                  <p className="text-xs text-[#8799b3]">{compactNumber(creator.followersCount)} 粉丝</p>
                 </div>
+              </div>
 
                 <div>
                   <h2 className="text-xl font-semibold leading-8 tracking-[-0.03em] text-white">{post.title}</h2>
@@ -362,7 +362,7 @@ const VideoPostView = () => {
 
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((tag) => (
-                    <span className="text-xs text-[#89bcff]" key={tag}>
+                    <span className="text-xs text-[#de725f]" key={tag}>
                       #{tag}
                     </span>
                   ))}
@@ -423,8 +423,8 @@ const VideoPostView = () => {
                 <div className="liquid-pill flex-1 rounded-full px-4 py-3 text-sm text-[#6f829d]">
                   说点什么...
                 </div>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/92" type="button">
-                  ↑
+                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-white transition hover:bg-[#ea523e]" type="button">
+                  ➤
                 </button>
               </div>
             </div>
@@ -465,7 +465,7 @@ const ActionRailButton = ({
   onClick?: () => void;
 }) => (
   <button className="flex flex-col items-center gap-1 text-white" onClick={onClick} type="button">
-    <div className="liquid-pill flex h-12 w-12 items-center justify-center rounded-full text-sm text-white transition hover:bg-white/10">
+    <div className="liquid-glass-icon-btn flex h-12 w-12 items-center justify-center rounded-full text-sm text-white transition hover:bg-white/10">
       {symbol}
     </div>
     <span className="text-[11px] font-medium drop-shadow-md">{label}</span>
