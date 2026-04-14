@@ -31,6 +31,7 @@ export type PostRecord = {
   mediaHeightClass: string;
   mediaStyle: string;
   coverSrc: string;
+  durationLabel?: string;
   gallerySrcs?: string[];
   hasMultipleImages?: boolean;
   comments: CommentRecord[];
@@ -452,6 +453,35 @@ export const posts: PostRecord[] = [
     ],
   },
   {
+    id: "post-midnight-console-cut",
+    type: "VIDEO",
+    creatorId: "neo-park",
+    creatorName: "深夜不下线",
+    creatorHandle: "@midnightsave",
+    creatorAvatarSrc: avatars.midnight,
+    title: "真正让我记住一台主机的，不只是参数，而是它第一次亮相时那种把你拽进世界里的气场",
+    excerpt: "有些设备不是先靠规格让人上头，而是先靠一段发布片把气氛立住。",
+    body:
+      "这条更像我最近循环播放的一段 launch cut。\n\n真正让我记住一台主机的，不只是参数表，而是它第一次亮相时有没有把一种“新的世界现在要被打开了”的感觉传达出来。\n\n黑色机身、冷光、空间感很强的镜头调度，再加上一点克制的声音设计，整件事会瞬间从“消费电子”变成“文化物件”。你会突然觉得，它卖的不只是性能，而是一种你愿不愿意把晚上交给它的沉浸感。\n\n我很吃这种视频，不是因为它讲得多完整，而是它知道该在哪一秒把你情绪先抓住。\n\n你们会因为一条发布片对某个设备突然改观吗？",
+    tags: ["游戏设备", "发布片", "视觉叙事", "主机", "科技美学"],
+    stage: "S2_ACTIVE",
+    likes: 12800,
+    saves: 1432,
+    commentsCount: 8,
+    timeLabel: "6小时前",
+    location: "深圳",
+    mediaHeightClass: "h-[420px]",
+    mediaStyle: "",
+    coverSrc: assetPath("2026-04-13-game-trailer-moodboard", "04.png"),
+    durationLabel: "00:38",
+    comments: [
+      makeComment("helix-1", "显卡还在挣扎", "显", avatars.gpu, "这种发布片最会的就是先卖氛围，等你冷静下来才想起自己根本还没看参数。", 61, "1小时前"),
+      makeComment("helix-2", "理智消费代表", "参", avatars.tech, "我承认我经常被这种片子骗进去，但也说明它们真的很懂情绪节奏。", 44, "2小时前"),
+      makeComment("helix-3", "不熬夜也会看", "夜", avatars.movie, "这种黑色机身配冷光真的太容易做出高级感了。", 36, "3小时前"),
+      makeComment("helix-4", "主机还没下单", "机", avatars.calm, "我就是会先被片子拿下，再去说服自己这是理性消费。", 28, "4小时前"),
+    ],
+  },
+  {
     id: "post-dune-afterglow",
     type: "IMAGE",
     creatorId: "mika-zhou",
@@ -484,6 +514,35 @@ export const posts: PostRecord[] = [
       makeComment("dune-4", "今天也想二刷", "二", avatars.latte, "我真的很吃这种配色，明明全是土黄和暗色，但就是美得很冷。", 44, "5小时前"),
       makeComment("dune-5", "剧情至上派", "剧", avatars.calm, "我个人还是更看重故事，但这类片子确实能做到“光画面就先把你拽进去”。", 31, "6小时前"),
       makeComment("dune-6", "不懂科幻但会共鸣", "共", avatars.movie, "虽然我平时不怎么看科幻，但这种宿命感和孤独感我反而很能代入。", 29, "7小时前"),
+    ],
+  },
+  {
+    id: "post-trackside-rain-cut",
+    type: "VIDEO",
+    creatorId: "luna-cai",
+    creatorName: "弯心入坑",
+    creatorHandle: "@wanxinrk",
+    creatorAvatarSrc: avatars.wanxin,
+    title: "雨战镜头最可怕的地方，是它会把速度、危险和审美同时拉满",
+    excerpt: "赛道一旦开始下雨，所有画面都会突然从“很好看”变成“好看到让人屏住呼吸”。",
+    body:
+      "这段我最近会反复看。\n\n赛道一旦开始下雨，所有画面都会突然从“很好看”变成“好看到让人屏住呼吸”。水雾、反光、尾灯、轮胎带起来的雾墙，再加上转播镜头那种贴着速度走的压迫感，整件事会瞬间变得特别像电影。\n\n我喜欢这种片段，不只是因为它刺激，而是因为它会把赛车那种功能性极强的美感拉到最满。每一个动作都更危险，但每一个画面也更成立。\n\n很多人第一次被 F1 击中，可能不是因为规则，而是因为类似这种镜头让你突然意识到：速度真的可以有情绪。\n\n你们最喜欢的雨战镜头是哪一种？高速直道、慢速弯，还是进站那一瞬间？",
+    tags: ["F1", "雨战", "转播镜头", "赛车审美", "速度感"],
+    stage: "S1_BUYOUT",
+    likes: 6240,
+    saves: 908,
+    commentsCount: 7,
+    timeLabel: "3小时前",
+    location: "上海",
+    mediaHeightClass: "h-[360px]",
+    mediaStyle: "",
+    coverSrc: assetPath("2026-04-13-f1-aesthetics-entry", "03.png"),
+    durationLabel: "00:27",
+    comments: [
+      makeComment("track-1", "风洞研究员007", "风", avatars.wind, "雨战最迷人的就是所有原本熟悉的东西都突然变得不稳定。", 42, "58分钟前"),
+      makeComment("track-2", "今天也想去上赛", "赛", avatars.track, "直道上那种雾墙最夸张，几乎看不见前车的时候真的会起鸡皮疙瘩。", 35, "1小时前"),
+      makeComment("track-3", "不懂车但会看帅", "看", avatars.neonSea, "这种镜头对我这种外行杀伤力也很大，就是会忍不住一直看。", 31, "2小时前"),
+      makeComment("track-4", "理性观赛选手", "理", avatars.calm, "雨战是最能把转播镜头价值拉出来的场景之一。", 22, "3小时前"),
     ],
   },
   {

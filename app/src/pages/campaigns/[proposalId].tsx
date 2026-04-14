@@ -26,19 +26,19 @@ export default function CampaignDetailPage() {
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Proposal</p>
                   <h3 className="mt-2 text-2xl font-semibold text-white">{campaign.creatorName} × {campaign.sponsorName}</h3>
                 </div>
-                <span className="rounded-full bg-white/12 px-3 py-1 text-xs text-slate-100">{campaign.status}</span>
+                <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-100">{campaign.status}</span>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Track 1</p>
                   <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(campaign.track1BaseUsd)}</p>
                 </div>
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Track 2</p>
                   <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(campaign.track2PoolUsd)}</p>
                 </div>
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Track 3</p>
                   <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(campaign.track3PoolUsd)}</p>
                 </div>
@@ -48,20 +48,20 @@ export default function CampaignDetailPage() {
             <Panel className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Binding and settlement</p>
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs text-slate-400">Content hash</p>
                   <p className="mt-2 text-sm text-white">{campaign.contentHashShort}</p>
                 </div>
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs text-slate-400">Content anchor</p>
                   <p className="mt-2 text-sm text-white">{campaign.contentAnchorShort}</p>
                 </div>
-                <div className="rounded-2xl bg-white/5 p-4">
+                <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs text-slate-400">On-chain tx</p>
                   <p className="mt-2 text-sm text-white">{campaign.chainTxShort}</p>
                 </div>
               </div>
-              <div className="rounded-2xl bg-white/5 p-4">
+              <div className="surface-muted rounded-2xl p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Metric progress</p>
                 <p className="mt-2 text-sm text-slate-200">{campaign.metric}: {campaign.actualValue}</p>
               </div>

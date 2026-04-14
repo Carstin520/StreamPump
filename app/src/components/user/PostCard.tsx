@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { compactNumber, PostRecord } from "@/lib/mock-data";
 
 const stageLabel: Record<PostRecord["stage"], string | null> = {
@@ -22,11 +23,13 @@ export const PostCard = ({ post }: { post: PostRecord }) => {
       className={`mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
       href={`/posts/${post.id}`}
     >
-      <article className="relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-[#101621] shadow-[0_16px_44px_rgba(0,0,0,0.22)] transition duration-300 hover:-translate-y-0.5 hover:border-white/[0.1]">
+      <article className="glass-card relative overflow-hidden rounded-[26px] border-white/[0.06] bg-[#101621]">
         <div className={`relative overflow-hidden ${post.mediaHeightClass} ${post.mediaStyle}`}>
-          <img
+          <ProgressiveImage
             alt={post.title}
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             src={post.coverSrc}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#08111c]/82 via-transparent to-transparent" />

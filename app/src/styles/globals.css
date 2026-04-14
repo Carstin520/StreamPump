@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
 
 :root {
   --bg-start: #090d14;
@@ -10,11 +10,13 @@
   --surface-1: #111827;
   --surface-2: #161f2c;
   --surface-3: #1a2231;
+  --surface-4: rgba(255, 255, 255, 0.05);
   --border-subtle: rgba(255, 255, 255, 0.045);
   --border-soft: rgba(255, 255, 255, 0.09);
   --text-main: #f5f7fb;
   --text-muted: #93a2bb;
   --primary: #de402a;
+  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
@@ -23,13 +25,15 @@ html {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(64, 90, 150, 0.14), transparent 24%),
-    radial-gradient(circle at top right, rgba(34, 74, 140, 0.12), transparent 20%),
-    radial-gradient(circle at bottom right, rgba(222, 64, 42, 0.06), transparent 18%),
+    radial-gradient(circle at top left, rgba(64, 90, 150, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(34, 74, 140, 0.14), transparent 20%),
+    radial-gradient(circle at bottom right, rgba(222, 64, 42, 0.08), transparent 18%),
     linear-gradient(180deg, var(--bg-start), var(--bg-end));
   color: var(--text-main);
-  font-family: "Inter", "Avenir Next", sans-serif;
+  font-family: "DM Sans", "Avenir Next", sans-serif;
   min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -65,21 +69,25 @@ a {
   }
 
   .liquid-panel {
-    background: linear-gradient(180deg, rgba(22, 31, 44, 0.88) 0%, rgba(15, 22, 32, 0.82) 100%);
+    background: linear-gradient(180deg, rgba(20, 28, 41, 0.84) 0%, rgba(11, 16, 25, 0.8) 100%);
     border: 1px solid var(--border-subtle);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.025),
-      0 18px 54px rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(18px) saturate(145%);
-    -webkit-backdrop-filter: blur(18px) saturate(145%);
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 22px 68px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+    transition:
+      transform 220ms var(--ease-fluid),
+      border-color 220ms var(--ease-fluid),
+      box-shadow 220ms var(--ease-fluid);
   }
 
   .liquid-card {
-    background: linear-gradient(180deg, rgba(18, 25, 37, 0.78) 0%, rgba(11, 17, 27, 0.72) 100%);
+    background: linear-gradient(180deg, rgba(18, 25, 37, 0.76) 0%, rgba(11, 17, 27, 0.68) 100%);
     border: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.02),
-      0 16px 40px rgba(0, 0, 0, 0.2);
+      0 18px 46px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(18px) saturate(150%);
     -webkit-backdrop-filter: blur(18px) saturate(150%);
   }
@@ -112,13 +120,17 @@ a {
     background: linear-gradient(160deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow:
-      0 6px 28px rgba(0, 0, 0, 0.5),
-      0 1px 3px rgba(0, 0, 0, 0.35),
+      0 14px 44px rgba(0, 0, 0, 0.28),
+      0 1px 3px rgba(0, 0, 0, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.22),
       inset 0 -1px 0 rgba(0, 0, 0, 0.14);
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    transition:
+      transform 200ms var(--ease-fluid),
+      box-shadow 200ms var(--ease-fluid),
+      border-color 200ms var(--ease-fluid),
+      background 200ms var(--ease-fluid);
   }
 
   .glass-card::before {
@@ -150,8 +162,8 @@ a {
     transform: translateY(-2px);
     border-color: rgba(255, 255, 255, 0.24);
     box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.6),
-      0 2px 6px rgba(0, 0, 0, 0.4),
+      0 22px 56px rgba(0, 0, 0, 0.34),
+      0 2px 6px rgba(0, 0, 0, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.28),
       inset 0 -1px 0 rgba(0, 0, 0, 0.14);
   }
@@ -165,13 +177,22 @@ a {
   }
 
   .liquid-glass-surface {
-    background: linear-gradient(180deg, rgba(18, 24, 37, 0.9) 0%, rgba(12, 18, 28, 0.86) 100%);
+    background: linear-gradient(180deg, rgba(18, 24, 37, 0.9) 0%, rgba(11, 17, 27, 0.84) 100%);
     border: 1px solid rgba(255, 255, 255, 0.055);
     box-shadow:
-      0 24px 80px rgba(0, 0, 0, 0.42),
+      0 24px 90px rgba(0, 0, 0, 0.4),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+
+  .detail-card-surface {
+    background: linear-gradient(180deg, rgba(16, 22, 34, 0.82) 0%, rgba(9, 13, 20, 0.74) 100%);
+    box-shadow:
+      0 34px 100px rgba(0, 0, 0, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px) saturate(135%);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
   }
 
   .liquid-glass-btn {
@@ -182,8 +203,12 @@ a {
       0 4px 16px rgba(0, 0, 0, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.28),
       inset 0 -1px 0 rgba(0, 0, 0, 0.16);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    transition:
+      transform 180ms var(--ease-fluid),
+      background 180ms var(--ease-fluid),
+      border-color 180ms var(--ease-fluid);
   }
 
   .liquid-glass-icon-btn {
@@ -192,8 +217,82 @@ a {
     box-shadow:
       0 8px 22px rgba(0, 0, 0, 0.28),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    transition:
+      transform 180ms var(--ease-fluid),
+      background 180ms var(--ease-fluid),
+      border-color 180ms var(--ease-fluid);
+  }
+
+  .app-shell-frame {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(14, 20, 30, 0.9) 0%, rgba(9, 14, 22, 0.84) 100%);
+    box-shadow:
+      0 26px 80px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+
+  .page-enter {
+    animation: page-enter 460ms var(--ease-fluid);
+  }
+
+  .section-enter {
+    animation: section-enter 420ms var(--ease-fluid);
+  }
+
+  .surface-muted {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.02),
+      0 18px 44px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .input-glass {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(17, 24, 39, 0.74);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 10px 28px rgba(0, 0, 0, 0.14);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition:
+      border-color 180ms var(--ease-fluid),
+      background 180ms var(--ease-fluid),
+      transform 180ms var(--ease-fluid);
+  }
+
+  .input-glass:focus-within {
+    border-color: rgba(222, 64, 42, 0.28);
+    background: rgba(20, 27, 40, 0.82);
+  }
+
+  .immersive-shell {
+    box-shadow:
+      0 40px 120px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .resize-detail-card {
+    min-width: min(1080px, calc(100vw - 20px));
+    min-height: min(720px, calc(100vh - 20px));
+    max-width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    resize: both;
+    overscroll-behavior: contain;
+  }
+
+  .resize-detail-card::-webkit-resizer {
+    background:
+      linear-gradient(135deg, transparent 0 46%, rgba(255, 255, 255, 0.24) 46% 56%, transparent 56% 100%),
+      linear-gradient(135deg, transparent 0 60%, rgba(255, 255, 255, 0.12) 60% 70%, transparent 70% 100%);
   }
 
   .scrollbar-none {
@@ -206,34 +305,143 @@ a {
   }
 
   .content-slide-up {
-    animation: content-slide-up 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: content-slide-up 480ms var(--ease-fluid);
   }
 
   .content-slide-down {
-    animation: content-slide-down 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: content-slide-down 480ms var(--ease-fluid);
+  }
+
+  .slot-reel-up {
+    animation: slot-reel-up 520ms cubic-bezier(0.17, 0.84, 0.44, 1);
+  }
+
+  .slot-reel-down {
+    animation: slot-reel-down 520ms cubic-bezier(0.17, 0.84, 0.44, 1);
+  }
+
+  .hint-flash {
+    animation: hint-flash 920ms ease-in-out infinite;
+  }
+}
+
+@media (max-width: 1023px) {
+  .resize-detail-card {
+    min-width: calc(100vw - 12px);
+    min-height: min(760px, calc(100vh - 12px));
+    resize: none;
+  }
+}
+
+@keyframes slot-reel-up {
+  0% {
+    opacity: 0.28;
+    transform: translateY(18%) scale(0.986);
+    filter: blur(10px);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(-4%) scale(1.006);
+    filter: blur(1px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes slot-reel-down {
+  0% {
+    opacity: 0.28;
+    transform: translateY(-18%) scale(0.986);
+    filter: blur(10px);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(4%) scale(1.006);
+    filter: blur(1px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes hint-flash {
+  0%, 100% {
+    opacity: 0.46;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @keyframes content-slide-up {
   from {
-    opacity: 0.4;
-    transform: translateY(42px);
+    opacity: 0.28;
+    transform: translateY(52px) scale(0.985);
+    filter: blur(12px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
 @keyframes content-slide-down {
   from {
-    opacity: 0.4;
-    transform: translateY(-42px);
+    opacity: 0.28;
+    transform: translateY(-52px) scale(0.985);
+    filter: blur(12px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
   }
 }

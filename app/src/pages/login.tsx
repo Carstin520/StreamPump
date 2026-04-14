@@ -1,8 +1,13 @@
+import dynamic from "next/dynamic";
 import Head from "next/head";
 
-import { AuthOptionsPanel } from "@/components/auth/AuthOptionsPanel";
 import { AppShell } from "@/components/layout/AppShell";
 import { Panel } from "@/components/shared/Panel";
+
+const DynamicAuthOptionsPanel = dynamic(
+  () => import("@/components/auth/AuthOptionsPanel").then((mod) => mod.AuthOptionsPanel),
+  { ssr: false },
+);
 
 export default function LoginPage() {
   return (
@@ -15,7 +20,7 @@ export default function LoginPage() {
         title="Account access without forcing wallet-first UX"
       >
         <div className="space-y-5">
-          <AuthOptionsPanel />
+          <DynamicAuthOptionsPanel />
           <Panel className="grid gap-5 lg:grid-cols-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phase 1 intent</p>

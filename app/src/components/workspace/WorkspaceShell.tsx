@@ -27,7 +27,8 @@ export const WorkspaceShell = ({
   return (
     <UserShell header={<UserTopbar searchPlaceholder="搜索内容包、launch、品牌合作" />}>
       <div className="space-y-6 py-4">
-        <section className="liquid-panel rounded-[34px] p-6 md:p-8">
+        <section className="liquid-panel section-enter relative overflow-hidden rounded-[34px] p-6 md:p-8">
+          <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Workspace</p>
@@ -43,10 +44,10 @@ export const WorkspaceShell = ({
 
               return (
                 <Link
-                  className={`rounded-full px-4 py-2 text-sm transition ${
+                  className={`rounded-full px-4 py-2 text-sm transition duration-200 ${
                     active
-                      ? "bg-white text-[#08101a]"
-                      : "liquid-pill text-white hover:bg-white/10"
+                      ? "bg-white text-[#08101a] shadow-[0_14px_28px_rgba(255,255,255,0.12)]"
+                      : "liquid-pill text-white hover:scale-[1.02] hover:bg-white/10"
                   }`}
                   href={tab.href}
                   key={tab.href}

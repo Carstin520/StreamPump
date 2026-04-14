@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock-data";
 
 type ProfileTab = "作品" | "投资档案" | "Signals";
 
 const shellCard =
-  "overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)] shadow-[0_26px_88px_rgba(0,0,0,0.34)] backdrop-blur-2xl";
+  "app-shell-frame overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)]";
 
 export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
@@ -17,9 +18,12 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
     <div className="space-y-6">
       <section className={shellCard}>
         <div className="relative h-52 overflow-hidden md:h-60">
-          <img
+          <ProgressiveImage
             alt={`${creator.name} banner`}
             className="h-full w-full object-cover"
+            fill
+            priority
+            sizes="(max-width: 768px) 100vw, 1200px"
             src={creator.heroSrc}
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.18)_0%,rgba(7,11,18,0.52)_48%,rgba(7,11,18,0.96)_100%)]" />
@@ -121,10 +125,12 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
               {creatorPosts.map((post) => (
                 <Link className="block" href={`/posts/${post.id}`} key={post.id}>
                   <div className="glass-card">
-                    <div className="relative overflow-hidden rounded-t-[24px]">
-                      <img
+                    <div className={`relative overflow-hidden rounded-t-[24px] ${post.mediaHeightClass}`}>
+                      <ProgressiveImage
                         alt={post.title}
-                        className={`w-full object-cover transition-transform duration-500 hover:scale-[1.02] ${post.mediaHeightClass}`}
+                        className="object-cover transition-transform duration-500 hover:scale-[1.02]"
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                         src={post.coverSrc}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/36 to-transparent" />

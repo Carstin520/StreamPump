@@ -9,6 +9,10 @@ target/
 !**/.env.example
 *.log
 app/.next/
+app/.next-dev/
+app/.next-dev*/
+app/.next_corrupt_preview_backup_*/
+app/.next_build_refresh_*/
 backend/dist/
 .anchor/
 test-ledger/

@@ -1,501 +1,390 @@
+import dynamic from "next/dynamic";
 import Head from "next/head";
 import Link from "next/link";
-import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { CommentPanel } from "@/components/user/CommentPanel";
-import { compactNumber, findCreator, findPost, posts } from "@/lib/mock-data";
+import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
+import { usePostNavigator } from "@/hooks/usePostNavigator";
+import { PostRecord, posts } from "@/lib/mock-data";
 
-type VideoTab = "详情" | "评论" | "相关";
+const DynamicCommentPanel = dynamic(
+  () => import("@/components/user/CommentPanel").then((mod) => mod.CommentPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <aside className="flex h-full min-h-[38vh] flex-col gap-4 border-l border-white/[0.045] bg-[linear-gradient(180deg,rgba(14,19,29,0.96)_0%,rgba(9,13,20,0.98)_100%)] px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-white/[0.08]" />
+          <div className="space-y-2">
+            <div className="h-3 w-28 animate-pulse rounded-full bg-white/[0.08]" />
+            <div className="h-3 w-20 animate-pulse rounded-full bg-white/[0.05]" />
+          </div>
+        </div>
+        <div className="space-y-3 pt-2">
+          <div className="h-8 w-[72%] animate-pulse rounded-full bg-white/[0.08]" />
+          <div className="h-4 w-full animate-pulse rounded-full bg-white/[0.05]" />
+          <div className="h-4 w-[94%] animate-pulse rounded-full bg-white/[0.05]" />
+          <div className="h-4 w-[82%] animate-pulse rounded-full bg-white/[0.05]" />
+        </div>
+        <div className="mt-4 space-y-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div className="flex gap-3" key={`comment-skeleton-${index}`}>
+              <div className="h-8 w-8 animate-pulse rounded-full bg-white/[0.08]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 animate-pulse rounded-full bg-white/[0.08]" />
+                <div className="h-3 w-full animate-pulse rounded-full bg-white/[0.05]" />
+                <div className="h-3 w-[78%] animate-pulse rounded-full bg-white/[0.05]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+    ),
+  },
+);
 
 export default function PostDetailPage() {
-  const router = useRouter();
-  const post = findPost(String(router.query.postId ?? ""));
+  const {
+    currentIndex,
+    currentPost,
+    handleWheel,
+    hasNext,
+    hasPrevious,
+    goNext,
+    goPrevious,
+    nextPost,
+    previousPost,
+    total,
+    transitionDirection,
+    transitionKey,
+    wheelEnabled,
+  } = usePostNavigator(posts);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const transitionClass = transitionDirection === "up" ? "slot-reel-up" : "slot-reel-down";
+
+  useEffect(() => {
+    if (!wheelEnabled) {
+      setShowScrollHint(false);
+      return;
+    }
+
+    setShowScrollHint(true);
+    const timeoutId = window.setTimeout(() => {
+      setShowScrollHint(false);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [wheelEnabled]);
 
   return (
     <>
       <Head>
-        <title>{`StreamPump | ${post.title}`}</title>
+        <title>{`StreamPump | ${currentPost.title}`}</title>
       </Head>
-      {post.type === "VIDEO" ? <VideoPostView /> : <ImagePostView />}
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05080d] text-white">
+        <AnimatedFeedBackdrop className="opacity-[0.78]" />
+        <div className="pointer-events-none absolute inset-[5%] rounded-[48px] border border-white/[0.025] bg-[linear-gradient(180deg,rgba(17,24,38,0.3)_0%,rgba(10,14,22,0.16)_100%)] shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur-[4px]" />
+        <div className="mx-auto flex min-h-screen w-full max-w-[1800px] items-center justify-center px-2 py-2 lg:px-5 lg:py-4">
+          <section
+            className="detail-card-surface immersive-shell resize-detail-card overflow-hidden rounded-[34px] border border-white/[0.055]"
+            style={{
+              width: "min(1500px, calc(100vw - 20px))",
+              height: "min(900px, calc(100vh - 20px))",
+            }}
+          >
+            <div className={`grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_clamp(312px,26vw,392px)] ${transitionClass}`} key={`${currentPost.id}-${transitionKey}`}>
+              <div
+                className="relative flex min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_28%),linear-gradient(180deg,rgba(8,11,18,0.74)_0%,rgba(5,8,13,0.88)_100%)] px-3 pb-3 pt-3 lg:px-4 lg:pb-3 lg:pt-3"
+                onWheel={handleWheel}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(96,128,190,0.09),transparent_22%)]" />
+
+                <div className="relative z-10 flex min-h-0 flex-1 items-stretch">
+                  <PostMediaStage post={currentPost} />
+                  <StageOverlayControls
+                    currentIndex={currentIndex}
+                    hasNext={hasNext}
+                    hasPrevious={hasPrevious}
+                    onNext={goNext}
+                    onPrevious={goPrevious}
+                    showScrollHint={showScrollHint}
+                    total={total}
+                  />
+                </div>
+
+                <div className="relative z-10 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.045] pt-2.5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <img alt={currentPost.creatorName} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/12" src={currentPost.creatorAvatarSrc} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{currentPost.creatorName}</p>
+                      <p className="truncate text-xs text-[#8ea0ba]">
+                        {currentPost.timeLabel} · {currentPost.location}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[#93a5bd]">
+                    <StageChip post={currentPost} />
+                    {previousPost ? <RouteHint prefix="Prev" post={previousPost} /> : null}
+                    {nextPost ? <RouteHint prefix="Next" post={nextPost} /> : null}
+                  </div>
+                </div>
+
+                <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-[10px] text-white/44">
+                  ◢
+                </div>
+              </div>
+
+              <div className="min-h-[36vh] border-t border-white/[0.045] lg:min-h-0 lg:border-l lg:border-t-0">
+                <DynamicCommentPanel post={currentPost} />
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
     </>
   );
 }
 
-const ImagePostView = () => {
-  const router = useRouter();
-  const imagePosts = useMemo(() => posts.filter((item) => item.type === "IMAGE"), []);
-  const routePostId = String(router.query.postId ?? "");
-  const routeIndex = Math.max(0, imagePosts.findIndex((item) => item.id === routePostId));
-  const [displayIndex, setDisplayIndex] = useState(routeIndex);
-  const [transitionDirection, setTransitionDirection] = useState<"up" | "down">("up");
-  const [transitionKey, setTransitionKey] = useState(0);
-  const post = imagePosts[displayIndex] ?? imagePosts[0];
+const PostMediaStage = ({ post }: { post: PostRecord }) => {
+  if (post.type === "VIDEO") {
+    return <VideoStage post={post} />;
+  }
+
+  return <ImageCarouselStage post={post} />;
+};
+
+const ImageCarouselStage = ({ post }: { post: PostRecord }) => {
   const images = post.gallerySrcs?.length ? post.gallerySrcs : [post.coverSrc];
-  const [currentImage, setCurrentImage] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const touchStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (routeIndex !== displayIndex && routeIndex >= 0) {
-      setTransitionDirection(routeIndex > displayIndex ? "up" : "down");
-      setDisplayIndex(routeIndex);
-      setTransitionKey((value) => value + 1);
-    }
-  }, [displayIndex, routeIndex]);
-
-  useEffect(() => {
-    setCurrentImage(0);
+    setActiveIndex(0);
   }, [post.id]);
 
-  const goPrev = () => setCurrentImage((value) => Math.max(value - 1, 0));
-  const goNext = () => setCurrentImage((value) => Math.min(value + 1, images.length - 1));
-  const previousPost = displayIndex > 0 ? imagePosts[displayIndex - 1] : null;
-  const nextPost = displayIndex < imagePosts.length - 1 ? imagePosts[displayIndex + 1] : null;
+  const goPrevious = () => {
+    setActiveIndex((value) => Math.max(value - 1, 0));
+  };
 
-  const switchPost = (direction: "up" | "down", nextIndex: number) => {
-    if (nextIndex < 0 || nextIndex >= imagePosts.length) return;
-    setTransitionDirection(direction);
-    setDisplayIndex(nextIndex);
-    setTransitionKey((value) => value + 1);
-    void router.replace(`/posts/${imagePosts[nextIndex].id}`, undefined, { shallow: true, scroll: false });
+  const goNext = () => {
+    setActiveIndex((value) => Math.min(value + 1, images.length - 1));
   };
 
   return (
-    <main className="min-h-screen bg-[#070b11] text-white">
-      <div className="mx-auto flex min-h-screen max-w-[1720px] items-center p-3 lg:p-5">
-        <section
-          className={`liquid-glass-surface grid min-h-[88vh] w-full overflow-hidden rounded-[26px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] ${
-            transitionDirection === "up" ? "content-slide-up" : "content-slide-down"
-          }`}
-          key={`${post.id}-${transitionKey}`}
+    <div className="h-full w-full">
+      <div
+        className="relative h-full min-h-[320px] overflow-hidden rounded-[30px] border border-white/10 bg-[#091019] shadow-[0_28px_90px_rgba(0,0,0,0.5)]"
+        onTouchEnd={(event) => {
+          const touchStartX = touchStartXRef.current;
+          const touchEndX = event.changedTouches[0]?.clientX ?? 0;
+
+          if (touchStartX === null) {
+            return;
+          }
+
+          const deltaX = touchEndX - touchStartX;
+          if (Math.abs(deltaX) < 48) {
+            return;
+          }
+
+          if (deltaX < 0) {
+            goNext();
+            return;
+          }
+
+          goPrevious();
+        }}
+        onTouchStart={(event) => {
+          touchStartXRef.current = event.touches[0]?.clientX ?? null;
+        }}
+      >
+        <div
+          className="flex h-full transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
-          <div className="relative flex min-h-[60vh] items-center justify-center bg-black/34 px-4 py-6 lg:px-8">
-            <Link
-              className="liquid-glass-icon-btn absolute left-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
-              href="/explore"
-            >
-              ×
-            </Link>
-
-            {post.stage !== "NONE" ? (
-              <div className="liquid-pill absolute left-16 top-4 z-20 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white">
-                {post.stage === "S1_DISCOVERY" ? "S1" : post.stage === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
-              </div>
-            ) : null}
-
-            <div className="liquid-pill absolute right-4 top-4 z-20 rounded-full px-3 py-1 text-xs text-white">
-              {currentImage + 1} / {images.length}
+          {images.map((image, index) => (
+            <div className="relative h-full min-w-full" key={`${post.id}-${index}`}>
+              <ProgressiveImage
+                alt={`${post.title} ${index + 1}`}
+                className="object-contain"
+                fill
+                priority={index === 0}
+                sizes="(max-width: 1280px) 100vw, 72vw"
+                src={image}
+              />
             </div>
+          ))}
+        </div>
 
-            <div className="absolute right-4 top-16 z-20 flex flex-col items-center gap-2">
-              <button
-                className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
-                  previousPost ? "hover:bg-white/10" : "cursor-not-allowed opacity-30"
-                }`}
-                onClick={() => switchPost("down", displayIndex - 1)}
-                type="button"
-              >
-                ↑
-              </button>
-              <span className="text-xs text-white/60">
-                {displayIndex + 1}/{imagePosts.length}
-              </span>
-              <button
-                className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
-                  nextPost ? "hover:bg-white/10" : "cursor-not-allowed opacity-30"
-                }`}
-                onClick={() => switchPost("up", displayIndex + 1)}
-                type="button"
-              >
-                ↓
-              </button>
-            </div>
+        {images.length > 1 ? (
+          <>
+            <GalleryArrow
+              direction="left"
+              disabled={activeIndex === 0}
+              onClick={goPrevious}
+            />
+            <GalleryArrow
+              direction="right"
+              disabled={activeIndex === images.length - 1}
+              onClick={goNext}
+            />
+          </>
+        ) : null}
 
-            <div className="relative w-full max-w-[760px]">
-              <div className="overflow-hidden rounded-[28px] shadow-[0_34px_90px_rgba(0,0,0,0.45)]">
-                <div
-                  className="flex transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{
-                    transform: `translateX(-${currentImage * (100 / images.length)}%)`,
-                    width: `${images.length * 100}%`,
-                  }}
-                >
-                  {images.map((image, index) => (
-                    <img
-                      alt={`${post.title} ${index + 1}`}
-                      className="max-h-[76vh] object-contain"
-                      key={`${post.id}-${image}-${index}`}
-                      src={image}
-                      style={{ width: `${100 / images.length}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {images.length > 1 ? (
-                <>
-                  {currentImage > 0 ? (
-                    <button
-                      className="liquid-glass-icon-btn absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-                      onClick={goPrev}
-                      type="button"
-                    >
-                      ‹
-                    </button>
-                  ) : null}
-                  {currentImage < images.length - 1 ? (
-                    <button
-                      className="liquid-glass-icon-btn absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-                      onClick={goNext}
-                      type="button"
-                    >
-                      ›
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-
-              {images.length > 1 ? (
-                <div className="mt-5 flex items-center justify-center gap-3 overflow-x-auto">
-                  {images.map((image, index) => (
-                    <button
-                      className={`overflow-hidden rounded-2xl border transition ${
-                        index === currentImage
-                          ? "border-white/24 shadow-[0_12px_28px_rgba(0,0,0,0.26)]"
-                          : "border-white/8 opacity-70 hover:opacity-100"
-                      }`}
-                      key={`${post.id}-${index}`}
-                      onClick={() => setCurrentImage(index)}
-                      type="button"
-                    >
-                      <img alt={`${post.title} ${index + 1}`} className="h-16 w-16 object-cover" src={image} />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="min-h-[88vh] xl:border-l xl:border-white/8">
-            <CommentPanel post={post} />
-          </div>
-        </section>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/34 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/40 to-transparent" />
+        <div className="liquid-pill absolute bottom-4 right-4 z-10 rounded-full px-3 py-1 text-xs text-white">
+          {activeIndex + 1} / {images.length}
+        </div>
       </div>
-    </main>
+    </div>
   );
 };
 
-const VideoPostView = () => {
-  const router = useRouter();
-  const videoPosts = useMemo(() => posts.filter((item) => item.type === "VIDEO"), []);
-  const routePostId = String(router.query.postId ?? "");
-  const routeIndex = Math.max(0, videoPosts.findIndex((item) => item.id === routePostId));
-  const [displayIndex, setDisplayIndex] = useState(routeIndex);
-  const [transitionDirection, setTransitionDirection] = useState<"up" | "down">("up");
-  const [transitionKey, setTransitionKey] = useState(0);
-  const post = videoPosts[displayIndex] ?? videoPosts[0];
-  const creator = findCreator(post.creatorId);
-  const [showComments, setShowComments] = useState(false);
-  const [activeTab, setActiveTab] = useState<VideoTab>("评论");
-  const previousPost = displayIndex > 0 ? videoPosts[displayIndex - 1] : null;
-  const nextPost = displayIndex < videoPosts.length - 1 ? videoPosts[displayIndex + 1] : null;
-  const relatedVideos = videoPosts.filter((item) => item.id !== post.id).slice(0, 4);
+const VideoStage = ({ post }: { post: PostRecord }) => (
+  <div className="h-full w-full">
+    <div className="relative h-full min-h-[320px] overflow-hidden rounded-[30px] border border-white/10 bg-[#05070d] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+      <ProgressiveImage
+        alt={post.title}
+        className="object-cover"
+        fill
+        priority
+        sizes="(max-width: 1280px) 100vw, 72vw"
+        src={post.coverSrc}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_20%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.46)_55%,rgba(0,0,0,0.78)_100%)]" />
+      <div className="absolute bottom-5 left-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white backdrop-blur-xl">
+        Video post
+      </div>
+      {post.durationLabel ? (
+        <div className="absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
+          {post.durationLabel}
+        </div>
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_64%,rgba(0,0,0,0.34)_100%)]" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <button
+          className="flex h-16 w-16 items-center justify-center rounded-full border border-white/12 bg-black/26 text-xl text-white shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-xl transition duration-200 hover:scale-[1.03] hover:bg-black/34"
+          type="button"
+        >
+          ▶
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
-  useEffect(() => {
-    if (routeIndex !== displayIndex && routeIndex >= 0) {
-      setTransitionDirection(routeIndex > displayIndex ? "up" : "down");
-      setDisplayIndex(routeIndex);
-      setTransitionKey((value) => value + 1);
-      setShowComments(false);
-    }
-  }, [displayIndex, routeIndex]);
-
-  const switchVideo = (direction: "up" | "down", nextIndex: number) => {
-    if (nextIndex < 0 || nextIndex >= videoPosts.length) return;
-    setTransitionDirection(direction);
-    setDisplayIndex(nextIndex);
-    setTransitionKey((value) => value + 1);
-    setShowComments(false);
-    void router.replace(`/posts/${videoPosts[nextIndex].id}`, undefined, { shallow: true, scroll: false });
-  };
-
-  return (
-    <main className="fixed inset-0 z-50 overflow-hidden bg-black text-white">
+const StageOverlayControls = ({
+  currentIndex,
+  total,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
+  showScrollHint,
+}: {
+  currentIndex: number;
+  total: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+  showScrollHint: boolean;
+}) => (
+  <>
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-28 bg-gradient-to-b from-black/24 to-transparent" />
+    <div className="absolute left-4 top-4 z-30 flex items-center gap-2">
       <Link
-        className="liquid-glass-icon-btn absolute left-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-full text-lg text-white transition hover:bg-white/10"
+        aria-label="Back to explore"
+        className="liquid-glass-icon-btn flex h-10 w-10 items-center justify-center rounded-full text-base text-white transition duration-200 hover:scale-[1.03] hover:bg-white/10"
         href="/explore"
       >
         ←
       </Link>
-
-      <div className="absolute right-5 top-5 z-40 flex flex-col items-center gap-2">
-        <Link
-          className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
-            previousPost ? "hover:bg-white/10" : "pointer-events-none opacity-30"
-          }`}
-          href={previousPost ? `/posts/${previousPost.id}` : "#"}
-          onClick={(event) => {
-            if (!previousPost) return;
-            event.preventDefault();
-            switchVideo("down", displayIndex - 1);
-          }}
-        >
-          ↑
-        </Link>
-        <span className="text-xs text-white/60">
-          {displayIndex + 1}/{videoPosts.length}
-        </span>
-        <Link
-          className={`liquid-glass-icon-btn flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
-            nextPost ? "hover:bg-white/10" : "pointer-events-none opacity-30"
-          }`}
-          href={nextPost ? `/posts/${nextPost.id}` : "#"}
-          onClick={(event) => {
-            if (!nextPost) return;
-            event.preventDefault();
-            switchVideo("up", displayIndex + 1);
-          }}
-        >
-          ↓
-        </Link>
+      <div className="liquid-panel rounded-full px-3 py-1.5 text-sm font-medium text-white">
+        {currentIndex + 1}/{total}
       </div>
+    </div>
 
-      <section
-        className={`relative flex h-full ${transitionDirection === "up" ? "content-slide-up" : "content-slide-down"}`}
-        key={`${post.id}-${transitionKey}`}
-      >
-        <div className="relative flex-1 overflow-hidden">
-          <img
-            alt={post.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            src={post.coverSrc}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/14 to-black/38" />
-
-          <div className="absolute bottom-0 left-0 right-0 z-10 p-6 lg:p-8">
-            <div className="flex items-center gap-3">
-              <Link href={`/creators/${post.creatorId}`}>
-                <img
-                  alt={post.creatorName}
-                  className="h-10 w-10 rounded-full border-2 border-white/40 object-cover"
-                  src={post.creatorAvatarSrc}
-                />
-              </Link>
-              <div>
-                <div className="flex items-center gap-2">
-                  <Link className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
-                    {post.creatorName}
-                  </Link>
-                  {post.stage !== "NONE" ? (
-                    <span className="liquid-pill rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white">
-                      {post.stage === "S1_DISCOVERY" ? "S1" : post.stage === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-white/65">{post.creatorHandle}</p>
-              </div>
-              <button className="ml-1 rounded-full bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/92" type="button">
-                关注
-              </button>
-            </div>
-
-            <h1 className="mt-4 max-w-xl text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-white">
-              {post.title}
-            </h1>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {post.tags.map((tag) => (
-                <span className="text-sm text-white/72" key={tag}>
-                  #{tag}
-                </span>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-white/45">
-              {post.timeLabel} · {post.location}
-            </p>
-          </div>
-
-          <div className="absolute bottom-24 right-4 z-20 flex flex-col items-center gap-5 lg:right-6">
-            <ActionRailButton label={compactNumber(post.likes)} symbol="♡" />
-            <ActionRailButton
-              label={compactNumber(post.commentsCount)}
-              onClick={() => setShowComments((value) => !value)}
-              symbol="💬"
-            />
-            <ActionRailButton label={compactNumber(post.saves)} symbol="☆" />
-            <ActionRailButton label="分享" symbol="↗" />
-          </div>
-        </div>
-
-        <div className="hidden h-full w-[400px] border-l border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.98)_0%,rgba(12,18,28,0.98)_100%)] xl:flex xl:flex-col">
-          <div className="border-b border-white/8 px-4 pt-4">
-            <div className="flex items-center gap-4">
-              {(["详情", "评论", "相关"] as VideoTab[]).map((tab) => (
-                <button
-                  className={`relative pb-4 text-sm transition ${
-                    activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
-                  }`}
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  type="button"
-                >
-                  {tab}
-                  {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#de402a]" /> : null}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-5 py-5">
-            {activeTab === "详情" ? (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <img alt={creator.name} className="h-11 w-11 rounded-full object-cover" src={creator.avatarSrc} />
-                  <div>
-                  <p className="text-sm font-semibold text-white">{creator.name}</p>
-                  <p className="text-xs text-[#8799b3]">{compactNumber(creator.followersCount)} 粉丝</p>
-                </div>
-              </div>
-
-                <div>
-                  <h2 className="text-xl font-semibold leading-8 tracking-[-0.03em] text-white">{post.title}</h2>
-                  <p className="mt-3 text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
-                    <span className="text-xs text-[#de725f]" key={tag}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <VideoMetric label="点赞" value={compactNumber(post.likes)} />
-                  <VideoMetric label="收藏" value={compactNumber(post.saves)} />
-                  <VideoMetric label="评论" value={compactNumber(post.commentsCount)} />
-                  <VideoMetric label="阶段" value={post.stage === "NONE" ? "Story" : post.stage === "S1_DISCOVERY" ? "S1" : post.stage === "S1_BUYOUT" ? "S1 Buyout" : "S2"} />
-                </div>
-
-                <div className="glass-card p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849e]">Creator signal</p>
-                  <p className="mt-2 text-sm leading-7 text-[#d3dbe9]">{creator.teaser}</p>
-                </div>
-              </div>
-            ) : null}
-
-            {activeTab === "评论" ? (
-              <div className="space-y-5">
-                <p className="text-sm font-semibold text-white">共 {compactNumber(post.commentsCount)} 条评论</p>
-                {post.comments.map((comment) => (
-                  <VideoCommentRow comment={comment} key={comment.id} />
-                ))}
-              </div>
-            ) : null}
-
-            {activeTab === "相关" ? (
-              <div className="space-y-3">
-                {relatedVideos.map((related) => (
-                  <Link className="block" href={`/posts/${related.id}`} key={related.id}>
-                    <div className="glass-card overflow-hidden">
-                      <div className="relative">
-                        <img alt={related.title} className="h-36 w-full object-cover" src={related.coverSrc} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
-                      </div>
-                      <div className="glass-card-footer px-4 pb-4 pt-4">
-                        <p className="line-clamp-2 text-sm font-medium leading-6 text-white">{related.title}</p>
-                        <div className="mt-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <img alt={related.creatorName} className="h-5 w-5 rounded-full object-cover" src={related.creatorAvatarSrc} />
-                            <span className="text-xs text-[#8ea0ba]">{related.creatorName}</span>
-                          </div>
-                          <span className="text-xs text-[#8ea0ba]">♡ {compactNumber(related.likes)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          {activeTab === "评论" ? (
-            <div className="border-t border-white/8 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <div className="liquid-pill flex-1 rounded-full px-4 py-3 text-sm text-[#6f829d]">
-                  说点什么...
-                </div>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-white transition hover:bg-[#ea523e]" type="button">
-                  ➤
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      {showComments ? (
-        <div className="absolute inset-x-0 bottom-0 z-30 xl:hidden">
-          <div className="mx-auto h-[65vh] max-w-2xl overflow-hidden rounded-t-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,21,32,0.96)_0%,rgba(10,16,24,0.98)_100%)] shadow-[0_-24px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
-              <span className="text-sm font-semibold text-white">共 {compactNumber(post.commentsCount)} 条评论</span>
-              <button
-                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/75 transition hover:bg-white/6"
-                onClick={() => setShowComments(false)}
-                type="button"
-              >
-                关闭
-              </button>
-            </div>
-            <div className="h-[calc(65vh-57px)]">
-              <CommentPanel post={post} variant="sheet" />
-            </div>
-          </div>
+    <div className="absolute right-4 top-4 z-30 flex items-start gap-2">
+      {showScrollHint ? (
+        <div className="hint-flash rounded-full border border-white/[0.08] bg-black/22 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-[#c3d0e2] backdrop-blur-md">
+          Scroll
         </div>
       ) : null}
-    </main>
-  );
-};
+      <div className="flex flex-col items-center gap-1.5 rounded-[18px] border border-white/[0.08] bg-black/22 p-1.5 backdrop-blur-lg">
+        <PostSwitchButton direction="up" disabled={!hasPrevious} onClick={onPrevious} />
+        <PostSwitchButton direction="down" disabled={!hasNext} onClick={onNext} />
+      </div>
+    </div>
+  </>
+);
 
-const ActionRailButton = ({
-  symbol,
-  label,
+const PostSwitchButton = ({
+  direction,
+  disabled,
   onClick,
 }: {
-  symbol: string;
-  label: string;
-  onClick?: () => void;
+  direction: "up" | "down";
+  disabled: boolean;
+  onClick: () => void;
 }) => (
-  <button className="flex flex-col items-center gap-1 text-white" onClick={onClick} type="button">
-    <div className="liquid-glass-icon-btn flex h-12 w-12 items-center justify-center rounded-full text-sm text-white transition hover:bg-white/10">
-      {symbol}
-    </div>
-    <span className="text-[11px] font-medium drop-shadow-md">{label}</span>
+  <button
+    aria-label={direction === "up" ? "Previous post" : "Next post"}
+    disabled={disabled}
+    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm transition duration-200 ${
+      disabled
+        ? "cursor-not-allowed border-white/[0.06] bg-white/[0.03] text-white/24"
+        : "border-white/[0.12] bg-white/[0.08] text-white hover:scale-[1.03] hover:bg-white/[0.14]"
+    }`}
+    onClick={onClick}
+    type="button"
+  >
+    {direction === "up" ? "↑" : "↓"}
   </button>
 );
 
-const VideoMetric = ({ label, value }: { label: string; value: string }) => (
-  <div className="glass-card p-4">
-    <p className="text-[10px] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
-    <p className="mt-2 text-base font-semibold text-white">{value}</p>
-  </div>
+const GalleryArrow = ({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: "left" | "right";
+  disabled: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    aria-label={direction === "left" ? "Previous image" : "Next image"}
+    disabled={disabled}
+    className={`liquid-glass-icon-btn absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white transition duration-200 ${
+      direction === "left" ? "left-4" : "right-4"
+    } ${disabled ? "pointer-events-none opacity-20" : "hover:scale-[1.03] hover:bg-white/12"}`}
+    onClick={onClick}
+    type="button"
+  >
+    {direction === "left" ? "‹" : "›"}
+  </button>
 );
 
-const VideoCommentRow = ({
-  comment,
-}: {
-  comment: ReturnType<typeof findPost>["comments"][number];
-}) => (
-  <div className="flex gap-3">
-    <img alt={comment.author} className="mt-0.5 h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={comment.avatarSrc} />
-    <div className="min-w-0 flex-1">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-white">{comment.author}</span>
-        <span className="text-[10px] text-[#7485a0]">{comment.timeLabel}</span>
-      </div>
-      <p className="mt-1 text-sm leading-6 text-[#d1d9e7]">{comment.content}</p>
-      <div className="mt-2 flex items-center gap-4 text-xs text-[#7c8ba1]">
-        <span>回复</span>
-        <span>♡ {comment.likes}</span>
-      </div>
+const StageChip = ({ post }: { post: PostRecord }) => {
+  const label = post.stage === "NONE" ? post.type : post.stage === "S1_DISCOVERY" ? "S1 Discovery" : post.stage === "S1_BUYOUT" ? "S1 Buyout" : "S2 Active";
+
+  return (
+    <div className="inline-flex rounded-full border border-white/[0.08] bg-white/[0.05] px-3.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_12px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl">
+      {label}
     </div>
-  </div>
+  );
+};
+
+const RouteHint = ({ prefix, post }: { prefix: string; post: PostRecord }) => (
+  <Link
+    className="max-w-[220px] truncate rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 transition hover:bg-white/[0.08] hover:text-white"
+    href={`/posts/${post.id}`}
+    scroll={false}
+  >
+    {prefix}: {post.title}
+  </Link>
 );

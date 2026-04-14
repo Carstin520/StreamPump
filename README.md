@@ -136,6 +136,10 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - Mux reconciliation worker for missed-webhook recovery
 - explicit on-chain events emitted for proposal lifecycle, content anchoring, S1 buyout lifecycle, endorsement settlement, and user registration
 - EventParser-first chain indexer with persisted `ChainEvent` records and proposal projection sync
+- a much stronger frontend experience prototype built on the existing `pages` router
+- immersive `Discover` feed with animated background, progressive image loading, and unified glassmorphism system
+- refined `Trending`, `Portfolio`, and `Profile` surfaces with a more coherent visual language
+- floating post-detail modal for both image and video posts with wheel-based post switching and preserved resize state
 
 ### Still under construction
 
@@ -143,19 +147,72 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - dispute / review workflow
 - remaining explicit event coverage for the rest of the protocol surface
 - real operator dashboards for creator, sponsor, MCN
-- actual frontend product experience
+- full frontend-to-backend wiring beyond mock-data-driven product surfaces
+- real production media playback and final mobile interaction polish
 
 ### Important reality check
 
-The frontend is still mostly scaffold-stage.
+The frontend is no longer "just a scaffold", but it is still not a production-ready app.
 
 Right now the strongest parts of the project are:
 
 - protocol logic
 - settlement design
 - backend architecture direction
+- the high-fidelity frontend interaction model
 
-The weakest part right now is the end-user surface.
+The main frontend gap now is not visual quality, but real data wiring and production hardening.
+
+## Frontend Progress Update
+
+The frontend moved forward substantially in the latest iteration.
+
+What is now in place:
+
+- a unified visual system across `Discover`, `Trending`, `Portfolio`, `Profile`, workspace pages, and post detail
+- startup-only branded loading, with progressive blur-up media loading for large images instead of repeated full-page loaders
+- an animated background layer so the app surface feels alive even behind floating detail views
+- a floating post-detail modal with shared navigation for image and video posts, vertical wheel switching, lighter separators, and preserved resize state
+
+What is still intentionally prototype-grade:
+
+- most pages are still driven by local mock data
+- video posts currently use poster-style presentation rather than a final production playback stack
+- the UI has not yet been fully connected to the new backend content / proposal-intent flow
+
+## UI Snapshot
+
+These screenshots reflect the current frontend direction inside the repo.
+
+### Discover Feed
+
+The main feed now behaves more like an immersive content surface than a static mockup. It uses a stronger poster-style hero, stage-aware post cards, and a subtle animated page layer in the background.
+
+![Discover feed](docs/readme-assets/frontend-explore-surface.png)
+
+### Floating Post Detail
+
+Post detail is now a floating modal-style surface instead of a full hard transition page. Image and video posts share the same navigation model, and users can switch posts with the mouse wheel while keeping the resized modal state.
+
+![Floating post detail](docs/readme-assets/frontend-post-detail-modal.png)
+
+### Trending Creators
+
+The `Trending` surface now reads like a creator market dashboard rather than a placeholder list, with clearer stage language, hero imagery, and creator-level market metrics.
+
+![Trending creators](docs/readme-assets/frontend-trending-creators.png)
+
+### Portfolio
+
+The `Portfolio` view now frames S1 exposure, pending claims, and action queues in a way that is much closer to an actual product surface for supporters.
+
+![Portfolio surface](docs/readme-assets/frontend-portfolio-surface.png)
+
+### User Profile
+
+The profile page now better matches the rest of the app, combining creator-style note cards, a stronger hero treatment, and a more coherent social / ownership surface.
+
+![User profile](docs/readme-assets/frontend-profile-surface.png)
 
 ## The New Backend Flow
 

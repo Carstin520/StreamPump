@@ -11,14 +11,14 @@ export const AuthOptionsPanel = () => {
       <Panel className="space-y-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Primary path</p>
-          <h3 className="mt-2 text-2xl font-semibold text-white">Social sign-in + embedded wallet</h3>
+          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">Social sign-in + embedded wallet</h3>
           <p className="mt-2 text-sm text-slate-300">
             Users enter with Google, Apple, email, or passkey. Wallets stay behind the product surface unless the user asks for more control.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_14px_28px_rgba(255,255,255,0.12)] transition duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!isReady || Boolean(provider)}
             onClick={() => void connect()}
             type="button"
@@ -26,7 +26,7 @@ export const AuthOptionsPanel = () => {
             Continue with social login
           </button>
           <button
-            className="rounded-full border border-white/12 px-4 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full border border-white/12 px-4 py-2 text-sm text-slate-200 transition duration-200 hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!provider}
             onClick={() => void disconnect()}
             type="button"
@@ -42,7 +42,7 @@ export const AuthOptionsPanel = () => {
       <Panel className="space-y-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Advanced path</p>
-          <h3 className="mt-2 text-2xl font-semibold text-white">External wallet</h3>
+          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">External wallet</h3>
           <p className="mt-2 text-sm text-slate-300">
             Power users can still connect Phantom or Solflare, sign launch bundles, and stay in full wallet-native control.
           </p>

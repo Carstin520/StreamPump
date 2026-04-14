@@ -16,11 +16,31 @@ export const DiscoverSurface = () => (
 
 const ExploreView = () => (
   <div className="space-y-5 py-4">
-    <section className="sticky top-16 z-20 bg-[#090d14]/88 pb-2 pt-2 backdrop-blur-md">
+    <section className="liquid-panel section-enter relative overflow-hidden rounded-[34px] px-5 py-6 md:px-7">
+      <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
+      <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-[#92a4bd]">Discover</p>
+          <h1 className="mt-3 max-w-3xl text-[38px] font-semibold leading-[1.02] tracking-[-0.06em] text-white md:text-[52px]">
+            Scroll less noise. Land on posts that already feel like signal.
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#c6d2e3]">
+            StreamPump now reads more like an immersive content surface than a debug-heavy prototype. The feed stays visual, while creator stage and market context stay legible.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <TrendStat label="Live buyouts" value="12" />
+          <TrendStat label="S2 campaigns" value="84" />
+          <TrendStat label="Signal score" value="+4.2%" />
+        </div>
+      </div>
+    </section>
+
+    <section className="sticky top-20 z-20 bg-[#090d14]/76 pb-2 pt-2 backdrop-blur-xl">
       <div className="flex gap-3 overflow-x-auto pb-1 text-sm">
         {discoverCategories.map((category) => (
           <button
-            className={`whitespace-nowrap rounded-full px-4 py-2.5 transition ${
+            className={`whitespace-nowrap rounded-full px-4 py-2.5 transition duration-200 ${
               category === "推荐"
                 ? "liquid-pill liquid-pill-active text-white"
                 : "liquid-pill text-[#edf2fb] hover:text-white"
@@ -34,7 +54,7 @@ const ExploreView = () => (
       </div>
     </section>
 
-    <section className="liquid-panel flex items-center gap-3 rounded-2xl px-4 py-3.5">
+    <section className="liquid-panel section-enter flex items-center gap-3 rounded-2xl px-4 py-3.5">
       <div className="flex items-center gap-2 rounded-full bg-[#24151a] px-3 py-1.5">
         <div className="h-2 w-2 rounded-full bg-[#de402a]" />
         <span className="text-xs font-bold tracking-[0.18em] text-[#ff8a78]">HOT RIGHT NOW</span>
@@ -47,13 +67,20 @@ const ExploreView = () => (
       </div>
     </section>
 
-    <section className="pb-8">
+    <section className="section-enter pb-8">
       <div className="masonry-grid">
         {posts.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}
       </div>
     </section>
+  </div>
+);
+
+const TrendStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="surface-muted rounded-[24px] px-4 py-4">
+    <p className="text-[10px] uppercase tracking-[0.22em] text-[#8d9eb7]">{label}</p>
+    <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-white">{value}</p>
   </div>
 );
 
