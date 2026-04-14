@@ -9,7 +9,6 @@ const primaryNav = [
   { href: "/explore", label: "发现", match: ["/", "/explore", "/discover", "/posts"] },
   { href: "/trending", label: "Trending", match: ["/trending"] },
   { href: "/portfolio", label: "投资组合", match: ["/portfolio"] },
-  { href: "/workspace", label: "创作中心", match: ["/workspace"] },
 ];
 
 export const UserShell = ({

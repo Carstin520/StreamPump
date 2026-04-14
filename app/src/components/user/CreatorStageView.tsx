@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
+import { StagePill } from "@/components/shared/StagePill";
 import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock-data";
 
 type ProfileTab = "作品" | "投资档案" | "Signals";
@@ -11,8 +13,16 @@ const shellCard =
 
 export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followPulse, setFollowPulse] = useState(false);
   const creatorPosts = useMemo(() => posts.filter((post) => post.creatorId === creator.id), [creator.id]);
   const metrics = getInvestmentMetrics(creator);
+
+  const toggleFollow = () => {
+    setIsFollowing((value) => !value);
+    setFollowPulse(true);
+    window.setTimeout(() => setFollowPulse(false), 340);
+  };
 
   return (
     <div className="space-y-6">
@@ -41,7 +51,7 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
             </p>
 
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <StageBadge creator={creator} />
+              <StagePill stage={creator.state} />
               <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#dce6f8]">
                 {creator.level}
               </span>
@@ -62,10 +72,16 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
                 私信
               </button>
               <button
-                className="rounded-full bg-[#de402a] px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-[#ea523e]"
+                className={`rounded-full px-7 py-2.5 text-sm font-semibold transition hover:bg-[#ea523e] ${
+                  isFollowing ? "bg-[#13291f] text-[#90efac]" : "bg-[#de402a] text-white"
+                } ${followPulse ? "tap-bounce-active" : ""}`}
+                onClick={toggleFollow}
                 type="button"
               >
-                + 关注
+                <span className="inline-flex items-center gap-1.5">
+                  {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
+                  {isFollowing ? "已关注" : "关注"}
+                </span>
               </button>
             </div>
           </div>
@@ -77,7 +93,7 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Investment Profile</h2>
-              <StageBadge compact creator={creator} />
+              <StagePill compact stage={creator.state} />
             </div>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[#93a3bc]">{getInvestmentSubtitle(creator)}</p>
           </div>
@@ -167,27 +183,6 @@ export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) 
         </div>
       </section>
     </div>
-  );
-};
-
-const StageBadge = ({ creator, compact = false }: { creator: CreatorMarketRecord; compact?: boolean }) => {
-  const label =
-    creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2";
-  const tone =
-    creator.state === "S1_DISCOVERY"
-      ? "bg-white/7 text-[#dce6f8] border-white/10"
-      : creator.state === "S1_BUYOUT"
-        ? "bg-[#271723] text-[#ff9dc3] border-[#ff73b5]/16"
-        : "bg-[#132238] text-[#92c7ff] border-[#4b92f4]/18";
-
-  return (
-    <span
-      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone} ${
-        compact ? "text-[10px]" : ""
-      }`}
-    >
-      {label}
-    </span>
   );
 };
 

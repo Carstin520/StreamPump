@@ -1,12 +1,7 @@
 import Link from "next/link";
 
+import { StagePill } from "@/components/shared/StagePill";
 import { compactNumber, CreatorMarketRecord, formatUsd } from "@/lib/mock-data";
-
-const stateTone: Record<CreatorMarketRecord["state"], string> = {
-  S1_DISCOVERY: "bg-[#13291f]/80 text-[#90efac]",
-  S1_BUYOUT: "bg-[#2d1621]/80 text-[#ff9fc4]",
-  S2_ACTIVE: "bg-[#15263e]/80 text-[#93c8ff]",
-};
 
 export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
   <Link className="block" href={`/creators/${creator.id}`}>
@@ -19,11 +14,7 @@ export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord 
           src={creator.heroSrc}
         />
         <div className="absolute left-4 top-4 z-[2]">
-          <span
-            className={`rounded-full border border-white/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] ${stateTone[creator.state]}`}
-          >
-            {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
-          </span>
+          <StagePill compact stage={creator.state} />
         </div>
         <div className="absolute right-4 top-4 z-[2] rounded-full border border-white/10 bg-black/24 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/82 backdrop-blur-md">
           {creator.niche}

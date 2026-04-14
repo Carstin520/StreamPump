@@ -1,30 +1,26 @@
 import Head from "next/head";
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { PostDetailExperience } from "@/components/post/PostDetailExperience";
+import { StagePill } from "@/components/shared/StagePill";
 import { UserShell } from "@/components/user/UserShell";
 import { UserTopbar } from "@/components/user/UserTopbar";
 import {
-  CreatorSeasonState,
+  PostRecord,
+  UserNoteRecord,
   compactNumber,
   currentUser,
   currentUserLikedPosts,
   currentUserNotes,
   currentUserSavedPosts,
-  UserNoteRecord,
+  posts,
 } from "@/lib/mock-data";
 
 type ProfileTab = "笔记" | "收藏" | "点赞";
 
-const stageLabel: Record<CreatorSeasonState | "NONE", string | null> = {
-  NONE: null,
-  S1_DISCOVERY: "S1",
-  S1_BUYOUT: "S1 Buyout",
-  S2_ACTIVE: "S2",
-};
-
 export default function MePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("笔记");
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const items =
     activeTab === "笔记"
@@ -32,6 +28,14 @@ export default function MePage() {
       : activeTab === "收藏"
         ? currentUserSavedPosts
         : currentUserLikedPosts;
+
+  const tabPosts = useMemo(() => resolveProfilePosts(items), [items]);
+
+  useEffect(() => {
+    if (selectedPostId && !tabPosts.some((post) => post.id === selectedPostId)) {
+      setSelectedPostId(null);
+    }
+  }, [selectedPostId, tabPosts]);
 
   return (
     <>
@@ -108,11 +112,22 @@ export default function MePage() {
           <section className="mx-auto max-w-[960px] px-2 pt-2">
             <div className="masonry-grid">
               {items.map((item) => (
-                <ProfileNoteCard item={item} key={item.id} />
+                <ProfileNoteCard item={item} key={item.id} onOpen={() => setSelectedPostId(resolveItemPostId(item))} />
               ))}
             </div>
           </section>
         </div>
+        {selectedPostId ? (
+          <PostDetailExperience
+            closeLabel="Close profile post"
+            currentPostId={selectedPostId}
+            items={tabPosts}
+            mode="modal"
+            onChangePostId={setSelectedPostId}
+            onClose={() => setSelectedPostId(null)}
+            syncRoute={false}
+          />
+        ) : null}
       </UserShell>
     </>
   );
@@ -136,25 +151,54 @@ const formatProfileCount = (value: number) => {
   return String(value);
 };
 
-const ProfileNoteCard = ({ item }: { item: UserNoteRecord }) => (
-  <Link
-    className="block"
-    href={
-      item.id.startsWith("saved-")
-        ? `/posts/${item.id.replace("saved-", "")}`
-        : item.id.startsWith("liked-")
-          ? `/posts/${item.id.replace("liked-", "")}`
-          : "/me"
+const resolveItemPostId = (item: UserNoteRecord) => {
+  if (item.id.startsWith("saved-")) {
+    return item.id.replace("saved-", "");
+  }
+
+  if (item.id.startsWith("liked-")) {
+    return item.id.replace("liked-", "");
+  }
+
+  return item.sourcePostId ?? "";
+};
+
+const resolveProfilePosts = (items: UserNoteRecord[]) => {
+  const seen = new Set<string>();
+  const resolved: PostRecord[] = [];
+
+  for (const item of items) {
+    const postId = resolveItemPostId(item);
+    if (!postId || seen.has(postId)) {
+      continue;
     }
-  >
+
+    const post = posts.find((entry) => entry.id === postId);
+    if (!post) {
+      continue;
+    }
+
+    seen.add(postId);
+    resolved.push(post);
+  }
+
+  return resolved;
+};
+
+const ProfileNoteCard = ({
+  item,
+  onOpen,
+}: {
+  item: UserNoteRecord;
+  onOpen: () => void;
+}) => (
+  <button className="block w-full text-left" onClick={onOpen} type="button">
     <div className="overflow-hidden rounded-[22px] border border-white/[0.06] bg-[#101621] shadow-[0_16px_44px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
       <div className="relative overflow-hidden">
         <img alt={item.title} className={`w-full object-cover transition duration-500 hover:scale-[1.02] ${item.mediaHeightClass}`} src={item.coverSrc} />
-        {stageLabel[item.stage] ? (
-          <div className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[10px] tracking-[0.18em] text-white backdrop-blur-md">
-            {stageLabel[item.stage]}
-          </div>
-        ) : null}
+        <div className="absolute left-3 top-3">
+          <StagePill stage={item.stage} />
+        </div>
       </div>
       <div className="px-3.5 pb-3.5 pt-3">
         <p className="line-clamp-2 text-[14px] font-medium leading-6 text-white">{item.title}</p>
@@ -167,5 +211,5 @@ const ProfileNoteCard = ({ item }: { item: UserNoteRecord }) => (
         </div>
       </div>
     </div>
-  </Link>
+  </button>
 );

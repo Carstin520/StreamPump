@@ -1,14 +1,8 @@
 import Link from "next/link";
 
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
+import { StagePill } from "@/components/shared/StagePill";
 import { compactNumber, PostRecord } from "@/lib/mock-data";
-
-const stageLabel: Record<PostRecord["stage"], string | null> = {
-  NONE: null,
-  S1_DISCOVERY: "S1",
-  S1_BUYOUT: "S1 BUYOUT",
-  S2_ACTIVE: "S2",
-};
 
 const stageGlow: Record<PostRecord["stage"], string> = {
   NONE: "",
@@ -34,11 +28,9 @@ export const PostCard = ({ post }: { post: PostRecord }) => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#08111c]/82 via-transparent to-transparent" />
 
-          {stageLabel[post.stage] ? (
-            <div className="absolute left-3 top-3 z-[2] rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-medium tracking-[0.18em] text-white backdrop-blur-md">
-              {stageLabel[post.stage]}
-            </div>
-          ) : null}
+          <div className="absolute left-3 top-3 z-[2]">
+            <StagePill stage={post.stage} />
+          </div>
 
           {(post.type === "VIDEO" || post.hasMultipleImages) ? (
             <div className="absolute right-3 top-3 z-[2] flex h-8 min-w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 px-2 text-[10px] uppercase tracking-[0.16em] text-white backdrop-blur-md">

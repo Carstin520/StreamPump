@@ -2,6 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useState } from "react";
 
+import { StagePill } from "@/components/shared/StagePill";
 import { UserShell } from "@/components/user/UserShell";
 import { UserTopbar } from "@/components/user/UserTopbar";
 import { findCreator, formatUsd, portfolioActions, portfolioHoldings } from "@/lib/mock-data";
@@ -69,9 +70,7 @@ export default function PortfolioPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="text-base font-semibold text-white">{creator.name}</p>
-                            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#aebad0]">
-                              {creator.state === "S1_DISCOVERY" ? "S1" : creator.state === "S1_BUYOUT" ? "S1 Buyout" : "S2"}
-                            </span>
+                            <StagePill compact stage={creator.state} />
                           </div>
                           <p className="text-sm text-[#8ea0ba]">{holding.tokenCount} HELD</p>
                         </div>
