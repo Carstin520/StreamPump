@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
-
 :root {
   --bg-start: #090d14;
   --bg-end: #0a1018;
@@ -61,6 +59,12 @@ a {
   @media (min-width: 1280px) {
     .masonry-grid {
       column-count: 3;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .masonry-grid-home {
+      column-count: 4;
     }
   }
 

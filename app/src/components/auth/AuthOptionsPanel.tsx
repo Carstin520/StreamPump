@@ -9,7 +9,6 @@ import {
   SearchIcon,
   WalletIcon,
 } from "@/components/shared/AppIcons";
-import { useWeb3Auth } from "@/components/Wallet/Web3AuthContext";
 import {
   LoginMethodRecord,
   LoginPreviewMode,
@@ -23,9 +22,9 @@ type AuthOptionsPanelProps = {
 };
 
 export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) => {
-  const { connect, disconnect, isReady, provider } = useWeb3Auth();
   const [lastAction, setLastAction] = useState<string>("Preview mode: social login first.");
   const [showAccounts, setShowAccounts] = useState(false);
+  const [walletConnected, setWalletConnected] = useState(false);
 
   const currentAccount = useMemo(
     () => loginAccounts.find((account) => account.isCurrent) ?? loginAccounts[0],
@@ -38,17 +37,9 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
 
   const handleMethod = async (method: LoginMethodRecord) => {
     if (method.id === "wallet") {
-      if (!provider && isReady) {
-        await connect();
-        setLastAction("Wallet connect preview fired through Web3Auth.");
-        return;
-      }
-
-      if (provider) {
-        await disconnect();
-        setLastAction("Wallet session preview ended.");
-        return;
-      }
+      setWalletConnected((value) => !value);
+      setLastAction(walletConnected ? "Wallet session preview ended." : "Wallet connect preview fired through mock auth state.");
+      return;
     }
 
     setLastAction(`${method.label} selected. This prototype keeps the flow front-loaded and low-friction.`);

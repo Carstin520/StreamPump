@@ -68,7 +68,7 @@ const ExploreView = () => (
     </section>
 
     <section className="section-enter pb-8">
-      <div className="masonry-grid">
+      <div className="masonry-grid masonry-grid-home">
         {posts.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}

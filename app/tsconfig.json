@@ -18,6 +18,23 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".next-dev",
+    ".next-*",
+    ".next_*",
+    "src/**/* 2.ts",
+    "src/**/* 2.tsx",
+    "src/components/Wallet/**/*",
+    "src/components/Dashboard/**/*",
+    "src/components/VideoPlayer/**/*",
+    "src/hooks/useBondingCurve.ts",
+    "src/hooks/useCreatorUpgradePayload.ts",
+    "src/hooks/useProgram.ts",
+    "src/hooks/useProposalOracleReport.ts",
+    "src/utils/proposalPda.ts",
+    "src/utils/solana.ts"
+  ]
 }
