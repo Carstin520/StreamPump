@@ -5,8 +5,9 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "crypto";
 
 import { ed25519 } from "@noble/curves/ed25519";
+import { IdentityProvider } from "@prisma/client";
 import bs58 from "bs58";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 
 import { config } from "../../config/default";
 import { prisma } from "./prisma";
@@ -148,6 +149,36 @@ const parseSessionToken = (
   }
 };
 
+const normalizeManagedWallet = (value?: string | null): string =>
+  value && value.trim()
+    ? new PublicKey(value).toBase58()
+    : Keypair.generate().publicKey.toBase58();
+
+const createWalletSession = async (wallet: string) => {
+  const sessionId = randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const accessToken = buildSessionToken({
+    sessionId,
+    wallet,
+    expiresAt,
+  });
+
+  await prisma.walletSession.create({
+    data: {
+      id: sessionId,
+      wallet,
+      tokenHash: sha256Hex(accessToken),
+      expiresAt,
+    },
+  });
+
+  return {
+    wallet,
+    accessToken,
+    expiresAt,
+  };
+};
+
 export const createWalletAuthChallenge = async (wallet: string) => {
   const normalizedWallet = new PublicKey(wallet).toBase58();
   const issuedAt = new Date();
@@ -236,6 +267,70 @@ export const verifyWalletAuthChallenge = async (params: {
     expiresAt,
   };
 };
+
+export const exchangeProviderIdentitySession = async (params: {
+  provider: IdentityProvider;
+  providerSubject: string;
+  email?: string | null;
+  displayName?: string | null;
+  managedWalletAddress?: string | null;
+}) => {
+  const providerSubject = params.providerSubject.trim();
+  if (!providerSubject) {
+    throw new Error("providerSubject is required");
+  }
+
+  const existingIdentity = await prisma.authIdentity.findUnique({
+    where: {
+      provider_providerSubject: {
+        provider: params.provider,
+        providerSubject,
+      },
+    },
+  });
+
+  const managedWalletAddress = existingIdentity?.managedWalletAddress ?? normalizeManagedWallet(params.managedWalletAddress);
+
+  const identity = existingIdentity
+    ? await prisma.authIdentity.update({
+        where: { id: existingIdentity.id },
+        data: {
+          email: params.email ?? existingIdentity.email,
+          displayName: params.displayName ?? existingIdentity.displayName,
+          managedWalletAddress,
+        },
+      })
+    : await prisma.authIdentity.create({
+        data: {
+          provider: params.provider,
+          providerSubject,
+          email: params.email ?? null,
+          displayName: params.displayName ?? null,
+          managedWalletAddress,
+        },
+      });
+
+  const session = await createWalletSession(identity.managedWalletAddress);
+
+  return {
+    ...session,
+    identity: {
+      id: identity.id,
+      provider: identity.provider,
+      providerSubject: identity.providerSubject,
+      email: identity.email,
+      displayName: identity.displayName,
+      managedWalletAddress: identity.managedWalletAddress,
+    },
+  };
+};
+
+export const findAuthIdentityByWallet = async (wallet: string) =>
+  prisma.authIdentity.findFirst({
+    where: {
+      managedWalletAddress: wallet,
+    },
+  });
 
 export const verifyWalletSessionToken = async (token: string) => {
   const parsed = parseSessionToken(token);

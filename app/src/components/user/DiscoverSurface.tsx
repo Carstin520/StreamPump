@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { discoverCategories, posts, creators } from "@/lib/mock-data";
+import { creators, discoverCategories, posts } from "@/lib/mocks/discover";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
 import { UserShell } from "./UserShell";

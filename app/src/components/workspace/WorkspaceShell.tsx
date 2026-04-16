@@ -8,7 +8,6 @@ import { UserTopbar } from "@/components/user/UserTopbar";
 const tabs = [
   { href: "/workspace", label: "Overview" },
   { href: "/workspace/content/new", label: "Create Content" },
-  { href: "/workspace/intents/intent-luna-radiantlab", label: "Launch Intent" },
 ];
 
 export const WorkspaceShell = ({

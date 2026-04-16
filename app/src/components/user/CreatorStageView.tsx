@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
-import { CreatorMarketRecord, compactNumber, formatUsd, posts } from "@/lib/mock-data";
+import { CreatorMarketRecord } from "@/lib/api/types";
+import { posts } from "@/lib/mocks/discover";
+import { compactNumber, formatUsd } from "@/lib/mocks/utils";
 
 type ProfileTab = "作品" | "投资档案" | "Signals";
 

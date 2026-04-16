@@ -25,7 +25,6 @@ import {
   parseOptionalString,
   parseSha256Hex,
   parseStringArray,
-  parseWalletFromRequest,
 } from "./http";
 import {
   buildInternalCanonicalUrl,
@@ -44,6 +43,14 @@ import {
 } from "../services/S3Service";
 
 const MAX_ASSET_SIZE_BYTES = 100 * 1024 * 1024;
+
+const requireAuthenticatedWallet = (req: Request): string => {
+  if (!req.auth?.wallet || req.auth.source !== "session") {
+    throw new HttpError(401, "AUTH_REQUIRED", "bearer session authentication is required");
+  }
+
+  return req.auth.wallet;
+};
 
 const normalizeAssetType = (value: unknown): AssetType => {
   const normalized = String(value ?? "").trim().toUpperCase();
@@ -123,6 +130,76 @@ const serializeAsset = (asset: {
   updatedAt: asset.updatedAt.toISOString(),
 });
 
+const serializePublication = (publication: {
+  id: string;
+  platform: string;
+  externalUrl: string;
+  verificationStatus: string;
+  verifiedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) => ({
+  publicationId: publication.id,
+  platform: publication.platform,
+  externalUrl: publication.externalUrl,
+  verificationStatus: publication.verificationStatus,
+  verifiedAt: publication.verifiedAt?.toISOString() ?? null,
+  createdAt: publication.createdAt.toISOString(),
+  updatedAt: publication.updatedAt.toISOString(),
+});
+
+const serializeManifestDetail = (manifest: {
+  id: string;
+  creatorWallet: string;
+  contentType: string;
+  status: string;
+  version: number;
+  title: string | null;
+  captionText: string | null;
+  tagsJson: Prisma.JsonValue | null;
+  metadataJson: Prisma.JsonValue | null;
+  manifestHashHex: string | null;
+  currentAnchorPda: string | null;
+  currentAnchorTx: string | null;
+  internalCanonicalUrl: string | null;
+  internalUrlDigestHex: string | null;
+  coverAssetId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  assets: Array<{
+    id: string;
+    assetType: string;
+    orderIndex: number;
+    storageKey: string;
+    uploadStatus: string;
+    processingStatus: string;
+    muxAssetId: string | null;
+    muxPlaybackId: string | null;
+    muxLastKnownStatus: string | null;
+    updatedAt: Date;
+  }>;
+  publications: Array<{
+    id: string;
+    platform: string;
+    externalUrl: string;
+    verificationStatus: string;
+    verifiedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+}) => ({
+  ...serializeManifest(manifest),
+  title: manifest.title,
+  captionText: manifest.captionText,
+  tags: Array.isArray(manifest.tagsJson) ? manifest.tagsJson : [],
+  metadata: manifest.metadataJson ?? null,
+  internalCanonicalUrl: manifest.internalCanonicalUrl,
+  internalUrlDigestHex: manifest.internalUrlDigestHex,
+  coverAssetId: manifest.coverAssetId,
+  assets: manifest.assets.map(serializeAsset),
+  publications: manifest.publications.map(serializePublication),
+});
+
 const requireOwnedManifest = async (manifestId: string, creatorWallet: string) => {
   // Ownership is enforced at the DB layer so a creator cannot mutate another creator's content state.
   const manifest = await prisma.contentManifest.findFirst({
@@ -143,7 +220,7 @@ export const createContentManifest = async (req: Request, res: Response) => {
   try {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = parseWalletFromRequest(req, "x-wallet-address", "creatorWallet");
+    const creatorWallet = requireAuthenticatedWallet(req);
     const contentType = normalizeContentType(req.body.contentType);
     const title = parseOptionalString(req.body.title);
     const captionText = parseOptionalString(req.body.captionText);
@@ -181,7 +258,7 @@ export const presignManifestAssets = async (req: Request, res: Response) => {
   try {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = parseWalletFromRequest(req, "x-wallet-address", "creatorWallet");
+    const creatorWallet = requireAuthenticatedWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const manifest = await requireOwnedManifest(manifestId, creatorWallet);
     const inputs = Array.isArray(req.body.assets) ? req.body.assets : null;
@@ -291,7 +368,7 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
   try {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = parseWalletFromRequest(req, "x-wallet-address", "creatorWallet");
+    const creatorWallet = requireAuthenticatedWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const assetId = parseNonEmptyString(req.params.assetId, "assetId");
 
@@ -375,7 +452,7 @@ export const finalizeContentManifest = async (req: Request, res: Response) => {
   try {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = parseWalletFromRequest(req, "x-wallet-address", "creatorWallet");
+    const creatorWallet = requireAuthenticatedWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const manifest = await prisma.contentManifest.findFirst({
       where: {
@@ -443,7 +520,7 @@ export const createContentPublication = async (req: Request, res: Response) => {
   try {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = parseWalletFromRequest(req, "x-wallet-address", "creatorWallet");
+    const creatorWallet = requireAuthenticatedWallet(req);
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
     await requireOwnedManifest(manifestId, creatorWallet);
 
@@ -486,5 +563,71 @@ export const createContentPublication = async (req: Request, res: Response) => {
     }, 201);
   } catch (error) {
     handleControllerError(res, error, "CREATE_CONTENT_PUBLICATION_FAILED");
+  }
+};
+
+export const listContentManifests = async (req: Request, res: Response) => {
+  try {
+    const creatorWallet = requireAuthenticatedWallet(req);
+    const manifests = await prisma.contentManifest.findMany({
+      where: {
+        creatorWallet,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      include: {
+        assets: {
+          orderBy: {
+            orderIndex: "asc",
+          },
+        },
+      },
+    });
+
+    ok(
+      res,
+      manifests.map((manifest) => ({
+        ...serializeManifest(manifest),
+        title: manifest.title,
+        assetCount: manifest.assets.length,
+        assets: manifest.assets.map(serializeAsset),
+      }))
+    );
+  } catch (error) {
+    handleControllerError(res, error, "LIST_CONTENT_MANIFESTS_FAILED");
+  }
+};
+
+export const getContentManifestById = async (req: Request, res: Response) => {
+  try {
+    const creatorWallet = requireAuthenticatedWallet(req);
+    const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
+    const manifest = await prisma.contentManifest.findFirst({
+      where: {
+        id: manifestId,
+        creatorWallet,
+      },
+      include: {
+        assets: {
+          orderBy: {
+            orderIndex: "asc",
+          },
+        },
+        publications: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+      },
+    });
+
+    if (!manifest) {
+      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
+    }
+
+    ok(res, serializeManifestDetail(manifest));
+  } catch (error) {
+    handleControllerError(res, error, "GET_CONTENT_MANIFEST_FAILED");
   }
 };

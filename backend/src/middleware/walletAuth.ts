@@ -82,10 +82,47 @@ export const optionalWalletAuth = async (req: Request, res: Response, next: Next
   }
 };
 
+export const optionalSessionAuth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      next();
+      return;
+    }
+
+    const session = await verifyWalletSessionToken(token);
+    if (!session) {
+      fail(res, 401, "AUTH_INVALID", "wallet session is invalid or expired");
+      return;
+    }
+
+    req.auth = {
+      wallet: session.wallet,
+      sessionId: session.sessionId,
+      source: "session",
+    };
+
+    next();
+  } catch (error) {
+    fail(res, 500, "AUTH_CHECK_FAILED", error instanceof Error ? error.message : "auth failed");
+  }
+};
+
 export const requireWalletAuth = async (req: Request, res: Response, next: NextFunction) => {
   await optionalWalletAuth(req, res, () => {
     if (!req.auth) {
       fail(res, 401, "AUTH_REQUIRED", "wallet authentication is required");
+      return;
+    }
+
+    next();
+  });
+};
+
+export const requireSessionAuth = async (req: Request, res: Response, next: NextFunction) => {
+  await optionalSessionAuth(req, res, () => {
+    if (!req.auth || req.auth.source !== "session") {
+      fail(res, 401, "AUTH_REQUIRED", "bearer session authentication is required");
       return;
     }
 

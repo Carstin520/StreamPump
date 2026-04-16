@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import { FollowCheckIcon, FollowPlusIcon, HeartOutlineIcon, HeartSolidIcon, SendRoundedIcon } from "@/components/shared/AppIcons";
 import { StagePill } from "@/components/shared/StagePill";
-import { compactNumber, CommentRecord, PostRecord, currentUser } from "@/lib/mock-data";
+import { CommentRecord, PostRecord } from "@/lib/api/types";
+import { currentUser } from "@/lib/mocks/profile";
+import { compactNumber } from "@/lib/mocks/utils";
 
 export const CommentPanel = ({
   post,

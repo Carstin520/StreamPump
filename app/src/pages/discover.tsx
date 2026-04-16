@@ -1,14 +1,12 @@
-import Head from "next/head";
+import type { GetServerSideProps } from "next";
 
-import { DiscoverSurface } from "@/components/user/DiscoverSurface";
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: "/explore",
+    permanent: false,
+  },
+});
 
 export default function DiscoverPage() {
-  return (
-    <>
-      <Head>
-        <title>StreamPump | Discover</title>
-      </Head>
-      <DiscoverSurface />
-    </>
-  );
+  return null;
 }

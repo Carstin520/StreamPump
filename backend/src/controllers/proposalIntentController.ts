@@ -25,7 +25,6 @@ import {
   parseNonNegativeBigInt,
   parseNonNegativeInt,
   parseOptionalString,
-  parseOptionalWallet,
   parseWallet,
 } from "./http";
 import {
@@ -82,8 +81,15 @@ const parseOptionalBoolean = (value: unknown): boolean => {
   return normalized === "true" || normalized === "1" || normalized === "yes";
 };
 
-const getRequesterWallet = (req: Request): string =>
-  req.auth?.wallet ?? parseWallet(req.header("x-wallet-address"), "x-wallet-address");
+const requireAuthenticatedWallet = (req: Request): string => {
+  if (!req.auth?.wallet || req.auth.source !== "session") {
+    throw new HttpError(401, "AUTH_REQUIRED", "bearer session authentication is required");
+  }
+
+  return req.auth.wallet;
+};
+
+const getRequesterWallet = (req: Request): string => requireAuthenticatedWallet(req);
 
 export const isBundleExpired = (bundle: { expiresAt: Date }): boolean =>
   bundle.expiresAt.getTime() <= Date.now();
@@ -995,6 +1001,125 @@ export const getProposalIntentStatus = async (req: Request, res: Response) => {
   }
 };
 
+export const listProposalIntents = async (req: Request, res: Response) => {
+  try {
+    const requesterWallet = requireAuthenticatedWallet(req);
+    const intents = await prisma.proposalIntent.findMany({
+      where: {
+        OR: [{ creatorWallet: requesterWallet }, { sponsorWallet: requesterWallet }],
+      },
+      include: {
+        manifest: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            contentType: true,
+            manifestHashHex: true,
+            currentAnchorPda: true,
+          },
+        },
+        txBundles: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
+
+    ok(
+      res,
+      intents.map((intent) => ({
+        ...serializeIntent(intent),
+        manifest: intent.manifest
+          ? {
+              manifestId: intent.manifest.id,
+              title: intent.manifest.title,
+              status: intent.manifest.status,
+              contentType: intent.manifest.contentType,
+              manifestHashHex: intent.manifest.manifestHashHex,
+              currentAnchorPda: intent.manifest.currentAnchorPda,
+            }
+          : null,
+        latestBundle: intent.txBundles[0] ? serializeBundle(intent.txBundles[0]) : null,
+        viewerRole:
+          requesterWallet === intent.creatorWallet
+            ? "CREATOR"
+            : requesterWallet === intent.sponsorWallet
+              ? "SPONSOR"
+              : "OBSERVER",
+      }))
+    );
+  } catch (error) {
+    handleControllerError(res, error, "LIST_PROPOSAL_INTENTS_FAILED");
+  }
+};
+
+export const getProposalIntentById = async (req: Request, res: Response) => {
+  try {
+    const requesterWallet = requireAuthenticatedWallet(req);
+    const intentId = parseNonEmptyString(req.params.intentId, "intentId");
+    const intent = await prisma.proposalIntent.findUnique({
+      where: { id: intentId },
+      include: {
+        manifest: {
+          include: {
+            assets: {
+              orderBy: {
+                orderIndex: "asc",
+              },
+            },
+          },
+        },
+        txBundles: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+        proposal: true,
+      },
+    });
+
+    if (!intent) {
+      throw new HttpError(404, "INTENT_NOT_FOUND", "proposal intent not found");
+    }
+
+    assertParticipant(requesterWallet, intent);
+
+    ok(res, {
+      intent: serializeIntent(intent),
+      viewerRole: requesterWallet === intent.creatorWallet ? "CREATOR" : "SPONSOR",
+      manifest: intent.manifest
+        ? {
+            manifestId: intent.manifest.id,
+            title: intent.manifest.title,
+            contentType: intent.manifest.contentType,
+            status: intent.manifest.status,
+            version: intent.manifest.version,
+            manifestHashHex: intent.manifest.manifestHashHex,
+            currentAnchorPda: intent.manifest.currentAnchorPda,
+            assets: intent.manifest.assets.map((asset) => ({
+              assetId: asset.id,
+              assetType: asset.assetType,
+              orderIndex: asset.orderIndex,
+              uploadStatus: asset.uploadStatus,
+              processingStatus: asset.processingStatus,
+              muxPlaybackId: asset.muxPlaybackId,
+            })),
+          }
+        : null,
+      proposal: intent.proposal ? serializeProposal(intent.proposal) : null,
+      bundles: intent.txBundles.map(serializeBundle),
+    });
+  } catch (error) {
+    handleControllerError(res, error, "GET_PROPOSAL_INTENT_FAILED");
+  }
+};
+
 export const getProposalById = async (req: Request, res: Response) => {
   try {
     const id = parseNonEmptyString(req.params.id, "id");
@@ -1008,9 +1133,7 @@ export const getProposalById = async (req: Request, res: Response) => {
       throw new HttpError(404, "PROPOSAL_NOT_FOUND", "proposal not found");
     }
 
-    const requesterWallet =
-      req.auth?.wallet ??
-      parseOptionalWallet(req.header("x-wallet-address"), "x-wallet-address");
+    const requesterWallet = req.auth?.source === "session" ? req.auth.wallet : null;
     const isCreatorOrSponsor =
       requesterWallet !== null &&
       (requesterWallet === proposal.creatorWallet || requesterWallet === proposal.sponsorWallet);

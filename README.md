@@ -139,7 +139,8 @@ This repo is **not a polished production app yet**. It is a serious prototype mo
 - a much stronger frontend experience prototype built on the existing `pages` router
 - immersive `Discover` feed with animated background, progressive image loading, and unified glassmorphism system
 - refined `Trending`, `Portfolio`, `Profile`, `Login`, and `Activity` surfaces with a more coherent visual language
-- dual-state login preview covering both first-time entry and account switching
+- dual-state login surface covering both first-time entry and account switching
+- real wallet challenge/signature login from the tracked frontend login page
 - supporter-facing `Portfolio` with exposure curve, row-level sparklines, claim queue, and re-entry prototype flows
 - new follow-first `Activity` page with `综合 / 视频` tabs, creator filtering, and bilibili-inspired subscription-feed information architecture
 - floating post-detail modal for both image and video posts with wheel-based post switching and preserved resize state
@@ -185,6 +186,7 @@ What is still intentionally prototype-grade:
 - most pages are still driven by local mock data
 - video posts currently use poster-style presentation rather than a final production playback stack
 - the UI has not yet been fully connected to the new backend content / proposal-intent flow
+- social/provider login still uses preview identities through `provider-exchange`, even though external wallet login now uses the real challenge/signature path
 
 ## UI Snapshot
 
@@ -267,6 +269,12 @@ The current backend auth path supports:
 - `POST /api/v1/auth/verify`
 - Bearer session auth on `v1/content/*` and `v1/proposal-intents/*`
 - optional legacy `x-wallet-address` fallback only when explicitly enabled in local env
+
+The current tracked frontend auth path supports:
+
+- social/provider preview login through `POST /api/v1/auth/provider-exchange`
+- real external-wallet login through `POST /api/v1/auth/challenge -> POST /api/v1/auth/verify`
+- Bearer session storage in browser local state for `workspace`, `content`, `proposal-intents`, and proposal detail pages
 
 ## Who This Product Is For
 
@@ -378,6 +386,10 @@ Useful env vars:
 - `PORT`
 - `API_BASE_URL`
 - `SOLANA_RPC_ENDPOINT`
+- `NEXT_PUBLIC_BACKEND_BASE_URL`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_RPC_ENDPOINT`
+- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
 - `STREAMPUMP_PROGRAM_ID`
 - `S3_*`
 - `R2_*`
@@ -390,6 +402,24 @@ cd app
 npm install
 npm run dev
 ```
+
+Recommended local frontend env flow:
+
+```bash
+cp app/.env.example app/.env.local
+```
+
+Then fill at least:
+
+- `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000`
+- `NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com`
+- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...` only if you want Web3Auth social login enabled
+
+Notes:
+
+- the frontend now prefers `NEXT_PUBLIC_BACKEND_BASE_URL` and derives `/api/v1` automatically
+- `NEXT_PUBLIC_API_BASE_URL` is still accepted as a backward-compatible fallback
+- wallet login on `/login` requires a Solana wallet that supports `signMessage`
 
 ## Recommended Reading
 

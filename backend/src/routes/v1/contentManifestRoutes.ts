@@ -9,15 +9,19 @@ import {
   createContentManifest,
   createContentPublication,
   finalizeContentManifest,
+  getContentManifestById,
+  listContentManifests,
   presignManifestAssets,
 } from "../../controllers/contentManifestController";
-import { requireWalletAuth } from "../../middleware/walletAuth";
+import { requireSessionAuth } from "../../middleware/walletAuth";
 
 const router = Router();
 
-router.use(requireWalletAuth);
+router.use(requireSessionAuth);
 
+router.get("/manifests", listContentManifests);
 router.post("/manifests", createContentManifest);
+router.get("/manifests/:manifestId", getContentManifestById);
 router.post("/manifests/:manifestId/assets/presign", presignManifestAssets);
 router.post("/manifests/:manifestId/assets/:assetId/complete", completeManifestAssetUpload);
 router.post("/manifests/:manifestId/finalize", finalizeContentManifest);

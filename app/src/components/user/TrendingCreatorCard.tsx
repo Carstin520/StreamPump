@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { StagePill } from "@/components/shared/StagePill";
-import { compactNumber, CreatorMarketRecord, formatUsd } from "@/lib/mock-data";
+import { CreatorMarketRecord } from "@/lib/api/types";
+import { compactNumber, formatUsd } from "@/lib/mocks/utils";
 
 export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
   <Link className="block" href={`/creators/${creator.id}`}>

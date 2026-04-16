@@ -1,4 +1,7 @@
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 import {
   AppleIcon,
@@ -10,21 +13,78 @@ import {
   WalletIcon,
 } from "@/components/shared/AppIcons";
 import {
-  LoginMethodRecord,
-  LoginPreviewMode,
-  loginAccounts,
-  loginMethods,
-} from "@/lib/mock-data";
+  createWalletAuthChallenge,
+  exchangeProviderSession,
+  verifyWalletAuthChallenge,
+} from "@/lib/api/auth";
+import { IdentityProvider, LoginMethodRecord, LoginPreviewMode } from "@/lib/api/types";
+import { storeAuthSession } from "@/lib/auth-session";
+import { loginAccounts, loginMethods } from "@/lib/mocks/auth";
 
 type AuthOptionsPanelProps = {
   mode: LoginPreviewMode;
   onModeChange: (mode: LoginPreviewMode) => void;
 };
 
+type PreviewIdentity = {
+  provider: IdentityProvider;
+  providerSubject: string;
+  email?: string | null;
+  displayName?: string | null;
+};
+
+const METHOD_IDENTITIES: Record<Exclude<LoginMethodRecord["id"], "wallet">, PreviewIdentity> = {
+  email: {
+    provider: "EMAIL",
+    providerSubject: "preview-email-alex-chen",
+    email: "alex+email@streampump.local",
+    displayName: "Alex Chen",
+  },
+  google: {
+    provider: "GOOGLE",
+    providerSubject: "preview-google-alex-chen",
+    email: "alex+google@streampump.local",
+    displayName: "Alex Chen",
+  },
+  apple: {
+    provider: "APPLE",
+    providerSubject: "preview-apple-neo-park",
+    email: "neo+apple@streampump.local",
+    displayName: "Neo Park",
+  },
+};
+
+const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
+  "james-li": METHOD_IDENTITIES.google,
+  "neo-preview-account": METHOD_IDENTITIES.apple,
+  "wallet-preview-account": null,
+};
+
+const resolveMethodIdentity = (methodId: LoginMethodRecord["id"]) => {
+  if (methodId === "wallet") {
+    return null;
+  }
+
+  return METHOD_IDENTITIES[methodId];
+};
+
+const bytesToBase64 = (value: Uint8Array) => {
+  let binary = "";
+
+  value.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return window.btoa(binary);
+};
+
 export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) => {
+  const router = useRouter();
+  const { connected, connecting, publicKey, signMessage } = useWallet();
+  const { setVisible } = useWalletModal();
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<string>("Preview mode: social login first.");
   const [showAccounts, setShowAccounts] = useState(false);
-  const [walletConnected, setWalletConnected] = useState(false);
 
   const currentAccount = useMemo(
     () => loginAccounts.find((account) => account.isCurrent) ?? loginAccounts[0],
@@ -35,14 +95,75 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
     [currentAccount.id],
   );
 
-  const handleMethod = async (method: LoginMethodRecord) => {
-    if (method.id === "wallet") {
-      setWalletConnected((value) => !value);
-      setLastAction(walletConnected ? "Wallet session preview ended." : "Wallet connect preview fired through mock auth state.");
+  const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
+    setBusyKey(identity.providerSubject);
+    setLastAction(`Starting ${successLabel} session...`);
+
+    try {
+      const session = await exchangeProviderSession(identity);
+      storeAuthSession(session);
+      setLastAction(`${successLabel} session ready. Redirecting to workspace.`);
+      void router.push("/workspace");
+    } catch (error) {
+      setLastAction(error instanceof Error ? error.message : `Failed to create ${successLabel} session.`);
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleWalletLogin = async () => {
+    if (!connected || !publicKey) {
+      setVisible(true);
+      setLastAction("Open the wallet picker, connect a Solana wallet, then retry wallet sign-in.");
       return;
     }
 
-    setLastAction(`${method.label} selected. This prototype keeps the flow front-loaded and low-friction.`);
+    if (!signMessage) {
+      setLastAction("The connected wallet does not support signMessage. Use Phantom or another signing-capable wallet.");
+      return;
+    }
+
+    const walletAddress = publicKey.toBase58();
+    setBusyKey("wallet");
+    setLastAction("Requesting wallet auth challenge...");
+
+    try {
+      const challenge = await createWalletAuthChallenge(walletAddress);
+      const signatureBytes = await signMessage(new TextEncoder().encode(challenge.message));
+      const session = await verifyWalletAuthChallenge({
+        wallet: walletAddress,
+        nonce: challenge.nonce,
+        signature: bytesToBase64(signatureBytes),
+      });
+
+      storeAuthSession(session);
+      setLastAction("Wallet session ready. Redirecting to workspace.");
+      void router.push("/workspace");
+    } catch (error) {
+      setLastAction(error instanceof Error ? error.message : "Failed to create wallet session.");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleMethod = async (method: LoginMethodRecord) => {
+    if (method.id === "wallet") {
+      await handleWalletLogin();
+      return;
+    }
+
+    await createPreviewSession(METHOD_IDENTITIES[method.id], method.label);
+  };
+
+  const handleAccountSwitch = async (accountId: string, accountName: string) => {
+    const identity = ACCOUNT_IDENTITIES[accountId];
+    if (!identity) {
+      setLastAction(`${accountName} will use the connected wallet instead of the old preview path.`);
+      await handleWalletLogin();
+      return;
+    }
+
+    await createPreviewSession(identity, `${accountName} account`);
   };
 
   return (
@@ -75,36 +196,42 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
             </div>
 
             <div className="space-y-3">
-              {loginMethods.map((method) => (
-                <button
-                  className={`card-radius group flex w-full items-center justify-between border px-4 py-4 text-left transition ${
-                    method.tone === "wallet"
-                      ? "border-[#7a4d27] bg-[linear-gradient(180deg,rgba(60,31,18,0.56)_0%,rgba(25,17,13,0.72)_100%)] text-[#ffd0a6] hover:border-[#b06f34]"
-                      : "border-white/[0.08] bg-[#111827]/88 text-white hover:border-white/[0.14] hover:bg-[#151d2b]"
-                  }`}
-                  key={method.id}
-                  onClick={() => void handleMethod(method)}
-                  type="button"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`flex h-9 w-9 items-center justify-center rounded-full ${method.tone === "wallet" ? "bg-[#2e1e17]" : "bg-white/[0.07]"}`}>
-                      <LoginMethodIcon id={method.id} />
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium">{method.label}</p>
-                      <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>{method.subtitle}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {method.id === "wallet" ? (
-                      <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
-                        Web3
+              {loginMethods.map((method) => {
+                const identity = resolveMethodIdentity(method.id);
+                const methodBusy = busyKey === (identity?.providerSubject ?? "wallet");
+
+                return (
+                  <button
+                    className={`card-radius group flex w-full items-center justify-between border px-4 py-4 text-left transition ${
+                      method.tone === "wallet"
+                        ? "border-[#7a4d27] bg-[linear-gradient(180deg,rgba(60,31,18,0.56)_0%,rgba(25,17,13,0.72)_100%)] text-[#ffd0a6] hover:border-[#b06f34]"
+                        : "border-white/[0.08] bg-[#111827]/88 text-white hover:border-white/[0.14] hover:bg-[#151d2b]"
+                    } ${methodBusy ? "cursor-wait opacity-80" : ""}`}
+                    disabled={Boolean(busyKey)}
+                    key={method.id}
+                    onClick={() => void handleMethod(method)}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${method.tone === "wallet" ? "bg-[#2e1e17]" : "bg-white/[0.07]"}`}>
+                        <LoginMethodIcon id={method.id} />
                       </span>
-                    ) : null}
-                    <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
-                  </div>
-                </button>
-              ))}
+                      <div>
+                        <p className="text-sm font-medium">{method.label}</p>
+                        <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>{method.subtitle}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {method.id === "wallet" ? (
+                        <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
+                          {connecting ? "Connecting" : connected ? "Wallet ready" : "Web3"}
+                        </span>
+                      ) : null}
+                      <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <p className="text-center text-xs text-[#70819d]">
@@ -159,9 +286,10 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
               <div className="card-radius space-y-3 border border-white/[0.08] bg-[#0d1420]/90 p-3">
                 {secondaryAccounts.map((account) => (
                   <button
-                    className="card-radius flex w-full items-center justify-between border border-white/[0.05] bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/[0.12] hover:bg-white/[0.05]"
+                    className="card-radius flex w-full items-center justify-between border border-white/[0.05] bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/[0.12] hover:bg-white/[0.05] disabled:cursor-wait disabled:opacity-80"
+                    disabled={Boolean(busyKey)}
                     key={account.id}
-                    onClick={() => setLastAction(`Preview switched focus to ${account.name}.`)}
+                    onClick={() => void handleAccountSwitch(account.id, account.name)}
                     type="button"
                   >
                     <div className="flex items-center gap-3">

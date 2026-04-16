@@ -6,19 +6,21 @@ import { Router } from "express";
 
 import {
   createAuthChallenge,
+  exchangeProviderSession,
   getCurrentSession,
   verifyAuthChallenge,
 } from "../../controllers/authController";
 import {
   logoutWalletSession,
-  requireWalletAuth,
+  requireSessionAuth,
 } from "../../middleware/walletAuth";
 
 const router = Router();
 
 router.post("/challenge", createAuthChallenge);
 router.post("/verify", verifyAuthChallenge);
-router.get("/session", requireWalletAuth, getCurrentSession);
-router.post("/logout", requireWalletAuth, logoutWalletSession);
+router.post("/provider-exchange", exchangeProviderSession);
+router.get("/session", requireSessionAuth, getCurrentSession);
+router.post("/logout", requireSessionAuth, logoutWalletSession);
 
 export default router;

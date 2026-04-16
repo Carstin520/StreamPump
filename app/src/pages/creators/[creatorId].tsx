@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { CreatorStageView } from "@/components/user/CreatorStageView";
 import { UserShell } from "@/components/user/UserShell";
 import { UserTopbar } from "@/components/user/UserTopbar";
-import { findCreator } from "@/lib/mock-data";
+import { findCreator } from "@/lib/mocks/discover";
 
 export default function CreatorDetailPage() {
   const router = useRouter();

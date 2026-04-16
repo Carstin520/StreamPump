@@ -8,17 +8,21 @@ import {
   buildProposalLaunchBundle,
   createProposalIntent,
   creatorPartialSignBundle,
+  getProposalIntentById,
   getProposalIntentStatus,
+  listProposalIntents,
   submitProposalBundle,
   lockProposalIntent,
 } from "../../controllers/proposalIntentController";
-import { requireWalletAuth } from "../../middleware/walletAuth";
+import { requireSessionAuth } from "../../middleware/walletAuth";
 
 const router = Router();
 
-router.use(requireWalletAuth);
+router.use(requireSessionAuth);
 
+router.get("/", listProposalIntents);
 router.post("/", createProposalIntent);
+router.get("/:intentId", getProposalIntentById);
 router.post("/:intentId/lock", lockProposalIntent);
 router.post("/:intentId/build-bundle", buildProposalLaunchBundle);
 router.post("/:intentId/creator-partial-sign", creatorPartialSignBundle);

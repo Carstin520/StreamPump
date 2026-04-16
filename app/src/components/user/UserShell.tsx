@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { SwitchAccountIcon } from "@/components/shared/AppIcons";
-import { currentUser } from "@/lib/mock-data";
+import { currentUser } from "@/lib/mocks/profile";
 
 const primaryNav = [
   { href: "/explore", label: "发现", match: ["/", "/explore", "/discover", "/posts"] },

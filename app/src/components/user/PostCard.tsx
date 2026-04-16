@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
-import { compactNumber, PostRecord } from "@/lib/mock-data";
+import { PostRecord } from "@/lib/api/types";
+import { compactNumber } from "@/lib/mocks/utils";
 
 const stageGlow: Record<PostRecord["stage"], string> = {
   NONE: "",

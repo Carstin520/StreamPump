@@ -111,6 +111,13 @@ enum BundleSubmitMode {
   CLIENT_RELAY
 }
 
+enum IdentityProvider {
+  GOOGLE
+  APPLE
+  EMAIL
+  PASSKEY
+}
+
 model Proposal {
   id                         String           @id @default(cuid())
   /// CN: 链上 Proposal PDA，数据库用它和链上账户强绑定。
@@ -425,6 +432,22 @@ model WalletSession {
   updatedAt  DateTime @updatedAt
 
   @@index([wallet, expiresAt])
+}
+
+model AuthIdentity {
+  id                   String           @id @default(cuid())
+  provider             IdentityProvider
+  providerSubject      String
+  email                String?
+  displayName          String?
+  /// CN: 产品内托管/嵌入式钱包地址，用于把社交身份映射回统一的链上会话主体。
+  /// EN: Product-managed / embedded wallet address that maps social identities back to a unified on-chain session subject.
+  managedWalletAddress String           @unique
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@unique([provider, providerSubject])
+  @@index([managedWalletAddress])
 }
 
 model Track2Event {

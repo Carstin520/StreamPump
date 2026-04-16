@@ -5,11 +5,11 @@
 import { Router } from "express";
 
 import { getProposalById } from "../../controllers/proposalIntentController";
-import { optionalWalletAuth } from "../../middleware/walletAuth";
+import { optionalSessionAuth } from "../../middleware/walletAuth";
 
 const router = Router();
 
-router.use(optionalWalletAuth);
+router.use(optionalSessionAuth);
 
 router.get("/:id", getProposalById);
 

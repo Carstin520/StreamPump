@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { currentUser } from "@/lib/mock-data";
+import { currentUser } from "@/lib/mocks/profile";
 
 export const UserTopbar = ({
   searchPlaceholder = "搜索帖子、创作者、品牌合作",

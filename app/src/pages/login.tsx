@@ -5,7 +5,8 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
-import { LoginPreviewMode, loginPreviewDefaultMode } from "@/lib/mock-data";
+import { LoginPreviewMode } from "@/lib/api/types";
+import { loginPreviewDefaultMode } from "@/lib/mocks/auth";
 
 const DynamicAuthOptionsPanel = dynamic(
   () => import("@/components/auth/AuthOptionsPanel").then((mod) => mod.AuthOptionsPanel),
