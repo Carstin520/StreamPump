@@ -1,0 +1,168 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CommentPanel = void 0;
+const react_1 = require("react");
+const link_1 = __importDefault(require("next/link"));
+const AppIcons_1 = require("@/components/shared/AppIcons");
+const StagePill_1 = require("@/components/shared/StagePill");
+const profile_1 = require("@/lib/mocks/profile");
+const utils_1 = require("@/lib/mocks/utils");
+const CommentPanel = ({ post, variant = "sidebar", }) => {
+    const [isFollowing, setIsFollowing] = (0, react_1.useState)(false);
+    const [liked, setLiked] = (0, react_1.useState)(false);
+    const [saved, setSaved] = (0, react_1.useState)(false);
+    const [composerValue, setComposerValue] = (0, react_1.useState)("");
+    const [comments, setComments] = (0, react_1.useState)(post.comments);
+    const [highlightKey, setHighlightKey] = (0, react_1.useState)(null);
+    (0, react_1.useEffect)(() => {
+        setComments(post.comments);
+        setComposerValue("");
+        setLiked(false);
+        setSaved(false);
+        setIsFollowing(false);
+        setHighlightKey(null);
+    }, [post.id, post.comments]);
+    const triggerHighlight = (key) => {
+        setHighlightKey(key);
+        window.setTimeout(() => {
+            setHighlightKey((value) => (value === key ? null : value));
+        }, 340);
+    };
+    const toggleFollow = () => {
+        setIsFollowing((value) => !value);
+        triggerHighlight("follow");
+    };
+    const toggleLike = () => {
+        setLiked((value) => !value);
+        triggerHighlight("like");
+    };
+    const toggleSave = () => {
+        setSaved((value) => !value);
+        triggerHighlight("save");
+    };
+    const publishComment = () => {
+        const content = composerValue.trim();
+        if (!content) {
+            triggerHighlight("composer");
+            return;
+        }
+        setComments((value) => [
+            {
+                id: `new-${Date.now()}`,
+                author: profile_1.currentUser.name,
+                avatarSeed: "A",
+                avatarSrc: profile_1.currentUser.avatarSrc,
+                content,
+                likes: 0,
+                timeLabel: "刚刚",
+            },
+            ...value,
+        ]);
+        setComposerValue("");
+        triggerHighlight("publish");
+    };
+    return (<aside className={`flex h-full flex-col ${variant === "sidebar"
+            ? "bg-[linear-gradient(180deg,rgba(16,23,34,0.98)_0%,rgba(10,14,21,0.98)_100%)]"
+            : "bg-transparent"}`}>
+    <div className="border-b border-white/[0.045] px-5 py-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <link_1.default href={`/creators/${post.creatorId}`}>
+            <img alt={post.creatorName} className="h-10 w-10 cursor-pointer rounded-full object-cover ring-1 ring-white/16" src={post.creatorAvatarSrc}/>
+          </link_1.default>
+          <div>
+            <div className="flex items-center gap-2">
+              <link_1.default className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
+                {post.creatorName}
+              </link_1.default>
+              <StagePill_1.StagePill compact stage={post.stage}/>
+            </div>
+            <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
+          </div>
+        </div>
+        <button className={`liquid-glass-btn rounded-full px-4 py-2 text-xs font-semibold text-white transition hover:scale-[1.02] hover:bg-white/10 ${highlightKey === "follow" ? "tap-bounce-active" : ""} ${isFollowing ? "border-[#90efac]/30 bg-[#13291f]/70 text-[#90efac]" : ""}`} onClick={toggleFollow} type="button">
+          <span className="inline-flex items-center gap-1.5">
+            {isFollowing ? <AppIcons_1.FollowCheckIcon className="h-4 w-4"/> : <AppIcons_1.FollowPlusIcon className="h-4 w-4"/>}
+            {isFollowing ? "已关注" : "关注"}
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto px-5 py-5" data-post-scroll-region>
+      <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.04em] text-white">{post.title}</h1>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {post.tags.map((tag) => (<span className="text-xs text-[#de725f]" key={tag}>
+            #{tag}
+          </span>))}
+      </div>
+      <p className="mt-3 text-xs text-[#7a8ba5]">
+        {post.timeLabel} · {post.location}
+      </p>
+
+      <div className="my-6 h-px bg-white/[0.045]"/>
+
+      <p className="mb-5 text-sm font-semibold text-white">共 {(0, utils_1.compactNumber)(comments.length)} 条评论</p>
+      <div className="space-y-5">
+        {comments.map((comment, index) => (<CommentRow comment={comment} emphasized={index === 0 && comment.author === profile_1.currentUser.name} key={comment.id}/>))}
+      </div>
+    </div>
+
+    <div className="border-t border-white/[0.045] px-5 py-4">
+      <div className="mb-3 flex items-center gap-5 px-1">
+        <button className={`flex items-center gap-1.5 text-sm transition hover:text-white ${liked ? "text-[#ff9fc4]" : "text-[#c7d2e3]"} ${highlightKey === "like" ? "tap-bounce-active" : ""}`} onClick={toggleLike} type="button">
+          {liked ? <AppIcons_1.HeartSolidIcon className="h-4 w-4"/> : <AppIcons_1.HeartOutlineIcon className="h-4 w-4"/>}
+          <span>{(0, utils_1.compactNumber)(post.likes + (liked ? 1 : 0))}</span>
+        </button>
+        <button className={`flex items-center gap-1.5 text-sm transition hover:text-white ${saved ? "text-[#93c8ff]" : "text-[#c7d2e3]"} ${highlightKey === "save" ? "tap-bounce-active" : ""}`} onClick={toggleSave} type="button">
+          <span className="text-base">☆</span>
+          <span>{(0, utils_1.compactNumber)(post.saves + (saved ? 1 : 0))}</span>
+        </button>
+        <button className={`flex items-center gap-1.5 text-sm text-[#c7d2e3] transition hover:text-white ${highlightKey === "share" ? "tap-bounce-active" : ""}`} onClick={() => triggerHighlight("share")} type="button">
+          <span className="text-base">↗</span>
+          <span>分享</span>
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className={`liquid-pill flex-1 rounded-full px-4 py-1.5 text-sm ${highlightKey === "composer" ? "composer-glow-active" : ""}`}>
+          <input className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-[#6f829d]" onChange={(event) => setComposerValue(event.target.value)} placeholder="说点什么..." type="text" value={composerValue}/>
+        </div>
+        <button className={`flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-white shadow-[0_14px_28px_rgba(222,64,42,0.24)] transition duration-200 hover:scale-[1.03] hover:bg-[#ea523e] ${highlightKey === "publish" ? "tap-bounce-active" : ""}`} onClick={publishComment} type="button">
+          <AppIcons_1.SendRoundedIcon className="h-4 w-4"/>
+        </button>
+      </div>
+    </div>
+  </aside>);
+};
+exports.CommentPanel = CommentPanel;
+const CommentRow = ({ comment, emphasized = false }) => {
+    const [activeAction, setActiveAction] = (0, react_1.useState)(null);
+    const triggerAction = (action) => {
+        setActiveAction(action);
+        window.setTimeout(() => {
+            setActiveAction((value) => (value === action ? null : value));
+        }, 260);
+    };
+    return (<div className={`flex gap-3 rounded-[18px] px-2 py-2 transition ${emphasized ? "tap-soft-active bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}>
+      <img alt={comment.author} className="mt-0.5 h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={comment.avatarSrc}/>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-xs font-medium text-white">{comment.author}</span>
+          <span className="text-[10px] text-[#7485a0]">{comment.timeLabel}</span>
+        </div>
+        <p className="mt-1 text-sm leading-6 text-[#d1d9e7]">{comment.content}</p>
+        <div className="mt-2 flex items-center gap-4 text-xs text-[#7c8ba1]">
+          <button className={activeAction === "reply" ? "tap-soft-active" : ""} onClick={() => triggerAction("reply")} type="button">
+            回复
+          </button>
+          <button className={activeAction === "like" ? "tap-soft-active" : ""} onClick={() => triggerAction("like")} type="button">
+            ♡ {comment.likes}
+          </button>
+        </div>
+      </div>
+    </div>);
+};

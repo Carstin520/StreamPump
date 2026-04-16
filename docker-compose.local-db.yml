@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: streampump-local-postgres
+    environment:
+      POSTGRES_DB: streampump_backend
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d streampump_backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - streampump-local-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  streampump-local-postgres-data:
