@@ -9,8 +9,6 @@ module.exports = {
     "./src/components/shared/**/*.{js,ts,jsx,tsx}",
     "./src/components/user/**/*.{js,ts,jsx,tsx}",
     "./src/components/workspace/**/*.{js,ts,jsx,tsx}",
-    "!./src/**/* 2.ts",
-    "!./src/**/* 2.tsx",
   ],
   theme: {
     extend: {
