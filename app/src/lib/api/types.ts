@@ -78,6 +78,7 @@ export type PostRecord = {
   mediaHeightClass: string;
   mediaStyle: string;
   coverSrc: string;
+  videoSrc?: string;
   durationLabel?: string;
   gallerySrcs?: string[];
   hasMultipleImages?: boolean;
@@ -280,7 +281,7 @@ export type ActivityVideoItemRecord = {
   postId: string;
   title: string;
   coverSrc: string;
-  durationLabel: string;
+  durationLabel?: string;
   viewsCount: number;
   commentsCount: number;
   timeLabel: string;

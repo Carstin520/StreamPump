@@ -320,32 +320,49 @@ const ImageCarouselStage = ({ post }: { post: PostRecord }) => {
 const VideoStage = ({ post }: { post: PostRecord }) => (
   <div className="h-full w-full">
     <div className="relative h-full min-h-[320px] overflow-hidden rounded-[30px] border border-white/10 bg-[#05070d] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
-      <ProgressiveImage
-        alt={post.title}
-        className="object-cover"
-        fill
-        priority
-        sizes="(max-width: 1280px) 100vw, 72vw"
-        src={post.coverSrc}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_20%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.46)_55%,rgba(0,0,0,0.78)_100%)]" />
-      <div className="absolute bottom-5 left-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white backdrop-blur-xl">
+      {post.videoSrc ? (
+        <video
+          autoPlay
+          className="h-full w-full object-contain"
+          controls
+          key={`${post.id}-${post.videoSrc}`}
+          loop
+          muted
+          playsInline
+          poster={post.coverSrc}
+          preload="metadata"
+          src={post.videoSrc}
+        />
+      ) : (
+        <>
+          <ProgressiveImage
+            alt={post.title}
+            className="object-cover"
+            fill
+            priority
+            sizes="(max-width: 1280px) 100vw, 72vw"
+            src={post.coverSrc}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <button
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-white/12 bg-black/26 text-xl text-white shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-xl transition duration-200 hover:scale-[1.03] hover:bg-black/34"
+              type="button"
+            >
+              ▶
+            </button>
+          </div>
+        </>
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_20%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.46)_55%,rgba(0,0,0,0.78)_100%)]" />
+      <div className="pointer-events-none absolute bottom-5 left-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white backdrop-blur-xl">
         Video post
       </div>
       {post.durationLabel ? (
-        <div className="absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
+        <div className="pointer-events-none absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
           {post.durationLabel}
         </div>
       ) : null}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_64%,rgba(0,0,0,0.34)_100%)]" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <button
-          className="flex h-16 w-16 items-center justify-center rounded-full border border-white/12 bg-black/26 text-xl text-white shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-xl transition duration-200 hover:scale-[1.03] hover:bg-black/34"
-          type="button"
-        >
-          ▶
-        </button>
-      </div>
     </div>
   </div>
 );

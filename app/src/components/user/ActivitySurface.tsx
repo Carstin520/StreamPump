@@ -164,7 +164,7 @@ export const ActivitySurface = () => {
                               <div className="absolute left-4 top-4">
                                 <StagePill stage={item.stage} />
                               </div>
-                              {item.mediaType === "VIDEO" ? (
+                              {item.mediaType === "VIDEO" && item.durationLabel ? (
                                 <div className="absolute bottom-4 right-4 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
                                   {item.durationLabel}
                                 </div>
@@ -222,9 +222,11 @@ export const ActivitySurface = () => {
                             <span>▶ {compactNumber(item.viewsCount)}</span>
                             <span>◌ {compactNumber(item.commentsCount)}</span>
                           </div>
-                          <div className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md">
-                            {item.durationLabel}
-                          </div>
+                          {item.durationLabel ? (
+                            <div className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md">
+                              {item.durationLabel}
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="space-y-3 px-4 py-4">

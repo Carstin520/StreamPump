@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "cover:videos": "scripts/generate-video-cover.sh",
     "test:anchor": "anchor test",
     "test:backend": "ts-mocha -p backend/tsconfig.test.json backend/tests/**/*.spec.ts"
   },

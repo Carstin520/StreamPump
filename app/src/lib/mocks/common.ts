@@ -14,7 +14,10 @@ const makeAvatar = (seed: string, start: string, end: string) =>
     </svg>
   `)}`;
 
-export const assetPath = (slug: string, file: string) => `/local-post-assets/posts/${slug}/images/${file}`;
+const encodeAssetFile = (file: string) => encodeURIComponent(file);
+
+export const assetPath = (slug: string, file: string) => `/local-post-assets/posts/${slug}/images/${encodeAssetFile(file)}`;
+export const videoAssetPath = (slug: string, file: string) => `/local-post-assets/posts/${slug}/videos/${encodeAssetFile(file)}`;
 
 export const avatars = {
   wanxin: makeAvatar("弯", "#5C3C4A", "#1E2737"),
@@ -34,4 +37,8 @@ export const avatars = {
   neonSea: makeAvatar("霓", "#6A4D7F", "#1C2A3F"),
   movie: makeAvatar("影", "#7D5C49", "#2C211A"),
   tech: makeAvatar("参", "#476279", "#1E2733"),
+  canned: makeAvatar("罐", "#B97B4F", "#503326"),
+  distortion: makeAvatar("失", "#7B4957", "#261A24"),
+  corner: makeAvatar("角", "#8E5F46", "#2D221D"),
+  fog: makeAvatar("雾", "#5E6A83", "#202A38"),
 } as const;
