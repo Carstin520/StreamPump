@@ -94,7 +94,6 @@ BUILT
 - `backend/src/routes/contentManifestRoutes.ts`
 - `backend/src/routes/proposalIntentRoutes.ts`
 - `backend/src/routes/txBundleRoutes.ts`
-- `backend/src/routes/internalOracleRoutes.ts`
 
 ## 5. 通用约束
 
@@ -672,4 +671,3 @@ type ApiErrorCode =
 - 内容对象稳定
 - sponsor 只看到 1 次最终签名
 - proposal launch 原子上链
-
