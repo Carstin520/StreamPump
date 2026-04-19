@@ -55,6 +55,31 @@ export interface OnChainProposalState {
   deadlineUnix: bigint;
 }
 
+type ProtocolConfigAccount = {
+  oracleAuthority: PublicKey;
+  usdcMint: PublicKey;
+};
+
+type CreatorProfileAccount = {
+  payoutUsdcAta: PublicKey;
+};
+
+type ResolvedSettlementAccounts = {
+  protocolConfigPda: PublicKey;
+  proposalUsdcVaultPda: PublicKey;
+  creatorProfilePda: PublicKey;
+  creatorUsdcAta: PublicKey;
+  sponsorUsdcAta?: PublicKey;
+};
+
+type ContentAnchorContext = {
+  trimmedUrl: string;
+  contentDigest: Uint8Array;
+  urlDigest: Uint8Array;
+  creatorProfilePda: PublicKey;
+  contentAnchorPda: PublicKey;
+};
+
 class RpcTimeoutError extends Error {
   constructor(operation: string, timeoutMs: number) {
     super(`RPC timeout after ${timeoutMs}ms (${operation})`);
@@ -352,12 +377,8 @@ export class AnchorService {
   }
 
   async fetchProtocolConfigAccount(): Promise<any> {
-    const protocolConfigPda = this.deriveProtocolConfigPda();
-
-    return this.withRpcTimeout(
-      (this.program.account as any).protocolConfig.fetch(protocolConfigPda),
-      "fetch protocol_config account"
-    );
+    const { account } = await this.fetchProtocolConfigState();
+    return account;
   }
 
   async fetchProposalState(proposalPda: PublicKey): Promise<OnChainProposalState | null> {
@@ -432,26 +453,24 @@ export class AnchorService {
 
   async executeSettleTrack1Base(proposalPda: PublicKey): Promise<string> {
     try {
-      const accounts = await this.resolveSettlementAccounts(proposalPda, "track1");
-
-      const signature = (await this.withRpcTimeout(
-        (this.program.methods as any)
-          .settleTrack1Base()
-          .accounts({
-            oracle: this.oracleAuthority.publicKey,
-            protocolConfig: accounts.protocolConfigPda,
-            proposal: proposalPda,
-            proposalUsdcVault: accounts.proposalUsdcVaultPda,
-            creatorProfile: accounts.creatorProfilePda,
-            creatorUsdcAta: accounts.creatorUsdcAta,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          })
-          .rpc(),
-        "settle_track1_base rpc"
-      )) as string;
-
-      await this.confirmSignature(signature, "settle_track1_base confirm");
-      return signature;
+      return await this.executeSettlementRpc({
+        operation: "settle_track1_base",
+        proposalPda,
+        track: "track1",
+        rpcFactory: (accounts) =>
+          (this.program.methods as any)
+            .settleTrack1Base()
+            .accounts({
+              oracle: this.oracleAuthority.publicKey,
+              protocolConfig: accounts.protocolConfigPda,
+              proposal: proposalPda,
+              proposalUsdcVault: accounts.proposalUsdcVaultPda,
+              creatorProfile: accounts.creatorProfilePda,
+              creatorUsdcAta: accounts.creatorUsdcAta,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .rpc() as Promise<string>,
+      });
     } catch (error) {
       throw this.wrapRpcError("executeSettleTrack1Base", error);
     }
@@ -459,30 +478,27 @@ export class AnchorService {
 
   async executeSettleTrack2(proposalPda: PublicKey, actualValue: number): Promise<string> {
     try {
-      const accounts = await this.resolveSettlementAccounts(proposalPda, "track2");
-      const sponsorUsdcAta = this.requireSponsorAta(accounts);
-
-      const signature = (await this.withRpcTimeout(
-        (this.program.methods as any)
-          .settleTrack2({
-            actualValue: toU64Bn(actualValue, "actualValue"),
-          })
-          .accounts({
-            oracle: this.oracleAuthority.publicKey,
-            protocolConfig: accounts.protocolConfigPda,
-            proposal: proposalPda,
-            proposalUsdcVault: accounts.proposalUsdcVaultPda,
-            creatorProfile: accounts.creatorProfilePda,
-            creatorUsdcAta: accounts.creatorUsdcAta,
-            sponsorUsdcAta,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          })
-          .rpc(),
-        "settle_track2 rpc"
-      )) as string;
-
-      await this.confirmSignature(signature, "settle_track2 confirm");
-      return signature;
+      return await this.executeSettlementRpc({
+        operation: "settle_track2",
+        proposalPda,
+        track: "track2",
+        rpcFactory: (accounts) =>
+          (this.program.methods as any)
+            .settleTrack2({
+              actualValue: toU64Bn(actualValue, "actualValue"),
+            })
+            .accounts({
+              oracle: this.oracleAuthority.publicKey,
+              protocolConfig: accounts.protocolConfigPda,
+              proposal: proposalPda,
+              proposalUsdcVault: accounts.proposalUsdcVaultPda,
+              creatorProfile: accounts.creatorProfilePda,
+              creatorUsdcAta: accounts.creatorUsdcAta,
+              sponsorUsdcAta: this.requireSponsorAta(accounts),
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .rpc() as Promise<string>,
+      });
     } catch (error) {
       throw this.wrapRpcError("executeSettleTrack2", error);
     }
@@ -493,30 +509,27 @@ export class AnchorService {
     approvedCpsPayout: number
   ): Promise<string> {
     try {
-      const accounts = await this.resolveSettlementAccounts(proposalPda, "track3");
-      const sponsorUsdcAta = this.requireSponsorAta(accounts);
-
-      const signature = (await this.withRpcTimeout(
-        (this.program.methods as any)
-          .settleTrack3Cps({
-            approvedCpsPayout: toU64Bn(approvedCpsPayout, "approvedCpsPayout"),
-          })
-          .accounts({
-            oracle: this.oracleAuthority.publicKey,
-            protocolConfig: accounts.protocolConfigPda,
-            proposal: proposalPda,
-            proposalUsdcVault: accounts.proposalUsdcVaultPda,
-            creatorProfile: accounts.creatorProfilePda,
-            creatorUsdcAta: accounts.creatorUsdcAta,
-            sponsorUsdcAta,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          })
-          .rpc(),
-        "settle_track3_cps rpc"
-      )) as string;
-
-      await this.confirmSignature(signature, "settle_track3_cps confirm");
-      return signature;
+      return await this.executeSettlementRpc({
+        operation: "settle_track3_cps",
+        proposalPda,
+        track: "track3",
+        rpcFactory: (accounts) =>
+          (this.program.methods as any)
+            .settleTrack3Cps({
+              approvedCpsPayout: toU64Bn(approvedCpsPayout, "approvedCpsPayout"),
+            })
+            .accounts({
+              oracle: this.oracleAuthority.publicKey,
+              protocolConfig: accounts.protocolConfigPda,
+              proposal: proposalPda,
+              proposalUsdcVault: accounts.proposalUsdcVaultPda,
+              creatorProfile: accounts.creatorProfilePda,
+              creatorUsdcAta: accounts.creatorUsdcAta,
+              sponsorUsdcAta: this.requireSponsorAta(accounts),
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .rpc() as Promise<string>,
+      });
     } catch (error) {
       throw this.wrapRpcError("executeSettleTrack3Cps", error);
     }
@@ -528,30 +541,26 @@ export class AnchorService {
     contentHashHex: string
   ): Promise<string> {
     try {
-      const trimmedUrl = canonicalUrl.trim();
-      if (!trimmedUrl) {
-        throw new Error("canonicalUrl is required");
-      }
-
-      const contentDigest = parseDigestHex(contentHashHex, "contentHashHex");
-      const urlDigest = keccak_256(new TextEncoder().encode(trimmedUrl));
-      const creatorProfilePda = this.deriveCreatorProfilePda(creator);
-      const contentAnchorPda = this.deriveContentAnchorPda(creatorProfilePda, urlDigest);
+      const context = this.buildContentAnchorContext({
+        creator,
+        canonicalUrl,
+        contentHashHex,
+      });
       // In the current hybrid model, server-assisted anchoring works only when the backend controls a matching signer.
       const creatorSigner = this.resolveCreatorSigner(creator);
 
       const signature = (await this.withRpcTimeout(
         (this.program.methods as any)
           .anchorContentHash({
-            canonicalUrl: trimmedUrl,
-            urlDigest: Array.from(urlDigest),
-            contentDigest: Array.from(contentDigest),
+            canonicalUrl: context.trimmedUrl,
+            urlDigest: Array.from(context.urlDigest),
+            contentDigest: Array.from(context.contentDigest),
           })
           .accounts({
             creatorAuthority: creator,
             payer: creator,
-            creatorProfile: creatorProfilePda,
-            contentAnchor: contentAnchorPda,
+            creatorProfile: context.creatorProfilePda,
+            contentAnchor: context.contentAnchorPda,
             systemProgram: SystemProgram.programId,
           })
           .signers([creatorSigner])
@@ -572,29 +581,25 @@ export class AnchorService {
     canonicalUrl: string;
     contentHashHex: string;
   }): Promise<TransactionInstruction> {
-    const trimmedUrl = params.canonicalUrl.trim();
-    if (!trimmedUrl) {
-      throw new Error("canonicalUrl is required");
-    }
-
     const creator = new PublicKey(params.creatorWallet);
     const payer = new PublicKey(params.payerWallet);
-    const creatorProfilePda = this.deriveCreatorProfilePda(creator);
-    const urlDigest = keccak_256(new TextEncoder().encode(trimmedUrl));
-    const contentDigest = parseDigestHex(params.contentHashHex, "contentHashHex");
-    const contentAnchorPda = this.deriveContentAnchorPda(creatorProfilePda, urlDigest);
+    const context = this.buildContentAnchorContext({
+      creator,
+      canonicalUrl: params.canonicalUrl,
+      contentHashHex: params.contentHashHex,
+    });
 
     return (this.program.methods as any)
       .anchorContentHash({
-        canonicalUrl: trimmedUrl,
-        urlDigest: Array.from(urlDigest),
-        contentDigest: Array.from(contentDigest),
+        canonicalUrl: context.trimmedUrl,
+        urlDigest: Array.from(context.urlDigest),
+        contentDigest: Array.from(context.contentDigest),
       })
       .accounts({
         creatorAuthority: creator,
         payer,
-        creatorProfile: creatorProfilePda,
-        contentAnchor: contentAnchorPda,
+        creatorProfile: context.creatorProfilePda,
+        contentAnchor: context.contentAnchorPda,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
@@ -747,44 +752,20 @@ export class AnchorService {
   private async resolveSettlementAccounts(
     proposalPda: PublicKey,
     track: "track1" | "track2" | "track3"
-  ): Promise<{
-    protocolConfigPda: PublicKey;
-    proposalUsdcVaultPda: PublicKey;
-    creatorProfilePda: PublicKey;
-    creatorUsdcAta: PublicKey;
-    sponsorUsdcAta?: PublicKey;
-  }> {
+  ): Promise<ResolvedSettlementAccounts> {
     const proposal = await this.fetchProposalState(proposalPda);
     if (!proposal) {
       throw new Error(`Proposal not found on-chain: ${proposalPda.toBase58()}`);
     }
 
-    const protocolConfigPda = this.deriveProtocolConfigPda();
-    const protocolConfig = (await this.withRpcTimeout(
-      (this.program.account as any).protocolConfig.fetch(protocolConfigPda),
-      "fetch protocol_config account"
-    )) as any;
-
-    if (
-      !this.oracleAuthority.publicKey.equals(
-        protocolConfig.oracleAuthority as PublicKey
-      )
-    ) {
-      throw new Error(
-        `Loaded oracle authority (${this.oracleAuthority.publicKey.toBase58()}) does not match protocol_config.oracle_authority (${(
-          protocolConfig.oracleAuthority as PublicKey
-        ).toBase58()})`
-      );
-    }
-
-    const creatorProfilePda = this.deriveCreatorProfilePda(proposal.creator);
-    const creatorProfile = (await this.withRpcTimeout(
-      (this.program.account as any).creatorProfile.fetch(creatorProfilePda),
-      "fetch creator_profile account"
-    )) as any;
+    const { pda: protocolConfigPda, account: protocolConfig } = await this.fetchProtocolConfigState();
+    this.assertOracleAuthorityMatches(protocolConfig);
+    const { pda: creatorProfilePda, account: creatorProfile } = await this.fetchCreatorProfileState(
+      proposal.creator
+    );
 
     const proposalUsdcVaultPda = this.deriveProposalUsdcVaultPda(proposalPda);
-    const creatorUsdcAta = creatorProfile.payoutUsdcAta as PublicKey;
+    const creatorUsdcAta = creatorProfile.payoutUsdcAta;
 
     if (track === "track1") {
       return {
@@ -810,6 +791,95 @@ export class AnchorService {
       creatorProfilePda,
       creatorUsdcAta,
       sponsorUsdcAta,
+    };
+  }
+
+  private async executeSettlementRpc(params: {
+    operation: string;
+    proposalPda: PublicKey;
+    track: "track1" | "track2" | "track3";
+    rpcFactory: (accounts: ResolvedSettlementAccounts) => Promise<string>;
+  }): Promise<string> {
+    const accounts = await this.resolveSettlementAccounts(params.proposalPda, params.track);
+    const signature = await this.withRpcTimeout(
+      params.rpcFactory(accounts),
+      `${params.operation} rpc`
+    );
+
+    await this.confirmSignature(signature, `${params.operation} confirm`);
+    return signature;
+  }
+
+  private async fetchProgramAccount<T>(
+    accountName: string,
+    accountAddress: PublicKey,
+    operation: string
+  ): Promise<T> {
+    return this.withRpcTimeout(
+      (this.program.account as any)[accountName].fetch(accountAddress),
+      operation
+    ) as Promise<T>;
+  }
+
+  private async fetchProtocolConfigState(): Promise<{
+    pda: PublicKey;
+    account: ProtocolConfigAccount;
+  }> {
+    const pda = this.deriveProtocolConfigPda();
+    const account = await this.fetchProgramAccount<ProtocolConfigAccount>(
+      "protocolConfig",
+      pda,
+      "fetch protocol_config account"
+    );
+
+    return { pda, account };
+  }
+
+  private async fetchCreatorProfileState(creator: PublicKey): Promise<{
+    pda: PublicKey;
+    account: CreatorProfileAccount;
+  }> {
+    const pda = this.deriveCreatorProfilePda(creator);
+    const account = await this.fetchProgramAccount<CreatorProfileAccount>(
+      "creatorProfile",
+      pda,
+      "fetch creator_profile account"
+    );
+
+    return { pda, account };
+  }
+
+  private assertOracleAuthorityMatches(protocolConfig: ProtocolConfigAccount): void {
+    if (this.oracleAuthority.publicKey.equals(protocolConfig.oracleAuthority)) {
+      return;
+    }
+
+    throw new Error(
+      `Loaded oracle authority (${this.oracleAuthority.publicKey.toBase58()}) does not match protocol_config.oracle_authority (${protocolConfig.oracleAuthority.toBase58()})`
+    );
+  }
+
+  private buildContentAnchorContext(params: {
+    creator: PublicKey;
+    canonicalUrl: string;
+    contentHashHex: string;
+  }): ContentAnchorContext {
+    const trimmedUrl = params.canonicalUrl.trim();
+    if (!trimmedUrl) {
+      throw new Error("canonicalUrl is required");
+    }
+
+    const contentDigest = parseDigestHex(params.contentHashHex, "contentHashHex");
+    const urlDigest = keccak_256(new TextEncoder().encode(trimmedUrl));
+    const creatorProfilePda = this.deriveCreatorProfilePda(params.creator);
+    const contentAnchorPda = this.deriveContentAnchorPda(creatorProfilePda, urlDigest);
+
+    return {
+      trimmedUrl,
+      contentDigest,
+      urlDigest,
+      creatorProfilePda,
+      contentAnchorPda,
     };
   }
 

@@ -1,55 +1,15 @@
 /**
- * CN: Backend HTTP 入口，负责挂载路由、启动 indexer 和 oracle scheduler。
- * EN: Backend HTTP entrypoint that mounts routes and starts the indexer and oracle scheduler.
+ * CN: Backend HTTP 入口，仅负责启动 HTTP 服务和后台任务。
+ * EN: Backend HTTP entrypoint responsible only for starting HTTP and background services.
  */
-import cors from "cors";
-import express from "express";
-
 import { config } from "./config/default";
-import routes from "./src/routes";
-import { startIndexer } from "./src/services/indexer";
-import { startMuxReconciliationScheduler } from "./src/schedulers/MuxReconciliationScheduler";
-import { startOracleScheduler } from "./src/schedulers/OracleScheduler";
+import { createApp } from "./src/app";
+import { startBackgroundServices } from "./src/startup";
 
-const app = express();
+const app = createApp();
 const port = Number(process.env.PORT ?? 4000);
-const programId = config.solana.programId;
-const jsonParser = express.json();
-const allowedOrigins = config.app.corsAllowedOrigins;
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow same-origin server calls, curl/Postman, and webhook traffic without an Origin header.
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-  })
-);
-app.use((req, res, next) => {
-  // Mux webhook needs the raw body for signature verification, so JSON parsing is skipped here.
-  if (req.originalUrl.startsWith("/api/webhooks/mux")) {
-    next();
-    return;
-  }
-
-  jsonParser(req, res, next);
-});
-
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
-});
-
-app.use("/api", routes);
 
 app.listen(port, () => {
   console.log(`[backend] listening on :${port}`);
-  void startIndexer(config.solana.rpcEndpoint, programId);
-  startMuxReconciliationScheduler();
-  startOracleScheduler();
+  void startBackgroundServices(config);
 });

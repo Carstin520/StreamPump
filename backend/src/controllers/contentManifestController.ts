@@ -5,18 +5,15 @@
 import {
   AssetProcessingStatus,
   AssetProcessingSource,
-  AssetType,
   AssetUploadStatus,
   ContentManifestStatus,
   PublicationVerificationStatus,
   Prisma,
 } from "@prisma/client";
-import { Request, Response } from "express";
 
 import {
   HttpError,
   ensureIdempotencyKey,
-  handleControllerError,
   ok,
   parseNonEmptyString,
   parseNonNegativeBigInt,
@@ -25,9 +22,20 @@ import {
   parseOptionalString,
   parseSha256Hex,
   parseStringArray,
+  requireSessionWallet,
+  withController,
 } from "./http";
 import {
-  buildInternalCanonicalUrl,
+  assertAssetAndMimeTypeMatch,
+  nextManifestStatusAfterPublication,
+  normalizeAssetType,
+  requireOwnedManifest,
+  serializeAsset,
+  serializeManifest,
+  serializeManifestDetail,
+  serializeManifestListItem,
+} from "./contentManifestShared";
+import {
   computeManifestFinalizeState,
   keccakHex,
   normalizeContentType,
@@ -44,183 +52,11 @@ import {
 
 const MAX_ASSET_SIZE_BYTES = 100 * 1024 * 1024;
 
-const requireAuthenticatedWallet = (req: Request): string => {
-  if (!req.auth?.wallet || req.auth.source !== "session") {
-    throw new HttpError(401, "AUTH_REQUIRED", "bearer session authentication is required");
-  }
+export const createContentManifest = withController("CREATE_CONTENT_MANIFEST_FAILED", async (req, res) => {
+  ensureIdempotencyKey(req);
 
-  return req.auth.wallet;
-};
-
-const normalizeAssetType = (value: unknown): AssetType => {
-  const normalized = String(value ?? "").trim().toUpperCase();
-
-  if (normalized === "IMAGE") {
-    return AssetType.IMAGE;
-  }
-
-  if (normalized === "VIDEO") {
-    return AssetType.VIDEO;
-  }
-
-  if (normalized === "COVER") {
-    return AssetType.COVER;
-  }
-
-  throw new HttpError(400, "INVALID_INPUT", "assetType must be one of: IMAGE, VIDEO, COVER");
-};
-
-const assertAssetAndMimeTypeMatch = (assetType: AssetType, mimeType: string): void => {
-  const video = isVideoMimeType(mimeType);
-
-  if (assetType === AssetType.VIDEO && !video) {
-    throw new HttpError(400, "INVALID_INPUT", "VIDEO assets must use a video mimeType");
-  }
-
-  if ((assetType === AssetType.IMAGE || assetType === AssetType.COVER) && video) {
-    throw new HttpError(400, "INVALID_INPUT", `${assetType} assets must use an image mimeType`);
-  }
-};
-
-const serializeManifest = (manifest: {
-  id: string;
-  creatorWallet: string;
-  contentType: string;
-  status: string;
-  version: number;
-  manifestHashHex: string | null;
-  currentAnchorPda: string | null;
-  currentAnchorTx: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  manifestId: manifest.id,
-  creatorWallet: manifest.creatorWallet,
-  contentType: manifest.contentType,
-  status: manifest.status,
-  version: manifest.version,
-  manifestHashHex: manifest.manifestHashHex,
-  currentAnchorPda: manifest.currentAnchorPda,
-  currentAnchorTx: manifest.currentAnchorTx,
-  createdAt: manifest.createdAt.toISOString(),
-  updatedAt: manifest.updatedAt.toISOString(),
-});
-
-const serializeAsset = (asset: {
-  id: string;
-  assetType: string;
-  orderIndex: number;
-  storageKey: string;
-  uploadStatus: string;
-  processingStatus: string;
-  muxAssetId: string | null;
-  muxPlaybackId: string | null;
-  muxLastKnownStatus: string | null;
-  updatedAt: Date;
-}) => ({
-  assetId: asset.id,
-  assetType: asset.assetType,
-  orderIndex: asset.orderIndex,
-  storageKey: asset.storageKey,
-  uploadStatus: asset.uploadStatus,
-  processingStatus: asset.processingStatus,
-  muxAssetId: asset.muxAssetId,
-  muxPlaybackId: asset.muxPlaybackId,
-  muxLastKnownStatus: asset.muxLastKnownStatus,
-  updatedAt: asset.updatedAt.toISOString(),
-});
-
-const serializePublication = (publication: {
-  id: string;
-  platform: string;
-  externalUrl: string;
-  verificationStatus: string;
-  verifiedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  publicationId: publication.id,
-  platform: publication.platform,
-  externalUrl: publication.externalUrl,
-  verificationStatus: publication.verificationStatus,
-  verifiedAt: publication.verifiedAt?.toISOString() ?? null,
-  createdAt: publication.createdAt.toISOString(),
-  updatedAt: publication.updatedAt.toISOString(),
-});
-
-const serializeManifestDetail = (manifest: {
-  id: string;
-  creatorWallet: string;
-  contentType: string;
-  status: string;
-  version: number;
-  title: string | null;
-  captionText: string | null;
-  tagsJson: Prisma.JsonValue | null;
-  metadataJson: Prisma.JsonValue | null;
-  manifestHashHex: string | null;
-  currentAnchorPda: string | null;
-  currentAnchorTx: string | null;
-  internalCanonicalUrl: string | null;
-  internalUrlDigestHex: string | null;
-  coverAssetId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  assets: Array<{
-    id: string;
-    assetType: string;
-    orderIndex: number;
-    storageKey: string;
-    uploadStatus: string;
-    processingStatus: string;
-    muxAssetId: string | null;
-    muxPlaybackId: string | null;
-    muxLastKnownStatus: string | null;
-    updatedAt: Date;
-  }>;
-  publications: Array<{
-    id: string;
-    platform: string;
-    externalUrl: string;
-    verificationStatus: string;
-    verifiedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
-}) => ({
-  ...serializeManifest(manifest),
-  title: manifest.title,
-  captionText: manifest.captionText,
-  tags: Array.isArray(manifest.tagsJson) ? manifest.tagsJson : [],
-  metadata: manifest.metadataJson ?? null,
-  internalCanonicalUrl: manifest.internalCanonicalUrl,
-  internalUrlDigestHex: manifest.internalUrlDigestHex,
-  coverAssetId: manifest.coverAssetId,
-  assets: manifest.assets.map(serializeAsset),
-  publications: manifest.publications.map(serializePublication),
-});
-
-const requireOwnedManifest = async (manifestId: string, creatorWallet: string) => {
-  // Ownership is enforced at the DB layer so a creator cannot mutate another creator's content state.
-  const manifest = await prisma.contentManifest.findFirst({
-    where: {
-      id: manifestId,
-      creatorWallet,
-    },
-  });
-
-  if (!manifest) {
-    throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
-  }
-
-  return manifest;
-};
-
-export const createContentManifest = async (req: Request, res: Response) => {
   try {
-    ensureIdempotencyKey(req);
-
-    const creatorWallet = requireAuthenticatedWallet(req);
+    const creatorWallet = requireSessionWallet(req);
     const contentType = normalizeContentType(req.body.contentType);
     const title = parseOptionalString(req.body.title);
     const captionText = parseOptionalString(req.body.captionText);
@@ -242,23 +78,19 @@ export const createContentManifest = async (req: Request, res: Response) => {
     ok(res, serializeManifest(manifest), 201);
   } catch (error) {
     if (error instanceof Error && error.message.includes("contentType")) {
-      handleControllerError(
-        res,
-        new HttpError(400, "INVALID_INPUT", error.message),
-        "CREATE_CONTENT_MANIFEST_FAILED"
-      );
-      return;
+      throw new HttpError(400, "INVALID_INPUT", error.message);
     }
 
-    handleControllerError(res, error, "CREATE_CONTENT_MANIFEST_FAILED");
+    throw error;
   }
-};
+});
 
-export const presignManifestAssets = async (req: Request, res: Response) => {
-  try {
+export const presignManifestAssets = withController(
+  "PRESIGN_MANIFEST_ASSETS_FAILED",
+  async (req, res) => {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = requireAuthenticatedWallet(req);
+    const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const manifest = await requireOwnedManifest(manifestId, creatorWallet);
     const inputs = Array.isArray(req.body.assets) ? req.body.assets : null;
@@ -300,7 +132,6 @@ export const presignManifestAssets = async (req: Request, res: Response) => {
       assertAssetAndMimeTypeMatch(assetType, mimeType);
 
       const extension = extensionForMimeType(mimeType);
-      // Storage keys remain deterministic inside one manifest version so asset hashing and audit traces stay stable.
       const storageKey = `content/${manifest.id}/v/${manifest.version}/${orderIndex}-${sha256HexDigest.slice(
         0,
         12
@@ -359,16 +190,15 @@ export const presignManifestAssets = async (req: Request, res: Response) => {
       manifestId: manifest.id,
       uploads,
     });
-  } catch (error) {
-    handleControllerError(res, error, "PRESIGN_MANIFEST_ASSETS_FAILED");
   }
-};
+);
 
-export const completeManifestAssetUpload = async (req: Request, res: Response) => {
-  try {
+export const completeManifestAssetUpload = withController(
+  "COMPLETE_MANIFEST_ASSET_FAILED",
+  async (req, res) => {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = requireAuthenticatedWallet(req);
+    const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const assetId = parseNonEmptyString(req.params.assetId, "assetId");
 
@@ -389,7 +219,6 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
       throw new HttpError(404, "ASSET_NOT_FOUND", "content asset not found");
     }
 
-    // Current MVP trusts the upload completion signal from the client; object existence verification can be added later.
     let updated = await prisma.contentAsset.update({
       where: { id: asset.id },
       data: {
@@ -400,7 +229,6 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
 
     if (isVideoMimeType(asset.mimeType)) {
       try {
-        // Video assets move into PREPARING while Mux asynchronously transcodes them and later calls back via webhook.
         const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 3600);
         const muxAssetId = await muxService.createAsset(downloadUrl);
 
@@ -429,98 +257,90 @@ export const completeManifestAssetUpload = async (req: Request, res: Response) =
         });
       }
     } else {
-        updated = await prisma.contentAsset.update({
-          where: { id: asset.id },
-          data: {
-            processingStatus: AssetProcessingStatus.READY,
-            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
-            processingError: null,
-          },
-        });
+      updated = await prisma.contentAsset.update({
+        where: { id: asset.id },
+        data: {
+          processingStatus: AssetProcessingStatus.READY,
+          processingSource: AssetProcessingSource.CLIENT_COMPLETE,
+          processingError: null,
+        },
+      });
     }
 
     ok(res, {
       manifestId,
       asset: serializeAsset(updated),
     });
-  } catch (error) {
-    handleControllerError(res, error, "COMPLETE_MANIFEST_ASSET_FAILED");
   }
-};
+);
 
-export const finalizeContentManifest = async (req: Request, res: Response) => {
-  try {
-    ensureIdempotencyKey(req);
+export const finalizeContentManifest = withController("FINALIZE_MANIFEST_FAILED", async (req, res) => {
+  ensureIdempotencyKey(req);
 
-    const creatorWallet = requireAuthenticatedWallet(req);
-    const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
-    const manifest = await prisma.contentManifest.findFirst({
-      where: {
-        id: manifestId,
-        creatorWallet,
-      },
-      include: {
-        assets: {
-          orderBy: {
-            orderIndex: "asc",
-          },
+  const creatorWallet = requireSessionWallet(req);
+  const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
+  const manifest = await prisma.contentManifest.findFirst({
+    where: {
+      id: manifestId,
+      creatorWallet,
+    },
+    include: {
+      assets: {
+        orderBy: {
+          orderIndex: "asc",
         },
       },
-    });
+    },
+  });
 
-    if (!manifest) {
-      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
-    }
-
-    if (manifest.assets.length === 0) {
-      throw new HttpError(409, "MANIFEST_EMPTY", "manifest must contain at least one asset");
-    }
-
-    const incomplete = manifest.assets.find((asset) => asset.uploadStatus !== AssetUploadStatus.UPLOADED);
-    if (incomplete) {
-      throw new HttpError(
-        409,
-        "ASSET_UPLOAD_INCOMPLETE",
-        `asset ${incomplete.id} must reach UPLOADED before finalize`
-      );
-    }
-
-    // Finalization freezes the current asset ordering and generates the canonical digest used by chain-facing flows.
-    const finalized = computeManifestFinalizeState({
-      manifest,
-      assets: manifest.assets,
-    });
-
-    const updated = await prisma.contentManifest.update({
-      where: { id: manifest.id },
-      data: {
-        status: manifest.currentAnchorPda
-          ? ContentManifestStatus.ANCHORED
-          : ContentManifestStatus.READY,
-        captionTextHash: finalized.captionTextHash,
-        canonicalManifestJson: finalized.canonicalManifestJson as Prisma.InputJsonValue,
-        manifestHashHex: finalized.manifestHashHex,
-        internalCanonicalUrl: finalized.internalCanonicalUrl,
-        internalUrlDigestHex: finalized.internalUrlDigestHex,
-      },
-    });
-
-    ok(res, {
-      ...serializeManifest(updated),
-      internalCanonicalUrl: updated.internalCanonicalUrl,
-      internalUrlDigestHex: updated.internalUrlDigestHex,
-      plannedContentAnchorPda: finalized.plannedContentAnchorPda,
-    });
-  } catch (error) {
-    handleControllerError(res, error, "FINALIZE_MANIFEST_FAILED");
+  if (!manifest) {
+    throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
   }
-};
 
-export const createContentPublication = async (req: Request, res: Response) => {
-  try {
+  if (manifest.assets.length === 0) {
+    throw new HttpError(409, "MANIFEST_EMPTY", "manifest must contain at least one asset");
+  }
+
+  const incomplete = manifest.assets.find((asset) => asset.uploadStatus !== AssetUploadStatus.UPLOADED);
+  if (incomplete) {
+    throw new HttpError(
+      409,
+      "ASSET_UPLOAD_INCOMPLETE",
+      `asset ${incomplete.id} must reach UPLOADED before finalize`
+    );
+  }
+
+  const finalized = computeManifestFinalizeState({
+    manifest,
+    assets: manifest.assets,
+  });
+
+  const updated = await prisma.contentManifest.update({
+    where: { id: manifest.id },
+    data: {
+      status: manifest.currentAnchorPda ? ContentManifestStatus.ANCHORED : ContentManifestStatus.READY,
+      captionTextHash: finalized.captionTextHash,
+      canonicalManifestJson: finalized.canonicalManifestJson as Prisma.InputJsonValue,
+      manifestHashHex: finalized.manifestHashHex,
+      internalCanonicalUrl: finalized.internalCanonicalUrl,
+      internalUrlDigestHex: finalized.internalUrlDigestHex,
+    },
+  });
+
+  ok(res, {
+    ...serializeManifest(updated),
+    internalCanonicalUrl: updated.internalCanonicalUrl,
+    internalUrlDigestHex: updated.internalUrlDigestHex,
+    plannedContentAnchorPda: finalized.plannedContentAnchorPda,
+  });
+});
+
+export const createContentPublication = withController(
+  "CREATE_CONTENT_PUBLICATION_FAILED",
+  async (req, res) => {
     ensureIdempotencyKey(req);
 
-    const creatorWallet = requireAuthenticatedWallet(req);
+    const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
     await requireOwnedManifest(manifestId, creatorWallet);
 
@@ -544,90 +364,80 @@ export const createContentPublication = async (req: Request, res: Response) => {
       select: { status: true },
     });
 
-    if (manifestStatus?.status === ContentManifestStatus.READY) {
+    const nextStatus = manifestStatus?.status
+      ? nextManifestStatusAfterPublication(manifestStatus.status)
+      : null;
+
+    if (nextStatus && manifestStatus?.status !== nextStatus) {
       await prisma.contentManifest.update({
         where: { id: manifestId },
         data: {
-          status: ContentManifestStatus.PUBLISHED,
+          status: nextStatus,
         },
       });
     }
 
-    ok(res, {
-      publicationId: publication.id,
-      manifestId: publication.manifestId,
-      platform: publication.platform,
-      externalUrl: publication.externalUrl,
-      verificationStatus: publication.verificationStatus,
-      createdAt: publication.createdAt.toISOString(),
-    }, 201);
-  } catch (error) {
-    handleControllerError(res, error, "CREATE_CONTENT_PUBLICATION_FAILED");
-  }
-};
-
-export const listContentManifests = async (req: Request, res: Response) => {
-  try {
-    const creatorWallet = requireAuthenticatedWallet(req);
-    const manifests = await prisma.contentManifest.findMany({
-      where: {
-        creatorWallet,
-      },
-      orderBy: {
-        updatedAt: "desc",
-      },
-      include: {
-        assets: {
-          orderBy: {
-            orderIndex: "asc",
-          },
-        },
-      },
-    });
-
     ok(
       res,
-      manifests.map((manifest) => ({
-        ...serializeManifest(manifest),
-        title: manifest.title,
-        assetCount: manifest.assets.length,
-        assets: manifest.assets.map(serializeAsset),
-      }))
+      {
+        publicationId: publication.id,
+        manifestId: publication.manifestId,
+        platform: publication.platform,
+        externalUrl: publication.externalUrl,
+        verificationStatus: publication.verificationStatus,
+        createdAt: publication.createdAt.toISOString(),
+      },
+      201
     );
-  } catch (error) {
-    handleControllerError(res, error, "LIST_CONTENT_MANIFESTS_FAILED");
   }
-};
+);
 
-export const getContentManifestById = async (req: Request, res: Response) => {
-  try {
-    const creatorWallet = requireAuthenticatedWallet(req);
-    const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
-    const manifest = await prisma.contentManifest.findFirst({
-      where: {
-        id: manifestId,
-        creatorWallet,
-      },
-      include: {
-        assets: {
-          orderBy: {
-            orderIndex: "asc",
-          },
-        },
-        publications: {
-          orderBy: {
-            createdAt: "desc",
-          },
+export const listContentManifests = withController("LIST_CONTENT_MANIFESTS_FAILED", async (req, res) => {
+  const creatorWallet = requireSessionWallet(req);
+  const manifests = await prisma.contentManifest.findMany({
+    where: {
+      creatorWallet,
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    include: {
+      assets: {
+        orderBy: {
+          orderIndex: "asc",
         },
       },
-    });
+    },
+  });
 
-    if (!manifest) {
-      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
-    }
+  ok(res, manifests.map((manifest) => serializeManifestListItem(manifest)));
+});
 
-    ok(res, serializeManifestDetail(manifest));
-  } catch (error) {
-    handleControllerError(res, error, "GET_CONTENT_MANIFEST_FAILED");
+export const getContentManifestById = withController("GET_CONTENT_MANIFEST_FAILED", async (req, res) => {
+  const creatorWallet = requireSessionWallet(req);
+  const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
+  const manifest = await prisma.contentManifest.findFirst({
+    where: {
+      id: manifestId,
+      creatorWallet,
+    },
+    include: {
+      assets: {
+        orderBy: {
+          orderIndex: "asc",
+        },
+      },
+      publications: {
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+  });
+
+  if (!manifest) {
+    throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
   }
-};
+
+  ok(res, serializeManifestDetail(manifest));
+});

@@ -53,6 +53,27 @@ export const handleControllerError = (res: Response, error: unknown, fallback: s
   fail(res, 500, fallback, error instanceof Error ? error.message : fallback);
 };
 
+export const withController =
+  (
+    fallback: string,
+    handler: (req: Request, res: Response) => Promise<void> | void
+  ) =>
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      await handler(req, res);
+    } catch (error) {
+      handleControllerError(res, error, fallback);
+    }
+  };
+
+export const requireSessionWallet = (req: Request): string => {
+  if (!req.auth?.wallet || req.auth.source !== "session") {
+    throw new HttpError(401, "AUTH_REQUIRED", "bearer session authentication is required");
+  }
+
+  return req.auth.wallet;
+};
+
 export const parseWallet = (value: unknown, fieldName: string): string => {
   const wallet = String(value ?? "").trim();
   if (!wallet) {

@@ -14,6 +14,9 @@ app/.next-dev*/
 app/.next_corrupt_preview_backup_*/
 app/.next_build_refresh_*/
 backend/dist/
+backend/index.js
+backend/config/*.js
+backend/tests/*.spec.js
 .anchor/
 test-ledger/
 test-ledger-*/
