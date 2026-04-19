@@ -1,7 +1,8 @@
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 
-import { PostRecord } from "@/lib/mock-data";
+import { PostRecord } from "@/lib/api/types";
+import { buildPostHref } from "@/lib/routes";
 
 type NavigationDirection = "up" | "down";
 type UsePostNavigatorOptions = {
@@ -116,7 +117,7 @@ export const usePostNavigator = (items: PostRecord[], options: UsePostNavigatorO
       if (syncRoute) {
         const nextPostId = items[nextIndex].id;
         pendingPostIdRef.current = nextPostId;
-        void router.replace(options.hrefBuilder?.(nextPostId) ?? `/posts/${nextPostId}`, undefined, {
+        void router.replace(options.hrefBuilder?.(nextPostId) ?? buildPostHref(nextPostId), undefined, {
           shallow: true,
           scroll: false,
         });

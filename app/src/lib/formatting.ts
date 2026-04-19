@@ -1,4 +1,4 @@
-import { formatUsd } from "@/lib/mocks/utils";
+import { formatUsd } from "@/lib/public-data";
 
 const USDC_DECIMALS = 1_000_000;
 

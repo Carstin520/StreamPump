@@ -2,11 +2,18 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
-import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { ContentType } from "@/lib/api/types";
 import { createContentManifest } from "@/lib/api/workspace";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
+import { WORKSPACE_CONTENT_NEW_PATH, workspacePageTabs } from "@/lib/routes";
+import {
+  buildLoginHrefFromRouter,
+  clearAuthSession,
+  getAccessToken,
+  getAuthSession,
+  isAuthError,
+} from "@/lib/session-flow";
 
 const parseTags = (value: string) =>
   value
@@ -25,14 +32,15 @@ export default function NewContentPage() {
   const [tagsInput, setTagsInput] = useState("food, city, late-night");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_CONTENT_NEW_PATH);
 
   useEffect(() => {
-    setAuthState(getStoredAuthSession() ? "ready" : "auth");
+    setAuthState(getAuthSession() ? "ready" : "auth");
   }, []);
 
   const handleCreate = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       setAuthState("auth");
       setMessage("Session required. Open login before creating a manifest draft.");
       return;
@@ -42,7 +50,7 @@ export default function NewContentPage() {
     setMessage("Creating manifest draft...");
 
     try {
-      const manifest = await createContentManifest(session.accessToken, {
+      const manifest = await createContentManifest(token, {
         contentType,
         title,
         captionText,
@@ -53,8 +61,8 @@ export default function NewContentPage() {
       void router.push(`/workspace/content/${manifest.manifestId}`);
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Failed to create manifest draft.";
-      if (nextMessage.includes("AUTH_REQUIRED") || nextMessage.includes("AUTH_INVALID") || nextMessage.includes("401")) {
-        clearStoredAuthSession();
+      if (isAuthError(error)) {
+        clearAuthSession();
         setAuthState("auth");
       }
       setMessage(nextMessage);
@@ -68,8 +76,10 @@ export default function NewContentPage() {
       <Head>
         <title>StreamPump | New Content Manifest</title>
       </Head>
-      <WorkspaceShell
+      <PageShell
+        eyebrow="Workspace"
         subtitle="Content starts here. The user decides when to publish, what media package to bind, and when that package becomes the exact object later referenced by a launch bundle."
+        tabs={workspacePageTabs}
         title="Create a content manifest"
       >
         {authState === "checking" ? (
@@ -79,7 +89,7 @@ export default function NewContentPage() {
           />
         ) : authState === "auth" ? (
           <AsyncStateCard
-            actionHref="/login"
+            actionHref={loginHref}
             actionLabel="Open login"
             body="Manifest creation now uses the authenticated content API. Sign in first to create a creator-owned draft."
             title="Session required"
@@ -165,7 +175,7 @@ export default function NewContentPage() {
           </section>
         </div>
         )}
-      </WorkspaceShell>
+      </PageShell>
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { StagePill } from "@/components/shared/StagePill";
 import { PostRecord, UserNoteRecord } from "@/lib/api/types";
-import { compactNumber } from "@/lib/mocks/utils";
+import { compactNumber } from "@/lib/public-data";
 
 export const PROFILE_TABS = ["笔记", "收藏", "点赞"] as const;
 

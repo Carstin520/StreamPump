@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { LoginPreviewMode } from "@/lib/api/types";
-import { loginPreviewDefaultMode } from "@/lib/mocks/auth";
+import { loginPreviewDefaultMode } from "@/lib/public-data";
+import { WORKSPACE_PATH, buildLoginHref, normalizeInternalHref } from "@/lib/routes";
 
 const DynamicAuthOptionsPanel = dynamic(
   () => import("@/components/auth/AuthOptionsPanel").then((mod) => mod.AuthOptionsPanel),
@@ -19,6 +20,9 @@ const getPreviewMode = (value: string | string[] | undefined): LoginPreviewMode 
 export default function LoginPage() {
   const router = useRouter();
   const [previewMode, setPreviewMode] = useState<LoginPreviewMode>(loginPreviewDefaultMode);
+  const nextHref = normalizeInternalHref(
+    typeof router.query.next === "string" ? router.query.next : null,
+  ) ?? WORKSPACE_PATH;
 
   useEffect(() => {
     if (!router.isReady) {
@@ -30,14 +34,13 @@ export default function LoginPage() {
 
   const handleModeChange = (mode: LoginPreviewMode) => {
     setPreviewMode(mode);
-    void router.replace(
-      {
-        pathname: "/login",
-        query: mode === "switch" ? { preview: "switch" } : {},
-      },
-      undefined,
-      { shallow: true, scroll: false },
-    );
+    void router.replace(buildLoginHref({
+      nextPath: nextHref,
+      preview: mode === "switch" ? "switch" : null,
+    }), undefined, {
+      shallow: true,
+      scroll: false,
+    });
   };
 
   return (
@@ -76,7 +79,7 @@ export default function LoginPage() {
                   </p>
                 </div>
 
-                <DynamicAuthOptionsPanel mode={previewMode} onModeChange={handleModeChange} />
+                <DynamicAuthOptionsPanel mode={previewMode} nextHref={nextHref} onModeChange={handleModeChange} />
               </div>
             </div>
           </div>

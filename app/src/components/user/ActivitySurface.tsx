@@ -7,14 +7,19 @@ import {
   HeartOutlineIcon,
   SendRoundedIcon,
 } from "@/components/shared/AppIcons";
+import { PageShell } from "@/components/layout/PageShell";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
-import { UserShell } from "@/components/user/UserShell";
-import { UserTopbar } from "@/components/user/UserTopbar";
 import { ActivityTab } from "@/lib/api/types";
-import { activityAuthors, activityFeedItems, activityFeedTabs, activitySidebarHighlights, activityVideoItems } from "@/lib/mocks/activity";
-import { findCreator } from "@/lib/mocks/discover";
-import { compactNumber } from "@/lib/mocks/utils";
+import {
+  activityAuthors,
+  activityFeedItems,
+  activityFeedTabs,
+  activitySidebarHighlights,
+  activityVideoItems,
+  compactNumber,
+  findCreator,
+} from "@/lib/public-data";
 
 const ALL_ACTIVITY = "all";
 
@@ -30,7 +35,7 @@ export const ActivitySurface = () => {
   );
 
   return (
-    <UserShell header={<UserTopbar searchPlaceholder="搜索动态、创作者、视频" />}>
+    <PageShell searchPlaceholder="搜索动态、创作者、视频">
       <div className="mx-auto max-w-[1400px] py-6">
         <div className="grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)_280px]">
           <aside className="hidden xl:block">
@@ -288,7 +293,7 @@ export const ActivitySurface = () => {
           </aside>
         </div>
       </div>
-    </UserShell>
+    </PageShell>
   );
 };
 

@@ -1,7 +1,8 @@
 import dynamic from "next/dynamic";
 import Head from "next/head";
 
-import { posts } from "@/lib/mocks/discover";
+import { posts } from "@/lib/public-data";
+import { EXPLORE_PATH } from "@/lib/routes";
 
 const DynamicPostDetailExperience = dynamic(
   () => import("@/components/post/PostDetailExperience").then((mod) => mod.PostDetailExperience),
@@ -14,7 +15,7 @@ export default function PostDetailPage() {
       <Head>
         <title>StreamPump | Post Detail</title>
       </Head>
-      <DynamicPostDetailExperience closeHref="/explore" closeLabel="Back to explore" items={posts} syncRoute />
+      <DynamicPostDetailExperience closeHref={EXPLORE_PATH} closeLabel="Back to explore" items={posts} syncRoute />
     </>
   );
 }

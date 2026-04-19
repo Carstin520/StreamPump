@@ -2,11 +2,16 @@ import Head from "next/head";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
-import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { getWorkspaceOverview, WorkspaceOverviewResponse } from "@/lib/api/workspace";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
+import { WORKSPACE_PATH, buildLoginHref, workspacePageTabs } from "@/lib/routes";
+import {
+  clearAuthSession,
+  getAccessToken,
+  isAuthError,
+} from "@/lib/session-flow";
 
 type PageState =
   | { kind: "loading" }
@@ -16,17 +21,18 @@ type PageState =
 
 export default function WorkspacePage() {
   const [state, setState] = useState<PageState>({ kind: "loading" });
+  const loginHref = buildLoginHref({ nextPath: WORKSPACE_PATH });
 
   useEffect(() => {
     let cancelled = false;
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
 
-    if (!session) {
+    if (!token) {
       setState({ kind: "auth" });
       return;
     }
 
-    void getWorkspaceOverview(session.accessToken)
+    void getWorkspaceOverview(token)
       .then((data) => {
         if (!cancelled) {
           setState({ kind: "ready", data });
@@ -38,8 +44,8 @@ export default function WorkspacePage() {
         }
 
         const message = error instanceof Error ? error.message : "Failed to load workspace.";
-        if (message.includes("AUTH_REQUIRED") || message.includes("401")) {
-          clearStoredAuthSession();
+        if (isAuthError(error)) {
+          clearAuthSession();
           setState({ kind: "auth" });
           return;
         }
@@ -66,16 +72,18 @@ export default function WorkspacePage() {
       <Head>
         <title>StreamPump | Workspace</title>
       </Head>
-      <WorkspaceShell
+      <PageShell
+        eyebrow="Workspace"
         subtitle="The workspace is not role-based. It is where users create content, follow launch state, and handle the next signature or review action that belongs to them."
+        tabs={workspacePageTabs}
         title="Unified workspace"
       >
         {state.kind === "loading" ? <AsyncStateCard body="Loading manifests, intents, and proposal summaries from the backend workspace view." title="Loading workspace" /> : null}
-        {state.kind === "auth" ? <AsyncStateCard actionHref="/login" actionLabel="Open login" body="Workspace now reads from authenticated v1 APIs. Sign in through the tracked login screen to get a Bearer session first." title="Session required" /> : null}
+        {state.kind === "auth" ? <AsyncStateCard actionHref={loginHref} actionLabel="Open login" body="Workspace now reads from authenticated v1 APIs. Sign in through the tracked login screen to get a Bearer session first." title="Session required" /> : null}
         {state.kind === "error" ? <AsyncStateCard body={state.message} title="Workspace request failed" /> : null}
         {state.kind === "ready" ? (
           <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="space-y-5">
+            <div className="space-y-5" id="content">
               <section className="app-shell-frame rounded-[28px] p-5">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
@@ -111,7 +119,7 @@ export default function WorkspacePage() {
             </div>
 
             <div className="space-y-5">
-              <section className="app-shell-frame rounded-[28px] p-5">
+              <section className="app-shell-frame rounded-[28px] p-5" id="intents">
                 <div className="space-y-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Needs your action</p>
                   <div className="space-y-3">
@@ -140,7 +148,7 @@ export default function WorkspacePage() {
             </div>
           </div>
         ) : null}
-      </WorkspaceShell>
+      </PageShell>
     </>
   );
 }

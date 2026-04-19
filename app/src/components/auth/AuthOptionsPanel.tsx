@@ -19,10 +19,12 @@ import {
 } from "@/lib/api/auth";
 import { IdentityProvider, LoginMethodRecord, LoginPreviewMode } from "@/lib/api/types";
 import { storeAuthSession } from "@/lib/auth-session";
-import { loginAccounts, loginMethods } from "@/lib/mocks/auth";
+import { loginAccounts, loginMethods } from "@/lib/public-data";
+import { WORKSPACE_PATH } from "@/lib/routes";
 
 type AuthOptionsPanelProps = {
   mode: LoginPreviewMode;
+  nextHref?: string;
   onModeChange: (mode: LoginPreviewMode) => void;
 };
 
@@ -78,7 +80,11 @@ const bytesToBase64 = (value: Uint8Array) => {
   return window.btoa(binary);
 };
 
-export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) => {
+export const AuthOptionsPanel = ({
+  mode,
+  nextHref = WORKSPACE_PATH,
+  onModeChange,
+}: AuthOptionsPanelProps) => {
   const router = useRouter();
   const { connected, connecting, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
@@ -102,8 +108,8 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
     try {
       const session = await exchangeProviderSession(identity);
       storeAuthSession(session);
-      setLastAction(`${successLabel} session ready. Redirecting to workspace.`);
-      void router.push("/workspace");
+      setLastAction(`${successLabel} session ready. Redirecting to the requested page.`);
+      void router.push(nextHref);
     } catch (error) {
       setLastAction(error instanceof Error ? error.message : `Failed to create ${successLabel} session.`);
     } finally {
@@ -137,8 +143,8 @@ export const AuthOptionsPanel = ({ mode, onModeChange }: AuthOptionsPanelProps) 
       });
 
       storeAuthSession(session);
-      setLastAction("Wallet session ready. Redirecting to workspace.");
-      void router.push("/workspace");
+      setLastAction("Wallet session ready. Redirecting to the requested page.");
+      void router.push(nextHref);
     } catch (error) {
       setLastAction(error instanceof Error ? error.message : "Failed to create wallet session.");
     } finally {

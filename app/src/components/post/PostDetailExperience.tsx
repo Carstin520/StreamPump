@@ -14,7 +14,7 @@ import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
-import { PostRecord } from "@/lib/mock-data";
+import { PostRecord } from "@/lib/api/types";
 
 const DynamicCommentPanel = dynamic(
   () => import("@/components/user/CommentPanel").then((mod) => mod.CommentPanel),

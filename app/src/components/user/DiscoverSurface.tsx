@@ -1,17 +1,14 @@
 import Link from "next/link";
 
-import { creators, discoverCategories, posts } from "@/lib/mocks/discover";
+import { PageShell } from "@/components/layout/PageShell";
+import { creators, discoverCategories, posts } from "@/lib/public-data";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
-import { UserShell } from "./UserShell";
-import { UserTopbar } from "./UserTopbar";
 
 export const DiscoverSurface = () => (
-  <UserShell
-    header={<UserTopbar />}
-  >
+  <PageShell>
     <ExploreView />
-  </UserShell>
+  </PageShell>
 );
 
 const ExploreView = () => (
@@ -85,9 +82,7 @@ const TrendStat = ({ label, value }: { label: string; value: string }) => (
 );
 
 export const TrendingSurface = () => (
-  <UserShell
-    header={<UserTopbar />}
-  >
+  <PageShell>
     <section className="mx-auto max-w-[1280px] space-y-8 py-6">
       <div className="flex items-end justify-between">
         <div>
@@ -105,5 +100,5 @@ export const TrendingSurface = () => (
         ))}
       </div>
     </section>
-  </UserShell>
+  </PageShell>
 );

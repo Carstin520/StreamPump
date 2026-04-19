@@ -2,12 +2,12 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-import { AppShell } from "@/components/layout/AppShell";
+import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
 import { Panel } from "@/components/shared/Panel";
 import { getProposalById, ProposalDetailResponse } from "@/lib/api/workspace";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
+import { getAccessToken, loadWithPublicFallback } from "@/lib/session-flow";
 
 type PageState =
   | { kind: "loading" }
@@ -25,7 +25,7 @@ export default function CampaignDetailPage() {
 
     let cancelled = false;
     const proposalId = String(router.query.proposalId ?? "").trim();
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
 
     if (!proposalId) {
       setState({ kind: "error", message: "proposalId is required" });
@@ -35,21 +35,16 @@ export default function CampaignDetailPage() {
     setState({ kind: "loading" });
     const loadProposal = async () => {
       try {
-        const data = await getProposalById(proposalId, session?.accessToken);
+        const data = await loadWithPublicFallback({
+          loadPublic: () => getProposalById(proposalId),
+          loadWithToken: (accessToken) => getProposalById(proposalId, accessToken),
+          token,
+        });
         if (!cancelled) {
           setState({ kind: "ready", data });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to load proposal.";
-        if (session?.accessToken && (message.includes("AUTH_INVALID") || message.includes("AUTH_REQUIRED") || message.includes("401"))) {
-          clearStoredAuthSession();
-          const publicData = await getProposalById(proposalId);
-          if (!cancelled) {
-            setState({ kind: "ready", data: publicData });
-          }
-          return;
-        }
-
         if (!cancelled) {
           setState({ kind: "error", message });
         }
@@ -71,7 +66,7 @@ export default function CampaignDetailPage() {
       <Head>
         <title>{`StreamPump | ${pageTitle}`}</title>
       </Head>
-      <AppShell
+      <PageShell
         subtitle="Campaign detail is the shared surface after launch. It should speak both to sponsors and creators without forcing them into different portals."
         title="Campaign detail"
       >
@@ -153,7 +148,7 @@ export default function CampaignDetailPage() {
             </Panel>
           </div>
         ) : null}
-      </AppShell>
+      </PageShell>
     </>
   );
 }

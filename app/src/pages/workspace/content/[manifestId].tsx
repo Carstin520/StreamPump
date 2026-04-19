@@ -2,8 +2,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { ChangeEvent, useEffect, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
-import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import {
   completeManifestAssetUpload,
   ContentManifestDetailResponse,
@@ -13,8 +13,14 @@ import {
   ManifestAssetKind,
   presignManifestAssets,
 } from "@/lib/api/workspace";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
+import { WORKSPACE_PATH, workspacePageTabs } from "@/lib/routes";
+import {
+  buildLoginHrefFromRouter,
+  clearAuthSession,
+  getAccessToken,
+  isAuthError,
+} from "@/lib/session-flow";
 
 type PageState =
   | { kind: "loading" }
@@ -64,6 +70,7 @@ export default function ManifestDetailPage() {
   const [publicationPlatform, setPublicationPlatform] = useState("XIAOHONGSHU");
   const [publicationUrl, setPublicationUrl] = useState("");
   const [publicationPostId, setPublicationPostId] = useState("");
+  const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
 
   const refreshManifest = async (token: string, manifestId: string) => {
     const data = await getContentManifestById(token, manifestId);
@@ -72,13 +79,13 @@ export default function ManifestDetailPage() {
   };
 
   const handleAuthFailure = () => {
-    clearStoredAuthSession();
+    clearAuthSession();
     setState({ kind: "auth" });
   };
 
   const handleApiError = (error: unknown, fallback: string) => {
     const message = error instanceof Error ? error.message : fallback;
-    if (message.includes("AUTH_REQUIRED") || message.includes("AUTH_INVALID") || message.includes("401")) {
+    if (isAuthError(error)) {
       handleAuthFailure();
       return;
     }
@@ -92,10 +99,10 @@ export default function ManifestDetailPage() {
     }
 
     let cancelled = false;
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
     const manifestId = String(router.query.manifestId ?? "").trim();
 
-    if (!session) {
+    if (!token) {
       setState({ kind: "auth" });
       return;
     }
@@ -106,7 +113,7 @@ export default function ManifestDetailPage() {
     }
 
     setState({ kind: "loading" });
-    void getContentManifestById(session.accessToken, manifestId)
+    void getContentManifestById(token, manifestId)
       .then((data) => {
         if (!cancelled) {
           setState({ kind: "ready", data });
@@ -118,7 +125,7 @@ export default function ManifestDetailPage() {
         }
 
         const message = error instanceof Error ? error.message : "Failed to load manifest.";
-        if (message.includes("AUTH_REQUIRED") || message.includes("401")) {
+        if (isAuthError(error)) {
           handleAuthFailure();
           return;
         }
@@ -138,12 +145,12 @@ export default function ManifestDetailPage() {
   };
 
   const handleUploadAssets = async () => {
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
     const manifestId = state.kind === "ready"
       ? state.data.manifestId
       : String(router.query.manifestId ?? "").trim();
 
-    if (!session) {
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -180,16 +187,16 @@ export default function ManifestDetailPage() {
         })),
       );
 
-      const response = await presignManifestAssets(session.accessToken, manifestId, inputs);
+      const response = await presignManifestAssets(token, manifestId, inputs);
 
       for (const [index, upload] of response.uploads.entries()) {
         const file = selectedFiles[index];
         setActionMessage(`Uploading ${index + 1}/${response.uploads.length}: ${file.name}`);
         await uploadToPresignedUrl(upload.presignedUrl, file);
-        await completeManifestAssetUpload(session.accessToken, manifestId, upload.assetId);
+        await completeManifestAssetUpload(token, manifestId, upload.assetId);
       }
 
-      await refreshManifest(session.accessToken, manifestId);
+      await refreshManifest(token, manifestId);
       setSelectedFiles([]);
       setActionMessage("Asset upload completed and manifest state refreshed.");
     } catch (error) {
@@ -200,12 +207,12 @@ export default function ManifestDetailPage() {
   };
 
   const handleFinalize = async () => {
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
     const manifestId = state.kind === "ready"
       ? state.data.manifestId
       : String(router.query.manifestId ?? "").trim();
 
-    if (!session) {
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -219,8 +226,8 @@ export default function ManifestDetailPage() {
 
     try {
       setActionMessage("Finalizing manifest and deriving canonical hash...");
-      const result = await finalizeContentManifest(session.accessToken, manifestId);
-      await refreshManifest(session.accessToken, manifestId);
+      const result = await finalizeContentManifest(token, manifestId);
+      await refreshManifest(token, manifestId);
       setActionMessage(
         result.manifestHashHex
           ? `Manifest finalized. Hash: ${result.manifestHashHex.slice(0, 16)}...`
@@ -234,12 +241,12 @@ export default function ManifestDetailPage() {
   };
 
   const handleCreatePublication = async () => {
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
     const manifestId = state.kind === "ready"
       ? state.data.manifestId
       : String(router.query.manifestId ?? "").trim();
 
-    if (!session) {
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -266,14 +273,14 @@ export default function ManifestDetailPage() {
 
     try {
       setActionMessage("Creating publication record...");
-      await createContentPublication(session.accessToken, {
+      await createContentPublication(token, {
         manifestId,
         platform: publicationPlatform,
         externalUrl: normalizedUrl,
         externalPostId: publicationPostId.trim() || null,
       });
 
-      await refreshManifest(session.accessToken, manifestId);
+      await refreshManifest(token, manifestId);
       setPublicationUrl("");
       setPublicationPostId("");
       setActionMessage("Publication record created and manifest refreshed.");
@@ -291,12 +298,14 @@ export default function ManifestDetailPage() {
       <Head>
         <title>{`StreamPump | ${manifestTitle}`}</title>
       </Head>
-      <WorkspaceShell
+      <PageShell
+        eyebrow="Workspace"
         subtitle="This view is where upload, processing, and finalize status need to feel operationally clear without looking like an ops dashboard."
+        tabs={workspacePageTabs}
         title={manifestTitle}
       >
         {state.kind === "loading" ? <AsyncStateCard body="Loading manifest detail, assets, and publication records from the v1 content API." title="Loading manifest" /> : null}
-        {state.kind === "auth" ? <AsyncStateCard actionHref="/login" actionLabel="Open login" body="Manifest detail now uses authenticated content APIs. Sign in to load creator-owned manifest data." title="Session required" /> : null}
+        {state.kind === "auth" ? <AsyncStateCard actionHref={loginHref} actionLabel="Open login" body="Manifest detail now uses authenticated content APIs. Sign in to load creator-owned manifest data." title="Session required" /> : null}
         {state.kind === "error" ? <AsyncStateCard body={state.message} title="Manifest request failed" /> : null}
         {state.kind === "ready" ? (
           <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
@@ -474,7 +483,7 @@ export default function ManifestDetailPage() {
             </section>
           </div>
         ) : null}
-      </WorkspaceShell>
+      </PageShell>
     </>
   );
 }

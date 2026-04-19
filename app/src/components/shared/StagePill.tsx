@@ -1,4 +1,4 @@
-import { CreatorSeasonState } from "@/lib/mock-data";
+import { CreatorSeasonState } from "@/lib/api/types";
 
 type StageValue = CreatorSeasonState | "NONE";
 

@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import {
   ActionFlowModal,
   ClaimQueueSection,
@@ -12,14 +13,12 @@ import {
   PortfolioTabBar,
   ReentrySection,
 } from "@/components/portfolio/PortfolioSections";
-import { UserShell } from "@/components/user/UserShell";
-import { UserTopbar } from "@/components/user/UserTopbar";
 import {
   portfolioClaimWindows,
   portfolioExposureTrend,
   portfolioHoldings,
-} from "@/lib/mocks/portfolio";
-import { findCreator } from "@/lib/mocks/discover";
+  findCreator,
+} from "@/lib/public-data";
 
 export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<PortfolioTab>("Portfolio");
@@ -53,7 +52,7 @@ export default function PortfolioPage() {
       <Head>
         <title>StreamPump | Portfolio</title>
       </Head>
-      <UserShell header={<UserTopbar />}>
+      <PageShell>
         <div className="mx-auto max-w-[1180px] space-y-7 py-6">
           <section>
             <h1 className="text-[42px] font-semibold tracking-[-0.05em] text-white">Your S1 exposure and next actions</h1>
@@ -86,7 +85,7 @@ export default function PortfolioPage() {
             onConfirm={() => setFlowState({ ...flowState, status: "processing" })}
           />
         ) : null}
-      </UserShell>
+      </PageShell>
     </>
   );
 }

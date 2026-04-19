@@ -14,15 +14,15 @@ import {
   PortfolioClaimWindowRecord,
   PortfolioReentryRecord,
 } from "@/lib/api/types";
-import { findCreator } from "@/lib/mocks/discover";
 import {
+  findCreator,
   portfolioClaimWindows,
   portfolioExposureTrend,
   portfolioHoldings,
   portfolioReentryPositions,
   portfolioUpcomingClaims,
-} from "@/lib/mocks/portfolio";
-import { formatUsd } from "@/lib/mocks/utils";
+  formatUsd,
+} from "@/lib/public-data";
 
 export const PORTFOLIO_TABS = ["Portfolio", "Claim queue", "Re-entry"] as const;
 

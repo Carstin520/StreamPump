@@ -4,14 +4,8 @@ import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { SwitchAccountIcon } from "@/components/shared/AppIcons";
-import { currentUser } from "@/lib/mocks/profile";
-
-const primaryNav = [
-  { href: "/explore", label: "发现", match: ["/", "/explore", "/discover", "/posts"] },
-  { href: "/activity", label: "动态", match: ["/activity"] },
-  { href: "/trending", label: "Trending", match: ["/trending"] },
-  { href: "/portfolio", label: "投资组合", match: ["/portfolio"] },
-];
+import { currentUser } from "@/lib/public-data";
+import { PROFILE_PATH, buildLoginHref, isRouteActive, primaryNavItems } from "@/lib/routes";
 
 export const UserShell = ({
   children,
@@ -21,10 +15,15 @@ export const UserShell = ({
   header?: ReactNode;
 }) => {
   const router = useRouter();
-
-  const isActive = (href: string, match: string[]) =>
-    match.some((prefix) => (prefix === "/" ? router.pathname === "/" || router.pathname === "/discover" : router.pathname.startsWith(prefix))) ||
-    router.asPath === href;
+  const switchAccountHref = buildLoginHref({
+    nextPath: router.asPath,
+    preview: "switch",
+  });
+  const profileActive = isRouteActive(router.asPath, {
+    href: PROFILE_PATH,
+    label: "Me",
+    prefixes: [PROFILE_PATH],
+  });
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#090d14] text-[#f5f7fb]">
@@ -44,10 +43,10 @@ export const UserShell = ({
         </div>
 
         <nav className="flex-1 space-y-2 px-2 py-6 lg:px-4">
-          {primaryNav.map((item) => (
+          {primaryNavItems.map((item) => (
             <Link
               className={`group flex h-12 items-center justify-center rounded-2xl px-3 text-sm transition duration-200 lg:justify-start ${
-                isActive(item.href, item.match)
+                isRouteActive(router.asPath, item)
                   ? "border border-white/10 bg-white/[0.08] text-white shadow-[0_14px_34px_rgba(0,0,0,0.14)]"
                   : "border border-transparent text-[#8f9eb7] hover:border-white/8 hover:bg-white/[0.05] hover:text-white"
               }`}
@@ -60,10 +59,10 @@ export const UserShell = ({
         </nav>
 
         <div className="space-y-2 border-t border-white/[0.05] p-2 lg:p-4">
-          <Link href="/me">
+          <Link href={PROFILE_PATH}>
             <div
               className={`surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 transition duration-200 lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
-                router.pathname.startsWith("/me")
+                profileActive
                   ? "border-white/[0.12] bg-white/[0.08] text-white"
                   : "text-white/80 hover:bg-white/[0.07]"
               }`}
@@ -80,7 +79,7 @@ export const UserShell = ({
             </div>
           </Link>
 
-          <Link href="/login?preview=switch">
+          <Link href={switchAccountHref}>
             <div className="surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 text-white/80 transition duration-200 hover:bg-white/[0.07] lg:justify-start lg:px-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-[#9dadc6]">
                 <SwitchAccountIcon className="h-4 w-4" />

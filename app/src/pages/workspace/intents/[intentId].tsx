@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
-import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { ProposalIntentStatus } from "@/lib/api/types";
 import {
   buildProposalLaunchBundle,
@@ -16,8 +16,14 @@ import {
   ProposalIntentDetailResponse,
   submitProposalBundle,
 } from "@/lib/api/workspace";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
+import { WORKSPACE_PATH, workspacePageTabs } from "@/lib/routes";
+import {
+  buildLoginHrefFromRouter,
+  clearAuthSession,
+  getAccessToken,
+  isAuthError,
+} from "@/lib/session-flow";
 
 type PageState =
   | { kind: "loading" }
@@ -55,6 +61,7 @@ export default function IntentDetailPage() {
   const [forceRebuild, setForceRebuild] = useState(false);
   const [creatorSignedBase64, setCreatorSignedBase64] = useState("");
   const [fullySignedBase64, setFullySignedBase64] = useState("");
+  const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
 
   const intentId = String(router.query.intentId ?? "").trim();
 
@@ -65,17 +72,17 @@ export default function IntentDetailPage() {
   };
 
   const handleAuthFailure = () => {
-    clearStoredAuthSession();
+    clearAuthSession();
     setState({ kind: "auth" });
   };
 
   const handleApiError = (error: unknown, fallback: string) => {
-    const message = error instanceof Error ? error.message : fallback;
-    if (message.includes("AUTH_REQUIRED") || message.includes("AUTH_INVALID") || message.includes("401")) {
+    if (isAuthError(error)) {
       handleAuthFailure();
       return;
     }
 
+    const message = error instanceof Error ? error.message : fallback;
     setActionMessage(message);
   };
 
@@ -85,10 +92,10 @@ export default function IntentDetailPage() {
     }
 
     let cancelled = false;
-    const session = getStoredAuthSession();
+    const token = getAccessToken();
     const currentIntentId = String(router.query.intentId ?? "").trim();
 
-    if (!session) {
+    if (!token) {
       setState({ kind: "auth" });
       return;
     }
@@ -99,7 +106,7 @@ export default function IntentDetailPage() {
     }
 
     setState({ kind: "loading" });
-    void getProposalIntentById(session.accessToken, currentIntentId)
+    void getProposalIntentById(token, currentIntentId)
       .then((data) => {
         if (!cancelled) {
           setState({ kind: "ready", data });
@@ -111,7 +118,7 @@ export default function IntentDetailPage() {
         }
 
         const message = error instanceof Error ? error.message : "Failed to load intent.";
-        if (message.includes("AUTH_REQUIRED") || message.includes("401")) {
+        if (isAuthError(error)) {
           handleAuthFailure();
           return;
         }
@@ -136,8 +143,8 @@ export default function IntentDetailPage() {
   const latestBundle = state.kind === "ready" ? state.data.bundles[0] ?? null : null;
 
   const handleRefresh = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -149,8 +156,8 @@ export default function IntentDetailPage() {
 
     setBusyAction("refresh");
     try {
-      const status = await getProposalIntentStatus(session.accessToken, intentId);
-      await refreshIntent(session.accessToken, intentId);
+      const status = await getProposalIntentStatus(token, intentId);
+      await refreshIntent(token, intentId);
       setActionMessage(
         `Refreshed intent status: ${status.intent.status}${status.latestBundle ? ` / latest bundle ${status.latestBundle.status}` : ""}.`,
       );
@@ -162,8 +169,8 @@ export default function IntentDetailPage() {
   };
 
   const handleLock = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -175,8 +182,8 @@ export default function IntentDetailPage() {
 
     setBusyAction("lock");
     try {
-      const locked = await lockProposalIntent(session.accessToken, intentId);
-      await refreshIntent(session.accessToken, intentId);
+      const locked = await lockProposalIntent(token, intentId);
+      await refreshIntent(token, intentId);
       setActionMessage(`Intent locked. Status is now ${locked.status}.`);
     } catch (error) {
       handleApiError(error, "Failed to lock proposal intent.");
@@ -186,8 +193,8 @@ export default function IntentDetailPage() {
   };
 
   const handleBuildBundle = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -199,11 +206,11 @@ export default function IntentDetailPage() {
 
     setBusyAction("build");
     try {
-      const result = await buildProposalLaunchBundle(session.accessToken, intentId, {
+      const result = await buildProposalLaunchBundle(token, intentId, {
         submitMode,
         forceRebuild,
       });
-      await refreshIntent(session.accessToken, intentId);
+      await refreshIntent(token, intentId);
       setActionMessage(
         `${result.reused ? "Reused" : "Built"} bundle ${result.bundle.bundleId} in ${result.bundle.submitMode} mode.`,
       );
@@ -215,8 +222,8 @@ export default function IntentDetailPage() {
   };
 
   const handleCreatorPartialSign = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -238,11 +245,11 @@ export default function IntentDetailPage() {
 
     setBusyAction("creator-sign");
     try {
-      const result = await creatorPartialSignBundle(session.accessToken, intentId, {
+      const result = await creatorPartialSignBundle(token, intentId, {
         bundleId: latestBundle.bundleId,
         partiallySignedTxBase64: creatorSignedBase64.trim(),
       });
-      await refreshIntent(session.accessToken, intentId);
+      await refreshIntent(token, intentId);
       setActionMessage(
         `${result.replayed ? "Replayed" : "Stored"} creator partial signature for bundle ${result.bundle.bundleId}.`,
       );
@@ -254,8 +261,8 @@ export default function IntentDetailPage() {
   };
 
   const handleSubmitBundle = async () => {
-    const session = getStoredAuthSession();
-    if (!session) {
+    const token = getAccessToken();
+    if (!token) {
       handleAuthFailure();
       return;
     }
@@ -277,11 +284,11 @@ export default function IntentDetailPage() {
 
     setBusyAction("submit");
     try {
-      const result = await submitProposalBundle(session.accessToken, intentId, {
+      const result = await submitProposalBundle(token, intentId, {
         bundleId: latestBundle.bundleId,
         fullySignedTxBase64: fullySignedBase64.trim(),
       });
-      await refreshIntent(session.accessToken, intentId);
+      await refreshIntent(token, intentId);
       setActionMessage(
         `Submit result: ${result.relayStatus}${result.chainTxSignature ? ` / ${result.chainTxSignature}` : ""}.`,
       );
@@ -297,12 +304,14 @@ export default function IntentDetailPage() {
       <Head>
         <title>{`StreamPump | ${title}`}</title>
       </Head>
-      <WorkspaceShell
+      <PageShell
+        eyebrow="Workspace"
         subtitle="This page is intentionally single-surface. The same intent detail should reveal creator actions or sponsor actions based on the current session context instead of splitting the product into separate portals."
+        tabs={workspacePageTabs}
         title="Launch intent detail"
       >
         {state.kind === "loading" ? <AsyncStateCard body="Loading intent, bundle, manifest, and proposal linkage from the v1 proposal-intent API." title="Loading intent" /> : null}
-        {state.kind === "auth" ? <AsyncStateCard actionHref="/login" actionLabel="Open login" body="Intent detail is now authenticated. Sign in through the tracked login surface to inspect launch state." title="Session required" /> : null}
+        {state.kind === "auth" ? <AsyncStateCard actionHref={loginHref} actionLabel="Open login" body="Intent detail is now authenticated. Sign in through the tracked login surface to inspect launch state." title="Session required" /> : null}
         {state.kind === "error" ? <AsyncStateCard body={state.message} title="Intent request failed" /> : null}
         {state.kind === "ready" ? (
           <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
@@ -524,7 +533,7 @@ export default function IntentDetailPage() {
             </section>
           </div>
         ) : null}
-      </WorkspaceShell>
+      </PageShell>
     </>
   );
 }

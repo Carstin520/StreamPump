@@ -2,6 +2,7 @@ import dynamic from "next/dynamic";
 import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageShell } from "@/components/layout/PageShell";
 import {
   ProfileHero,
   ProfileNoteGrid,
@@ -10,10 +11,13 @@ import {
   resolveItemPostId,
   resolveProfilePosts,
 } from "@/components/profile/ProfileSurface";
-import { UserShell } from "@/components/user/UserShell";
-import { UserTopbar } from "@/components/user/UserTopbar";
-import { currentUserLikedPosts, currentUserNotes, currentUserSavedPosts, currentUser } from "@/lib/mocks/profile";
-import { posts } from "@/lib/mocks/discover";
+import {
+  currentUser,
+  currentUserLikedPosts,
+  currentUserNotes,
+  currentUserSavedPosts,
+  posts,
+} from "@/lib/public-data";
 
 const DynamicPostDetailExperience = dynamic(
   () => import("@/components/post/PostDetailExperience").then((mod) => mod.PostDetailExperience),
@@ -44,7 +48,7 @@ export default function MePage() {
       <Head>
         <title>StreamPump | Me</title>
       </Head>
-      <UserShell header={<UserTopbar />}>
+      <PageShell>
         <div className="pb-10">
           <ProfileHero
             avatarSrc={currentUser.avatarSrc}
@@ -71,7 +75,7 @@ export default function MePage() {
             syncRoute={false}
           />
         ) : null}
-      </UserShell>
+      </PageShell>
     </>
   );
 }
