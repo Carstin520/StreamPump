@@ -1,5 +1,8 @@
 // EN: Unselected sponsor withdraws escrowed USDC and closes their offer.
+//     After graduation, the winning sponsor may also reclaim any residual USDC
+//     once no S1 holder claims remain.
 // ZH: 未中选赞助商取回托管 USDC 并关闭报价。
+//     毕业后，如果已不存在待领取的 S1 holder，中标 sponsor 也可以回收剩余 USDC。
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
@@ -25,6 +28,7 @@ pub struct CancelBuyoutOffer<'info> {
     pub creator_profile: Account<'info, CreatorProfile>,
 
     #[account(
+        mut,
         seeds = [b"s1_buyout_state", creator_profile.key().as_ref()],
         bump = s1_buyout_state.bump,
         constraint = s1_buyout_state.creator == creator_profile.key() @ StreamPumpError::BuyoutStateMismatch
@@ -69,9 +73,15 @@ pub(crate) fn handler(ctx: Context<CancelBuyoutOffer>) -> Result<()> {
         StreamPumpError::InvalidCreatorStatus
     );
 
-    if let Some(winning_sponsor) = ctx.accounts.s1_buyout_state.winning_sponsor {
+    let winning_sponsor = ctx.accounts.s1_buyout_state.winning_sponsor;
+    let is_winning_sponsor = matches!(winning_sponsor, Some(sponsor) if sponsor == ctx.accounts.sponsor.key());
+    if is_winning_sponsor {
         require!(
-            winning_sponsor != ctx.accounts.sponsor.key(),
+            ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,
+            StreamPumpError::InvalidCreatorStatus
+        );
+        require!(
+            ctx.accounts.s1_buyout_state.claimable_s1_supply_remaining == 0,
             StreamPumpError::WinningOfferCannotCancel
         );
     }
@@ -100,6 +110,10 @@ pub(crate) fn handler(ctx: Context<CancelBuyoutOffer>) -> Result<()> {
             ),
             vault_amount,
         )?;
+    }
+
+    if is_winning_sponsor {
+        ctx.accounts.s1_buyout_state.claimable_usdc_remaining = 0;
     }
 
     token::close_account(CpiContext::new_with_signer(

@@ -1,13 +1,14 @@
 // EN: S2 fan claims pro-rata USDC from the accepted S1 buyout offer.
 // ZH: 粉丝在 S2 阶段按份额领取 S1 买断报价中的 USDC。
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
     errors::StreamPumpError,
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState, S1UserPosition,
     },
+    utils::{calculate_remaining_pro_rata_share, checked_sub},
 };
 
 #[derive(Accounts)]
@@ -25,6 +26,7 @@ pub struct ClaimS1BuyoutUsdc<'info> {
     pub creator_profile: Account<'info, CreatorProfile>,
 
     #[account(
+        mut,
         seeds = [b"s1_buyout_state", creator_profile.key().as_ref()],
         bump = s1_buyout_state.bump,
         constraint = s1_buyout_state.creator == creator_profile.key() @ StreamPumpError::BuyoutStateMismatch
@@ -75,9 +77,6 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         StreamPumpError::InvalidCreatorStatus
     );
 
-    let final_s1_supply = ctx.accounts.creator_profile.s1_supply;
-    require!(final_s1_supply > 0, StreamPumpError::InvalidAmount);
-
     let winning_sponsor = ctx
         .accounts
         .s1_buyout_state
@@ -94,15 +93,19 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         position.internal_token_balance > 0,
         StreamPumpError::InsufficientInternalTokenBalance
     );
+    let position_balance = position.internal_token_balance;
 
-    let numerator = (position.internal_token_balance as u128)
-        .checked_mul(ctx.accounts.s1_buyout_state.usdc_deposited as u128)
-        .ok_or(StreamPumpError::MathOverflow)?;
-    let share_u128 = numerator
-        .checked_div(final_s1_supply as u128)
-        .ok_or(StreamPumpError::MathOverflow)?;
-    let usdc_share =
-        u64::try_from(share_u128).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+    let buyout_state = &mut ctx.accounts.s1_buyout_state;
+    require!(
+        buyout_state.claimable_s1_supply_remaining > 0,
+        StreamPumpError::InvalidAmount
+    );
+
+    let usdc_share = calculate_remaining_pro_rata_share(
+        position_balance,
+        buyout_state.claimable_usdc_remaining,
+        buyout_state.claimable_s1_supply_remaining,
+    )?;
 
     require!(
         ctx.accounts.offer_usdc_vault.amount >= usdc_share,
@@ -132,6 +135,28 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
             ),
             usdc_share,
         )?;
+
+        let remaining_usdc = checked_sub(buyout_state.claimable_usdc_remaining, usdc_share)?;
+        let remaining_supply =
+            checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
+        buyout_state.claimable_usdc_remaining = remaining_usdc;
+        buyout_state.claimable_s1_supply_remaining = remaining_supply;
+
+        if remaining_supply == 0 && ctx.accounts.offer_usdc_vault.amount == 0 {
+            token::close_account(CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.offer_usdc_vault.to_account_info(),
+                    destination: ctx.accounts.user.to_account_info(),
+                    authority: ctx.accounts.buyout_offer.to_account_info(),
+                },
+                signer,
+            ))?;
+        }
+    } else {
+        let remaining_supply =
+            checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
+        buyout_state.claimable_s1_supply_remaining = remaining_supply;
     }
 
     position.internal_token_balance = 0;

@@ -53,6 +53,7 @@ pub struct ExecuteS1Graduation<'info> {
     /// EN: S1 buyout state — must have a winning sponsor and expired rage-quit deadline.
     /// ZH: S1 买断状态——必须有中标 Sponsor 且 rage-quit 截止已过。
     #[account(
+        mut,
         seeds = [b"s1_buyout_state", creator_profile.key().as_ref()],
         bump = s1_buyout_state.bump,
         constraint = s1_buyout_state.creator == creator_profile.key() @ StreamPumpError::BuyoutStateMismatch
@@ -137,6 +138,10 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
     // EN: Graduate creator to S2 and bump level if below minimum proposal level.
     // ZH: 将创作者毕业到 S2 并在等级低于最低提案等级时提升。
     let creator_profile = &mut ctx.accounts.creator_profile;
+    let s1_buyout_state = &mut ctx.accounts.s1_buyout_state;
+    s1_buyout_state.claimable_usdc_remaining = s1_buyout_state.usdc_deposited;
+    s1_buyout_state.claimable_s1_supply_remaining = creator_profile.s1_supply;
+
     creator_profile.status = CreatorStatus::S2_Active;
     if creator_profile.level < MIN_PROPOSAL_CREATOR_LEVEL {
         creator_profile.level = MIN_PROPOSAL_CREATOR_LEVEL;

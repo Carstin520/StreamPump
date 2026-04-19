@@ -6,6 +6,7 @@
 //       of the Track 2 fan pool (20% of achieved budget).
 //     - Resolved_Fail: 95% SPUMP minted back; 5% permanently unissued (deflation).
 //     - Cancelled/Voided: 100% SPUMP principal minted back.
+//     - Open but expired and unfunded: 100% SPUMP principal minted back.
 //     SPUMP is minted (not transferred from a vault) because endorsement burns
 //     SPUMP on entry. The protocol_config PDA is the mint authority.
 //
@@ -14,6 +15,7 @@
 //     - 成功：100% SPUMP 本金铸回 + 按比例分享 Track2 粉丝池（达成预算的 20%）。
 //     - 失败：95% SPUMP 铸回；5% 永久不铸造（通缩）。
 //     - 取消/作废：100% SPUMP 本金铸回。
+//     - 仍为 Open 但已过期且未获注资：100% SPUMP 本金铸回。
 //     SPUMP 通过 mint 而非从 vault 转出——因为背书时已经将 SPUMP 销毁。
 //     protocol_config PDA 是 SPUMP 的 mint authority。
 // ────────────────────────────────────────────────────────────────────────────────
@@ -45,8 +47,10 @@ pub struct ClaimEndorsement<'info> {
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
     pub protocol_config: Account<'info, ProtocolConfig>,
 
-    /// EN: Proposal being claimed against. Track 2 must be settled first.
-    /// ZH: 要领取的提案。Track2 必须先完成结算。
+    /// EN: Proposal being claimed against. Resolved Track 2 claims require settlement first;
+    ///     expired unfunded proposals can refund principal directly.
+    /// ZH: 要领取的提案。已决议的 Track2 必须先完成结算；
+    ///     已过期但未注资的提案可直接退还本金。
     #[account(
         mut,
         seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
@@ -107,6 +111,9 @@ pub struct ClaimEndorsement<'info> {
 pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     let proposal_status = ctx.accounts.proposal.status;
     let track2_settled_at = ctx.accounts.proposal.track2_settled_at;
+    let now = Clock::get()?.unix_timestamp;
+    let expired_open_refund =
+        matches!(proposal_status, ProposalStatus::Open) && now >= ctx.accounts.proposal.deadline;
 
     let staked_amount = {
         let position = &ctx.accounts.endorsement_position;
@@ -289,6 +296,25 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 proposal.track2_unsettled_spump =
                     checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
             }
+        }
+        ProposalStatus::Open if expired_open_refund => {
+            // EN: EXPIRED-OPEN PATH: the proposal never reached settlement,
+            //     but the deadline has passed so endorsements must be refundable.
+            // ZH: 已过期的 Open 路径：提案未进入结算，但截止时间已过，
+            //     背书本金必须可退。
+            token_interface::mint_to(
+                CpiContext::new_with_signer(
+                    ctx.accounts.spump_token_program.to_account_info(),
+                    MintTo {
+                        mint: ctx.accounts.spump_mint.to_account_info(),
+                        to: ctx.accounts.user_spump_ata.to_account_info(),
+                        authority: ctx.accounts.protocol_config.to_account_info(),
+                    },
+                    protocol_signer,
+                ),
+                staked_amount,
+            )?;
+            spump_refund = staked_amount;
         }
         _ => return err!(StreamPumpError::ProposalNotClaimable),
     }

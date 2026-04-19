@@ -85,6 +85,8 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     buyout_state.creator = creator_profile.key();
     buyout_state.winning_sponsor = Some(buyout_offer.sponsor);
     buyout_state.usdc_deposited = buyout_offer.usdc_amount;
+    buyout_state.claimable_usdc_remaining = 0;
+    buyout_state.claimable_s1_supply_remaining = 0;
     buyout_state.rage_quit_deadline = rage_quit_deadline;
     buyout_state.bump = ctx.bumps.s1_buyout_state;
 

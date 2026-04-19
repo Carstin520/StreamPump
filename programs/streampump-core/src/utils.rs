@@ -131,3 +131,46 @@ pub fn role_flag_for_organization_type(organization_type: OrganizationType) -> u
         OrganizationType::McnAgency => USER_ROLE_MCN_OPERATOR,
     }
 }
+
+/// Calculates an exact pro-rata share against the remaining pool.
+/// The final claimant sweeps the entire remainder to avoid stranded dust.
+pub fn calculate_remaining_pro_rata_share(
+    claimant_amount: u64,
+    remaining_pool: u64,
+    remaining_total: u64,
+) -> Result<u64> {
+    require!(
+        claimant_amount > 0 && remaining_total > 0 && claimant_amount <= remaining_total,
+        StreamPumpError::InvalidAmount
+    );
+
+    if claimant_amount == remaining_total {
+        return Ok(remaining_pool);
+    }
+
+    let numerator = (claimant_amount as u128)
+        .checked_mul(remaining_pool as u128)
+        .ok_or(StreamPumpError::MathOverflow)?;
+    let share = numerator
+        .checked_div(remaining_total as u128)
+        .ok_or(StreamPumpError::MathOverflow)?;
+
+    u64::try_from(share).map_err(|_| error!(StreamPumpError::MathOverflow))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::calculate_remaining_pro_rata_share;
+
+    #[test]
+    fn pro_rata_share_rounds_down_before_final_claim() {
+        let share = calculate_remaining_pro_rata_share(2, 100, 3).unwrap();
+        assert_eq!(share, 66);
+    }
+
+    #[test]
+    fn final_claimant_sweeps_remaining_dust() {
+        let share = calculate_remaining_pro_rata_share(1, 34, 1).unwrap();
+        assert_eq!(share, 34);
+    }
+}

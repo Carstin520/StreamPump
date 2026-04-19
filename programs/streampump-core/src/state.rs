@@ -250,12 +250,16 @@ pub struct S1BuyoutState {
     pub creator: Pubkey,
     pub winning_sponsor: Option<Pubkey>,
     pub usdc_deposited: u64,
+    /// Remaining USDC claimable by S1 holders after graduation.
+    pub claimable_usdc_remaining: u64,
+    /// Remaining virtual S1 supply still entitled to the buyout proceeds.
+    pub claimable_s1_supply_remaining: u64,
     pub rage_quit_deadline: i64,
     pub bump: u8,
 }
 
 impl S1BuyoutState {
-    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
