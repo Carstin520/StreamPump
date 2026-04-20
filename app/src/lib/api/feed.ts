@@ -86,10 +86,10 @@ const pickBestVideoUrl = (asset: PublicFeedAssetRecord | null | undefined) => {
   }
 
   const candidates = [
-    asset.originUrl,
-    asset.preferredPlaybackSource === "ORIGIN" ? asset.preferredPlaybackUrl : null,
     asset.preferredPlaybackUrl,
     asset.muxPlaybackUrl,
+    asset.originUrl,
+    asset.preferredPlaybackSource === "ORIGIN" ? asset.preferredPlaybackUrl : null,
   ];
 
   return candidates.find(isRenderableUrl) ?? null;
