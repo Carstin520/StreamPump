@@ -443,4 +443,9 @@ If we get those four things right, the rest becomes much easier.
 
 ## License
 
-MIT
+This repository uses a dual-license structure:
+
+- **On-chain programs** (`programs/`) are licensed under the [Apache License 2.0](programs/LICENSE).
+- **Backend, frontend, scripts, and documentation** are licensed under the [Business Source License 1.1](LICENSE).
+
+The BSL grants free use for personal learning, testnet experimentation, academic research, and contributions back to this project. Commercial use requires a separate license from the Licensor. On **April 20, 2030**, all BSL-covered code will automatically convert to Apache License 2.0.
