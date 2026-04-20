@@ -2,6 +2,18 @@
 const nextConfig = {
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      {
+        hostname: "**",
+        protocol: "https",
+      },
+      {
+        hostname: "**",
+        protocol: "http",
+      },
+    ],
+  },
   async redirects() {
     return [
       {

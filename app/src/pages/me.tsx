@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import {
   ProfileHero,
   ProfileNoteGrid,
@@ -11,13 +12,6 @@ import {
   resolveItemPostId,
   resolveProfilePosts,
 } from "@/components/profile/ProfileSurface";
-import {
-  currentUser,
-  currentUserLikedPosts,
-  currentUserNotes,
-  currentUserSavedPosts,
-  posts,
-} from "@/lib/public-data";
 
 const DynamicPostDetailExperience = dynamic(
   () => import("@/components/post/PostDetailExperience").then((mod) => mod.PostDetailExperience),
@@ -27,6 +21,15 @@ const DynamicPostDetailExperience = dynamic(
 export default function MePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("笔记");
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const {
+    currentUser,
+    currentUserLikedPosts,
+    currentUserNotes,
+    currentUserSavedPosts,
+    error,
+    loading,
+    posts,
+  } = usePublicFeedViewModel();
 
   const items =
     activeTab === "笔记"
@@ -35,7 +38,7 @@ export default function MePage() {
         ? currentUserSavedPosts
         : currentUserLikedPosts;
 
-  const tabPosts = useMemo(() => resolveProfilePosts(items, posts), [items]);
+  const tabPosts = useMemo(() => resolveProfilePosts(items, posts), [items, posts]);
 
   useEffect(() => {
     if (selectedPostId && !tabPosts.some((post) => post.id === selectedPostId)) {
@@ -49,21 +52,25 @@ export default function MePage() {
         <title>StreamPump | Me</title>
       </Head>
       <PageShell>
-        <div className="pb-10">
-          <ProfileHero
-            avatarSrc={currentUser.avatarSrc}
-            bannerSrc={currentUser.bannerSrc}
-            bio={currentUser.bio}
-            followersCount={currentUser.followersCount}
-            followingCount={currentUser.followingCount}
-            handle={currentUser.handle}
-            likesAndSavesCount={currentUser.totalLikesAndSavesCount}
-            location={currentUser.location}
-            name={currentUser.name}
-          />
-          <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
-          <ProfileNoteGrid items={items} onOpen={(item) => setSelectedPostId(resolveItemPostId(item))} />
-        </div>
+        {loading ? <div className="py-10 text-sm text-[#8ea0ba]">Loading imported library…</div> : null}
+        {!loading && error ? <div className="py-10 text-sm text-[#8ea0ba]">{error}</div> : null}
+        {!loading && !error ? (
+          <div className="pb-10">
+            <ProfileHero
+              avatarSrc={currentUser.avatarSrc}
+              bannerSrc={currentUser.bannerSrc}
+              bio={currentUser.bio}
+              followersCount={currentUser.followersCount}
+              followingCount={currentUser.followingCount}
+              handle={currentUser.handle}
+              likesAndSavesCount={currentUser.totalLikesAndSavesCount}
+              location={currentUser.location}
+              name={currentUser.name}
+            />
+            <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+            <ProfileNoteGrid items={items} onOpen={(item) => setSelectedPostId(resolveItemPostId(item))} />
+          </div>
+        ) : null}
         {selectedPostId ? (
           <DynamicPostDetailExperience
             closeLabel="Close profile post"

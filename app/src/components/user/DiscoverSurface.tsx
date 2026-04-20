@@ -1,7 +1,7 @@
-import Link from "next/link";
+import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
 import { PageShell } from "@/components/layout/PageShell";
-import { creators, discoverCategories, posts } from "@/lib/public-data";
+import { discoverCategories } from "@/lib/public-data";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
 
@@ -64,41 +64,89 @@ const ExploreView = () => (
       </div>
     </section>
 
-    <section className="section-enter pb-8">
-      <div className="masonry-grid masonry-grid-home">
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-      </div>
-    </section>
+    <PostsSection />
   </div>
 );
 
-const TrendStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="surface-muted rounded-[24px] px-4 py-4">
-    <p className="text-[10px] uppercase tracking-[0.22em] text-[#8d9eb7]">{label}</p>
-    <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-white">{value}</p>
-  </div>
-);
+const PostsSection = () => {
+  const { error, loading, posts } = usePublicFeedViewModel();
+
+  return (
+    <section className="section-enter pb-8">
+      {loading ? (
+        <div className="masonry-grid masonry-grid-home">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              className="mb-4 h-[320px] break-inside-avoid rounded-[28px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(18,24,37,0.92)_0%,rgba(9,14,22,0.92)_100%)]"
+              key={`feed-skeleton-${index}`}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {!loading && error ? (
+        <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
+          <p className="font-semibold text-white">Imported feed unavailable</p>
+          <p className="mt-2 text-[#8ea0ba]">{error}</p>
+        </div>
+      ) : null}
+
+      {!loading && !error && posts.length === 0 ? (
+        <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
+          <p className="font-semibold text-white">No imported posts yet</p>
+          <p className="mt-2 text-[#8ea0ba]">The public feed is live, but there are no published local post assets to show.</p>
+        </div>
+      ) : null}
+
+      {!loading && !error && posts.length > 0 ? (
+        <div className="masonry-grid masonry-grid-home">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+};
 
 export const TrendingSurface = () => (
   <PageShell>
+    <TrendingView />
+  </PageShell>
+);
+
+const TrendingView = () => {
+  const { creators, error, loading } = usePublicFeedViewModel();
+
+  return (
     <section className="mx-auto max-w-[1280px] space-y-8 py-6">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white">Trending Creators</h1>
-          <p className="mt-2 text-sm text-[#97a7be]">Discover investable creators with high momentum.</p>
+          <p className="mt-2 text-sm text-[#97a7be]">Discover investable creators with real imported media already attached.</p>
         </div>
         <div className="rounded-full border border-[#de402a]/20 bg-[#2c1715] px-4 py-2 text-sm font-medium text-[#ff8f7f]">
           Market Up +4.2%
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {creators.map((creator) => (
-          <TrendingCreatorCard creator={creator} key={creator.id} />
-        ))}
-      </div>
+      {loading ? <div className="text-sm text-[#8ea0ba]">Loading imported creators…</div> : null}
+      {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
+
+      {!loading && !error ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {creators.map((creator) => (
+            <TrendingCreatorCard creator={creator} key={creator.id} />
+          ))}
+        </div>
+      ) : null}
     </section>
-  </PageShell>
+  );
+};
+
+const TrendStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="surface-muted rounded-[24px] px-4 py-4">
+    <p className="text-[10px] uppercase tracking-[0.22em] text-[#8d9eb7]">{label}</p>
+    <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-white">{value}</p>
+  </div>
 );

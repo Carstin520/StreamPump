@@ -7,6 +7,7 @@ import { Router } from "express";
 import authRoutes from "./authRoutes";
 import contentManifestRoutes from "./contentManifestRoutes";
 import internalMuxRoutes from "./internalMuxRoutes";
+import publicFeedRoutes from "./publicFeedRoutes";
 import proposalIntentRoutes from "./proposalIntentRoutes";
 import proposalRoutes from "./proposalRoutes";
 import workspaceRoutes from "./workspaceRoutes";
@@ -14,6 +15,7 @@ import workspaceRoutes from "./workspaceRoutes";
 const router = Router();
 
 router.use("/auth", authRoutes);
+router.use("/feed", publicFeedRoutes);
 router.use("/content", contentManifestRoutes);
 router.use("/proposal-intents", proposalIntentRoutes);
 router.use("/proposals", proposalRoutes);

@@ -4,11 +4,27 @@ import { useRouter } from "next/router";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { CreatorStageView } from "@/components/user/CreatorStageView";
-import { findCreator } from "@/lib/public-data";
+import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
 export default function CreatorDetailPage() {
   const router = useRouter();
-  const creator = findCreator(String(router.query.creatorId ?? ""));
+  const { creatorMap, postsByCreator } = usePublicFeedViewModel();
+  const creatorId = String(router.query.creatorId ?? "");
+  const creator = creatorMap.get(creatorId);
+  const creatorPosts = creator ? postsByCreator.get(creator.id) ?? [] : [];
+
+  if (!creator) {
+    return (
+      <>
+        <Head>
+          <title>StreamPump | Creator</title>
+        </Head>
+        <PageShell>
+          <div className="py-10 text-sm text-[#8ea0ba]">Imported creator not found.</div>
+        </PageShell>
+      </>
+    );
+  }
 
   return (
     <>
@@ -21,7 +37,7 @@ export default function CreatorDetailPage() {
             返回 Trending Creators
           </Link>
         </div>
-        <CreatorStageView creator={creator} />
+        <CreatorStageView creator={creator} posts={creatorPosts} />
       </PageShell>
     </>
   );

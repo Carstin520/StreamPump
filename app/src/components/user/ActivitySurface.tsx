@@ -11,21 +11,24 @@ import { PageShell } from "@/components/layout/PageShell";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { ActivityTab } from "@/lib/api/types";
-import {
-  activityAuthors,
-  activityFeedItems,
-  activityFeedTabs,
-  activitySidebarHighlights,
-  activityVideoItems,
-  compactNumber,
-  findCreator,
-} from "@/lib/public-data";
+import { compactNumber } from "@/lib/public-data";
+import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
 const ALL_ACTIVITY = "all";
 
 export const ActivitySurface = () => {
   const [activeTab, setActiveTab] = useState<ActivityTab>("overview");
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(ALL_ACTIVITY);
+  const {
+    activityAuthors,
+    activityFeedItems,
+    activityFeedTabs,
+    activitySidebarHighlights,
+    activityVideoItems,
+    creatorMap,
+    error,
+    loading,
+  } = usePublicFeedViewModel();
 
   const visibleFeedItems = activityFeedItems.filter((item) =>
     selectedCreatorId === ALL_ACTIVITY ? true : item.creatorId === selectedCreatorId,
@@ -57,7 +60,10 @@ export const ActivitySurface = () => {
 
               <div className="card-radius border border-white/[0.05] bg-[#0f1521]/90 p-2">
                 {activityAuthors.map((author) => {
-                  const creator = findCreator(author.creatorId);
+                  const creator = creatorMap.get(author.creatorId);
+                  if (!creator) {
+                    return null;
+                  }
                   const isActive = selectedCreatorId === creator.id;
 
                   return (
@@ -120,10 +126,17 @@ export const ActivitySurface = () => {
               </div>
             </div>
 
-            {activeTab === "overview" ? (
+            {loading ? <div className="text-sm text-[#8ea0ba]">Loading imported activity…</div> : null}
+
+            {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
+
+            {!loading && !error && activeTab === "overview" ? (
               <div className="space-y-4">
                 {visibleFeedItems.map((item) => {
-                  const creator = findCreator(item.creatorId);
+                  const creator = creatorMap.get(item.creatorId);
+                  if (!creator) {
+                    return null;
+                  }
 
                   return (
                     <article className="liquid-panel card-radius overflow-hidden px-5 py-5" key={item.id}>
@@ -199,10 +212,13 @@ export const ActivitySurface = () => {
               </div>
             ) : null}
 
-            {activeTab === "video" ? (
+            {!loading && !error && activeTab === "video" ? (
               <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {visibleVideoItems.map((item) => {
-                  const creator = findCreator(item.creatorId);
+                  const creator = creatorMap.get(item.creatorId);
+                  if (!creator) {
+                    return null;
+                  }
 
                   return (
                     <Link
@@ -268,7 +284,10 @@ export const ActivitySurface = () => {
 
               <div className="card-radius border border-white/[0.05] bg-[#101621]/88 p-2">
                 {activitySidebarHighlights.map((item) => {
-                  const creator = findCreator(item.creatorId);
+                  const creator = creatorMap.get(item.creatorId);
+                  if (!creator) {
+                    return null;
+                  }
 
                   return (
                     <Link

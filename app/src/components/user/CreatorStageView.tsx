@@ -4,19 +4,28 @@ import { useMemo, useState } from "react";
 import { FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
-import { CreatorMarketRecord } from "@/lib/api/types";
-import { compactNumber, formatUsd, posts } from "@/lib/public-data";
+import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
+import { compactNumber, formatUsd } from "@/lib/public-data";
 
 type ProfileTab = "作品" | "投资档案" | "Signals";
 
 const shellCard =
   "app-shell-frame overflow-hidden border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)]";
 
-export const CreatorStageView = ({ creator }: { creator: CreatorMarketRecord }) => {
+export const CreatorStageView = ({
+  creator,
+  posts = [],
+}: {
+  creator: CreatorMarketRecord;
+  posts?: PostRecord[];
+}) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
   const [isFollowing, setIsFollowing] = useState(false);
   const [followPulse, setFollowPulse] = useState(false);
-  const creatorPosts = useMemo(() => posts.filter((post) => post.creatorId === creator.id), [creator.id]);
+  const creatorPosts = useMemo(
+    () => posts.filter((post) => post.creatorId === creator.id),
+    [creator.id, posts]
+  );
   const metrics = getInvestmentMetrics(creator);
 
   const toggleFollow = () => {
