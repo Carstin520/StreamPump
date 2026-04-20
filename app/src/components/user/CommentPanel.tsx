@@ -118,7 +118,7 @@ export const CommentPanel = ({
     </div>
 
     <div className="flex-1 overflow-y-auto px-5 py-5" data-post-scroll-region>
-      <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.04em] text-white">{post.title}</h1>
+      <h1 className="line-clamp-3 text-[24px] font-semibold leading-8 tracking-[-0.04em] text-white">{post.title}</h1>
       <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {post.tags.map((tag) => (

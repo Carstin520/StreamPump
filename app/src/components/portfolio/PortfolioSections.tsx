@@ -24,6 +24,11 @@ import {
   formatUsd,
 } from "@/lib/public-data";
 
+const PRIMARY_BUTTON_CLASS =
+  "glass-button-primary px-4 py-3 text-sm font-semibold";
+const SECONDARY_BUTTON_CLASS =
+  "glass-button-ghost px-4 py-3 text-sm font-medium";
+
 export const PORTFOLIO_TABS = ["Portfolio", "Claim queue", "Re-entry"] as const;
 
 export type PortfolioTab = (typeof PORTFOLIO_TABS)[number];
@@ -113,12 +118,12 @@ export const PortfolioHoldingsSection = ({
                 >
                   <div className="flex flex-wrap items-center gap-4 xl:flex-nowrap">
                     <img alt={creator.name} className="h-12 w-12 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
-                    <div className="min-w-[180px] flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-base font-semibold text-white">{creator.name}</p>
+                    <div className="min-w-[160px] flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate text-base font-semibold text-white">{creator.name}</p>
                         <StagePill compact stage={creator.state} />
                       </div>
-                      <p className="mt-1 text-sm text-[#8ea0ba]">{holding.tokenCount} tokens held</p>
+                      <p className="mt-1 truncate text-sm text-[#8ea0ba]">{holding.tokenCount} tokens held</p>
                     </div>
 
                     <div className="min-w-[92px]">
@@ -241,12 +246,12 @@ export const ReentrySection = ({
             key={record.id}
           >
             <img alt={creator.name} className="h-12 w-12 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
-            <div className="min-w-[220px] flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-base font-semibold text-white">{creator.name}</p>
+            <div className="min-w-[180px] flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate text-base font-semibold text-white">{creator.name}</p>
                 <StagePill compact stage={creator.state} />
               </div>
-              <p className="mt-1 text-sm text-[#8ea0ba]">
+              <p className="mt-1 truncate text-sm text-[#8ea0ba]">
                 {record.thesis} · {record.exitedAtLabel}
               </p>
             </div>
@@ -307,10 +312,10 @@ export const ActionFlowModal = ({
                 : `${flowState.record.thesis} · exited at ${formatUsd(flowState.record.exitPriceUsd)} · current ${formatUsd(flowState.record.currentPriceUsd)}`}
             </div>
             <div className="flex gap-3">
-              <button className="flex-1 rounded-full border border-white/[0.1] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/6" onClick={onClose} type="button">
+              <button className={`flex-1 ${SECONDARY_BUTTON_CLASS}`} onClick={onClose} type="button">
                 Not now
               </button>
-              <button className="flex flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90" onClick={onConfirm} type="button">
+              <button className={`flex flex-1 items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onConfirm} type="button">
                 Confirm
                 <SendRoundedIcon className="h-4 w-4" />
               </button>
@@ -344,7 +349,7 @@ export const ActionFlowModal = ({
                   : `${creator.name} is now surfaced as a re-entry watch candidate for this session.`}
               </p>
             </div>
-            <button className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90" onClick={onClose} type="button">
+            <button className={`w-full ${PRIMARY_BUTTON_CLASS}`} onClick={onClose} type="button">
               Close
             </button>
           </div>
@@ -356,9 +361,10 @@ export const ActionFlowModal = ({
 
 const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => {
   const tone = getTrendTone(portfolioExposureTrend.map((point) => point.value));
+  const timelineLabels = compactTrendLabels(portfolioExposureTrend.map((point) => point.label));
 
   return (
-    <section className="card-radius border border-white/[0.06] bg-[#111723] p-5 shadow-[0_18px_44px_rgba(0,0,0,0.2)]">
+    <section className="liquid-glass-shell card-radius p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-[#73849f]">Exposure trend</p>
@@ -367,12 +373,12 @@ const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => 
             {tone === "positive" ? "Portfolio trend is still climbing across the last 8 sessions." : "Portfolio trend is softening across the last 8 sessions."}
           </p>
         </div>
-        <div className="card-radius min-w-[220px] border border-white/[0.05] bg-white/[0.03] px-4 py-3 text-sm text-[#8ea0ba]">
-          Curve uses mock portfolio snapshots and helps separate mark-to-market movement from one-off claim windows.
+        <div className="liquid-card card-radius min-w-[220px] px-4 py-3 text-sm text-[#8ea0ba]">
+          Lightweight snapshots keep the trend readable instead of turning this section into a dense trading dashboard.
         </div>
       </div>
 
-      <div className="card-radius mt-6 overflow-hidden border border-white/[0.05] bg-[linear-gradient(180deg,rgba(12,18,28,0.92)_0%,rgba(11,16,24,0.72)_100%)] px-3 py-4">
+      <div className="liquid-card card-radius mt-6 overflow-hidden px-3 py-4">
         <SparklineChart
           className="h-[180px] w-full"
           color={tone === "positive" ? "#65ecaf" : "#f67263"}
@@ -382,9 +388,11 @@ const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => 
           strokeWidth={3}
           width={640}
         />
-        <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] uppercase tracking-[0.16em] text-[#70819a] md:grid-cols-8">
-          {portfolioExposureTrend.map((point) => (
-            <span key={point.label}>{point.label}</span>
+        <div className="mt-4 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] text-[#70819a]">
+          {timelineLabels.map((label) => (
+            <span className="shrink-0" key={label}>
+              {label}
+            </span>
           ))}
         </div>
       </div>
@@ -421,7 +429,7 @@ const PendingClaimCard = ({
         </div>
       </div>
 
-      <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90" onClick={onClaim} type="button">
+      <button className={`mt-6 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
         Claim Now
         <ChevronRightIcon className="h-4 w-4" />
       </button>
@@ -462,7 +470,7 @@ const ActiveClaimCard = ({
         <ClaimMetricCard label="Payout" tone="positive" value={formatUsd(record.payoutUsd)} />
       </div>
 
-      <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90" onClick={onClaim} type="button">
+      <button className={`mt-5 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
         Claim {formatUsd(record.payoutUsd)}
         <ChevronRightIcon className="h-4 w-4" />
       </button>
@@ -519,3 +527,16 @@ const HoldingMetric = ({
     <p className={`mt-1 text-sm font-medium ${highlight === "green" ? "text-[#65ecaf]" : highlight === "pink" ? "text-[#ff8ca8]" : "text-white"}`}>{value}</p>
   </div>
 );
+
+const compactTrendLabels = (labels: string[]) => {
+  if (labels.length <= 4) {
+    return labels;
+  }
+
+  return [
+    labels[0],
+    labels[Math.floor((labels.length - 1) / 3)],
+    labels[Math.floor(((labels.length - 1) * 2) / 3)],
+    labels[labels.length - 1],
+  ];
+};

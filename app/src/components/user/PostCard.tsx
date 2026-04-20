@@ -34,7 +34,7 @@ export const PostCard = ({
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             src={post.coverSrc}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#08111c]/82 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_40%,rgba(8,17,28,0.36)_64%,rgba(8,17,28,0.82)_100%)]" />
 
           <div className="absolute left-3 top-3 z-[2]">
             <StagePill stage={post.stage} />

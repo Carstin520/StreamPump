@@ -46,7 +46,7 @@ export const CreatorStageView = ({
             sizes="(max-width: 768px) 100vw, 1200px"
             src={creator.heroSrc}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.18)_0%,rgba(7,11,18,0.52)_48%,rgba(7,11,18,0.96)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.12)_0%,rgba(7,11,18,0.28)_30%,rgba(7,11,18,0.56)_55%,rgba(7,11,18,0.86)_80%,rgba(7,11,18,0.98)_100%)]" />
         </div>
 
         <div className="relative px-6 pb-9 md:px-10">
@@ -55,8 +55,8 @@ export const CreatorStageView = ({
               <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
             </div>
 
-            <h1 className="mt-5 text-[38px] font-semibold tracking-[-0.05em] text-white">{creator.name}</h1>
-            <p className="mt-2 text-sm text-[#92a3bc]">
+            <h1 className="mt-5 max-w-[620px] truncate text-[38px] font-semibold tracking-[-0.05em] text-white">{creator.name}</h1>
+            <p className="mt-2 max-w-[480px] truncate text-sm text-[#92a3bc]">
               {creator.handle} · IP属地: {creator.city}
             </p>
 
@@ -75,7 +75,7 @@ export const CreatorStageView = ({
               <ProfileStat label="获赞与收藏" value={compactNumber(creator.totalLikesAndSavesCount)} />
             </div>
 
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
+            <p className="mt-6 line-clamp-3 max-w-2xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
 
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <button className="liquid-glass-btn rounded-full px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/10" type="button">
@@ -139,7 +139,7 @@ export const CreatorStageView = ({
                 type="button"
               >
                 {tab}
-                {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-white" /> : null}
+                {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[#de402a]" /> : null}
               </button>
             ))}
           </div>
@@ -160,7 +160,7 @@ export const CreatorStageView = ({
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                         src={post.coverSrc}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/36 to-transparent" />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_45%,rgba(0,0,0,0.18)_65%,rgba(0,0,0,0.36)_100%)]" />
                       {post.type === "VIDEO" ? (
                         <div className="liquid-pill absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
                           Video

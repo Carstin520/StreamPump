@@ -44,7 +44,7 @@ export const ActivitySurface = () => {
           <aside className="hidden xl:block">
             <div className="sticky top-24 space-y-3">
               <button
-                className={`card-radius flex w-full items-center justify-between border px-4 py-3 text-left transition ${
+                className={`card-radius liquid-card flex w-full items-center justify-between border px-4 py-3 text-left transition ${
                   selectedCreatorId === ALL_ACTIVITY
                     ? "border-white/[0.12] bg-white/[0.08] text-white"
                     : "border-white/[0.05] bg-[#101621]/88 text-[#a7b5c9] hover:border-white/[0.1] hover:text-white"
@@ -58,7 +58,7 @@ export const ActivitySurface = () => {
                 <span className="text-xs text-[#7f91ab]">{activityFeedItems.length}</span>
               </button>
 
-              <div className="card-radius border border-white/[0.05] bg-[#0f1521]/90 p-2">
+              <div className="liquid-glass-shell p-2">
                 {activityAuthors.map((author) => {
                   const creator = creatorMap.get(author.creatorId);
                   if (!creator) {
@@ -106,12 +106,12 @@ export const ActivitySurface = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#101621]/88 p-1">
+              <div className="glass-toolbar flex items-center gap-2 p-1">
                 {activityFeedTabs.map((tab) => (
                   <button
                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                       activeTab === tab.id
-                        ? "bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
+                        ? "glass-button-primary text-white"
                         : "text-[#8192ac] hover:text-white"
                     }`}
                     key={tab.id}
@@ -139,7 +139,7 @@ export const ActivitySurface = () => {
                   }
 
                   return (
-                    <article className="liquid-panel card-radius overflow-hidden px-5 py-5" key={item.id}>
+                      <article className="liquid-glass-shell card-radius overflow-hidden px-5 py-5" key={item.id}>
                       <div className="flex items-start justify-between gap-4">
                         <Link className="flex min-w-0 items-center gap-3" href={`/creators/${creator.id}`}>
                           <img alt={creator.name} className="h-11 w-11 rounded-full object-cover" src={creator.avatarSrc} />
@@ -161,11 +161,11 @@ export const ActivitySurface = () => {
 
                       <Link className="mt-4 block" href={`/posts/${item.postId}`}>
                         {item.title ? (
-                          <h2 className="max-w-3xl text-[23px] font-semibold leading-[1.24] tracking-[-0.04em] text-white">
+                          <h2 className="line-clamp-2 max-w-3xl text-[23px] font-semibold leading-[1.24] tracking-[-0.04em] text-white">
                             {item.title}
                           </h2>
                         ) : null}
-                        <p className="mt-3 max-w-3xl text-[15px] leading-8 text-[#d4deec]">{item.body}</p>
+                        <p className="mt-3 line-clamp-4 max-w-3xl text-[15px] leading-8 text-[#d4deec]">{item.body}</p>
                         <p className="mt-3 text-sm text-[#de7a68]">{item.actionSummary}</p>
 
                         {item.coverSrc ? (
@@ -179,7 +179,7 @@ export const ActivitySurface = () => {
                                 sizes="(max-width: 1024px) 100vw, 720px"
                                 src={item.coverSrc}
                               />
-                              <div className="absolute inset-0 bg-gradient-to-t from-[#08111c]/62 via-transparent to-transparent" />
+                              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,17,28,0.08)_0%,transparent_25%,transparent_50%,rgba(8,17,28,0.32)_72%,rgba(8,17,28,0.62)_100%)]" />
                               <div className="absolute left-4 top-4">
                                 <StagePill stage={item.stage} />
                               </div>
@@ -237,7 +237,7 @@ export const ActivitySurface = () => {
                             sizes="(max-width: 768px) 100vw, (max-width: 1536px) 50vw, 33vw"
                             src={item.coverSrc}
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#070d15]/88 via-[#070d15]/15 to-transparent" />
+                          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_30%,rgba(7,13,21,0.28)_55%,rgba(7,13,21,0.68)_80%,rgba(7,13,21,0.88)_100%)]" />
                           <div className="absolute left-3 top-3">
                             <StagePill compact stage={creator.state} />
                           </div>
@@ -272,7 +272,7 @@ export const ActivitySurface = () => {
 
           <aside className="hidden xl:block">
             <div className="sticky top-24 space-y-3">
-              <div className="card-radius border border-white/[0.05] bg-[#101621]/88 px-4 py-4">
+              <div className="liquid-glass-shell card-radius px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">关注中的活跃创作者</p>
@@ -284,7 +284,7 @@ export const ActivitySurface = () => {
                 </div>
               </div>
 
-              <div className="card-radius border border-white/[0.05] bg-[#101621]/88 p-2">
+              <div className="liquid-glass-shell card-radius p-2">
                 {activitySidebarHighlights.map((item) => {
                   const creator = creatorMap.get(item.creatorId);
                   if (!creator) {

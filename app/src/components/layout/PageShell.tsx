@@ -32,14 +32,14 @@ export const PageShell = ({
     <UserShell header={<UserTopbar searchPlaceholder={searchPlaceholder} />}>
       <div className="space-y-6 py-4">
         {showHeaderCard ? (
-          <section className="liquid-panel section-enter relative overflow-hidden rounded-[34px] p-6 md:p-8">
+          <section className="liquid-glass-shell hero-glow section-enter relative p-6 md:p-8">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%)]" />
             {title || subtitle || action ? (
               <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
                   <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">{eyebrow}</p>
                   {title ? (
-                    <h1 className="mt-3 text-[38px] font-semibold tracking-[-0.05em] text-white">
+                    <h1 className="mt-3 text-[38px] font-semibold tracking-[-0.06em] text-white md:text-[46px]">
                       {title}
                     </h1>
                   ) : null}
@@ -60,7 +60,7 @@ export const PageShell = ({
                     <Link
                       className={`rounded-full px-4 py-2 text-sm transition duration-200 ${
                         active
-                          ? "bg-white text-[#08101a] shadow-[0_14px_28px_rgba(255,255,255,0.12)]"
+                          ? "glass-button-primary text-white"
                           : "liquid-pill text-white hover:scale-[1.02] hover:bg-white/10"
                       }`}
                       href={tab.href}

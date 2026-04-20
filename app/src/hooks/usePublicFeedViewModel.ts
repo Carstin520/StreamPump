@@ -138,7 +138,12 @@ const createUserNote = (
 });
 
 const createCurrentUserRecord = (posts: PostRecord[]): CurrentUserRecord => {
-  const bannerSrc = posts[0]?.coverSrc ?? "/mock/user-surface/posts/luna-shadow.svg";
+  const bannerPost =
+    posts.find((post) => post.type === "IMAGE" && !post.hasMultipleImages) ??
+    posts.find((post) => post.type === "IMAGE") ??
+    posts.find((post) => post.type === "VIDEO") ??
+    null;
+  const bannerSrc = bannerPost?.coverSrc ?? "/mock/user-surface/posts/luna-shadow.svg";
   const totalLikesAndSavesCount = posts.reduce((total, post) => total + post.likes + post.saves, 0);
 
   return {

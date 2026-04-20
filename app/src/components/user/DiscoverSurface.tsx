@@ -13,7 +13,7 @@ export const DiscoverSurface = () => (
 
 const ExploreView = () => (
   <div className="space-y-5 py-4">
-    <section className="liquid-panel section-enter relative overflow-hidden rounded-[34px] px-5 py-6 md:px-7">
+    <section className="liquid-glass-shell hero-glow section-enter relative px-5 py-6 md:px-7">
       <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
       <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
         <div>
@@ -22,7 +22,7 @@ const ExploreView = () => (
             Scroll less noise. Land on posts that already feel like signal.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[#c6d2e3]">
-            StreamPump now reads more like an immersive content surface than a debug-heavy prototype. The feed stays visual, while creator stage and market context stay legible.
+            Real imported media stays upfront, while creator stage and market context sit behind a calmer layer of glass instead of louder dashboard chrome.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -33,8 +33,8 @@ const ExploreView = () => (
       </div>
     </section>
 
-    <section className="sticky top-20 z-20 bg-[#090d14]/76 pb-2 pt-2 backdrop-blur-xl">
-      <div className="flex gap-3 overflow-x-auto pb-1 text-sm">
+    <section className="sticky top-24 z-20 pb-2 pt-2">
+      <div className="glass-toolbar flex gap-3 overflow-x-auto px-2 py-2 text-sm">
         {discoverCategories.map((category) => (
           <button
             className={`whitespace-nowrap rounded-full px-4 py-2.5 transition duration-200 ${
@@ -77,7 +77,7 @@ const PostsSection = () => {
         <div className="masonry-grid masonry-grid-home">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
-              className="mb-4 h-[320px] break-inside-avoid rounded-[28px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(18,24,37,0.92)_0%,rgba(9,14,22,0.92)_100%)]"
+              className="liquid-card mb-4 h-[320px] break-inside-avoid rounded-[28px]"
               key={`feed-skeleton-${index}`}
             />
           ))}

@@ -48,7 +48,7 @@ export default function LoginPage() {
       <Head>
         <title>StreamPump | Login</title>
       </Head>
-      <main className="relative min-h-screen overflow-hidden bg-[#080c14] text-white">
+      <main className="relative min-h-screen overflow-hidden bg-[#090d14] text-white">
         <AnimatedFeedBackdrop className="opacity-[0.85]" />
         <div className="pointer-events-none absolute inset-[8%] rounded-[54px] border border-white/[0.03] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_36%)] backdrop-blur-[2px]" />
 

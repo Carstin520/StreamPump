@@ -22,17 +22,17 @@ export default function PostDetailPage() {
         <title>StreamPump | Post Detail</title>
       </Head>
       {loading ? (
-        <main className="flex min-h-screen items-center justify-center bg-[#05080d] text-sm text-[#c8d4e6]">
+        <main className="flex min-h-screen items-center justify-center bg-[#090d14] text-sm text-[#c8d4e6]">
           Loading imported post…
         </main>
       ) : null}
       {!loading && error ? (
-        <main className="flex min-h-screen items-center justify-center bg-[#05080d] px-6 text-center text-sm text-[#c8d4e6]">
+        <main className="flex min-h-screen items-center justify-center bg-[#090d14] px-6 text-center text-sm text-[#c8d4e6]">
           {error}
         </main>
       ) : null}
       {!loading && !error && routePostId && !posts.some((post) => post.id === routePostId) ? (
-        <main className="flex min-h-screen items-center justify-center bg-[#05080d] px-6 text-center text-sm text-[#c8d4e6]">
+        <main className="flex min-h-screen items-center justify-center bg-[#090d14] px-6 text-center text-sm text-[#c8d4e6]">
           Imported post not found.
         </main>
       ) : null}

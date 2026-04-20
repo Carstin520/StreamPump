@@ -29,10 +29,10 @@ export const UserShell = ({
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#090d14] text-[#f5f7fb]">
       <AnimatedFeedBackdrop />
 
-      <aside className="app-shell-frame fixed left-0 top-0 z-40 hidden h-[100dvh] w-16 border-r border-white/[0.05] bg-[#090d14]/90 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex h-16 items-center justify-center border-b border-white/[0.05] lg:justify-start lg:px-6">
+      <aside className="liquid-glass-shell fixed bottom-4 left-4 top-4 z-40 hidden w-16 lg:flex lg:w-[248px] lg:flex-col">
+        <div className="flex h-20 items-center justify-center border-b border-white/[0.06] lg:justify-start lg:px-6">
           <Link
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(222,64,42,0.32)]"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold text-white shadow-[0_14px_34px_rgba(222,64,42,0.34)]"
             href="/explore"
           >
             SP
@@ -45,25 +45,24 @@ export const UserShell = ({
         <nav className="flex-1 space-y-2 px-2 py-6 lg:px-4">
           {primaryNavItems.map((item) => (
             <Link
-              className={`group flex h-12 items-center justify-center rounded-2xl px-3 text-sm transition duration-200 lg:justify-start ${
-                isRouteActive(router.asPath, item)
-                  ? "border border-white/10 bg-white/[0.08] text-white shadow-[0_14px_34px_rgba(0,0,0,0.14)]"
-                  : "border border-transparent text-[#8f9eb7] hover:border-white/8 hover:bg-white/[0.05] hover:text-white"
-              }`}
+              className="glass-nav-link group flex h-12 items-center justify-center px-3 text-sm transition duration-200 lg:justify-start"
+              data-active={isRouteActive(router.asPath, item)}
               href={item.href}
               key={item.href}
             >
-              {item.label}
+              <span className={`${isRouteActive(router.asPath, item) ? "text-white" : "text-[#8f9eb7]"} transition duration-200 group-hover:text-white`}>
+                {item.label}
+              </span>
             </Link>
           ))}
         </nav>
 
-        <div className="space-y-2 border-t border-white/[0.05] p-2 lg:p-4">
+        <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-4">
           <Link href={PROFILE_PATH}>
             <div
               className={`surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 transition duration-200 lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
                 profileActive
-                  ? "border-white/[0.12] bg-white/[0.08] text-white"
+                  ? "border-white/[0.14] bg-white/[0.09] text-white"
                   : "text-white/80 hover:bg-white/[0.07]"
               }`}
             >
@@ -90,8 +89,8 @@ export const UserShell = ({
         </div>
       </aside>
 
-      <div className="relative lg:ml-64">
-        <div className="page-enter mx-auto max-w-[1440px] space-y-6 px-4 py-4 lg:px-6 lg:py-0">
+      <div className="relative lg:ml-[280px]">
+        <div className="page-enter mx-auto max-w-[1480px] space-y-6 px-4 py-4 lg:px-6 lg:py-0">
           {header}
           {children}
         </div>

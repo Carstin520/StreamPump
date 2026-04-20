@@ -209,7 +209,7 @@ export const PostDetailExperience = ({
       <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
         <button
           aria-label="Close post detail"
-          className="absolute inset-0 bg-[#05080d]/54 backdrop-blur-[7px]"
+          className="absolute inset-0 bg-[#090d14]/60 backdrop-blur-[7px]"
           onClick={onClose}
           type="button"
         />
@@ -220,7 +220,7 @@ export const PostDetailExperience = ({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05080d] text-white">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#090d14] text-white">
       <AnimatedFeedBackdrop className="opacity-[0.78]" />
       <div className="pointer-events-none absolute inset-[5%] rounded-[48px] border border-white/[0.025] bg-[linear-gradient(180deg,rgba(17,24,38,0.3)_0%,rgba(10,14,22,0.16)_100%)] shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur-[4px]" />
       <div className="mx-auto flex min-h-screen w-full max-w-[1800px] items-center justify-center px-2 py-2 lg:px-5 lg:py-4">
