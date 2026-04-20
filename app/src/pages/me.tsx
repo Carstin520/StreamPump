@@ -6,7 +6,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import {
   ProfileHero,
-  ProfileNoteGrid,
+  ProfilePostGrid,
   ProfileTab,
   ProfileTabBar,
   resolveItemPostId,
@@ -68,7 +68,7 @@ export default function MePage() {
               name={currentUser.name}
             />
             <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
-            <ProfileNoteGrid items={items} onOpen={(item) => setSelectedPostId(resolveItemPostId(item))} />
+            <ProfilePostGrid posts={tabPosts} onOpen={(postId) => setSelectedPostId(postId)} />
           </div>
         ) : null}
         {selectedPostId ? (

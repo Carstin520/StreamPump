@@ -1,5 +1,6 @@
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
+import { PostCard } from "@/components/user/PostCard";
 import { PostRecord, UserNoteRecord } from "@/lib/api/types";
 import { compactNumber } from "@/lib/public-data";
 
@@ -29,53 +30,54 @@ export const ProfileHero = ({
   name: string;
 }) => (
   <section className="mx-auto max-w-[1360px] px-2 pt-3 md:px-4 md:pt-5">
-    <div className="liquid-glass-shell">
-      <div className="relative h-[250px] overflow-hidden md:h-[340px]">
-        <ProgressiveImage
-          alt={`${name} banner`}
-          className="h-full w-full object-cover"
-          fill
-          priority
-          sizes="(max-width: 1280px) 100vw, 1280px"
-          src={bannerSrc}
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,7,13,0.02)_0%,rgba(6,10,16,0.12)_20%,rgba(7,12,19,0.38)_48%,rgba(7,12,19,0.74)_68%,rgba(7,12,19,0.96)_88%,rgba(7,12,19,1)_100%)]" />
+    <div className="relative">
+      <div className="overflow-hidden rounded-[calc(var(--radius-card)+0.25rem)]">
+        <div className="relative h-[400px] md:h-[460px] lg:h-[500px]">
+          <ProgressiveImage
+            alt={`${name} banner`}
+            className="h-full w-full object-cover"
+            fill
+            priority
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            src={bannerSrc}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,12,19,0.36)_0%,rgba(7,12,19,0.1)_14%,transparent_28%,rgba(7,12,19,0.12)_38%,rgba(7,12,19,0.38)_48%,rgba(7,12,19,0.68)_60%,rgba(7,12,19,0.9)_74%,rgba(7,12,19,1)_88%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(7,12,19,0.4)_100%)]" />
+        </div>
       </div>
 
-      <div className="px-5 pb-10 md:px-8 md:pb-12">
-        <div className="-mt-16 flex flex-col items-center text-center md:-mt-20">
-          <div className="h-28 w-28 overflow-hidden rounded-full border-[4px] border-[#09111b] bg-[#121b2b] shadow-[0_30px_70px_rgba(0,0,0,0.42)] md:h-32 md:w-32">
-            <img alt={name} className="h-full w-full object-cover" src={avatarSrc} />
-          </div>
+      <div className="relative z-[2] -mt-[260px] flex flex-col items-center text-center md:-mt-[300px] lg:-mt-[320px]">
+        <div className="h-20 w-20 overflow-hidden rounded-full border-[3px] border-[#0b1119] bg-[#121b2b] shadow-[0_24px_56px_rgba(0,0,0,0.5)] md:h-24 md:w-24">
+          <img alt={name} className="h-full w-full object-cover" src={avatarSrc} />
+        </div>
 
-          <h1 className="mt-6 max-w-[760px] truncate text-[42px] font-semibold tracking-[-0.07em] text-white md:text-[58px]">{name}</h1>
-          <p className="mt-2 max-w-[620px] truncate text-sm text-[#8da0bb] md:text-[17px]">
-            {handle} · IP属地: {location}
-          </p>
-          <p className="mt-6 line-clamp-4 max-w-[760px] text-sm leading-8 text-[#c7d1e0] md:text-[18px]">
-            {bio}
-          </p>
+        <h1 className="mt-4 max-w-[760px] truncate text-[28px] font-semibold tracking-[-0.05em] text-white md:text-[34px] lg:text-[38px]">{name}</h1>
+        <p className="mt-1.5 max-w-[620px] truncate text-xs text-[#8da0bb] md:text-sm">
+          {handle} · IP属地: {location}
+        </p>
+        <p className="mt-4 line-clamp-3 max-w-[680px] text-xs leading-6 text-[#c7d1e0] md:text-sm md:leading-7">
+          {bio}
+        </p>
 
-          <div className="mt-10 grid w-full max-w-[620px] grid-cols-3 gap-4">
-            <HeroStat label="关注" value={formatProfileCount(followingCount)} />
-            <HeroStat label="粉丝" value={formatProfileCount(followersCount)} />
-            <HeroStat label="获赞与收藏" value={formatProfileCount(likesAndSavesCount)} />
-          </div>
+        <div className="mt-6 grid w-full max-w-[520px] grid-cols-3 gap-4 md:mt-8">
+          <HeroStat label="关注" value={formatProfileCount(followingCount)} />
+          <HeroStat label="粉丝" value={formatProfileCount(followersCount)} />
+          <HeroStat label="获赞与收藏" value={formatProfileCount(likesAndSavesCount)} />
+        </div>
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
-            <button
-              className="glass-button-ghost px-8 py-3 text-base font-semibold"
-              type="button"
-            >
-              编辑资料
-            </button>
-            <button
-              className="glass-button-primary px-8 py-3 text-base font-semibold"
-              type="button"
-            >
-              + 创作
-            </button>
-          </div>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:mt-7">
+          <button
+            className="glass-button-ghost px-6 py-2.5 text-sm font-semibold"
+            type="button"
+          >
+            编辑资料
+          </button>
+          <button
+            className="glass-button-primary px-6 py-2.5 text-sm font-semibold"
+            type="button"
+          >
+            + 创作
+          </button>
         </div>
       </div>
     </div>
@@ -89,7 +91,7 @@ export const ProfileTabBar = ({
   activeTab: ProfileTab;
   onTabChange: (tab: ProfileTab) => void;
 }) => (
-  <section className="mx-auto mt-8 max-w-[1360px] px-2 md:px-4">
+  <section className="mx-auto mt-5 max-w-[1360px] px-2 md:px-4">
     <div className="glass-divider h-px w-full" />
     <div className="mx-auto flex max-w-[420px] items-center justify-center gap-10 pt-5">
         {PROFILE_TABS.map((tab) => (
@@ -119,7 +121,7 @@ export const ProfileNoteGrid = ({
   onOpen: (item: UserNoteRecord) => void;
 }) => (
   <section className="mx-auto max-w-[1360px] px-2 pb-10 pt-6 md:px-4">
-    <div className="masonry-grid">
+    <div className="masonry-grid masonry-grid-home">
       {items.map((item, index) => (
         <ProfileNoteCard
           item={item}
@@ -127,6 +129,22 @@ export const ProfileNoteGrid = ({
           onOpen={() => onOpen(item)}
           priority={index < 3}
         />
+      ))}
+    </div>
+  </section>
+);
+
+export const ProfilePostGrid = ({
+  posts,
+  onOpen,
+}: {
+  posts: PostRecord[];
+  onOpen: (postId: string) => void;
+}) => (
+  <section className="mx-auto max-w-[1360px] px-2 pb-10 pt-6 md:px-4">
+    <div className="masonry-grid masonry-grid-home">
+      {posts.map((post, index) => (
+        <PostCard key={post.id} post={post} priority={index < 4} onClick={() => onOpen(post.id)} />
       ))}
     </div>
   </section>
@@ -169,8 +187,8 @@ export const resolveProfilePosts = (items: UserNoteRecord[], posts: PostRecord[]
 
 const HeroStat = ({ label, value }: { label: string; value: string }) => (
   <div className="text-center">
-    <p className="text-[34px] font-semibold tracking-[-0.05em] text-white md:text-[42px]">{value}</p>
-    <p className="mt-2 text-sm text-[#8698b2]">{label}</p>
+    <p className="text-[24px] font-semibold tracking-[-0.04em] text-white md:text-[28px]">{value}</p>
+    <p className="mt-1 text-xs text-[#8698b2]">{label}</p>
   </div>
 );
 

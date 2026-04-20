@@ -368,7 +368,7 @@ const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-[#73849f]">Exposure trend</p>
-          <h2 className="mt-3 text-[30px] font-semibold tracking-[-0.04em] text-white">{formatUsd(totalExposure)}</h2>
+          <h2 className="mt-3 text-[42px] font-semibold tracking-[-0.04em] text-white lg:text-[52px]">{formatUsd(totalExposure)}</h2>
           <p className={`mt-2 text-sm ${tone === "positive" ? "text-[#65ecaf]" : "text-[#f67263]"}`}>
             {tone === "positive" ? "Portfolio trend is still climbing across the last 8 sessions." : "Portfolio trend is softening across the last 8 sessions."}
           </p>
@@ -425,11 +425,15 @@ const PendingClaimCard = ({
         <img alt={creator.name} className="h-10 w-10 rounded-full object-cover" src={creator.avatarSrc} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white">{creator.name}</p>
-          <p className="text-xs text-[#8ea0ba]">Estimated payout: {formatUsd(record.payoutUsd)}</p>
         </div>
       </div>
 
-      <button className={`mt-6 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
+      <div className="card-radius mt-4 border border-[#65ecaf]/20 bg-[linear-gradient(180deg,rgba(18,45,33,0.4)_0%,rgba(9,21,16,0.6)_100%)] px-4 py-4 text-center">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-[#8df0bb]">Estimated payout</p>
+        <p className="mt-2 text-[32px] font-bold tracking-[-0.04em] text-[#65ecaf]">{formatUsd(record.payoutUsd)}</p>
+      </div>
+
+      <button className={`mt-5 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
         Claim Now
         <ChevronRightIcon className="h-4 w-4" />
       </button>

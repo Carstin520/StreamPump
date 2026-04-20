@@ -48,11 +48,11 @@ export default function LoginPage() {
       <Head>
         <title>StreamPump | Login</title>
       </Head>
-      <main className="relative min-h-screen overflow-hidden bg-[#090d14] text-white">
+      <main className="relative min-h-screen bg-[#090d14] text-white">
         <AnimatedFeedBackdrop className="opacity-[0.85]" />
-        <div className="pointer-events-none absolute inset-[8%] rounded-[54px] border border-white/[0.03] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_36%)] backdrop-blur-[2px]" />
+        <div className="pointer-events-none fixed inset-[8%] z-0 rounded-[54px] border border-white/[0.03] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_36%)] backdrop-blur-[2px]" />
 
-        <div className="relative flex min-h-screen flex-col px-5 py-5 lg:px-8">
+        <div className="relative z-[1] flex min-h-screen flex-col px-5 py-5 lg:px-8">
           <div className="flex items-center justify-between">
             <Link className="flex items-center gap-3" href="/explore">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold shadow-[0_12px_30px_rgba(222,64,42,0.32)]">

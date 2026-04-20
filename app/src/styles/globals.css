@@ -22,6 +22,11 @@
   --glass-fill-strong: rgba(255, 255, 255, 0.09);
 }
 
+html,
+body {
+  background: var(--bg-start);
+}
+
 html {
   min-height: 100%;
 }
@@ -543,31 +548,48 @@ a {
     border-radius: var(--radius-card);
   }
 
-  .feed-backdrop-column {
-    display: flex;
-    flex-direction: column;
+  .backdrop-base {
+    background:
+      radial-gradient(circle at 20% 8%, rgba(64, 90, 150, 0.16), transparent 26%),
+      radial-gradient(circle at 80% 6%, rgba(34, 74, 140, 0.12), transparent 22%),
+      radial-gradient(circle at 60% 90%, rgba(222, 64, 42, 0.06), transparent 20%),
+      radial-gradient(circle at 10% 60%, rgba(60, 92, 149, 0.06), transparent 18%);
   }
 
-  .feed-backdrop-column-a {
-    animation: feed-drift-a 28s ease-in-out infinite;
+  .backdrop-orb {
+    filter: blur(120px);
+    opacity: 0.5;
+    will-change: transform, opacity;
   }
 
-  .feed-backdrop-column-b {
-    animation: feed-drift-b 32s ease-in-out infinite;
+  .backdrop-orb-1 {
+    background: radial-gradient(circle, rgba(64, 105, 180, 0.18) 0%, transparent 70%);
+    animation: orb-float-1 24s ease-in-out infinite;
   }
 
-  .feed-backdrop-card {
-    transition: opacity 400ms var(--ease-fluid);
+  .backdrop-orb-2 {
+    background: radial-gradient(circle, rgba(222, 64, 42, 0.1) 0%, transparent 70%);
+    animation: orb-float-2 28s ease-in-out infinite;
   }
 
-  .feed-backdrop-line {
-    height: 6px;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  .backdrop-orb-3 {
+    background: radial-gradient(circle, rgba(52, 78, 130, 0.14) 0%, transparent 70%);
+    animation: orb-float-3 32s ease-in-out infinite;
   }
 
-  .feed-backdrop-pill {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.03);
+  .backdrop-orb-4 {
+    background: radial-gradient(circle, rgba(222, 64, 42, 0.08) 0%, transparent 70%);
+    animation: orb-float-4 22s ease-in-out infinite;
+  }
+
+  .backdrop-orb-5 {
+    background: radial-gradient(circle, rgba(74, 120, 200, 0.1) 0%, transparent 70%);
+    animation: orb-float-5 26s ease-in-out infinite;
+  }
+
+  .backdrop-mesh {
+    background-image:
+      radial-gradient(ellipse 100% 80% at 50% 20%, transparent 48%, rgba(9, 13, 20, 0.4) 100%);
   }
 }
 
@@ -738,24 +760,33 @@ a {
   }
 }
 
-@keyframes feed-drift-a {
-  0%, 100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-12px);
-  }
+@keyframes orb-float-1 {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
+  33% { opacity: 0.62; transform: translate(30px, -20px) scale(1.06); }
+  66% { opacity: 0.44; transform: translate(-18px, 14px) scale(0.96); }
 }
 
-@keyframes feed-drift-b {
-  0%, 100% {
-    transform: translateY(0);
-  }
+@keyframes orb-float-2 {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
+  40% { opacity: 0.58; transform: translate(-24px, 28px) scale(1.08); }
+  70% { opacity: 0.4; transform: translate(14px, -10px) scale(0.94); }
+}
 
-  50% {
-    transform: translateY(10px);
-  }
+@keyframes orb-float-3 {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
+  50% { opacity: 0.6; transform: translate(20px, 22px) scale(1.05); }
+}
+
+@keyframes orb-float-4 {
+  0%, 100% { opacity: 0.48; transform: translate(0, 0) scale(1); }
+  35% { opacity: 0.62; transform: translate(-28px, -16px) scale(1.1); }
+  65% { opacity: 0.42; transform: translate(12px, 18px) scale(0.95); }
+}
+
+@keyframes orb-float-5 {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
+  45% { opacity: 0.56; transform: translate(22px, -18px) scale(1.04); }
+  80% { opacity: 0.43; transform: translate(-14px, 10px) scale(0.97); }
 }
 
 @media (prefers-reduced-motion: reduce) {

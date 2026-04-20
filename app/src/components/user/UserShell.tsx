@@ -26,7 +26,7 @@ export const UserShell = ({
   });
 
   return (
-    <main className="relative min-h-[100dvh] overflow-hidden bg-[#090d14] text-[#f5f7fb]">
+    <main className="relative min-h-[100dvh] bg-[#090d14] text-[#f5f7fb]">
       <AnimatedFeedBackdrop />
 
       <aside className="liquid-glass-shell fixed bottom-4 left-4 top-4 z-40 hidden w-16 lg:flex lg:w-[248px] lg:flex-col">

@@ -1,3 +1,6 @@
+import dynamic from "next/dynamic";
+import { useState } from "react";
+
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
 import { PageShell } from "@/components/layout/PageShell";
@@ -5,13 +8,34 @@ import { discoverCategories } from "@/lib/public-data";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
 
-export const DiscoverSurface = () => (
-  <PageShell>
-    <ExploreView />
-  </PageShell>
+const DynamicPostDetailExperience = dynamic(
+  () => import("@/components/post/PostDetailExperience").then((mod) => mod.PostDetailExperience),
+  { ssr: false },
 );
 
-const ExploreView = () => (
+export const DiscoverSurface = () => {
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const { posts } = usePublicFeedViewModel();
+
+  return (
+    <PageShell>
+      <ExploreView onOpenPost={setSelectedPostId} />
+      {selectedPostId && posts.length > 0 ? (
+        <DynamicPostDetailExperience
+          closeLabel="Back to explore"
+          currentPostId={selectedPostId}
+          items={posts}
+          mode="modal"
+          onChangePostId={setSelectedPostId}
+          onClose={() => setSelectedPostId(null)}
+          syncRoute={false}
+        />
+      ) : null}
+    </PageShell>
+  );
+};
+
+const ExploreView = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) => (
   <div className="space-y-5 py-4">
     <section className="liquid-glass-shell hero-glow section-enter relative px-5 py-6 md:px-7">
       <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
@@ -64,11 +88,11 @@ const ExploreView = () => (
       </div>
     </section>
 
-    <PostsSection />
+    <PostsSection onOpenPost={onOpenPost} />
   </div>
 );
 
-const PostsSection = () => {
+const PostsSection = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) => {
   const { error, loading, posts } = usePublicFeedViewModel();
 
   return (
@@ -101,7 +125,7 @@ const PostsSection = () => {
       {!loading && !error && posts.length > 0 ? (
         <div className="masonry-grid masonry-grid-home">
           {posts.map((post, index) => (
-            <PostCard key={post.id} post={post} priority={index < 4} />
+            <PostCard key={post.id} post={post} priority={index < 4} onClick={() => onOpenPost(post.id)} />
           ))}
         </div>
       ) : null}
