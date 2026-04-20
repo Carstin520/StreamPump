@@ -3,6 +3,7 @@ import {
   Prisma,
 } from "@prisma/client";
 
+import { config } from "../../config/default";
 import { ok, parsePositiveInt, withController } from "./http";
 import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
@@ -120,6 +121,31 @@ const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0])
 
   if (isBrowserRenderableUrl(serialized.originUrl) || !asset.storageKey.trim()) {
     return serialized;
+  }
+
+  const canonicalUrl = s3Service.buildCanonicalUrl(asset.storageKey);
+  if (isBrowserRenderableUrl(canonicalUrl)) {
+    const preferredPlaybackUrl =
+      serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
+        ? canonicalUrl
+        : serialized.preferredPlaybackUrl;
+
+    return {
+      ...serialized,
+      originUrl: canonicalUrl,
+      preferredPlaybackUrl,
+    };
+  }
+
+  if (!config.storage.origin.bucket?.trim()) {
+    return {
+      ...serialized,
+      originUrl: null,
+      preferredPlaybackUrl:
+        serialized.preferredPlaybackSource === "ORIGIN"
+          ? null
+          : serialized.preferredPlaybackUrl,
+    };
   }
 
   const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 60 * 60);
