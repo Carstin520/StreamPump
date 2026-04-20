@@ -17,6 +17,8 @@ const loadEnvFile = (filePath: string): void => {
 [
   path.resolve(process.cwd(), ".env.local"),
   path.resolve(process.cwd(), ".env"),
+  path.resolve(process.cwd(), "backend/.env.local"),
+  path.resolve(process.cwd(), "backend/.env"),
   path.resolve(__dirname, ".env.local"),
   path.resolve(__dirname, ".env"),
   path.resolve(__dirname, "../.env.local"),

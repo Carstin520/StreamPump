@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "import:local-post-assets": "npm run build && node dist/scripts/import-local-post-assets.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy"

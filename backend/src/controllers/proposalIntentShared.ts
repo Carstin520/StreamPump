@@ -12,6 +12,7 @@ import {
 import bs58 from "bs58";
 
 import { HttpError } from "./http";
+import { serializeAsset } from "./contentManifestShared";
 import { decodeVersionedTransaction, derivePlannedContentAnchorPda } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
 
@@ -357,9 +358,15 @@ export const serializeProposalIntentDetail = (
         id: string;
         assetType: string;
         orderIndex: number;
+        storageKey: string;
+        cdnUrl: string | null;
         uploadStatus: string;
         processingStatus: string;
+        muxAssetId: string | null;
         muxPlaybackId: string | null;
+        muxLastKnownStatus: string | null;
+        processingError: string | null;
+        updatedAt: Date;
       }>;
     } | null;
     txBundles: SerializedBundleInput[];
@@ -378,14 +385,7 @@ export const serializeProposalIntentDetail = (
         version: intent.manifest.version,
         manifestHashHex: intent.manifest.manifestHashHex,
         currentAnchorPda: intent.manifest.currentAnchorPda,
-        assets: intent.manifest.assets.map((asset) => ({
-          assetId: asset.id,
-          assetType: asset.assetType,
-          orderIndex: asset.orderIndex,
-          uploadStatus: asset.uploadStatus,
-          processingStatus: asset.processingStatus,
-          muxPlaybackId: asset.muxPlaybackId,
-        })),
+        assets: intent.manifest.assets.map(serializeAsset),
       }
     : null,
   proposal: intent.proposal ? serializeProposal(intent.proposal) : null,

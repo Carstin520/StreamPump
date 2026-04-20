@@ -1,6 +1,6 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
@@ -28,6 +28,8 @@ type PageState =
   | { kind: "error"; message: string }
   | { kind: "ready"; data: ContentManifestDetailResponse };
 
+type ManifestAssetRecord = ContentManifestDetailResponse["assets"][number];
+
 const ACCEPTED_UPLOAD_TYPES = [
   "video/mp4",
   "video/quicktime",
@@ -36,6 +38,151 @@ const ACCEPTED_UPLOAD_TYPES = [
   "image/webp",
   "image/heic",
 ];
+
+const isRenderableUrl = (value: string | null | undefined) => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return normalized.startsWith("http://") || normalized.startsWith("https://") || normalized.startsWith("/");
+};
+
+const isVideoAsset = (asset: ManifestAssetRecord) => asset.assetType === "VIDEO";
+
+const isMuxAssetReady = (asset: ManifestAssetRecord) =>
+  isVideoAsset(asset) && asset.preferredPlaybackSource === "MUX" && isRenderableUrl(asset.muxPlaybackUrl);
+
+const resolveRenderableAssetUrl = (asset: ManifestAssetRecord) => {
+  if (isRenderableUrl(asset.preferredPlaybackUrl)) {
+    return asset.preferredPlaybackUrl;
+  }
+
+  if (isRenderableUrl(asset.originUrl)) {
+    return asset.originUrl;
+  }
+
+  return null;
+};
+
+const renderabilityHint = (asset: ManifestAssetRecord) => {
+  if (resolveRenderableAssetUrl(asset)) {
+    return null;
+  }
+
+  if (asset.originUrl?.startsWith("s3://")) {
+    return "Origin URL is not browser-safe yet. Set S3_PUBLIC_BASE_URL or a CDN domain for direct preview.";
+  }
+
+  if (isVideoAsset(asset) && asset.ingestStatus !== "READY") {
+    return "Video preview will appear after Mux ingest reaches READY.";
+  }
+
+  return "No browser-renderable asset URL is available yet.";
+};
+
+function ManifestAssetPreview({ asset }: { asset: ManifestAssetRecord }) {
+  const renderableUrl = resolveRenderableAssetUrl(asset);
+  const previewHint = renderabilityHint(asset);
+
+  if (isVideoAsset(asset)) {
+    if (isMuxAssetReady(asset) && asset.muxPlaybackUrl) {
+      return (
+        <HlsVideoPreview
+          asset={asset}
+          fallbackUrl={asset.originUrl && isRenderableUrl(asset.originUrl) ? asset.originUrl : null}
+        />
+      );
+    }
+
+    if (renderableUrl) {
+      return (
+        <video
+          className="h-full w-full object-cover"
+          controls
+          muted
+          playsInline
+          preload="metadata"
+          src={renderableUrl}
+        />
+      );
+    }
+  } else if (renderableUrl) {
+    return <img alt={`${asset.assetType} ${asset.orderIndex + 1}`} className="h-full w-full object-cover" src={renderableUrl} />;
+  }
+
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 px-4 text-center text-xs text-slate-300">
+      {previewHint ?? "Preview pending"}
+    </div>
+  );
+}
+
+function HlsVideoPreview({
+  asset,
+  fallbackUrl,
+}: {
+  asset: ManifestAssetRecord;
+  fallbackUrl: string | null;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !asset.muxPlaybackUrl) {
+      return;
+    }
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = asset.muxPlaybackUrl;
+      return;
+    }
+
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
+
+    void import("hls.js").then(({ default: Hls }) => {
+      if (cancelled || !video) {
+        return;
+      }
+
+      if (!Hls.isSupported()) {
+        if (fallbackUrl) {
+          video.src = fallbackUrl;
+        }
+        return;
+      }
+
+      const hls = new Hls({
+        enableWorker: true,
+      });
+
+      hls.loadSource(asset.muxPlaybackUrl as string);
+      hls.attachMedia(video);
+      cleanup = () => {
+        hls.destroy();
+      };
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [asset.muxPlaybackUrl, fallbackUrl]);
+
+  return (
+    <video
+      ref={videoRef}
+      className="h-full w-full object-cover"
+      controls
+      muted
+      playsInline
+      preload="metadata"
+    >
+      {fallbackUrl ? <source src={fallbackUrl} type="video/mp4" /> : null}
+    </video>
+  );
+}
 
 const sha256Hex = async (file: File) => {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
@@ -47,18 +194,60 @@ const sha256Hex = async (file: File) => {
 const resolveAssetType = (file: File): ManifestAssetKind =>
   file.type.toLowerCase().startsWith("video/") ? "VIDEO" : "IMAGE";
 
-const uploadToPresignedUrl = async (url: string, file: File) => {
+const uploadToPresignedUrl = async (url: string, file: Blob, contentType?: string) => {
   const response = await fetch(url, {
     method: "PUT",
-    headers: {
-      "Content-Type": file.type,
-    },
+    headers: contentType
+      ? {
+          "Content-Type": contentType,
+        }
+      : undefined,
     body: file,
   });
 
   if (!response.ok) {
     throw new Error(`Asset upload failed with ${response.status}`);
   }
+
+  return response;
+};
+
+const normalizeEtag = (value: string | null) =>
+  value?.trim().replace(/^"+|"+$/g, "") || null;
+
+const uploadMultipartAsset = async (
+  upload: Extract<
+    Awaited<ReturnType<typeof presignManifestAssets>>["uploads"][number],
+    { uploadStrategy: "MULTIPART" }
+  >,
+  file: File,
+  onPartStart: (partNumber: number, partCount: number) => void,
+) => {
+  const completedParts = [];
+
+  for (const part of upload.parts) {
+    onPartStart(part.partNumber, upload.partCount);
+
+    const start = (part.partNumber - 1) * upload.partSizeBytes;
+    const end = Math.min(start + upload.partSizeBytes, file.size);
+    const chunk = file.slice(start, end);
+    const response = await uploadToPresignedUrl(part.presignedUrl, chunk);
+    const etag = normalizeEtag(response.headers.get("etag"));
+
+    if (!etag) {
+      throw new Error("Multipart upload response is missing ETag. Expose ETag in S3 CORS.");
+    }
+
+    completedParts.push({
+      partNumber: part.partNumber,
+      etag,
+    });
+  }
+
+  return {
+    multipartUploadId: upload.multipartUploadId,
+    parts: completedParts,
+  };
 };
 
 export default function ManifestDetailPage() {
@@ -141,7 +330,11 @@ export default function ManifestDetailPage() {
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     setSelectedFiles(files);
-    setActionMessage(files.length > 0 ? `${files.length} asset file(s) ready for upload.` : null);
+    setActionMessage(
+      files.length > 0
+        ? `${files.length} asset file(s) ready for upload. Videos will use multipart S3 upload, then queue async Mux ingest.`
+        : null
+    );
   };
 
   const handleUploadAssets = async () => {
@@ -191,14 +384,38 @@ export default function ManifestDetailPage() {
 
       for (const [index, upload] of response.uploads.entries()) {
         const file = selectedFiles[index];
-        setActionMessage(`Uploading ${index + 1}/${response.uploads.length}: ${file.name}`);
-        await uploadToPresignedUrl(upload.presignedUrl, file);
-        await completeManifestAssetUpload(token, manifestId, upload.assetId);
+        setActionMessage(
+          `Uploading ${index + 1}/${response.uploads.length}: ${file.name} via ${upload.uploadStrategy}.`
+        );
+
+        if (upload.uploadStrategy === "MULTIPART") {
+          const multipartCompletion = await uploadMultipartAsset(
+            upload,
+            file,
+            (partNumber, partCount) => {
+              setActionMessage(
+                `Uploading ${file.name} part ${partNumber}/${partCount} to S3 before async Mux ingest.`
+              );
+            }
+          );
+
+          await completeManifestAssetUpload(
+            token,
+            manifestId,
+            upload.assetId,
+            multipartCompletion
+          );
+        } else {
+          await uploadToPresignedUrl(upload.presignedUrl, file, file.type);
+          await completeManifestAssetUpload(token, manifestId, upload.assetId);
+        }
       }
 
       await refreshManifest(token, manifestId);
       setSelectedFiles([]);
-      setActionMessage("Asset upload completed and manifest state refreshed.");
+      setActionMessage(
+        "Asset upload completed. Images are ready from S3 immediately; videos are now queued for async Mux ingest."
+      );
     } catch (error) {
       handleApiError(error, "Failed to upload manifest assets.");
     } finally {
@@ -323,9 +540,33 @@ export default function ManifestDetailPage() {
                   <div className="grid gap-3 md:grid-cols-3">
                     {state.data.assets.map((asset) => (
                       <div className="rounded-3xl border border-dashed border-white/10 bg-white/4 p-4" key={asset.assetId}>
-                        <div className="aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-800 to-slate-700" />
+                        <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-700">
+                          <ManifestAssetPreview asset={asset} />
+                        </div>
                         <p className="mt-3 text-sm font-medium text-white">{asset.assetType} #{asset.orderIndex + 1}</p>
-                        <p className="text-xs text-slate-400">{asset.uploadStatus} · {asset.processingStatus}</p>
+                        <p className="text-xs text-slate-400">{asset.uploadStatus} · {asset.deliveryStatus}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Read from: {asset.preferredPlaybackSource ?? "Pending"} · Ingest: {asset.ingestStatus}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Upload: {asset.uploadStrategy} · Mux: {asset.muxLastKnownStatus ?? "n/a"}
+                        </p>
+                        {asset.preferredPlaybackUrl ? (
+                          <a
+                            className="mt-2 inline-flex text-xs text-sky-300 transition hover:text-sky-200"
+                            href={asset.preferredPlaybackUrl}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Open asset URL
+                          </a>
+                        ) : null}
+                        {asset.processingError ? (
+                          <p className="mt-2 text-xs text-rose-300">{asset.processingError}</p>
+                        ) : null}
+                        {!asset.processingError && renderabilityHint(asset) ? (
+                          <p className="mt-2 text-xs text-amber-300">{renderabilityHint(asset)}</p>
+                        ) : null}
                       </div>
                     ))}
                     {state.data.assets.length === 0 ? (
@@ -356,7 +597,10 @@ export default function ManifestDetailPage() {
                       <div className="mt-3 space-y-2">
                         {selectedFiles.map((file) => (
                           <div className="flex items-center justify-between gap-3 text-sm text-slate-200" key={`${file.name}-${file.size}-${file.lastModified}`}>
-                            <span className="truncate">{file.name}</span>
+                            <span className="truncate">
+                              {file.name}
+                              {file.type.toLowerCase().startsWith("video/") ? " · multipart + async mux" : " · single-part s3"}
+                            </span>
                             <span className="shrink-0 text-xs text-slate-400">{Math.max(1, Math.round(file.size / 1024))} KB</span>
                           </div>
                         ))}

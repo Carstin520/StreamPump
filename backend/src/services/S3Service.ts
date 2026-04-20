@@ -2,12 +2,20 @@
  * CN: S3 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
  * EN: S3 origin-storage service responsible for content asset presigned upload and download URLs.
  */
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  UploadPartCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { config } from "../../config/default";
 
 const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 15 * 60;
+export const MULTIPART_UPLOAD_PART_SIZE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
   "video/mp4",
   "video/quicktime",
@@ -76,6 +84,24 @@ export interface PresignedUploadUrlResult {
   expiresInSeconds: number;
 }
 
+export interface PresignedMultipartUploadPartResult {
+  partNumber: number;
+  presignedUrl: string;
+  expiresInSeconds: number;
+}
+
+export interface PresignedMultipartUploadResult {
+  uploadId: string;
+  partCount: number;
+  partSizeBytes: number;
+  parts: PresignedMultipartUploadPartResult[];
+}
+
+export interface CompletedMultipartPart {
+  partNumber: number;
+  etag: string;
+}
+
 export class S3Service {
   private readonly client: S3Client;
 
@@ -106,6 +132,104 @@ export class S3Service {
       presignedUrl,
       expiresInSeconds: PRESIGNED_UPLOAD_EXPIRY_SECONDS,
     };
+  }
+
+  async createMultipartUpload(
+    objectKey: string,
+    mimeType: string,
+    fileSizeBytes: bigint
+  ): Promise<PresignedMultipartUploadResult> {
+    const normalizedMimeType = normalizeMimeType(mimeType);
+    assertAllowedMimeType(normalizedMimeType);
+
+    if (fileSizeBytes <= 0n) {
+      throw new Error("fileSizeBytes must be greater than 0");
+    }
+
+    const bucket = config.storage.origin.bucket;
+    if (!bucket) {
+      throw new Error("S3_BUCKET is not configured");
+    }
+
+    const createResult = await this.client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        ContentType: normalizedMimeType,
+      })
+    );
+    const uploadId = String(createResult.UploadId ?? "").trim();
+
+    if (!uploadId) {
+      throw new Error("failed to create multipart upload");
+    }
+
+    const partCount = Math.ceil(Number(fileSizeBytes) / MULTIPART_UPLOAD_PART_SIZE_BYTES);
+    const parts: PresignedMultipartUploadPartResult[] = [];
+
+    for (let partNumber = 1; partNumber <= partCount; partNumber += 1) {
+      const presignedUrl = await getSignedUrl(
+        this.client,
+        new UploadPartCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+        }),
+        {
+          expiresIn: PRESIGNED_UPLOAD_EXPIRY_SECONDS,
+        }
+      );
+
+      parts.push({
+        partNumber,
+        presignedUrl,
+        expiresInSeconds: PRESIGNED_UPLOAD_EXPIRY_SECONDS,
+      });
+    }
+
+    return {
+      uploadId,
+      partCount,
+      partSizeBytes: MULTIPART_UPLOAD_PART_SIZE_BYTES,
+      parts,
+    };
+  }
+
+  async completeMultipartUpload(
+    objectKey: string,
+    uploadId: string,
+    parts: CompletedMultipartPart[]
+  ): Promise<void> {
+    const trimmedUploadId = uploadId.trim();
+    if (!trimmedUploadId) {
+      throw new Error("uploadId is required");
+    }
+
+    if (parts.length === 0) {
+      throw new Error("parts must be a non-empty array");
+    }
+
+    const bucket = config.storage.origin.bucket;
+    if (!bucket) {
+      throw new Error("S3_BUCKET is not configured");
+    }
+
+    await this.client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        UploadId: trimmedUploadId,
+        MultipartUpload: {
+          Parts: [...parts]
+            .map((part) => ({
+              PartNumber: part.partNumber,
+              ETag: part.etag.trim().replace(/^"+|"+$/g, ""),
+            }))
+            .sort((left, right) => left.PartNumber - right.PartNumber),
+        },
+      })
+    );
   }
 
   async generateDownloadUrl(objectKey: string, expiresInSeconds = 3600): Promise<string> {

@@ -7,6 +7,7 @@ import {
 import { HttpError } from "./http";
 import { prisma } from "../services/prisma";
 import { isVideoMimeType } from "../services/S3Service";
+import { buildMuxPlaybackUrl } from "../services/MuxService";
 
 export const normalizeAssetType = (value: unknown): AssetType => {
   const normalized = String(value ?? "").trim().toUpperCase();
@@ -67,24 +68,72 @@ export const serializeAsset = (asset: {
   assetType: string;
   orderIndex: number;
   storageKey: string;
+  cdnUrl?: string | null;
   uploadStatus: string;
   processingStatus: string;
   muxAssetId: string | null;
   muxPlaybackId: string | null;
   muxLastKnownStatus: string | null;
+  processingError?: string | null;
   updatedAt: Date;
-}) => ({
-  assetId: asset.id,
-  assetType: asset.assetType,
-  orderIndex: asset.orderIndex,
-  storageKey: asset.storageKey,
-  uploadStatus: asset.uploadStatus,
-  processingStatus: asset.processingStatus,
-  muxAssetId: asset.muxAssetId,
-  muxPlaybackId: asset.muxPlaybackId,
-  muxLastKnownStatus: asset.muxLastKnownStatus,
-  updatedAt: asset.updatedAt.toISOString(),
-});
+}) => {
+  const muxPlaybackUrl = asset.muxPlaybackId
+    ? buildMuxPlaybackUrl(asset.muxPlaybackId)
+    : null;
+  const preferredPlaybackSource =
+    asset.assetType === AssetType.VIDEO
+      ? muxPlaybackUrl
+        ? "MUX"
+        : asset.cdnUrl
+          ? "ORIGIN"
+          : null
+      : asset.cdnUrl
+        ? "ORIGIN"
+        : null;
+  const preferredPlaybackUrl =
+    preferredPlaybackSource === "MUX" ? muxPlaybackUrl : asset.cdnUrl ?? null;
+  const ingestStatus =
+    asset.assetType !== AssetType.VIDEO
+      ? "NOT_APPLICABLE"
+      : asset.uploadStatus !== "UPLOADED"
+        ? "PENDING_UPLOAD"
+        : asset.processingStatus === "ERRORED"
+          ? "ERRORED"
+          : asset.muxPlaybackId
+            ? "READY"
+            : asset.muxAssetId
+              ? "PREPARING"
+              : "QUEUED";
+  const deliveryStatus =
+    asset.uploadStatus !== "UPLOADED"
+      ? "PENDING_UPLOAD"
+      : asset.processingStatus === "ERRORED"
+        ? "ERRORED"
+        : asset.assetType === AssetType.VIDEO && !asset.muxPlaybackId
+          ? "PROCESSING"
+          : "READY";
+
+  return {
+    assetId: asset.id,
+    assetType: asset.assetType,
+    orderIndex: asset.orderIndex,
+    storageKey: asset.storageKey,
+    originUrl: asset.cdnUrl ?? null,
+    uploadStrategy: asset.assetType === AssetType.VIDEO ? "MULTIPART" : "SINGLE_PART",
+    uploadStatus: asset.uploadStatus,
+    processingStatus: asset.processingStatus,
+    ingestStatus,
+    deliveryStatus,
+    preferredPlaybackSource,
+    preferredPlaybackUrl,
+    muxAssetId: asset.muxAssetId,
+    muxPlaybackId: asset.muxPlaybackId,
+    muxPlaybackUrl,
+    muxLastKnownStatus: asset.muxLastKnownStatus,
+    processingError: asset.processingError ?? null,
+    updatedAt: asset.updatedAt.toISOString(),
+  };
+};
 
 export const serializePublication = (publication: {
   id: string;
@@ -127,11 +176,13 @@ export const serializeManifestDetail = (manifest: {
     assetType: string;
     orderIndex: number;
     storageKey: string;
+    cdnUrl?: string | null;
     uploadStatus: string;
     processingStatus: string;
     muxAssetId: string | null;
     muxPlaybackId: string | null;
     muxLastKnownStatus: string | null;
+    processingError?: string | null;
     updatedAt: Date;
   }>;
   publications: Array<{
@@ -173,11 +224,13 @@ export const serializeManifestListItem = (manifest: {
     assetType: string;
     orderIndex: number;
     storageKey: string;
+    cdnUrl?: string | null;
     uploadStatus: string;
     processingStatus: string;
     muxAssetId: string | null;
     muxPlaybackId: string | null;
     muxLastKnownStatus: string | null;
+    processingError?: string | null;
     updatedAt: Date;
   }>;
 }) => ({

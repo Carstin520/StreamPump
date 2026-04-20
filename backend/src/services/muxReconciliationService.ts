@@ -14,6 +14,7 @@ import {
 import { config } from "../../config/default";
 import { muxService, NormalizedMuxAssetStatus } from "./MuxService";
 import { prisma } from "./prisma";
+import { s3Service } from "./S3Service";
 
 type ReconciliationUpdate = Prisma.ContentAssetUpdateInput | null;
 
@@ -29,10 +30,55 @@ export type ReconcileMuxAssetResult =
       errorMessage: string | null;
     };
 
+export type QueueMuxIngestResult =
+  | {
+      status: "SKIPPED";
+      reason: string;
+    }
+  | {
+      status: "PREPARING" | "ERRORED";
+      muxAssetId: string | null;
+      playbackId: string | null;
+      errorMessage: string | null;
+    };
+
 const now = (): Date => new Date();
 
 const resolveErrorMessage = (assetStatus: NormalizedMuxAssetStatus): string =>
   assetStatus.errorMessage?.trim() || "Mux asset processing failed";
+
+export const shouldAttemptMuxIngest = (
+  asset: Pick<
+    ContentAsset,
+    | "assetType"
+    | "uploadStatus"
+    | "processingStatus"
+    | "muxAssetId"
+    | "muxPlaybackId"
+    | "muxReconcileAttempts"
+  >
+): boolean => {
+  if (asset.assetType !== AssetType.VIDEO) {
+    return false;
+  }
+
+  if (asset.uploadStatus !== AssetUploadStatus.UPLOADED) {
+    return false;
+  }
+
+  if (asset.muxAssetId || asset.muxPlaybackId) {
+    return false;
+  }
+
+  if (
+    asset.processingStatus !== AssetProcessingStatus.NONE &&
+    asset.processingStatus !== AssetProcessingStatus.ERRORED
+  ) {
+    return false;
+  }
+
+  return asset.muxReconcileAttempts < config.mux.reconciliation.maxAttempts;
+};
 
 export const shouldAttemptMuxReconciliation = (asset: Pick<
   ContentAsset,
@@ -181,6 +227,140 @@ export const reconcileMuxAssetById = async (assetId: string): Promise<ReconcileM
     muxAssetId: updated.muxAssetId as string,
     playbackId: updated.muxPlaybackId,
     errorMessage: updated.processingError,
+  };
+};
+
+export const ingestUploadedVideoAssetById = async (
+  assetId: string
+): Promise<QueueMuxIngestResult> => {
+  const asset = await prisma.contentAsset.findUnique({
+    where: { id: assetId },
+  });
+
+  if (!asset) {
+    return {
+      status: "SKIPPED",
+      reason: "asset-not-found",
+    };
+  }
+
+  if (!shouldAttemptMuxIngest(asset)) {
+    return {
+      status: "SKIPPED",
+      reason: "asset-not-eligible",
+    };
+  }
+
+  try {
+    const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 3600);
+    const muxAssetId = await muxService.createAsset(downloadUrl);
+    const updated = await prisma.contentAsset.update({
+      where: { id: asset.id },
+      data: {
+        processingStatus: AssetProcessingStatus.PREPARING,
+        processingSource: AssetProcessingSource.MUX_RECONCILIATION,
+        muxAssetId,
+        muxLastKnownStatus: "created",
+        muxLastCheckedAt: null,
+        muxReadyAt: null,
+        processingError: null,
+        muxReconcileAttempts: 0,
+      },
+    });
+
+    return {
+      status: "PREPARING",
+      muxAssetId: updated.muxAssetId,
+      playbackId: updated.muxPlaybackId,
+      errorMessage: null,
+    };
+  } catch (error) {
+    const updated = await prisma.contentAsset.update({
+      where: { id: asset.id },
+      data: {
+        processingStatus: AssetProcessingStatus.ERRORED,
+        processingSource: AssetProcessingSource.MUX_RECONCILIATION,
+        muxLastKnownStatus: "errored",
+        muxLastCheckedAt: now(),
+        muxReconcileAttempts: {
+          increment: 1,
+        },
+        processingError:
+          error instanceof Error ? error.message : "failed to create mux asset",
+      },
+    });
+
+    return {
+      status: "ERRORED",
+      muxAssetId: updated.muxAssetId,
+      playbackId: updated.muxPlaybackId,
+      errorMessage: updated.processingError,
+    };
+  }
+};
+
+export const ingestQueuedMuxAssets = async () => {
+  const candidates = await prisma.contentAsset.findMany({
+    where: {
+      assetType: AssetType.VIDEO,
+      uploadStatus: AssetUploadStatus.UPLOADED,
+      processingStatus: {
+        in: [AssetProcessingStatus.NONE, AssetProcessingStatus.ERRORED],
+      },
+      muxAssetId: null,
+      muxPlaybackId: null,
+      muxReconcileAttempts: {
+        lt: config.mux.reconciliation.maxAttempts,
+      },
+    },
+    orderBy: [
+      {
+        updatedAt: "asc",
+      },
+    ],
+    take: config.mux.reconciliation.batchSize,
+  });
+
+  let preparingCount = 0;
+  let erroredCount = 0;
+  let skippedCount = 0;
+  let failureCount = 0;
+
+  for (const asset of candidates) {
+    try {
+      const result = await ingestUploadedVideoAssetById(asset.id);
+      if (result.status === "PREPARING") {
+        preparingCount += 1;
+      } else if (result.status === "ERRORED") {
+        erroredCount += 1;
+      } else {
+        skippedCount += 1;
+      }
+    } catch (error) {
+      failureCount += 1;
+      await prisma.contentAsset.update({
+        where: { id: asset.id },
+        data: {
+          processingStatus: AssetProcessingStatus.ERRORED,
+          processingSource: AssetProcessingSource.MUX_RECONCILIATION,
+          muxLastKnownStatus: "errored",
+          muxLastCheckedAt: now(),
+          muxReconcileAttempts: {
+            increment: 1,
+          },
+          processingError:
+            error instanceof Error ? error.message : "Mux ingest failed unexpectedly",
+        },
+      });
+    }
+  }
+
+  return {
+    scanned: candidates.length,
+    preparingCount,
+    erroredCount,
+    skippedCount,
+    failureCount,
   };
 };
 

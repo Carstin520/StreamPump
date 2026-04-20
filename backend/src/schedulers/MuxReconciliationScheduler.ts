@@ -5,7 +5,10 @@
 import cron, { ScheduledTask } from "node-cron";
 
 import { config } from "../../config/default";
-import { reconcileStaleMuxAssets } from "../services/muxReconciliationService";
+import {
+  ingestQueuedMuxAssets,
+  reconcileStaleMuxAssets,
+} from "../services/muxReconciliationService";
 
 class MuxReconciliationScheduler {
   private task: ScheduledTask | null = null;
@@ -42,7 +45,12 @@ class MuxReconciliationScheduler {
 
     this.running = true;
     try {
-      const summary = await reconcileStaleMuxAssets();
+      const ingestSummary = await ingestQueuedMuxAssets();
+      const reconcileSummary = await reconcileStaleMuxAssets();
+      const summary = {
+        ingest: ingestSummary,
+        reconcile: reconcileSummary,
+      };
       console.log("[mux-reconcile] completed", summary);
       return summary;
     } catch (error) {

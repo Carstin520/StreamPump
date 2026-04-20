@@ -31,6 +31,17 @@ Generate poster frames for local video posts:
 The script uses macOS native video tooling through Swift and AVFoundation.
 It samples frames from the middle section of the video, scores them for clarity and exposure, avoids transition-like frames, and writes the best candidate to `images/cover.jpg`.
 
+## Bulk Import
+
+Import all local posts into backend manifests, upload images/videos to S3, and queue video ingest into Mux:
+
+- all posts:
+  - `npm --prefix backend run import:local-post-assets -- --creator-wallet <wallet>`
+- one post only:
+  - `npm --prefix backend run import:local-post-assets -- --creator-wallet <wallet> --post 2026-04-17-orange-cat-under-table-watch-mode`
+- preview only without writing:
+  - `npm --prefix backend run import:local-post-assets -- --creator-wallet <wallet> --dry-run`
+
 ## Example
 
 - `posts/2026-04-13-luna-daily-fragments/`

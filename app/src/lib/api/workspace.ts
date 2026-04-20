@@ -59,11 +59,19 @@ export type ContentManifestAssetResponse = {
   assetType: string;
   orderIndex: number;
   storageKey: string;
+  originUrl: string | null;
+  uploadStrategy: "SINGLE_PART" | "MULTIPART";
   uploadStatus: string;
   processingStatus: string;
+  ingestStatus: string;
+  deliveryStatus: string;
+  preferredPlaybackSource: "ORIGIN" | "MUX" | null;
+  preferredPlaybackUrl: string | null;
   muxAssetId: string | null;
   muxPlaybackId: string | null;
+  muxPlaybackUrl: string | null;
   muxLastKnownStatus: string | null;
+  processingError: string | null;
   updatedAt: string;
 };
 
@@ -184,14 +192,7 @@ export type ProposalIntentDetailResponse = {
     version: number;
     manifestHashHex: string | null;
     currentAnchorPda: string | null;
-    assets: Array<{
-      assetId: string;
-      assetType: string;
-      orderIndex: number;
-      uploadStatus: string;
-      processingStatus: string;
-      muxPlaybackId: string | null;
-    }>;
+    assets: ContentManifestAssetResponse[];
   } | null;
   proposal: ProposalDetailRecord | null;
   bundles: BundleResponse[];
@@ -204,6 +205,7 @@ export type ProposalDetailResponse = {
 
 export type ManifestAssetKind = "IMAGE" | "VIDEO" | "COVER";
 export type BundleSubmitMode = "SERVER_RELAY" | "CLIENT_RELAY";
+export type ManifestAssetUploadStrategy = "SINGLE_PART" | "MULTIPART";
 
 type CreateContentManifestInput = {
   contentType: ContentType;
@@ -230,19 +232,45 @@ type CreatePublicationInput = {
 
 export type PresignManifestAssetsResponse = {
   manifestId: string;
-  uploads: Array<{
-    assetId: string;
-    assetType: ManifestAssetKind;
-    orderIndex: number;
-    storageKey: string;
-    presignedUrl: string;
-    expiresInSeconds: number;
-  }>;
+  uploads: Array<
+    | {
+        assetId: string;
+        assetType: ManifestAssetKind;
+        orderIndex: number;
+        storageKey: string;
+        uploadStrategy: "SINGLE_PART";
+        presignedUrl: string;
+        expiresInSeconds: number;
+      }
+    | {
+        assetId: string;
+        assetType: ManifestAssetKind;
+        orderIndex: number;
+        storageKey: string;
+        uploadStrategy: "MULTIPART";
+        multipartUploadId: string;
+        partCount: number;
+        partSizeBytes: number;
+        parts: Array<{
+          partNumber: number;
+          presignedUrl: string;
+          expiresInSeconds: number;
+        }>;
+      }
+  >;
 };
 
 export type CompleteManifestAssetUploadResponse = {
   manifestId: string;
   asset: ContentManifestAssetResponse;
+};
+
+export type CompleteManifestAssetUploadInput = {
+  multipartUploadId: string;
+  parts: Array<{
+    partNumber: number;
+    etag: string;
+  }>;
 };
 
 export type FinalizeManifestResponse = Pick<
@@ -340,6 +368,7 @@ export const completeManifestAssetUpload = (
   token: string,
   manifestId: string,
   assetId: string,
+  input?: CompleteManifestAssetUploadInput,
 ) =>
   apiClient.post<CompleteManifestAssetUploadResponse>(
     `/content/manifests/${manifestId}/assets/${assetId}/complete`,
@@ -348,6 +377,7 @@ export const completeManifestAssetUpload = (
       headers: {
         "x-idempotency-key": createIdempotencyKey("asset-complete"),
       },
+      body: input,
     },
   );
 

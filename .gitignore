@@ -25,3 +25,7 @@ test-ledger-ci-check/
 test-ledger-split/
 test_files/
 Creative-Social-Space/
+.local/
+*.keypair.json
+*.wallet.json
+id.json

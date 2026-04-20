@@ -8,10 +8,46 @@ import {
 
 import {
   buildMuxReconciliationUpdate,
+  shouldAttemptMuxIngest,
   shouldAttemptMuxReconciliation,
 } from "../src/services/muxReconciliationService";
 
 describe("muxReconciliationService", () => {
+  it("queues uploaded video assets that do not yet have a mux asset", () => {
+    const eligible = shouldAttemptMuxIngest({
+      assetType: AssetType.VIDEO,
+      uploadStatus: AssetUploadStatus.UPLOADED,
+      processingStatus: AssetProcessingStatus.NONE,
+      muxAssetId: null,
+      muxPlaybackId: null,
+      muxReconcileAttempts: 0,
+    });
+
+    expect(eligible).to.equal(true);
+  });
+
+  it("does not queue mux ingest for images or assets that already have mux metadata", () => {
+    const image = shouldAttemptMuxIngest({
+      assetType: AssetType.IMAGE,
+      uploadStatus: AssetUploadStatus.UPLOADED,
+      processingStatus: AssetProcessingStatus.NONE,
+      muxAssetId: null,
+      muxPlaybackId: null,
+      muxReconcileAttempts: 0,
+    });
+    const alreadyQueued = shouldAttemptMuxIngest({
+      assetType: AssetType.VIDEO,
+      uploadStatus: AssetUploadStatus.UPLOADED,
+      processingStatus: AssetProcessingStatus.PREPARING,
+      muxAssetId: "asset_123",
+      muxPlaybackId: null,
+      muxReconcileAttempts: 0,
+    });
+
+    expect(image).to.equal(false);
+    expect(alreadyQueued).to.equal(false);
+  });
+
   it("reconciles eligible preparing video assets", () => {
     const eligible = shouldAttemptMuxReconciliation({
       assetType: AssetType.VIDEO,

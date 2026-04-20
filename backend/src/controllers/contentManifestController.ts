@@ -18,6 +18,7 @@ import {
   parseNonEmptyString,
   parseNonNegativeBigInt,
   parseNonNegativeInt,
+  parsePositiveInt,
   parseOptionalJsonObject,
   parseOptionalString,
   parseSha256Hex,
@@ -41,16 +42,51 @@ import {
   normalizeContentType,
   sha256Hex,
 } from "../services/contentManifestService";
-import { muxService } from "../services/MuxService";
 import { prisma } from "../services/prisma";
 import {
   assertAllowedMimeType,
+  CompletedMultipartPart,
   extensionForMimeType,
   isVideoMimeType,
   s3Service,
 } from "../services/S3Service";
 
 const MAX_ASSET_SIZE_BYTES = 100 * 1024 * 1024;
+
+const parseCompletedMultipartParts = (value: unknown): CompletedMultipartPart[] => {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new HttpError(400, "INVALID_INPUT", "parts must be a non-empty array");
+  }
+
+  const seenPartNumbers = new Set<number>();
+
+  return value.map((rawPart, index) => {
+    const payload =
+      rawPart && typeof rawPart === "object" ? (rawPart as Record<string, unknown>) : null;
+
+    if (!payload) {
+      throw new HttpError(400, "INVALID_INPUT", `parts[${index}] must be an object`);
+    }
+
+    const partNumber = parsePositiveInt(payload.partNumber, `parts[${index}].partNumber`);
+    const etag = parseNonEmptyString(payload.etag, `parts[${index}].etag`);
+
+    if (seenPartNumbers.has(partNumber)) {
+      throw new HttpError(
+        400,
+        "INVALID_INPUT",
+        `parts[${index}].partNumber must be unique`
+      );
+    }
+
+    seenPartNumbers.add(partNumber);
+
+    return {
+      partNumber,
+      etag,
+    };
+  });
+};
 
 export const createContentManifest = withController("CREATE_CONTENT_MANIFEST_FAILED", async (req, res) => {
   ensureIdempotencyKey(req);
@@ -150,8 +186,17 @@ export const presignManifestAssets = withController(
           mimeType,
           fileSizeBytes,
           storageKey,
+          cdnUrl: null,
           uploadStatus: AssetUploadStatus.PENDING,
           processingStatus: AssetProcessingStatus.NONE,
+          processingSource: null,
+          muxAssetId: null,
+          muxPlaybackId: null,
+          muxLastKnownStatus: null,
+          muxWebhookReceivedAt: null,
+          muxLastCheckedAt: null,
+          muxReadyAt: null,
+          muxReconcileAttempts: 0,
           processingError: null,
         },
         create: {
@@ -162,21 +207,44 @@ export const presignManifestAssets = withController(
           mimeType,
           fileSizeBytes,
           storageKey,
+          cdnUrl: null,
           uploadStatus: AssetUploadStatus.PENDING,
           processingStatus: AssetProcessingStatus.NONE,
+          muxReconcileAttempts: 0,
         },
       });
 
-      const upload = await s3Service.generateUploadUrl(storageKey, mimeType);
+      if (isVideoMimeType(mimeType)) {
+        const multipartUpload = await s3Service.createMultipartUpload(
+          storageKey,
+          mimeType,
+          fileSizeBytes
+        );
 
-      uploads.push({
-        assetId: asset.id,
-        assetType,
-        orderIndex,
-        storageKey,
-        presignedUrl: upload.presignedUrl,
-        expiresInSeconds: upload.expiresInSeconds,
-      });
+        uploads.push({
+          assetId: asset.id,
+          assetType,
+          orderIndex,
+          storageKey,
+          uploadStrategy: "MULTIPART",
+          multipartUploadId: multipartUpload.uploadId,
+          partCount: multipartUpload.partCount,
+          partSizeBytes: multipartUpload.partSizeBytes,
+          parts: multipartUpload.parts,
+        });
+      } else {
+        const upload = await s3Service.generateUploadUrl(storageKey, mimeType);
+
+        uploads.push({
+          assetId: asset.id,
+          assetType,
+          orderIndex,
+          storageKey,
+          uploadStrategy: "SINGLE_PART",
+          presignedUrl: upload.presignedUrl,
+          expiresInSeconds: upload.expiresInSeconds,
+        });
+      }
     }
 
     await prisma.contentManifest.update({
@@ -219,6 +287,24 @@ export const completeManifestAssetUpload = withController(
       throw new HttpError(404, "ASSET_NOT_FOUND", "content asset not found");
     }
 
+    if (asset.uploadStatus === AssetUploadStatus.UPLOADED) {
+      ok(res, {
+        manifestId,
+        asset: serializeAsset(asset),
+      });
+      return;
+    }
+
+    if (isVideoMimeType(asset.mimeType)) {
+      const multipartUploadId = parseNonEmptyString(
+        req.body?.multipartUploadId,
+        "multipartUploadId"
+      );
+      const parts = parseCompletedMultipartParts(req.body?.parts);
+
+      await s3Service.completeMultipartUpload(asset.storageKey, multipartUploadId, parts);
+    }
+
     let updated = await prisma.contentAsset.update({
       where: { id: asset.id },
       data: {
@@ -228,34 +314,21 @@ export const completeManifestAssetUpload = withController(
     });
 
     if (isVideoMimeType(asset.mimeType)) {
-      try {
-        const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 3600);
-        const muxAssetId = await muxService.createAsset(downloadUrl);
-
-        updated = await prisma.contentAsset.update({
-          where: { id: asset.id },
-          data: {
-            processingStatus: AssetProcessingStatus.PREPARING,
-            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
-            muxAssetId,
-            muxLastKnownStatus: "created",
-            muxLastCheckedAt: null,
-            muxReadyAt: null,
-            muxReconcileAttempts: 0,
-            processingError: null,
-          },
-        });
-      } catch (error) {
-        updated = await prisma.contentAsset.update({
-          where: { id: asset.id },
-          data: {
-            processingStatus: AssetProcessingStatus.ERRORED,
-            processingSource: AssetProcessingSource.CLIENT_COMPLETE,
-            muxLastKnownStatus: "errored",
-            processingError: error instanceof Error ? error.message : "failed to create mux asset",
-          },
-        });
-      }
+      updated = await prisma.contentAsset.update({
+        where: { id: asset.id },
+        data: {
+          processingStatus: AssetProcessingStatus.NONE,
+          processingSource: AssetProcessingSource.CLIENT_COMPLETE,
+          muxAssetId: null,
+          muxPlaybackId: null,
+          muxLastKnownStatus: "queued",
+          muxWebhookReceivedAt: null,
+          muxLastCheckedAt: null,
+          muxReadyAt: null,
+          muxReconcileAttempts: 0,
+          processingError: null,
+        },
+      });
     } else {
       updated = await prisma.contentAsset.update({
         where: { id: asset.id },

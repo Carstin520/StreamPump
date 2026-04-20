@@ -6,6 +6,9 @@ import Mux from "@mux/mux-node";
 
 const MUX_TIMEOUT_MS = Number(process.env.MUX_REQUEST_TIMEOUT_MS ?? 20_000);
 
+export const buildMuxPlaybackUrl = (playbackId: string): string =>
+  `https://stream.mux.com/${playbackId.trim()}.m3u8`;
+
 export interface NormalizedMuxAssetStatus {
   muxAssetId: string;
   status: string;
