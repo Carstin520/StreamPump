@@ -3,7 +3,6 @@ import {
   Prisma,
 } from "@prisma/client";
 
-import { config } from "../../config/default";
 import { ok, parsePositiveInt, withController } from "./http";
 import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
@@ -119,25 +118,37 @@ const serializePublicFeedPost = (manifest: {
 const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0]) => {
   const serialized = serializeAsset(asset);
 
-  if (isBrowserRenderableUrl(serialized.originUrl) || !asset.storageKey.trim()) {
+  if (serialized.preferredPlaybackSource === "MUX" || !asset.storageKey.trim()) {
     return serialized;
   }
 
-  const canonicalUrl = s3Service.buildCanonicalUrl(asset.storageKey);
-  if (isBrowserRenderableUrl(canonicalUrl)) {
+  try {
+    const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 60 * 60);
     const preferredPlaybackUrl =
       serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-        ? canonicalUrl
+        ? downloadUrl
         : serialized.preferredPlaybackUrl;
 
     return {
       ...serialized,
-      originUrl: canonicalUrl,
+      originUrl: downloadUrl,
       preferredPlaybackUrl,
     };
-  }
+  } catch (_error) {
+    const canonicalUrl = s3Service.buildCanonicalUrl(asset.storageKey);
+    if (isBrowserRenderableUrl(canonicalUrl)) {
+      const preferredPlaybackUrl =
+        serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
+          ? canonicalUrl
+          : serialized.preferredPlaybackUrl;
 
-  if (!config.storage.origin.bucket?.trim()) {
+      return {
+        ...serialized,
+        originUrl: canonicalUrl,
+        preferredPlaybackUrl,
+      };
+    }
+
     return {
       ...serialized,
       originUrl: null,
@@ -147,18 +158,6 @@ const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0])
           : serialized.preferredPlaybackUrl,
     };
   }
-
-  const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 60 * 60);
-  const preferredPlaybackUrl =
-    serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-      ? downloadUrl
-      : serialized.preferredPlaybackUrl;
-
-  return {
-    ...serialized,
-    originUrl: downloadUrl,
-    preferredPlaybackUrl,
-  };
 };
 
 const serializePublicFeedPostAsync = async (manifest: {
