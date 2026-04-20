@@ -14,10 +14,30 @@ const makeAvatar = (seed: string, start: string, end: string) =>
     </svg>
   `)}`;
 
-const encodeAssetFile = (file: string) => encodeURIComponent(file);
+const mockPostAssets = [
+  "/mock/user-surface/posts/project-helix.svg",
+  "/mock/user-surface/posts/cat-portrait.svg",
+  "/mock/user-surface/posts/tamburins-red.svg",
+  "/mock/user-surface/posts/luna-shadow.svg",
+  "/mock/user-surface/posts/gblock-note.svg",
+  "/mock/user-surface/posts/singer-911.svg",
+] as const;
 
-export const assetPath = (slug: string, file: string) => `/local-post-assets/posts/${slug}/images/${encodeAssetFile(file)}`;
-export const videoAssetPath = (slug: string, file: string) => `/local-post-assets/posts/${slug}/videos/${encodeAssetFile(file)}`;
+const hashString = (value: string) => {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
+};
+
+const pickMockPostAsset = (seed: string) =>
+  mockPostAssets[hashString(seed) % mockPostAssets.length];
+
+export const assetPath = (slug: string, file: string) => pickMockPostAsset(`${slug}:${file}`);
+export const videoAssetPath = (_slug: string, _file: string) => "";
 
 export const avatars = {
   wanxin: makeAvatar("弯", "#5C3C4A", "#1E2737"),
