@@ -11,7 +11,10 @@ import {
   CloseIcon,
 } from "@/components/shared/AppIcons";
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
-import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
+import {
+  MediaVideoPlayer,
+  primeHlsJs,
+} from "@/components/shared/MediaVideoPlayer";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
@@ -138,6 +141,12 @@ export const PostDetailExperience = ({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [mode, onClose]);
+
+  useEffect(() => {
+    if (currentPost?.type === "VIDEO" && currentPost.videoSrc) {
+      void primeHlsJs();
+    }
+  }, [currentPost]);
 
   if (!currentPost) {
     return null;
@@ -334,7 +343,7 @@ const VideoStage = ({ post }: { post: PostRecord }) => (
           posterPriority
           posterSizes="(max-width: 1280px) 100vw, 72vw"
           posterSrc={post.coverSrc}
-          preload="metadata"
+          preload="auto"
           src={post.videoSrc}
           videoClassName="h-full w-full object-contain"
         />

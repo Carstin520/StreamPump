@@ -32,12 +32,17 @@ type PublicFeedPostApiRecord = {
   coverAssetId: string | null;
   tags: string[];
   assets: PublicFeedAssetRecord[];
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 type PublicFeedResponse = {
   posts: PublicFeedPostApiRecord[];
+};
+
+type PublicFeedPostResponse = {
+  post: PublicFeedPostApiRecord;
 };
 
 const FALLBACK_POSTER = "/mock/user-surface/posts/cat-portrait.svg";
@@ -186,12 +191,53 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   };
 };
 
-export const listPublicFeedPosts = async (): Promise<PostRecord[]> => {
+const extractOrigin = (value: string) => {
+  if (!value.startsWith("http://") && !value.startsWith("https://")) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch (_error) {
+    return null;
+  }
+};
+
+export const extractPublicMediaOrigins = (posts: PostRecord[]): string[] => {
+  const origins = new Set<string>();
+
+  posts.forEach((post) => {
+    [post.coverSrc, post.videoSrc, ...(post.gallerySrcs ?? [])].forEach((candidate) => {
+      if (!candidate) {
+        return;
+      }
+
+      const origin = extractOrigin(candidate);
+      if (origin) {
+        origins.add(origin);
+      }
+    });
+  });
+
+  return [...origins];
+};
+
+export const listPublicFeedPosts = async (
+  options?: {
+    limit?: number;
+  }
+): Promise<PostRecord[]> => {
   const response = await apiClient.get<PublicFeedResponse>("/feed/posts", {
     query: {
-      limit: 24,
+      limit: options?.limit ?? 24,
     },
   });
 
   return response.posts.map(mapFeedPostToPostRecord);
+};
+
+export const getPublicFeedPostById = async (postId: string): Promise<PostRecord> => {
+  const response = await apiClient.get<PublicFeedPostResponse>(`/feed/posts/${postId}`);
+
+  return mapFeedPostToPostRecord(response.post);
 };

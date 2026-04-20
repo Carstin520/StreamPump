@@ -207,8 +207,11 @@ const createSidebarHighlight = (creator: CreatorMarketRecord, posts: PostRecord[
   statusLabel: creator.buyoutStatus,
 });
 
-export const usePublicFeedViewModel = () => {
-  const { error, loading, posts } = usePublicFeedPosts();
+export const usePublicFeedViewModel = (options?: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => {
+  const { error, loading, posts } = usePublicFeedPosts(options);
 
   const derived = useMemo(() => {
     const postsByCreator = new Map<string, PostRecord[]>();

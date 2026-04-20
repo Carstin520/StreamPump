@@ -9,19 +9,61 @@ type PublicFeedState = {
   posts: PostRecord[];
 };
 
-const initialState: PublicFeedState = {
+const emptyState: PublicFeedState = {
   error: null,
   loading: true,
   posts: [],
 };
 
-export const usePublicFeedPosts = () => {
-  const [state, setState] = useState<PublicFeedState>(initialState);
+const buildInitialState = (
+  initialPosts?: PostRecord[],
+  initialError?: string | null
+): PublicFeedState => {
+  if (initialPosts && initialPosts.length > 0) {
+    return {
+      error: initialError ?? null,
+      loading: false,
+      posts: initialPosts,
+    };
+  }
+
+  if (initialError) {
+    return {
+      error: initialError,
+      loading: false,
+      posts: [],
+    };
+  }
+
+  return emptyState;
+};
+
+export const usePublicFeedPosts = (options?: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => {
+  const [state, setState] = useState<PublicFeedState>(() =>
+    buildInitialState(options?.initialPosts, options?.initialError)
+  );
 
   useEffect(() => {
     let active = true;
+    const nextInitialState = buildInitialState(
+      options?.initialPosts,
+      options?.initialError
+    );
 
-    setState(initialState);
+    setState((currentState) => {
+      if (nextInitialState.loading) {
+        return nextInitialState;
+      }
+
+      return {
+        ...currentState,
+        error: nextInitialState.error,
+        posts: nextInitialState.posts,
+      };
+    });
 
     void listPublicFeedPosts()
       .then((posts) => {
@@ -43,14 +85,14 @@ export const usePublicFeedPosts = () => {
         setState({
           error: error instanceof Error ? error.message : "Failed to load public posts",
           loading: false,
-          posts: [],
+          posts: nextInitialState.posts,
         });
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [options?.initialError, options?.initialPosts]);
 
   return state;
 };

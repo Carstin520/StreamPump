@@ -20,6 +20,16 @@ type MediaVideoPlayerProps = Omit<
 const isHlsSource = (value: string | null | undefined) =>
   typeof value === "string" && /\.m3u8(?:$|\?)/i.test(value);
 
+let hlsModulePromise: Promise<typeof import("hls.js")> | null = null;
+
+export const primeHlsJs = () => {
+  if (!hlsModulePromise) {
+    hlsModulePromise = import("hls.js");
+  }
+
+  return hlsModulePromise;
+};
+
 export const MediaVideoPlayer = ({
   autoPlay,
   className = "",
@@ -64,7 +74,7 @@ export const MediaVideoPlayer = ({
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
       } else {
-        void import("hls.js").then(({ default: Hls }) => {
+        void primeHlsJs().then(({ default: Hls }) => {
           if (cancelled) {
             return;
           }

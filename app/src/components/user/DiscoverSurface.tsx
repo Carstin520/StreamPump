@@ -1,27 +1,33 @@
-import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
+import { PostRecord } from "@/lib/api/types";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { discoverCategories } from "@/lib/public-data";
+import { PostDetailExperience } from "@/components/post/PostDetailExperience";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
 
-const DynamicPostDetailExperience = dynamic(
-  () => import("@/components/post/PostDetailExperience").then((mod) => mod.PostDetailExperience),
-  { ssr: false },
-);
-
-export const DiscoverSurface = () => {
+export const DiscoverSurface = ({
+  initialError = null,
+  initialPosts = [],
+}: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const { posts } = usePublicFeedViewModel();
+  const viewModel = usePublicFeedViewModel({
+    initialError,
+    initialPosts,
+  });
+  const { posts } = viewModel;
 
   return (
     <PageShell>
-      <ExploreView onOpenPost={setSelectedPostId} />
+      <ExploreView onOpenPost={setSelectedPostId} viewModel={viewModel} />
       {selectedPostId && posts.length > 0 ? (
-        <DynamicPostDetailExperience
+        <PostDetailExperience
           closeLabel="Back to explore"
           currentPostId={selectedPostId}
           items={posts}
@@ -35,7 +41,13 @@ export const DiscoverSurface = () => {
   );
 };
 
-const ExploreView = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) => (
+const ExploreView = ({
+  onOpenPost,
+  viewModel,
+}: {
+  onOpenPost: (postId: string) => void;
+  viewModel: ReturnType<typeof usePublicFeedViewModel>;
+}) => (
   <div className="space-y-5 py-4">
     <section className="liquid-glass-shell hero-glow section-enter relative px-5 py-6 md:px-7">
       <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
@@ -88,12 +100,18 @@ const ExploreView = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) =
       </div>
     </section>
 
-    <PostsSection onOpenPost={onOpenPost} />
+    <PostsSection onOpenPost={onOpenPost} viewModel={viewModel} />
   </div>
 );
 
-const PostsSection = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) => {
-  const { error, loading, posts } = usePublicFeedViewModel();
+const PostsSection = ({
+  onOpenPost,
+  viewModel,
+}: {
+  onOpenPost: (postId: string) => void;
+  viewModel: ReturnType<typeof usePublicFeedViewModel>;
+}) => {
+  const { error, loading, posts } = viewModel;
 
   return (
     <section className="section-enter pb-8">
@@ -133,14 +151,29 @@ const PostsSection = ({ onOpenPost }: { onOpenPost: (postId: string) => void }) 
   );
 };
 
-export const TrendingSurface = () => (
+export const TrendingSurface = ({
+  initialError = null,
+  initialPosts = [],
+}: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => (
   <PageShell>
-    <TrendingView />
+    <TrendingView initialError={initialError} initialPosts={initialPosts} />
   </PageShell>
 );
 
-const TrendingView = () => {
-  const { creators, error, loading } = usePublicFeedViewModel();
+const TrendingView = ({
+  initialError,
+  initialPosts,
+}: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => {
+  const { creators, error, loading } = usePublicFeedViewModel({
+    initialError,
+    initialPosts,
+  });
 
   return (
     <section className="mx-auto max-w-[1280px] space-y-8 py-6">

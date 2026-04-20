@@ -1,0 +1,69 @@
+import type { GetStaticPropsResult } from "next";
+
+import { PostRecord } from "@/lib/api/types";
+import {
+  extractPublicMediaOrigins,
+  getPublicFeedPostById,
+  listPublicFeedPosts,
+} from "@/lib/api/feed";
+
+export const PUBLIC_FEED_REVALIDATE_SECONDS = 60;
+
+export type PublicFeedPageProps = {
+  initialError: string | null;
+  initialPosts: PostRecord[];
+  mediaOrigins: string[];
+};
+
+export type PublicPostPageProps = {
+  initialError: string | null;
+  mediaOrigins: string[];
+  post: PostRecord | null;
+};
+
+export const loadPublicFeedPageProps = async (): Promise<PublicFeedPageProps> => {
+  try {
+    const initialPosts = await listPublicFeedPosts({
+      limit: 24,
+    });
+
+    return {
+      initialError: null,
+      initialPosts,
+      mediaOrigins: extractPublicMediaOrigins(initialPosts),
+    };
+  } catch (error) {
+    return {
+      initialError:
+        error instanceof Error ? error.message : "Failed to load public feed",
+      initialPosts: [],
+      mediaOrigins: [],
+    };
+  }
+};
+
+export const loadPublicPostPageProps = async (
+  postId: string
+): Promise<PublicPostPageProps> => {
+  try {
+    const post = await getPublicFeedPostById(postId);
+
+    return {
+      initialError: null,
+      mediaOrigins: extractPublicMediaOrigins([post]),
+      post,
+    };
+  } catch (error) {
+    return {
+      initialError:
+        error instanceof Error ? error.message : "Failed to load public post",
+      mediaOrigins: [],
+      post: null,
+    };
+  }
+};
+
+export const publicFeedNotFound = (): GetStaticPropsResult<never> => ({
+  notFound: true,
+  revalidate: PUBLIC_FEED_REVALIDATE_SECONDS,
+});

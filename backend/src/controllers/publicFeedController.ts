@@ -3,18 +3,70 @@ import {
   Prisma,
 } from "@prisma/client";
 
-import { ok, parsePositiveInt, withController } from "./http";
+import {
+  HttpError,
+  ok,
+  parsePositiveInt,
+  withController,
+} from "./http";
 import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
-import {
-  buildDisplayVariantKey,
-} from "../services/imageVariants";
+import { buildDisplayVariantKey } from "../services/imageVariants";
 import { s3Service } from "../services/S3Service";
 
 type JsonObject = Record<string, Prisma.JsonValue>;
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
+const PUBLIC_CACHE_CONTROL = "public, max-age=60";
+const PUBLIC_FEED_STATUSES = [
+  ContentManifestStatus.READY,
+  ContentManifestStatus.ANCHORED,
+  ContentManifestStatus.PUBLISHED,
+] as const;
+
+const publicAssetSelect = Prisma.validator<Prisma.ContentAssetSelect>()({
+  assetType: true,
+  cdnUrl: true,
+  id: true,
+  muxAssetId: true,
+  muxLastKnownStatus: true,
+  muxPlaybackId: true,
+  orderIndex: true,
+  processingError: true,
+  processingStatus: true,
+  storageKey: true,
+  updatedAt: true,
+  uploadStatus: true,
+});
+
+const publicManifestSelect = Prisma.validator<Prisma.ContentManifestSelect>()({
+  captionText: true,
+  contentType: true,
+  coverAssetId: true,
+  createdAt: true,
+  creatorDisplayName: true,
+  creatorWallet: true,
+  id: true,
+  metadataJson: true,
+  publicExcerpt: true,
+  publicSlug: true,
+  publishedAt: true,
+  status: true,
+  tagsJson: true,
+  title: true,
+  updatedAt: true,
+});
+
+type PublicAssetRecord = Prisma.ContentAssetGetPayload<{
+  select: typeof publicAssetSelect;
+}>;
+
+type PublicManifestRecord = Prisma.ContentManifestGetPayload<{
+  select: typeof publicManifestSelect;
+}> & {
+  assets: PublicAssetRecord[];
+};
 
 const isJsonObject = (value: Prisma.JsonValue | null | undefined): value is JsonObject =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -63,47 +115,94 @@ const readLocalImportMetadata = (metadataJson: Prisma.JsonValue | null | undefin
   };
 };
 
-const serializePublicFeedPost = (manifest: {
-  id: string;
-  creatorWallet: string;
-  contentType: string;
-  status: string;
-  title: string | null;
-  captionText: string | null;
-  tagsJson: Prisma.JsonValue | null;
-  metadataJson: Prisma.JsonValue | null;
-  coverAssetId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  assets: Array<{
-    id: string;
-    assetType: string;
-    orderIndex: number;
-    storageKey: string;
-    cdnUrl?: string | null;
-    uploadStatus: string;
-    processingStatus: string;
-    muxAssetId: string | null;
-    muxPlaybackId: string | null;
-    muxLastKnownStatus: string | null;
-    processingError?: string | null;
-    updatedAt: Date;
-  }>;
-}) => {
+const resolveCanonicalUrl = (objectKey: string | null | undefined) => {
+  const trimmedKey = objectKey?.trim();
+  if (!trimmedKey) {
+    return null;
+  }
+
+  const canonicalUrl = s3Service.buildCanonicalUrl(trimmedKey);
+  return isBrowserRenderableUrl(canonicalUrl) ? canonicalUrl : null;
+};
+
+const resolvePublicOriginUrl = async (storageKey: string) => {
+  const canonicalUrl = resolveCanonicalUrl(storageKey);
+  if (canonicalUrl) {
+    return canonicalUrl;
+  }
+
+  try {
+    return await s3Service.generateDownloadUrl(storageKey, 60 * 60);
+  } catch (_error) {
+    return null;
+  }
+};
+
+const resolvePublicImageVariantUrl = async (storageKey: string) => {
+  const variantKey = buildDisplayVariantKey(storageKey);
+  const canonicalUrl = resolveCanonicalUrl(variantKey);
+  if (canonicalUrl) {
+    return canonicalUrl;
+  }
+
+  try {
+    return await s3Service.generateDownloadUrl(variantKey, 60 * 60);
+  } catch (_error) {
+    return null;
+  }
+};
+
+const serializePublicAsset = async (asset: PublicAssetRecord) => {
+  const serialized = serializeAsset(asset);
+
+  if (!asset.storageKey.trim()) {
+    return serialized;
+  }
+
+  if (serialized.preferredPlaybackSource === "MUX") {
+    const originUrl = await resolvePublicOriginUrl(asset.storageKey);
+
+    return {
+      ...serialized,
+      originUrl,
+    };
+  }
+
+  const originUrl = await resolvePublicOriginUrl(asset.storageKey);
+  const preferredVariantUrl =
+    asset.assetType === "IMAGE" || asset.assetType === "COVER"
+      ? await resolvePublicImageVariantUrl(asset.storageKey)
+      : null;
+  const preferredPlaybackUrl =
+    serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
+      ? preferredVariantUrl ?? originUrl
+      : serialized.preferredPlaybackUrl;
+
+  return {
+    ...serialized,
+    originUrl,
+    preferredPlaybackUrl,
+  };
+};
+
+const serializePublicFeedPost = async (manifest: PublicManifestRecord) => {
   const metadata = readLocalImportMetadata(manifest.metadataJson);
+  const assets = await Promise.all(manifest.assets.map(serializePublicAsset));
 
   return {
     postId: manifest.id,
     manifestId: manifest.id,
-    slug: metadata?.slug ?? manifest.id,
+    slug: manifest.publicSlug?.trim() || metadata?.slug || manifest.id,
     creatorWallet: manifest.creatorWallet,
-    creatorName: metadata?.creatorName,
-    creatorStage: metadata?.creatorStage,
+    creatorName:
+      manifest.creatorDisplayName?.trim() || metadata?.creatorName || null,
+    creatorStage: metadata?.creatorStage ?? null,
     title: manifest.title,
-    excerpt: metadata?.excerpt ?? null,
+    excerpt: manifest.publicExcerpt?.trim() || metadata?.excerpt || null,
     body: manifest.captionText,
-    location: metadata?.location,
-    publishTimeLabel: metadata?.publishTimeLabel,
+    location: metadata?.location ?? null,
+    publishTimeLabel: metadata?.publishTimeLabel ?? null,
+    publishedAt: manifest.publishedAt?.toISOString() ?? null,
     theme: metadata?.theme,
     mood: metadata?.mood,
     visualDirection: metadata?.visualDirection,
@@ -112,98 +211,34 @@ const serializePublicFeedPost = (manifest: {
     status: manifest.status,
     coverAssetId: manifest.coverAssetId,
     tags: readStringArray(manifest.tagsJson),
-    assets: manifest.assets.map(serializeAsset),
+    assets,
     createdAt: manifest.createdAt.toISOString(),
     updatedAt: manifest.updatedAt.toISOString(),
   };
 };
 
-const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0]) => {
-  const serialized = serializeAsset(asset);
-
-  if (serialized.preferredPlaybackSource === "MUX" || !asset.storageKey.trim()) {
-    return serialized;
-  }
-
-  const preferredVariantUrl =
-    asset.assetType === "IMAGE" || asset.assetType === "COVER"
-      ? await s3Service
-          .generateDownloadUrl(buildDisplayVariantKey(asset.storageKey), 60 * 60)
-          .catch(() => null)
-      : null;
-
-  try {
-    const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 60 * 60);
-    const preferredPlaybackUrl =
-      serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-        ? preferredVariantUrl ?? downloadUrl
-        : serialized.preferredPlaybackUrl;
-
-    return {
-      ...serialized,
-      originUrl: downloadUrl,
-      preferredPlaybackUrl,
-    };
-  } catch (_error) {
-    const canonicalUrl = s3Service.buildCanonicalUrl(asset.storageKey);
-    if (isBrowserRenderableUrl(canonicalUrl)) {
-      const preferredPlaybackUrl =
-        serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-          ? preferredVariantUrl ?? canonicalUrl
-          : serialized.preferredPlaybackUrl;
-
-      return {
-        ...serialized,
-        originUrl: canonicalUrl,
-        preferredPlaybackUrl,
-      };
-    }
-
-    return {
-      ...serialized,
-      originUrl: null,
-      preferredPlaybackUrl:
-        serialized.preferredPlaybackSource === "ORIGIN"
-          ? null
-          : serialized.preferredPlaybackUrl,
-    };
-  }
-};
-
-const serializePublicFeedPostAsync = async (manifest: {
-  id: string;
-  creatorWallet: string;
-  contentType: string;
-  status: string;
-  title: string | null;
-  captionText: string | null;
-  tagsJson: Prisma.JsonValue | null;
-  metadataJson: Prisma.JsonValue | null;
-  coverAssetId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  assets: Array<{
-    id: string;
-    assetType: string;
-    orderIndex: number;
-    storageKey: string;
-    cdnUrl?: string | null;
-    uploadStatus: string;
-    processingStatus: string;
-    muxAssetId: string | null;
-    muxPlaybackId: string | null;
-    muxLastKnownStatus: string | null;
-    processingError?: string | null;
-    updatedAt: Date;
-  }>;
-}) => {
-  const serialized = serializePublicFeedPost(manifest);
-  const assets = await Promise.all(manifest.assets.map(serializePublicAsset));
-
-  return {
-    ...serialized,
-    assets,
-  };
+const findPublicManifestById = async (postId: string) => {
+  return prisma.contentManifest.findFirst({
+    where: {
+      id: postId,
+      isPublicFeedEligible: true,
+      status: {
+        in: [...PUBLIC_FEED_STATUSES],
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      ...publicManifestSelect,
+      assets: {
+        orderBy: {
+          orderIndex: "asc",
+        },
+        select: publicAssetSelect,
+      },
+    },
+  });
 };
 
 export const listPublicFeedPosts = withController(
@@ -217,36 +252,60 @@ export const listPublicFeedPosts = withController(
 
     const manifests = await prisma.contentManifest.findMany({
       where: {
+        isPublicFeedEligible: true,
         status: {
-          in: [
-            ContentManifestStatus.READY,
-            ContentManifestStatus.ANCHORED,
-            ContentManifestStatus.PUBLISHED,
-          ],
+          in: [...PUBLIC_FEED_STATUSES],
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: {
+      orderBy: [
+        {
+          publishedAt: "desc",
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
+      select: {
+        ...publicManifestSelect,
         assets: {
           orderBy: {
             orderIndex: "asc",
           },
+          select: publicAssetSelect,
         },
       },
-      take: Math.min(limit * 4, 200),
+      take: limit,
     });
 
     const posts = await Promise.all(
-      manifests
-        .filter((manifest) => readLocalImportMetadata(manifest.metadataJson))
-        .slice(0, limit)
-        .map(serializePublicFeedPostAsync)
+      manifests.map((manifest) => serializePublicFeedPost(manifest))
     );
 
+    res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
     ok(res, {
       posts,
+    });
+  }
+);
+
+export const getPublicFeedPostById = withController(
+  "GET_PUBLIC_FEED_POST_FAILED",
+  async (req, res) => {
+    const postId = String(req.params.postId ?? "").trim();
+    if (!postId) {
+      throw new HttpError(400, "INVALID_INPUT", "postId is required");
+    }
+
+    const manifest = await findPublicManifestById(postId);
+    if (!manifest) {
+      throw new HttpError(404, "POST_NOT_FOUND", "public post not found");
+    }
+
+    const post = await serializePublicFeedPost(manifest);
+
+    res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+    ok(res, {
+      post,
     });
   }
 );

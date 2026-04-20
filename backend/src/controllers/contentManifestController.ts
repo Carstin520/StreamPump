@@ -443,14 +443,19 @@ export const createContentPublication = withController(
       ? nextManifestStatusAfterPublication(manifestStatus.status)
       : null;
 
-    if (nextStatus && manifestStatus?.status !== nextStatus) {
-      await prisma.contentManifest.update({
-        where: { id: manifestId },
-        data: {
-          status: nextStatus,
-        },
-      });
+    const manifestUpdateData: Prisma.ContentManifestUpdateInput = {
+      isPublicFeedEligible: true,
+      publishedAt: new Date(),
+    };
+
+    if (nextStatus) {
+      manifestUpdateData.status = nextStatus;
     }
+
+    await prisma.contentManifest.update({
+      where: { id: manifestId },
+      data: manifestUpdateData,
+    });
 
     ok(
       res,

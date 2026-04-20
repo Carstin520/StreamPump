@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { primeHlsJs } from "@/components/shared/MediaVideoPlayer";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { PostRecord } from "@/lib/api/types";
@@ -21,6 +22,12 @@ export const PostCard = ({
   priority?: boolean;
   onClick?: () => void;
 }) => {
+  const prewarmVideoPlayer = () => {
+    if (post.type === "VIDEO") {
+      void primeHlsJs();
+    }
+  };
+
   const inner = (
     <article className="glass-card relative overflow-hidden border-white/[0.06] bg-[#101621]">
       <div className={`relative overflow-hidden ${post.mediaHeightClass} ${post.mediaStyle}`}>
@@ -62,6 +69,8 @@ export const PostCard = ({
     return (
       <button
         className={`mb-4 inline-block w-full break-inside-avoid text-left ${stageGlow[post.stage]}`}
+        onFocus={prewarmVideoPlayer}
+        onMouseEnter={prewarmVideoPlayer}
         onClick={onClick}
         type="button"
       >
@@ -74,6 +83,8 @@ export const PostCard = ({
     <Link
       className={`mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
       href={`/posts/${post.id}`}
+      onFocus={prewarmVideoPlayer}
+      onMouseEnter={prewarmVideoPlayer}
     >
       {inner}
     </Link>
