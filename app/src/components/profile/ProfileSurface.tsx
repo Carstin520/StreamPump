@@ -1,3 +1,4 @@
+import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { PostRecord, UserNoteRecord } from "@/lib/api/types";
 import { compactNumber } from "@/lib/public-data";
@@ -29,7 +30,14 @@ export const ProfileHero = ({
 }) => (
   <section className="-mx-4 border-b border-white/8 bg-[#0a0f18] lg:-mx-6">
     <div className="relative h-48 overflow-hidden sm:h-56">
-      <img alt={`${name} banner`} className="h-full w-full object-cover" src={bannerSrc} />
+      <ProgressiveImage
+        alt={`${name} banner`}
+        className="h-full w-full object-cover"
+        fill
+        priority
+        sizes="100vw"
+        src={bannerSrc}
+      />
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#09111b]/38 to-[#09111b]" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a0f18] to-transparent" />
     </div>
@@ -102,8 +110,8 @@ export const ProfileNoteGrid = ({
 }) => (
   <section className="mx-auto max-w-[960px] px-2 pt-2">
     <div className="masonry-grid">
-      {items.map((item) => (
-        <ProfileNoteCard item={item} key={item.id} onOpen={() => onOpen(item)} />
+      {items.map((item, index) => (
+        <ProfileNoteCard item={item} key={item.id} onOpen={() => onOpen(item)} priority={index < 2} />
       ))}
     </div>
   </section>
@@ -154,14 +162,25 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 const ProfileNoteCard = ({
   item,
   onOpen,
+  priority = false,
 }: {
   item: UserNoteRecord;
   onOpen: () => void;
+  priority?: boolean;
 }) => (
   <button className="block w-full text-left" onClick={onOpen} type="button">
     <div className="card-radius overflow-hidden border border-white/[0.06] bg-[#101621] shadow-[0_16px_44px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
       <div className="relative overflow-hidden">
-        <img alt={item.title} className={`w-full object-cover transition duration-500 hover:scale-[1.02] ${item.mediaHeightClass}`} src={item.coverSrc} />
+        <ProgressiveImage
+          alt={item.title}
+          className={`w-full object-cover transition duration-500 hover:scale-[1.02] ${item.mediaHeightClass}`}
+          height={640}
+          priority={priority}
+          sizes="(max-width: 768px) 100vw, 960px"
+          src={item.coverSrc}
+          width={480}
+          wrapperClassName="w-full"
+        />
         <div className="absolute left-3 top-3">
           <StagePill stage={item.stage} />
         </div>

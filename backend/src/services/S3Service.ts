@@ -134,6 +134,31 @@ export class S3Service {
     };
   }
 
+  async putObject(
+    objectKey: string,
+    body: Uint8Array,
+    mimeType: string,
+    options?: {
+      cacheControl?: string;
+    }
+  ): Promise<void> {
+    const normalizedMimeType = normalizeMimeType(mimeType);
+    const bucket = config.storage.origin.bucket;
+    if (!bucket) {
+      throw new Error("S3_BUCKET is not configured");
+    }
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Body: body,
+        CacheControl: options?.cacheControl,
+        ContentType: normalizedMimeType,
+      })
+    );
+  }
+
   async createMultipartUpload(
     objectKey: string,
     mimeType: string,

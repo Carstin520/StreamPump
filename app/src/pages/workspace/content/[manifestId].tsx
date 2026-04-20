@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 import {
   completeManifestAssetUpload,
   ContentManifestDetailResponse,
@@ -97,13 +98,15 @@ function ManifestAssetPreview({ asset }: { asset: ManifestAssetRecord }) {
 
     if (renderableUrl) {
       return (
-        <video
-          className="h-full w-full object-cover"
+        <MediaVideoPlayer
+          className="h-full w-full"
           controls
+          loadingLabel="Preparing preview…"
           muted
           playsInline
           preload="metadata"
           src={renderableUrl}
+          videoClassName="h-full w-full object-cover"
         />
       );
     }
@@ -125,62 +128,18 @@ function HlsVideoPreview({
   asset: ManifestAssetRecord;
   fallbackUrl: string | null;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !asset.muxPlaybackUrl) {
-      return;
-    }
-
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = asset.muxPlaybackUrl;
-      return;
-    }
-
-    let cancelled = false;
-    let cleanup: (() => void) | null = null;
-
-    void import("hls.js").then(({ default: Hls }) => {
-      if (cancelled || !video) {
-        return;
-      }
-
-      if (!Hls.isSupported()) {
-        if (fallbackUrl) {
-          video.src = fallbackUrl;
-        }
-        return;
-      }
-
-      const hls = new Hls({
-        enableWorker: true,
-      });
-
-      hls.loadSource(asset.muxPlaybackUrl as string);
-      hls.attachMedia(video);
-      cleanup = () => {
-        hls.destroy();
-      };
-    });
-
-    return () => {
-      cancelled = true;
-      cleanup?.();
-    };
-  }, [asset.muxPlaybackUrl, fallbackUrl]);
-
   return (
-    <video
-      ref={videoRef}
-      className="h-full w-full object-cover"
+    <MediaVideoPlayer
+      className="h-full w-full"
       controls
+      fallbackSrc={fallbackUrl}
+      loadingLabel="Preparing Mux preview…"
       muted
       playsInline
       preload="metadata"
-    >
-      {fallbackUrl ? <source src={fallbackUrl} type="video/mp4" /> : null}
-    </video>
+      src={asset.muxPlaybackUrl}
+      videoClassName="h-full w-full object-cover"
+    />
   );
 }
 

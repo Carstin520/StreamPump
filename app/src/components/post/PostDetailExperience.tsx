@@ -11,6 +11,7 @@ import {
   CloseIcon,
 } from "@/components/shared/AppIcons";
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
@@ -321,17 +322,21 @@ const VideoStage = ({ post }: { post: PostRecord }) => (
   <div className="h-full w-full">
     <div className="relative h-full min-h-[320px] overflow-hidden rounded-[30px] border border-white/10 bg-[#05070d] shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
       {post.videoSrc ? (
-        <video
+        <MediaVideoPlayer
           autoPlay
-          className="h-full w-full object-contain"
+          className="h-full w-full"
           controls
           key={`${post.id}-${post.videoSrc}`}
+          loadingLabel="Preparing video…"
           loop
           muted
           playsInline
-          poster={post.coverSrc}
+          posterPriority
+          posterSizes="(max-width: 1280px) 100vw, 72vw"
+          posterSrc={post.coverSrc}
           preload="metadata"
           src={post.videoSrc}
+          videoClassName="h-full w-full object-contain"
         />
       ) : (
         <>

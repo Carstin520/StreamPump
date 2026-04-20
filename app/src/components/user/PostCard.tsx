@@ -12,7 +12,13 @@ const stageGlow: Record<PostRecord["stage"], string> = {
   S2_ACTIVE: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(42,211,138,0.04)]",
 };
 
-export const PostCard = ({ post }: { post: PostRecord }) => {
+export const PostCard = ({
+  post,
+  priority = false,
+}: {
+  post: PostRecord;
+  priority?: boolean;
+}) => {
   return (
     <Link
       className={`mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
@@ -24,6 +30,7 @@ export const PostCard = ({ post }: { post: PostRecord }) => {
             alt={post.title}
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
             fill
+            priority={priority}
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             src={post.coverSrc}
           />

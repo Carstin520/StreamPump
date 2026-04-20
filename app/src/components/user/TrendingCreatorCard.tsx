@@ -1,17 +1,27 @@
 import Link from "next/link";
 
+import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { CreatorMarketRecord } from "@/lib/api/types";
 import { compactNumber, formatUsd } from "@/lib/public-data";
 
-export const TrendingCreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => (
+export const TrendingCreatorCard = ({
+  creator,
+  priority = false,
+}: {
+  creator: CreatorMarketRecord;
+  priority?: boolean;
+}) => (
   <Link className="block" href={`/creators/${creator.id}`}>
     <div className="card-radius group cursor-pointer overflow-hidden border border-white/[0.06] bg-[#121826] shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:border-white/[0.1]">
       <div className="relative h-24 overflow-hidden">
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-[#121826] via-transparent to-transparent" />
-        <img
+        <ProgressiveImage
           alt={creator.name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          fill
+          priority={priority}
+          sizes="(max-width: 768px) 100vw, (max-width: 1536px) 50vw, 25vw"
           src={creator.heroSrc}
         />
         <div className="absolute left-4 top-4 z-[2]">

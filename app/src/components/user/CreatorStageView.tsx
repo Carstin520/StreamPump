@@ -148,7 +148,7 @@ export const CreatorStageView = ({
         <div className="px-6 py-6 md:px-8">
           {activeTab === "作品" ? (
             <div className="masonry-grid">
-              {creatorPosts.map((post) => (
+              {creatorPosts.map((post, index) => (
                 <Link className="block" href={`/posts/${post.id}`} key={post.id}>
                   <div className="glass-card">
                     <div className={`relative overflow-hidden rounded-t-[24px] ${post.mediaHeightClass}`}>
@@ -156,6 +156,7 @@ export const CreatorStageView = ({
                         alt={post.title}
                         className="object-cover transition-transform duration-500 hover:scale-[1.02]"
                         fill
+                        priority={index < 2}
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                         src={post.coverSrc}
                       />

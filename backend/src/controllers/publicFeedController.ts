@@ -6,6 +6,9 @@ import {
 import { ok, parsePositiveInt, withController } from "./http";
 import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
+import {
+  buildDisplayVariantKey,
+} from "../services/imageVariants";
 import { s3Service } from "../services/S3Service";
 
 type JsonObject = Record<string, Prisma.JsonValue>;
@@ -122,11 +125,18 @@ const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0])
     return serialized;
   }
 
+  const preferredVariantUrl =
+    asset.assetType === "IMAGE" || asset.assetType === "COVER"
+      ? await s3Service
+          .generateDownloadUrl(buildDisplayVariantKey(asset.storageKey), 60 * 60)
+          .catch(() => null)
+      : null;
+
   try {
     const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 60 * 60);
     const preferredPlaybackUrl =
       serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-        ? downloadUrl
+        ? preferredVariantUrl ?? downloadUrl
         : serialized.preferredPlaybackUrl;
 
     return {
@@ -139,7 +149,7 @@ const serializePublicAsset = async (asset: Parameters<typeof serializeAsset>[0])
     if (isBrowserRenderableUrl(canonicalUrl)) {
       const preferredPlaybackUrl =
         serialized.preferredPlaybackSource === "ORIGIN" || !serialized.preferredPlaybackUrl
-          ? canonicalUrl
+          ? preferredVariantUrl ?? canonicalUrl
           : serialized.preferredPlaybackUrl;
 
       return {

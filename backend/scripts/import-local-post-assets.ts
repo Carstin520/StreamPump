@@ -25,6 +25,7 @@ import {
   isVideoMimeType,
   s3Service,
 } from "../src/services/S3Service";
+import { uploadDisplayVariant } from "../src/services/imageVariants";
 import { ingestUploadedVideoAssetById } from "../src/services/muxReconciliationService";
 
 type CliOptions = {
@@ -397,6 +398,8 @@ const uploadSinglePartObject = async (filePath: string, mimeType: string, storag
   if (!response.ok) {
     throw new Error(`single-part upload failed (${response.status} ${response.statusText})`);
   }
+
+  return fileBuffer;
 };
 
 const uploadMultipartObject = async (
@@ -567,7 +570,12 @@ const importPost = async (
         assetPlan.fileSizeBytes
       );
     } else {
-      await uploadSinglePartObject(assetPlan.filePath, assetPlan.mimeType, storageKey);
+      const fileBuffer = await uploadSinglePartObject(
+        assetPlan.filePath,
+        assetPlan.mimeType,
+        storageKey
+      );
+      await uploadDisplayVariant(storageKey, fileBuffer);
     }
 
     let updatedAsset = await prisma.contentAsset.update({

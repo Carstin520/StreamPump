@@ -8,6 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "import:local-post-assets": "npm run build && node dist/scripts/import-local-post-assets.js",
+    "backfill:image-variants": "npm run build && node dist/scripts/backfill-image-variants.js",
+    "update:local-post-cover": "npm run build && node dist/scripts/update-local-post-cover.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy"
@@ -25,7 +27,8 @@
     "express": "^4.21.2",
     "node-cron": "^3.0.3",
     "pg": "^8.13.1",
-    "redis": "^4.7.0"
+    "redis": "^4.7.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -132,7 +132,7 @@ export const ActivitySurface = () => {
 
             {!loading && !error && activeTab === "overview" ? (
               <div className="space-y-4">
-                {visibleFeedItems.map((item) => {
+                {visibleFeedItems.map((item, index) => {
                   const creator = creatorMap.get(item.creatorId);
                   if (!creator) {
                     return null;
@@ -175,6 +175,7 @@ export const ActivitySurface = () => {
                                 alt={item.title ?? creator.name}
                                 className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
                                 fill
+                                priority={index === 0}
                                 sizes="(max-width: 1024px) 100vw, 720px"
                                 src={item.coverSrc}
                               />
@@ -214,7 +215,7 @@ export const ActivitySurface = () => {
 
             {!loading && !error && activeTab === "video" ? (
               <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                {visibleVideoItems.map((item) => {
+                {visibleVideoItems.map((item, index) => {
                   const creator = creatorMap.get(item.creatorId);
                   if (!creator) {
                     return null;
@@ -232,6 +233,7 @@ export const ActivitySurface = () => {
                             alt={item.title}
                             className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                             fill
+                            priority={index < 2}
                             sizes="(max-width: 768px) 100vw, (max-width: 1536px) 50vw, 33vw"
                             src={item.coverSrc}
                           />

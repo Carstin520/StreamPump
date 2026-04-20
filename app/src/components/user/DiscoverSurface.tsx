@@ -100,8 +100,8 @@ const PostsSection = () => {
 
       {!loading && !error && posts.length > 0 ? (
         <div className="masonry-grid masonry-grid-home">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+          {posts.map((post, index) => (
+            <PostCard key={post.id} post={post} priority={index < 4} />
           ))}
         </div>
       ) : null}
@@ -135,8 +135,8 @@ const TrendingView = () => {
 
       {!loading && !error ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {creators.map((creator) => (
-            <TrendingCreatorCard creator={creator} key={creator.id} />
+          {creators.map((creator, index) => (
+            <TrendingCreatorCard creator={creator} key={creator.id} priority={index < 2} />
           ))}
         </div>
       ) : null}

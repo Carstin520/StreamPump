@@ -50,6 +50,7 @@ import {
   isVideoMimeType,
   s3Service,
 } from "../services/S3Service";
+import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
 
 const MAX_ASSET_SIZE_BYTES = 100 * 1024 * 1024;
 
@@ -330,6 +331,7 @@ export const completeManifestAssetUpload = withController(
         },
       });
     } else {
+      await backfillDisplayVariantFromStorage(asset.storageKey).catch(() => null);
       updated = await prisma.contentAsset.update({
         where: { id: asset.id },
         data: {
