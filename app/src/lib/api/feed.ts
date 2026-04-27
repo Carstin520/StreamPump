@@ -154,6 +154,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     (asset) => asset.assetType === "IMAGE" || asset.assetType === "COVER"
   );
   const coverSrc = pickBestAssetUrl(coverAsset) ?? FALLBACK_POSTER;
+  const videoSrc = pickBestVideoUrl(videoAsset);
   const gallerySrcs = imageAssets
     .map((asset) => pickBestAssetUrl(asset))
     .filter((value): value is string => Boolean(value));
@@ -184,8 +185,8 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     mediaHeightClass: inferMediaHeightClass(post),
     mediaStyle: "",
     coverSrc,
-    videoSrc: pickBestVideoUrl(videoAsset) ?? undefined,
-    gallerySrcs: gallerySrcs.length > 0 ? gallerySrcs : undefined,
+    ...(videoSrc ? { videoSrc } : {}),
+    ...(gallerySrcs.length > 0 ? { gallerySrcs } : {}),
     hasMultipleImages: gallerySrcs.length > 1,
     comments: [] as CommentRecord[],
   };
