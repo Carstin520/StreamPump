@@ -1,344 +1,123 @@
 # StreamPump
 
-**A creator sponsorship market for the short-video era.**
+StreamPump is a Web2.5 creator sponsorship market. Creators package content and campaign terms, sponsors fund real budgets, fans participate in creator momentum, and final financial settlement happens on Solana.
 
-Short version: creators make content, sponsors bring USDC, fans bring conviction, and StreamPump keeps score.
+简单说：StreamPump 不是单纯的 fan token，也不是传统 influencer CRM。它把“内容创作、赞助预算、粉丝参与、链上结算”放进同一个产品流程里，让创作者增长可以被资助、被验证、被结算。
 
-StreamPump is building a Web2.5 creator economy stack:
+## Product Model
 
-- creators package content and campaign terms
-- sponsors fund campaigns with real budgets
-- fans can back creator momentum with protocol-native participation
-- the final money movement settles on Solana
+StreamPump has two connected product layers:
 
-It is not "just another token app", and it is not "just another influencer CRM" either.  
-The idea is to turn creator growth into something that can be funded, measured, and settled in a much clearer way.
+- **Season 1 / Creator Discovery Market**  
+  Fans use `SPUMP` to back creators early. Creator momentum is tracked by the protocol, and sponsors can make buyout-style offers before a creator graduates into the sponsorship market.
 
-## Why This Exists
+- **Season 2 / Sponsored Campaign Market**  
+  Sponsors fund campaigns with three budget tracks: fixed creator base pay, performance-based budget, and delayed CPS-style payout after the return window closes.
 
-The creator economy has a weird problem:
+`SPUMP` is designed as a non-transferable Token-2022 participation asset. It is product fuel and reputation-linked participation, not a DEX-first speculative token.
 
-- creators create attention
-- brands spend money
-- fans create momentum
-- platforms take the data
+## Architecture
 
-But the actual market between these four parties is still fragmented, opaque, and slow.
+The repo is intentionally hybrid:
 
-StreamPump is our attempt to fix that by combining:
+- **DB-first for product workflow**: drafts, content manifests, uploads, media processing, proposal intents, retries, and workspace state.
+- **Chain-first for financial truth**: sponsor funding, proposal creation, final settlement, refunds, and protocol token mint/burn paths.
 
-- Web2 speed for high-frequency product actions
-- on-chain settlement for high-value financial actions
-- a product model designed for creators, sponsors, fans, and eventually MCNs
+This keeps common product actions fast while preserving on-chain settlement guarantees for high-value financial actions.
 
-## The Product, in Human Language
+## Current Status
 
-Think of StreamPump as two connected products.
+This is a serious prototype moving toward a usable product, not a polished production app.
 
-### Season 1: Creator Discovery Market
+Already in place:
 
-This is the "I think this creator is going somewhere" layer.
+- Anchor program for core S1/S2 protocol state and settlement paths.
+- Non-transferable `SPUMP` checks and core protocol account model.
+- S2 proposal funding and settlement primitives.
+- Content anchoring support on-chain.
+- Backend data model for `ContentManifest`, `ProposalIntent`, `TxBundle`, and confirmed `Proposal` projections.
+- v1 backend routes for wallet/session auth, content manifests, proposal intents, workspace overview, public feed, and proposal reads.
+- Mux, S3-compatible storage, Neon/Postgres, reconciliation, and chain indexing support.
+- Next.js frontend surfaces for discover, activity, trending creators, portfolio, profile, login, post detail, and workspace flows.
 
-- fans use `SPUMP` to back a creator early
-- creator momentum is tracked inside the protocol
-- sponsors can make buyout-style offers
-- once a creator graduates, they move into the sponsorship market
+Known gaps:
 
-If S1 is the discovery layer, S2 is where real business starts.
-
-### Season 2: Sponsored Campaign Market
-
-This is the "brand budget meets creator performance" layer.
-
-One proposal can include three budget tracks:
-
-1. `Track 1`: fixed base pay for the creator
-2. `Track 2`: performance-based budget tied to metrics like views, clicks, or saves
-3. `Track 3`: delayed CPS-style payout after the return window closes
-
-In plain English:
-
-- sponsors fund a campaign once
-- creators deliver the content
-- the protocol later settles what should go to creator, sponsor, and fan incentive pool
-
-### SPUMP
-
-`SPUMP` is the protocol participation token.
-
-It is intentionally designed as a **non-transferable Token-2022 asset**:
-
-- it is not meant to be dumped on a DEX
-- it is used inside the product, not traded outside it
-- users spend it to participate
-- the protocol can mint or burn it through approved contract paths
-
-The current direction is closer to "fuel + reputation-linked participation" than "speculative asset".
-
-## What Makes StreamPump Different
-
-Most creator tools do one piece of the puzzle:
-
-- analytics dashboards
-- influencer CRM
-- affiliate systems
-- fan token experiments
-
-StreamPump is trying to connect the whole loop:
-
-1. discover a creator early
-2. package content and campaign terms
-3. fund the campaign
-4. verify the outcome
-5. settle the money clearly
-
-That is why this repo has both on-chain code and a backend.  
-The product is intentionally hybrid.
-
-## Web2.5 by Design
-
-We are not forcing every click and every draft onto Solana.
-
-The current architecture principle is:
-
-- **DB-first for fast product actions**  
-  drafts, content manifests, uploads, click streams, queueing, and workflow state
-
-- **Chain-first for financial truth**  
-  sponsor funding, proposal creation, final settlement, refunds, and token mint/burn paths
-
-This gives us a more realistic UX:
-
-- less wallet pop-up spam
-- lower RPC overhead
-- cleaner final settlement guarantees
-
-## Current Project Status
-
-This repo is **not a polished production app yet**. It is a serious prototype moving toward a usable product.
-
-### Already in place
-
-- Anchor program for the core protocol
-- S1 and S2 state machine logic
-- non-transferable `SPUMP` mint checks
-- content hash / content anchor support on-chain
-- sponsor time-lock improvements for buyout offers
-- Track 2 sweep and automatic-settlement primitives
-- user profile and organization role primitives on-chain
-- backend data model upgrade to `ContentManifest + ProposalIntent + TxBundle`
-- backend `v1` routes for the new launch flow
-- real Phase 1 launch bundle assembly with creator approval separated from external rent payment
-- wallet challenge/signature auth with Bearer sessions for `v1` content and proposal launch routes
-- bundle expiry rebuild and retry-safe launch submission recovery
-- real local media flow verified across `Neon + AWS S3 + Mux`
-- real Mux webhook delivery verified in local development via `Cloudflare Tunnel`
-- Mux reconciliation worker for missed-webhook recovery
-- explicit on-chain events emitted for proposal lifecycle, content anchoring, S1 buyout lifecycle, endorsement settlement, and user registration
-- EventParser-first chain indexer with persisted `ChainEvent` records and proposal projection sync
-- a much stronger frontend experience prototype built on the existing `pages` router
-- immersive `Discover` feed with animated background, progressive image loading, and unified glassmorphism system
-- refined `Trending`, `Portfolio`, `Profile`, `Login`, and `Activity` surfaces with a more coherent visual language
-- dual-state login surface covering both first-time entry and account switching
-- real wallet challenge/signature login from the tracked frontend login page
-- supporter-facing `Portfolio` with exposure curve, row-level sparklines, claim queue, and re-entry prototype flows
-- new follow-first `Activity` page with `综合 / 视频` tabs, creator filtering, and bilibili-inspired subscription-feed information architecture
-- floating post-detail modal for both image and video posts with wheel-based post switching and preserved resize state
-
-### Still under construction
-
-- full backend task engine for daily SPUMP rewards and quests
-- dispute / review workflow
-- remaining explicit event coverage for the rest of the protocol surface
-- real operator dashboards for creator, sponsor, MCN
-- full frontend-to-backend wiring beyond mock-data-driven product surfaces
-- real production media playback and final mobile interaction polish
-
-### Important reality check
-
-The frontend is no longer "just a scaffold", but it is still not a production-ready app.
-
-Right now the strongest parts of the project are:
-
-- protocol logic
-- settlement design
-- backend architecture direction
-- the high-fidelity frontend interaction model
-
-The main frontend gap now is not visual quality, but real data wiring and production hardening.
-
-## Frontend Progress Update
-
-The frontend moved forward substantially in the latest iteration.
-
-What is now in place:
-
-- a unified visual system across `Discover`, `Activity`, `Trending`, `Portfolio`, `Profile`, login, workspace pages, and post detail
-- startup-only branded loading, with progressive blur-up media loading for large images instead of repeated full-page loaders
-- an animated background layer so the app surface feels alive even behind floating detail views
-- a floating post-detail modal with shared navigation for image and video posts, vertical wheel switching, lighter separators, and preserved resize state
-- a dual-state login surface for first-time access and account switching previews
-- a supporter portfolio flow with trend charts, claim queue, and re-entry action prototypes
-- a follow-first activity feed with creator filtering, mixed post/update cards, and compact video-grid mode
-
-What is still intentionally prototype-grade:
-
-- most pages are still driven by local mock data
-- video posts currently use poster-style presentation rather than a final production playback stack
-- the UI has not yet been fully connected to the new backend content / proposal-intent flow
-- social/provider login still uses preview identities through `provider-exchange`, even though external wallet login now uses the real challenge/signature path
-
-## UI Snapshot
-
-These screenshots reflect the current frontend direction inside the repo.
-
-### Discover Feed
-
-The main feed now behaves more like an immersive content surface than a static mockup. It uses a stronger poster-style hero, stage-aware post cards, and a subtle animated page layer in the background.
-
-![Discover feed](docs/readme-assets/frontend-explore-surface.png)
-
-### Activity Feed
-
-The new `Activity` surface adds a follow-first subscription layer inspired by bilibili-style dynamics. It introduces a left-side followed-creator rail, a central `综合 / 视频` content switcher, and a lighter right-side highlight column without breaking StreamPump's existing visual language.
-
-### Floating Post Detail
-
-Post detail is now a floating modal-style surface instead of a full hard transition page. Image and video posts share the same navigation model, and users can switch posts with the mouse wheel while keeping the resized modal state.
-
-![Floating post detail](docs/readme-assets/frontend-post-detail-modal.png)
-
-### Trending Creators
-
-The `Trending` surface now reads like a creator market dashboard rather than a placeholder list, with clearer stage language, hero imagery, and creator-level market metrics.
-
-![Trending creators](docs/readme-assets/frontend-trending-creators.png)
-
-### Portfolio
-
-The `Portfolio` view now frames S1 exposure, pending claims, and action queues in a way that is much closer to an actual product surface for supporters.
-
-![Portfolio surface](docs/readme-assets/frontend-portfolio-surface.png)
-
-### User Profile
-
-The profile page now better matches the rest of the app, combining creator-style note cards, a stronger hero treatment, and a more coherent social / ownership surface.
-
-![User profile](docs/readme-assets/frontend-profile-surface.png)
-
-## The New Backend Flow
-
-We recently moved the backend design toward a more practical content-and-launch workflow.
-
-### Content side
-
-Instead of treating everything as a single uploaded video, the backend now models:
-
-- `ContentManifest`
-- `ContentAsset`
-- `ContentPublication`
-
-This is important because the target content format is closer to Xiaohongshu:
-
-- short video
-- image carousel
-- mixed-media note
-- text + media together
-
-### Proposal side
-
-Instead of creating a chain-facing proposal draft too early, the backend now separates:
-
-- `ProposalIntent`: the off-chain business draft
-- `TxBundle`: the launch transaction wrapper
-- `Proposal`: the confirmed on-chain projection
-
-That split is much closer to how the product really works.
-
-The current Phase 1 launch path already supports:
-
-- a real `VersionedTransaction`
-- creator signature as business approval
-- sponsor or external payer covering rent and transaction fee
-- atomic proposal creation plus sponsor funding
-- bundle reuse while active, bundle rebuild after expiry, and retry-safe submission keyed by the same signed transaction
-
-The current backend auth path supports:
-
-- `POST /api/v1/auth/challenge`
-- `POST /api/v1/auth/verify`
-- Bearer session auth on `v1/content/*` and `v1/proposal-intents/*`
-- optional legacy `x-wallet-address` fallback only when explicitly enabled in local env
-
-The current tracked frontend auth path supports:
-
-- social/provider preview login through `POST /api/v1/auth/provider-exchange`
-- real external-wallet login through `POST /api/v1/auth/challenge -> POST /api/v1/auth/verify`
-- Bearer session storage in browser local state for `workspace`, `content`, `proposal-intents`, and proposal detail pages
-
-## Who This Product Is For
-
-### Regular users / fans
-
-"I want to discover interesting creators early and participate in their growth."
-
-### Creators
-
-"I want money, distribution, and sponsor demand before I become huge."
-
-### Sponsors / brands
-
-"I want creator marketing that is measurable, auditable, and less fake."
-
-### MCNs
-
-"I want to manage multiple creators, multiple campaigns, and multiple sponsor relationships in one system."
+- The frontend still has prototype-driven public/social surfaces.
+- Workspace and campaign flows are only partially wired to production-grade user actions.
+- Daily rewards, quests, dispute/review workflows, and operator dashboards are unfinished.
+- Production media playback, mobile polish, and deployment hardening still need work.
+- Vercel deployment status is currently unverified from this repo because there is no local `.vercel/project.json` or `vercel.json`.
 
 ## Monorepo Layout
 
 ```text
 programs/streampump-core     Anchor program (Rust)
 programs/tests               Anchor TypeScript tests
-backend/                     API, storage, manifest flow, proposal-intent flow
-app/                         Next.js product prototype for discover, activity, portfolio, profile, and workspace UX
-docs/                        Architecture notes and backend contracts
-scripts/                     Local helpers
+backend/                     Express API, Prisma, storage, Mux, indexer, schedulers
+app/                         Next.js frontend
+docs/                        Architecture notes, API contracts, deployment notes
+scripts/                     Local helper scripts and Git hooks
+local-post-assets/           Local seed content for development
+third_party/                 Vendored Rust dependencies used by the Anchor workspace
 ```
 
-## Quick Start
+## Local Setup
 
-### On-chain program
+Install dependencies per package as needed:
 
 ```bash
-anchor build
-anchor test
+npm install
+cd app && npm install
+cd ../backend && npm install
 ```
+
+Recommended local env files:
+
+```bash
+cp app/.env.example app/.env.local
+cp backend/.env.example backend/.env.local
+```
+
+Fill real secrets only in `.env.local`. Env files are ignored by Git.
+
+### Frontend
+
+```bash
+cd app
+npm run dev
+```
+
+Important frontend env vars:
+
+- `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000`
+- `NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com`
+- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...` only if Web3Auth social login is enabled
+
+The frontend prefers `NEXT_PUBLIC_BACKEND_BASE_URL` and derives `/api/v1` automatically. `NEXT_PUBLIC_API_BASE_URL` is still accepted as a backward-compatible fallback.
 
 ### Backend
 
 ```bash
 cd backend
-npm install
 npm run prisma:generate
 npm run build
 npm run dev
 ```
 
-Install local Git safety hooks:
+Common backend env vars:
 
-```bash
-./scripts/install-git-hooks.sh
-```
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `PORT`
+- `API_BASE_URL`
+- `CORS_ALLOWED_ORIGINS`
+- `AUTH_SESSION_SECRET`
+- `SOLANA_RPC_ENDPOINT`
+- `STREAMPUMP_PROGRAM_ID`
+- `S3_*` or compatible storage settings
+- `MUX_*`
 
-Recommended local secret flow:
-
-```bash
-cp backend/.env.example backend/.env.local
-```
-
-Then fill real values into `backend/.env.local` only.
-
-Local video smoke test:
+Local media smoke test:
 
 ```bash
 cd backend
@@ -352,100 +131,110 @@ cd backend
 node scripts/muxAssetStatus.js <muxAssetId>
 ```
 
-For local Mux webhook testing, the most reliable path we have verified is:
-
-1. run the backend on `:4000`
-2. expose it with Cloudflare Tunnel
-3. register the tunnel URL as a real Mux webhook endpoint
-4. use that endpoint secret as `MUX_WEBHOOK_SECRET`
-
-Quick Tunnel example:
+For local Mux webhook testing, run the backend on `:4000`, expose it with Cloudflare Tunnel, register the tunnel URL in Mux, and use that endpoint secret as `MUX_WEBHOOK_SECRET`.
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:4000
 ```
 
-Git safety notes:
-
-- `backend/.env.local` and other `.env.*` files are ignored by Git
-- `.env.example` is the only env template that should be committed
-- `pre-commit` checks staged files and blocks secret files or obvious credentials
-- `pre-push` re-checks the current `HEAD` as a second safety net
-- hooks are local Git config, so each new clone should run `./scripts/install-git-hooks.sh` once
-- if a secret file was already tracked before ignore rules were added, run `git rm --cached <file>`
-
-The shared hook logic lives in `scripts/git-hooks/secret-guard.sh`.
-It currently blocks common secret paths such as `.env`, `.env.*`, `*.pem`, `id.json`, wallet keypair JSON files,
-and scans file contents for connection strings with embedded credentials, secret-looking env assignments,
-and private key blocks.
-
-Useful env vars:
-
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `PORT`
-- `API_BASE_URL`
-- `SOLANA_RPC_ENDPOINT`
-- `NEXT_PUBLIC_BACKEND_BASE_URL`
-- `NEXT_PUBLIC_API_BASE_URL`
-- `NEXT_PUBLIC_RPC_ENDPOINT`
-- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
-- `STREAMPUMP_PROGRAM_ID`
-- `S3_*`
-- `R2_*`
-- `MUX_*`
-
-### Frontend
+### On-chain Program
 
 ```bash
-cd app
-npm install
-npm run dev
+anchor build
+anchor test
 ```
 
-Recommended local frontend env flow:
+For a lighter Rust check:
 
 ```bash
-cp app/.env.example app/.env.local
+cargo check
 ```
 
-Then fill at least:
+## Test Commands
 
-- `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000`
-- `NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com`
-- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...` only if you want Web3Auth social login enabled
+```bash
+cd app && npm run build
+cd backend && npm run build
+cargo check
+```
 
-Notes:
+Backend tests:
 
-- the frontend now prefers `NEXT_PUBLIC_BACKEND_BASE_URL` and derives `/api/v1` automatically
-- `NEXT_PUBLIC_API_BASE_URL` is still accepted as a backward-compatible fallback
-- wallet login on `/login` requires a Solana wallet that supports `signMessage`
+```bash
+npm run test:backend
+```
+
+Anchor tests:
+
+```bash
+npm run test:anchor
+```
+
+## Deployment Notes
+
+The current recommended first deployment path is:
+
+- `app/` to **Vercel**
+- `backend/` to **Render**
+- Neon for Postgres
+- AWS S3 or compatible storage for object storage
+- Mux for video
+
+For Vercel, the project must use:
+
+- Root Directory: `app`
+- Build Command: `next build`
+- Required env vars:
+  - `NEXT_PUBLIC_BACKEND_BASE_URL`
+  - `NEXT_PUBLIC_RPC_ENDPOINT`
+- Optional env var:
+  - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
+
+Do not deploy from the repository root unless the Vercel project settings or a checked-in config explicitly route the build to `app/`.
+
+For the backend, Render should use `backend` as the root directory. A practical first build command is:
+
+```bash
+npm ci --include=dev && npm run prisma:generate && npm run build
+```
+
+Start command:
+
+```bash
+npm run start
+```
+
+Run production migrations against the production database:
+
+```bash
+cd backend
+npm run prisma:migrate:deploy
+```
+
+More details live in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render-deployment.md).
+
+## Git Safety
+
+Install local hooks:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+The hooks block common secret files and obvious credential patterns before commit/push. The shared logic lives in `scripts/git-hooks/secret-guard.sh`.
 
 ## Recommended Reading
 
-If you want the product and backend direction first, read:
-
-- [docs/backend/prisma-migration-content-manifest.md](docs/backend/prisma-migration-content-manifest.md)
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md)
-
-## Where We Are Heading
-
-The short-term goal is not "launch a giant SocialFi universe".
-
-The short-term goal is much more practical:
-
-- make creator content packaging clean
-- make sponsor launch flow smooth
-- make settlement trustworthy
-- make the product understandable to normal users
-
-If we get those four things right, the rest becomes much easier.
+- [docs/backend/prisma-migration-content-manifest.md](docs/backend/prisma-migration-content-manifest.md)
+- [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render-deployment.md)
+- [docs/progress-review-2026-04.md](docs/progress-review-2026-04.md)
 
 ## License
 
 This repository uses a dual-license structure:
 
-- **On-chain programs** (`programs/`) are licensed under the [Apache License 2.0](programs/LICENSE).
-- **Backend, frontend, scripts, and documentation** are licensed under the [Business Source License 1.1](LICENSE).
+- On-chain programs under `programs/` are licensed under the [Apache License 2.0](programs/LICENSE).
+- Backend, frontend, scripts, and documentation are licensed under the [Business Source License 1.1](LICENSE).
 
-The BSL grants free use for personal learning, testnet experimentation, academic research, and contributions back to this project. Commercial use requires a separate license from the Licensor. On **April 20, 2030**, all BSL-covered code will automatically convert to Apache License 2.0.
+The BSL allows personal learning, testnet experimentation, academic research, and contributions back to this project. Commercial use requires a separate license from the Licensor. On April 20, 2030, all BSL-covered code automatically converts to Apache License 2.0.

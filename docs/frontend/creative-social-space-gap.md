@@ -9,10 +9,10 @@ It exists to keep the rebuild grounded in concrete UI differences instead of vag
 ## Reference Inputs
 
 - Reference code:
-  - [Creative-Social-Space/artifacts/streampump-web/src/index.css](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/Creative-Social-Space/artifacts/streampump-web/src/index.css)
-  - [Creative-Social-Space/artifacts/streampump-web/src/App.tsx](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/Creative-Social-Space/artifacts/streampump-web/src/App.tsx)
-  - [Creative-Social-Space/artifacts/streampump-web/src/pages/post.tsx](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/Creative-Social-Space/artifacts/streampump-web/src/pages/post.tsx)
-  - [Creative-Social-Space/artifacts/streampump-web/src/pages/video.tsx](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/Creative-Social-Space/artifacts/streampump-web/src/pages/video.tsx)
+  - [Creative-Social-Space/artifacts/streampump-web/src/index.css](../../Creative-Social-Space/artifacts/streampump-web/src/index.css)
+  - [Creative-Social-Space/artifacts/streampump-web/src/App.tsx](../../Creative-Social-Space/artifacts/streampump-web/src/App.tsx)
+  - [Creative-Social-Space/artifacts/streampump-web/src/pages/post.tsx](../../Creative-Social-Space/artifacts/streampump-web/src/pages/post.tsx)
+  - [Creative-Social-Space/artifacts/streampump-web/src/pages/video.tsx](../../Creative-Social-Space/artifacts/streampump-web/src/pages/video.tsx)
 - Runtime screenshots supplied by the user from Replit.
 
 ## Global Gaps

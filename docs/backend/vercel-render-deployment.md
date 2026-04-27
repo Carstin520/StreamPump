@@ -32,7 +32,7 @@
 
 本仓库已补好的部署前置项：
 - 后端支持 `CORS_ALLOWED_ORIGINS`
-- 前端有 [app/.env.example](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/app/.env.example)
+- 前端有 [app/.env.example](../../app/.env.example)
 - 后端有 `npm run prisma:migrate:deploy`
 
 ## 架构建议
@@ -118,7 +118,7 @@ npm run start
 ```
 
 ### 2.3 Render 环境变量
-按 [backend/.env.example](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/backend/.env.example) 填，重点是这些：
+按 [backend/.env.example](../../backend/.env.example) 填，重点是这些：
 
 #### App / Auth
 - `NODE_ENV=production`

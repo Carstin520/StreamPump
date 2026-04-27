@@ -37,7 +37,7 @@
 Sponsor 在 proposal launch 阶段只允许看到 1 次签名弹窗。
 
 ### 2.4 当前链上约束
-当前链上 `create_proposal` 需要 `creator` 签名，[create_proposal.rs](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/programs/streampump-core/src/instructions/create_proposal.rs)。
+当前链上 `create_proposal` 需要 `creator` 签名，[create_proposal.rs](../../programs/streampump-core/src/instructions/create_proposal.rs)。
 
 因此第一版合法流程是：
 
@@ -644,16 +644,16 @@ type ApiErrorCode =
 
 ## 14. 与现有文件的改造映射
 
-- 现有 [mediaController.ts](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/backend/src/controllers/mediaController.ts)
+- 现有 [mediaController.ts](../../backend/src/controllers/mediaController.ts)
   - 保留上传能力
   - 去掉自动 anchor
   - 改成服务 `ContentAsset` 写入
 
-- 现有 [proposalController.ts](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/backend/src/controllers/proposalController.ts)
+- 现有 [proposalController.ts](../../backend/src/controllers/proposalController.ts)
   - 废弃 `createProposalDraft`
   - 改为 `ProposalIntentController`
 
-- 现有 [AnchorService.ts](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/backend/src/services/AnchorService.ts)
+- 现有 [AnchorService.ts](../../backend/src/services/AnchorService.ts)
   - 新增 `buildAnchorContentHashIx`
   - 新增 `buildCreateProposalIx`
   - 新增 `buildSponsorFundIx`

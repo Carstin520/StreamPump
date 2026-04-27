@@ -10,7 +10,7 @@
 3. 保持迁移过程可灰度、可回滚，不要求一次性重写全部后端。
 
 ## 2. 当前问题
-当前 [schema.prisma](/Users/jamesli/Desktop/Sol%20Projects/StreamPump/backend/prisma/schema.prisma) 的核心问题：
+当前 [schema.prisma](../../backend/prisma/schema.prisma) 的核心问题：
 
 - `VideoContent` 只能表达单视频，不适合图文轮播和混排笔记。
 - `Proposal` 在链上确认前就被创建，导致 DB 和链上真相源混淆。

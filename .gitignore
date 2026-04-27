@@ -8,6 +8,7 @@ target/
 !.env.example
 !**/.env.example
 *.log
+*.tsbuildinfo
 app/.next/
 app/.next-dev/
 app/.next-dev*/
