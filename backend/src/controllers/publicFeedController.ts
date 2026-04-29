@@ -12,6 +12,7 @@ import {
 import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
 import { buildDisplayVariantKey } from "../services/imageVariants";
+import { config } from "../../config/default";
 import { s3Service } from "../services/S3Service";
 
 type JsonObject = Record<string, Prisma.JsonValue>;
@@ -126,6 +127,14 @@ const resolveCanonicalUrl = (objectKey: string | null | undefined) => {
 };
 
 const resolvePublicOriginUrl = async (storageKey: string) => {
+  if (config.storage.origin.publicFeedUseSignedUrls) {
+    try {
+      return await s3Service.generateDownloadUrl(storageKey, 60 * 60);
+    } catch (_error) {
+      return null;
+    }
+  }
+
   const canonicalUrl = resolveCanonicalUrl(storageKey);
   if (canonicalUrl) {
     return canonicalUrl;
@@ -140,6 +149,15 @@ const resolvePublicOriginUrl = async (storageKey: string) => {
 
 const resolvePublicImageVariantUrl = async (storageKey: string) => {
   const variantKey = buildDisplayVariantKey(storageKey);
+
+  if (config.storage.origin.publicFeedUseSignedUrls) {
+    try {
+      return await s3Service.generateDownloadUrl(variantKey, 60 * 60);
+    } catch (_error) {
+      return null;
+    }
+  }
+
   const canonicalUrl = resolveCanonicalUrl(variantKey);
   if (canonicalUrl) {
     return canonicalUrl;

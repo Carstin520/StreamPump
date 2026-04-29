@@ -73,6 +73,9 @@
 - `NEXT_PUBLIC_RPC_ENDPOINT`
   - 示例：`https://mainnet.helius-rpc.com/?api-key=...`
   - 或 devnet endpoint
+- `NEXT_IMAGE_REMOTE_HOSTS`
+  - 示例：`dhtrwpa2mlguo.cloudfront.net`
+  - 只填写你控制的公开素材/CDN 域名，逗号分隔；前端会把路径限制在 `/content/**`
 - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
   - 如果当前 web 还要保留 Web3Auth
 
@@ -147,6 +150,9 @@ npm run start
 - `S3_ACCESS_KEY_ID`
 - `S3_SECRET_ACCESS_KEY`
 - `S3_PUBLIC_BASE_URL`
+- `S3_PUBLIC_FEED_USE_SIGNED_URLS=false`
+  - 如果 CloudFront/S3 公开读取暂时返回 `403 AccessDenied`，可临时设为 `true` 让公共 feed 返回 1 小时签名读取 URL
+  - AWS 修复步骤见 [aws-media-access-runbook.md](./aws-media-access-runbook.md)
 
 #### Mux
 - `MUX_TOKEN_ID`

@@ -82,10 +82,20 @@ export const usePublicFeedPosts = (options?: {
           return;
         }
 
-        setState({
-          error: error instanceof Error ? error.message : "Failed to load public posts",
-          loading: false,
-          posts: nextInitialState.posts,
+        setState((currentState) => {
+          const fallbackPosts =
+            currentState.posts.length > 0 ? currentState.posts : nextInitialState.posts;
+
+          return {
+            error:
+              fallbackPosts.length > 0
+                ? null
+                : error instanceof Error
+                  ? error.message
+                  : "Failed to load public posts",
+            loading: false,
+            posts: fallbackPosts,
+          };
         });
       });
 

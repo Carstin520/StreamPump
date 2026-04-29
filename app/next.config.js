@@ -1,18 +1,54 @@
+const DEFAULT_REMOTE_IMAGE_HOSTS = ["dhtrwpa2mlguo.cloudfront.net"];
+
+const parseRemoteImageHostEntry = (entry) => {
+  const trimmed = entry.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+
+    return {
+      hostname: url.hostname,
+      pathname: url.pathname && url.pathname !== "/" ? url.pathname : "/content/**",
+      protocol: url.protocol.replace(":", "") || "https",
+    };
+  } catch (_error) {
+    return {
+      hostname: trimmed,
+      pathname: "/content/**",
+      protocol: "https",
+    };
+  }
+};
+
+const parseRemoteImageHosts = () => {
+  const configuredHosts = process.env.NEXT_IMAGE_REMOTE_HOSTS;
+  const hosts = configuredHosts
+    ? configuredHosts
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : DEFAULT_REMOTE_IMAGE_HOSTS;
+
+  const patterns = hosts.map(parseRemoteImageHostEntry).filter(Boolean);
+  const uniquePatterns = new Map(
+    patterns.map((pattern) => [
+      `${pattern.protocol}:${pattern.hostname}:${pattern.pathname}`,
+      pattern,
+    ])
+  );
+
+  return [...uniquePatterns.values()];
+};
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   reactStrictMode: true,
   images: {
-    remotePatterns: [
-      {
-        hostname: "**",
-        protocol: "https",
-      },
-      {
-        hostname: "**",
-        protocol: "http",
-      },
-    ],
+    remotePatterns: parseRemoteImageHosts(),
   },
   async redirects() {
     return [

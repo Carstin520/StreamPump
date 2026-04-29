@@ -91,6 +91,7 @@ Important frontend env vars:
 
 - `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000`
 - `NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com`
+- `NEXT_IMAGE_REMOTE_HOSTS=dhtrwpa2mlguo.cloudfront.net` for remote media optimized through `next/image`
 - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...` only if Web3Auth social login is enabled
 
 The frontend prefers `NEXT_PUBLIC_BACKEND_BASE_URL` and derives `/api/v1` automatically. `NEXT_PUBLIC_API_BASE_URL` is still accepted as a backward-compatible fallback.
@@ -187,6 +188,7 @@ For Vercel, the project must use:
 - Required env vars:
   - `NEXT_PUBLIC_BACKEND_BASE_URL`
   - `NEXT_PUBLIC_RPC_ENDPOINT`
+  - `NEXT_IMAGE_REMOTE_HOSTS`
 - Optional env var:
   - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
 
