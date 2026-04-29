@@ -1,9 +1,0 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/explore": "pages/explore.js",
-  "/posts/[postId]": "pages/posts/[postId].js",
-  "/workspace": "pages/workspace.js",
-  "/trending": "pages/trending.js"
-}

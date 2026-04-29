@@ -1,1 +1,0 @@
-{"c":["webpack"],"r":["pages/posts/[postId]"],"m":["./node_modules/next/dist/build/webpack/loaders/next-client-pages-loader.js?absolutePagePath=%2FUsers%2Fjamesli%2FDesktop%2FSol%20Projects%2FStreamPump%2Fapp%2Fsrc%2Fpages%2Fposts%2F%5BpostId%5D.tsx&page=%2Fposts%2F%5BpostId%5D!","./src/components/user/CommentPanel.tsx","./src/pages/posts/[postId].tsx"]}
