@@ -145,6 +145,7 @@ export type BundleResponse = {
   instructionPlan: unknown;
   requiredSigners: unknown;
   versionedTxBase64: string | null;
+  partiallySignedTxBase64: string | null;
   recentBlockhash: string | null;
   lastValidBlockHeight: string | null;
   expiresAt: string;
@@ -228,6 +229,22 @@ type CreatePublicationInput = {
   platform: string;
   externalUrl: string;
   externalPostId?: string | null;
+};
+
+type CreateProposalIntentInput = {
+  manifestId: string;
+  creatorWallet: string;
+  sponsorWallet: string;
+  sponsorOrgId?: string | null;
+  creatorOrgId?: string | null;
+  deadlineUnix: string;
+  track1BaseUsdc: string;
+  track2MetricType: "VIEWS" | "CLICKS" | "SAVES";
+  track2TargetValue: string;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: string;
+  track3UsdcDeposited: string;
+  track3DelayDays: number;
 };
 
 export type PresignManifestAssetsResponse = {
@@ -394,6 +411,15 @@ export const createContentPublication = (token: string, input: CreatePublication
     token,
     headers: {
       "x-idempotency-key": createIdempotencyKey("publication"),
+    },
+    body: input,
+  });
+
+export const createProposalIntent = (token: string, input: CreateProposalIntentInput) =>
+  apiClient.post<IntentSummaryResponse>("/proposal-intents", {
+    token,
+    headers: {
+      "x-idempotency-key": createIdempotencyKey("proposal-intent"),
     },
     body: input,
   });

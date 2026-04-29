@@ -23,6 +23,7 @@ type SerializedBundleInput = {
   instructionPlanJson: unknown;
   requiredSignersJson: unknown;
   messageBase64: string | null;
+  partiallySignedBase64: string | null;
   recentBlockhash: string | null;
   lastValidBlockHeight: bigint | null;
   expiresAt: Date;
@@ -151,6 +152,7 @@ export const serializeBundle = (bundle: SerializedBundleInput) => ({
   instructionPlan: bundle.instructionPlanJson,
   requiredSigners: bundle.requiredSignersJson,
   versionedTxBase64: bundle.messageBase64,
+  partiallySignedTxBase64: bundle.partiallySignedBase64,
   recentBlockhash: bundle.recentBlockhash,
   lastValidBlockHeight: bundle.lastValidBlockHeight?.toString() ?? null,
   expiresAt: bundle.expiresAt.toISOString(),

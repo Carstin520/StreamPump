@@ -2,20 +2,32 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 
-import { PageShell } from "@/components/layout/PageShell";
-import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
+import {
+  CheckCircleIcon,
+  CloseIcon,
+  ImageIcon,
+  LinkIcon,
+  SignatureIcon,
+  UploadIcon,
+  VideoIcon,
+} from "@/components/shared/AppIcons";
 import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
+import { StatusDot } from "@/components/workspace/StatusDot";
+import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
+import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import {
   completeManifestAssetUpload,
   ContentManifestDetailResponse,
   createContentPublication,
+  createProposalIntent,
   finalizeContentManifest,
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
 } from "@/lib/api/workspace";
+import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
-import { WORKSPACE_PATH, workspacePageTabs } from "@/lib/routes";
+import { WORKSPACE_PATH } from "@/lib/routes";
 import {
   buildLoginHrefFromRouter,
   clearAuthSession,
@@ -30,663 +42,562 @@ type PageState =
   | { kind: "ready"; data: ContentManifestDetailResponse };
 
 type ManifestAssetRecord = ContentManifestDetailResponse["assets"][number];
+type UploadStage = "selected" | "hashing" | "presigning" | "uploading" | "completing" | "uploaded" | "failed";
+type UploadQueueItem = { file: File; key: string; message: string; stage: UploadStage };
 
-const ACCEPTED_UPLOAD_TYPES = [
-  "video/mp4",
-  "video/quicktime",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-];
+const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
 
-const isRenderableUrl = (value: string | null | undefined) => {
-  const normalized = value?.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  return normalized.startsWith("http://") || normalized.startsWith("https://") || normalized.startsWith("/");
+const STATUS_LABELS: Record<ContentManifestStatus, string> = {
+  DRAFT: "草稿", UPLOADING: "上传中", READY: "可发布", LOCKED: "已锁定",
+  ANCHORED: "已锚定", PUBLISHED: "已发布", ARCHIVED: "已归档",
+};
+const STATUS_TONES: Record<ContentManifestStatus, string> = {
+  DRAFT: "border-[#7486a1]/30 bg-[#7486a1]/12 text-[#a8b6cc]",
+  UPLOADING: "border-[#67b8ff]/30 bg-[#67b8ff]/12 text-[#8ad0ff]",
+  READY: "border-[#65ecaf]/30 bg-[#65ecaf]/12 text-[#8df0c4]",
+  LOCKED: "border-[#f3b33e]/30 bg-[#f3b33e]/12 text-[#f3c66e]",
+  ANCHORED: "border-[#de402a]/30 bg-[#de402a]/12 text-[#ff8a78]",
+  PUBLISHED: "border-[#65ecaf]/40 bg-[#65ecaf]/16 text-[#65ecaf]",
+  ARCHIVED: "border-white/10 bg-white/5 text-[#8ea0ba]",
+};
+const UPLOAD_STAGE_LABELS: Record<UploadStage, string> = {
+  selected: "待上传", hashing: "计算哈希", presigning: "请求签名",
+  uploading: "上传中", completing: "完成中", uploaded: "已上传", failed: "失败",
+};
+const UPLOAD_STAGE_TONES: Record<UploadStage, string> = {
+  selected: "text-[#8ea0ba]", hashing: "text-[#67b8ff]", presigning: "text-[#67b8ff]",
+  uploading: "text-[#67b8ff]", completing: "text-[#f3b33e]", uploaded: "text-[#65ecaf]", failed: "text-[#f67263]",
 };
 
-const isVideoAsset = (asset: ManifestAssetRecord) => asset.assetType === "VIDEO";
-
-const isMuxAssetReady = (asset: ManifestAssetRecord) =>
-  isVideoAsset(asset) && asset.preferredPlaybackSource === "MUX" && isRenderableUrl(asset.muxPlaybackUrl);
-
-const resolveRenderableAssetUrl = (asset: ManifestAssetRecord) => {
-  if (isRenderableUrl(asset.preferredPlaybackUrl)) {
-    return asset.preferredPlaybackUrl;
-  }
-
-  if (isRenderableUrl(asset.originUrl)) {
-    return asset.originUrl;
-  }
-
+const isRenderableUrl = (v: string | null | undefined) => {
+  const n = v?.trim();
+  return n ? n.startsWith("http://") || n.startsWith("https://") || n.startsWith("/") : false;
+};
+const isVideoAsset = (a: ManifestAssetRecord) => a.assetType === "VIDEO";
+const isMuxAssetReady = (a: ManifestAssetRecord) =>
+  isVideoAsset(a) && a.preferredPlaybackSource === "MUX" && isRenderableUrl(a.muxPlaybackUrl);
+const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
+  if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
+  if (isRenderableUrl(a.originUrl)) return a.originUrl;
   return null;
 };
 
-const renderabilityHint = (asset: ManifestAssetRecord) => {
-  if (resolveRenderableAssetUrl(asset)) {
-    return null;
-  }
-
-  if (asset.originUrl?.startsWith("s3://")) {
-    return "Origin URL is not browser-safe yet. Set S3_PUBLIC_BASE_URL or a CDN domain for direct preview.";
-  }
-
-  if (isVideoAsset(asset) && asset.ingestStatus !== "READY") {
-    return "Video preview will appear after Mux ingest reaches READY.";
-  }
-
-  return "No browser-renderable asset URL is available yet.";
-};
-
-function ManifestAssetPreview({ asset }: { asset: ManifestAssetRecord }) {
-  const renderableUrl = resolveRenderableAssetUrl(asset);
-  const previewHint = renderabilityHint(asset);
-
-  if (isVideoAsset(asset)) {
-    if (isMuxAssetReady(asset) && asset.muxPlaybackUrl) {
-      return (
-        <HlsVideoPreview
-          asset={asset}
-          fallbackUrl={asset.originUrl && isRenderableUrl(asset.originUrl) ? asset.originUrl : null}
-        />
-      );
-    }
-
-    if (renderableUrl) {
-      return (
-        <MediaVideoPlayer
-          className="h-full w-full"
-          controls
-          loadingLabel="Preparing preview…"
-          muted
-          playsInline
-          preload="metadata"
-          src={renderableUrl}
-          videoClassName="h-full w-full object-cover"
-        />
-      );
-    }
-  } else if (renderableUrl) {
-    return <img alt={`${asset.assetType} ${asset.orderIndex + 1}`} className="h-full w-full object-cover" src={renderableUrl} />;
-  }
-
-  return (
-    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 px-4 text-center text-xs text-slate-300">
-      {previewHint ?? "Preview pending"}
-    </div>
-  );
-}
-
-function HlsVideoPreview({
-  asset,
-  fallbackUrl,
-}: {
-  asset: ManifestAssetRecord;
-  fallbackUrl: string | null;
-}) {
-  return (
-    <MediaVideoPlayer
-      className="h-full w-full"
-      controls
-      fallbackSrc={fallbackUrl}
-      loadingLabel="Preparing Mux preview…"
-      muted
-      playsInline
-      preload="metadata"
-      src={asset.muxPlaybackUrl}
-      videoClassName="h-full w-full object-cover"
-    />
-  );
-}
-
 const sha256Hex = async (file: File) => {
-  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return Array.from(new Uint8Array(digest))
-    .map((value) => value.toString(16).padStart(2, "0"))
-    .join("");
+  const d = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 };
-
 const resolveAssetType = (file: File): ManifestAssetKind =>
   file.type.toLowerCase().startsWith("video/") ? "VIDEO" : "IMAGE";
 
 const uploadToPresignedUrl = async (url: string, file: Blob, contentType?: string) => {
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: contentType
-      ? {
-          "Content-Type": contentType,
-        }
-      : undefined,
-    body: file,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Asset upload failed with ${response.status}`);
-  }
-
-  return response;
+  const r = await fetch(url, { method: "PUT", headers: contentType ? { "Content-Type": contentType } : undefined, body: file });
+  if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
+  return r;
 };
-
-const normalizeEtag = (value: string | null) =>
-  value?.trim().replace(/^"+|"+$/g, "") || null;
+const normalizeEtag = (v: string | null) => v?.trim().replace(/^"+|"+$/g, "") || null;
 
 const uploadMultipartAsset = async (
-  upload: Extract<
-    Awaited<ReturnType<typeof presignManifestAssets>>["uploads"][number],
-    { uploadStrategy: "MULTIPART" }
-  >,
+  upload: Extract<Awaited<ReturnType<typeof presignManifestAssets>>["uploads"][number], { uploadStrategy: "MULTIPART" }>,
   file: File,
   onPartStart: (partNumber: number, partCount: number) => void,
 ) => {
-  const completedParts = [];
-
+  const parts = [];
   for (const part of upload.parts) {
     onPartStart(part.partNumber, upload.partCount);
-
     const start = (part.partNumber - 1) * upload.partSizeBytes;
-    const end = Math.min(start + upload.partSizeBytes, file.size);
-    const chunk = file.slice(start, end);
-    const response = await uploadToPresignedUrl(part.presignedUrl, chunk);
-    const etag = normalizeEtag(response.headers.get("etag"));
-
-    if (!etag) {
-      throw new Error("Multipart upload response is missing ETag. Expose ETag in S3 CORS.");
-    }
-
-    completedParts.push({
-      partNumber: part.partNumber,
-      etag,
-    });
+    const chunk = file.slice(start, Math.min(start + upload.partSizeBytes, file.size));
+    const r = await uploadToPresignedUrl(part.presignedUrl, chunk);
+    const etag = normalizeEtag(r.headers.get("etag"));
+    if (!etag) throw new Error("Missing ETag");
+    parts.push({ partNumber: part.partNumber, etag });
   }
-
-  return {
-    multipartUploadId: upload.multipartUploadId,
-    parts: completedParts,
-  };
+  return { multipartUploadId: upload.multipartUploadId, parts };
 };
+
+const toUsdcAtomicString = (v: string) => {
+  const n = v.trim();
+  if (!/^\d+(\.\d{0,6})?$/.test(n)) throw new Error("USDC 格式无效");
+  const [whole, frac = ""] = n.split(".");
+  return `${whole}${frac.padEnd(6, "0")}`.replace(/^0+(?=\d)/, "") || "0";
+};
+
+const defaultDeadlineInput = () => {
+  const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
+function deriveManifestSteps(status: ContentManifestStatus, hasAssets: boolean, hasPublications: boolean): StepItem[] {
+  const s = (label: string, done: boolean, current: boolean): StepItem => ({
+    label,
+    status: done ? "done" : current ? "current" : "pending",
+  });
+  const isDraft = status === "DRAFT";
+  const isUploading = status === "UPLOADING";
+  const isReady = status === "READY";
+  const isLocked = status === "LOCKED";
+  const isAnchored = status === "ANCHORED";
+  const isPublished = status === "PUBLISHED";
+
+  return [
+    s("草稿", !isDraft, isDraft),
+    s("上传素材", hasAssets && !isUploading, isUploading || (isDraft && !hasAssets)),
+    s("完善内容", isReady || isLocked || isAnchored || isPublished, !isDraft && !isUploading && !isReady && !hasAssets),
+    s("发布", isPublished, isReady || isAnchored),
+    s("赞助合作", false, isLocked || isPublished),
+  ];
+}
 
 export default function ManifestDetailPage() {
   const router = useRouter();
   const [state, setState] = useState<PageState>({ kind: "loading" });
-  const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | null>(null);
+  const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const [publicationPlatform, setPublicationPlatform] = useState("XIAOHONGSHU");
   const [publicationUrl, setPublicationUrl] = useState("");
   const [publicationPostId, setPublicationPostId] = useState("");
+  const [sponsorWallet, setSponsorWallet] = useState("");
+  const [deadlineInput, setDeadlineInput] = useState(defaultDeadlineInput);
+  const [track1BaseUsdc, setTrack1BaseUsdc] = useState("500");
+  const [track2MetricType, setTrack2MetricType] = useState<"VIEWS" | "CLICKS" | "SAVES">("VIEWS");
+  const [track2TargetValue, setTrack2TargetValue] = useState("10000");
+  const [track2MinAchievementBps, setTrack2MinAchievementBps] = useState("7000");
+  const [track2BudgetUsdc, setTrack2BudgetUsdc] = useState("1000");
+  const [track3BudgetUsdc, setTrack3BudgetUsdc] = useState("300");
+  const [track3DelayDays, setTrack3DelayDays] = useState("14");
+  const [activeSection, setActiveSection] = useState<"assets" | "publish" | "sponsor">("assets");
+
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
+  const updateUploadItem = (key: string, patch: Partial<Pick<UploadQueueItem, "message" | "stage">>) =>
+    setUploadQueue((items) => items.map((i) => (i.key === key ? { ...i, ...patch } : i)));
 
   const refreshManifest = async (token: string, manifestId: string) => {
     const data = await getContentManifestById(token, manifestId);
     setState({ kind: "ready", data });
     return data;
   };
-
-  const handleAuthFailure = () => {
-    clearAuthSession();
-    setState({ kind: "auth" });
-  };
-
+  const handleAuthFailure = () => { clearAuthSession(); setState({ kind: "auth" }); };
   const handleApiError = (error: unknown, fallback: string) => {
-    const message = error instanceof Error ? error.message : fallback;
-    if (isAuthError(error)) {
-      handleAuthFailure();
-      return;
-    }
-
-    setActionMessage(message);
+    if (isAuthError(error)) { handleAuthFailure(); return; }
+    setActionMessage(error instanceof Error ? error.message : fallback);
   };
 
   useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
-
+    if (!router.isReady) return;
     let cancelled = false;
     const token = getAccessToken();
     const manifestId = String(router.query.manifestId ?? "").trim();
-
-    if (!token) {
-      setState({ kind: "auth" });
-      return;
-    }
-
-    if (!manifestId) {
-      setState({ kind: "error", message: "manifestId is required" });
-      return;
-    }
-
+    if (!token) { setState({ kind: "auth" }); return; }
+    if (!manifestId) { setState({ kind: "error", message: "manifestId required" }); return; }
     setState({ kind: "loading" });
     void getContentManifestById(token, manifestId)
-      .then((data) => {
-        if (!cancelled) {
-          setState({ kind: "ready", data });
-        }
-      })
+      .then((data) => { if (!cancelled) setState({ kind: "ready", data }); })
       .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
-        const message = error instanceof Error ? error.message : "Failed to load manifest.";
-        if (isAuthError(error)) {
-          handleAuthFailure();
-          return;
-        }
-
-        setState({ kind: "error", message });
+        if (cancelled) return;
+        if (isAuthError(error)) { handleAuthFailure(); return; }
+        setState({ kind: "error", message: error instanceof Error ? error.message : "加载失败" });
       });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [router.isReady, router.query.manifestId]);
 
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     setSelectedFiles(files);
-    setActionMessage(
-      files.length > 0
-        ? `${files.length} asset file(s) ready for upload. Videos will use multipart S3 upload, then queue async Mux ingest.`
-        : null
-    );
+    setUploadQueue(files.map((f) => ({ file: f, key: `${f.name}-${f.size}-${f.lastModified}`, message: "待上传", stage: "selected" })));
   };
 
   const handleUploadAssets = async () => {
     const token = getAccessToken();
-    const manifestId = state.kind === "ready"
-      ? state.data.manifestId
-      : String(router.query.manifestId ?? "").trim();
-
-    if (!token) {
-      handleAuthFailure();
-      return;
-    }
-
-    if (!manifestId) {
-      setActionMessage("manifestId is required");
-      return;
-    }
-
-    if (selectedFiles.length === 0) {
-      setActionMessage("Select at least one asset before requesting upload URLs.");
-      return;
-    }
-
-    const invalidFile = selectedFiles.find((file) => !ACCEPTED_UPLOAD_TYPES.includes(file.type.toLowerCase()));
-    if (invalidFile) {
-      setActionMessage(`Unsupported file type for ${invalidFile.name}. Allowed types: ${ACCEPTED_UPLOAD_TYPES.join(", ")}`);
-      return;
-    }
-
+    const manifestId = state.kind === "ready" ? state.data.manifestId : String(router.query.manifestId ?? "").trim();
+    if (!token) { handleAuthFailure(); return; }
+    if (!manifestId || selectedFiles.length === 0) { setActionMessage("请选择文件"); return; }
+    const invalid = selectedFiles.find((f) => !ACCEPTED_UPLOAD_TYPES.includes(f.type.toLowerCase()));
+    if (invalid) { setActionMessage(`不支持的格式: ${invalid.name}`); return; }
     setBusyAction("upload");
-
     try {
-      setActionMessage(`Preparing ${selectedFiles.length} upload slot(s)...`);
-
-      const existingAssetCount = state.kind === "ready" ? state.data.assets.length : 0;
-      const inputs = await Promise.all(
-        selectedFiles.map(async (file, index) => ({
-          assetType: resolveAssetType(file),
-          orderIndex: existingAssetCount + index,
-          sha256Hex: await sha256Hex(file),
-          mimeType: file.type.toLowerCase(),
-          fileSizeBytes: String(file.size),
-        })),
-      );
-
+      const existingCount = state.kind === "ready" ? state.data.assets.length : 0;
+      const inputs = await Promise.all(selectedFiles.map(async (f, i) => {
+        updateUploadItem(`${f.name}-${f.size}-${f.lastModified}`, { message: "计算哈希中", stage: "hashing" });
+        return { assetType: resolveAssetType(f), orderIndex: existingCount + i, sha256Hex: await sha256Hex(f), mimeType: f.type.toLowerCase(), fileSizeBytes: String(f.size) };
+      }));
+      setUploadQueue((items) => items.map((i) => ({ ...i, message: "请求上传签名", stage: "presigning" })));
       const response = await presignManifestAssets(token, manifestId, inputs);
-
-      for (const [index, upload] of response.uploads.entries()) {
-        const file = selectedFiles[index];
-        setActionMessage(
-          `Uploading ${index + 1}/${response.uploads.length}: ${file.name} via ${upload.uploadStrategy}.`
-        );
-
+      for (const [idx, upload] of response.uploads.entries()) {
+        const f = selectedFiles[idx];
+        const key = `${f.name}-${f.size}-${f.lastModified}`;
+        updateUploadItem(key, { message: `上传中 (${upload.uploadStrategy})`, stage: "uploading" });
         if (upload.uploadStrategy === "MULTIPART") {
-          const multipartCompletion = await uploadMultipartAsset(
-            upload,
-            file,
-            (partNumber, partCount) => {
-              setActionMessage(
-                `Uploading ${file.name} part ${partNumber}/${partCount} to S3 before async Mux ingest.`
-              );
-            }
-          );
-
-          await completeManifestAssetUpload(
-            token,
-            manifestId,
-            upload.assetId,
-            multipartCompletion
-          );
+          const mp = await uploadMultipartAsset(upload, f, (pn, pc) => updateUploadItem(key, { message: `上传分片 ${pn}/${pc}`, stage: "uploading" }));
+          updateUploadItem(key, { message: "完成上传", stage: "completing" });
+          await completeManifestAssetUpload(token, manifestId, upload.assetId, mp);
         } else {
-          await uploadToPresignedUrl(upload.presignedUrl, file, file.type);
+          await uploadToPresignedUrl(upload.presignedUrl, f, f.type);
+          updateUploadItem(key, { message: "完成中", stage: "completing" });
           await completeManifestAssetUpload(token, manifestId, upload.assetId);
         }
+        updateUploadItem(key, { message: "已上传", stage: "uploaded" });
       }
-
       await refreshManifest(token, manifestId);
       setSelectedFiles([]);
-      setActionMessage(
-        "Asset upload completed. Images are ready from S3 immediately; videos are now queued for async Mux ingest."
-      );
+      setActionMessage("素材上传完成");
     } catch (error) {
-      handleApiError(error, "Failed to upload manifest assets.");
-    } finally {
-      setBusyAction(null);
-    }
+      setUploadQueue((items) => items.map((i) => i.stage === "uploaded" ? i : { ...i, message: "上传失败", stage: "failed" }));
+      handleApiError(error, "上传失败");
+    } finally { setBusyAction(null); }
   };
 
   const handleFinalize = async () => {
     const token = getAccessToken();
-    const manifestId = state.kind === "ready"
-      ? state.data.manifestId
-      : String(router.query.manifestId ?? "").trim();
-
-    if (!token) {
-      handleAuthFailure();
-      return;
-    }
-
-    if (!manifestId) {
-      setActionMessage("manifestId is required");
-      return;
-    }
-
+    const manifestId = state.kind === "ready" ? state.data.manifestId : String(router.query.manifestId ?? "").trim();
+    if (!token) { handleAuthFailure(); return; }
+    if (!manifestId) return;
     setBusyAction("finalize");
-
     try {
-      setActionMessage("Finalizing manifest and deriving canonical hash...");
-      const result = await finalizeContentManifest(token, manifestId);
+      const r = await finalizeContentManifest(token, manifestId);
       await refreshManifest(token, manifestId);
-      setActionMessage(
-        result.manifestHashHex
-          ? `Manifest finalized. Hash: ${result.manifestHashHex.slice(0, 16)}...`
-          : "Manifest finalized.",
-      );
-    } catch (error) {
-      handleApiError(error, "Failed to finalize manifest.");
-    } finally {
-      setBusyAction(null);
-    }
+      setActionMessage(r.manifestHashHex ? `已完善，哈希: ${r.manifestHashHex.slice(0, 12)}...` : "已完善");
+    } catch (error) { handleApiError(error, "完善失败"); }
+    finally { setBusyAction(null); }
   };
 
   const handleCreatePublication = async () => {
     const token = getAccessToken();
-    const manifestId = state.kind === "ready"
-      ? state.data.manifestId
-      : String(router.query.manifestId ?? "").trim();
-
-    if (!token) {
-      handleAuthFailure();
-      return;
-    }
-
-    if (!manifestId) {
-      setActionMessage("manifestId is required");
-      return;
-    }
-
-    const normalizedUrl = publicationUrl.trim();
-    if (!normalizedUrl) {
-      setActionMessage("Publication URL is required.");
-      return;
-    }
-
-    try {
-      new URL(normalizedUrl);
-    } catch (_error) {
-      setActionMessage("Publication URL must be a valid absolute URL.");
-      return;
-    }
-
+    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
+    if (!token) { handleAuthFailure(); return; }
+    const url = publicationUrl.trim();
+    if (!url) { setActionMessage("请输入发布链接"); return; }
+    try { new URL(url); } catch { setActionMessage("无效的链接格式"); return; }
     setBusyAction("publication");
-
     try {
-      setActionMessage("Creating publication record...");
-      await createContentPublication(token, {
-        manifestId,
-        platform: publicationPlatform,
-        externalUrl: normalizedUrl,
-        externalPostId: publicationPostId.trim() || null,
-      });
-
+      await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId: publicationPostId.trim() || null });
       await refreshManifest(token, manifestId);
-      setPublicationUrl("");
-      setPublicationPostId("");
-      setActionMessage("Publication record created and manifest refreshed.");
-    } catch (error) {
-      handleApiError(error, "Failed to create publication.");
-    } finally {
-      setBusyAction(null);
-    }
+      setPublicationUrl(""); setPublicationPostId("");
+      setActionMessage("发布记录已创建");
+    } catch (error) { handleApiError(error, "发布失败"); }
+    finally { setBusyAction(null); }
   };
 
-  const manifestTitle = state.kind === "ready" ? state.data.title ?? state.data.manifestId : "Manifest detail";
+  const handleCreateProposalIntent = async () => {
+    const token = getAccessToken();
+    const manifest = state.kind === "ready" ? state.data : null;
+    if (!token) { handleAuthFailure(); return; }
+    if (!manifest || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(manifest.status)) { setActionMessage("请先完善内容"); return; }
+    if (!sponsorWallet.trim()) { setActionMessage("请输入赞助商钱包"); return; }
+    const dMs = new Date(deadlineInput).getTime();
+    if (!Number.isFinite(dMs) || dMs <= Date.now()) { setActionMessage("截止日期须在未来"); return; }
+    setBusyAction("intent");
+    try {
+      const intent = await createProposalIntent(token, {
+        manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
+        deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),
+        track2MetricType, track2TargetValue: track2TargetValue.trim(), track2MinAchievementBps: Number(track2MinAchievementBps),
+        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc), track3UsdcDeposited: toUsdcAtomicString(track3BudgetUsdc), track3DelayDays: Number(track3DelayDays),
+      });
+      setActionMessage("合作意向已创建");
+      void router.push(`/workspace/intents/${intent.intentId}`);
+    } catch (error) { handleApiError(error, "创建失败"); }
+    finally { setBusyAction(null); }
+  };
+
+  const title = state.kind === "ready" ? (state.data.title ?? "未命名内容") : "内容详情";
+
+  if (state.kind !== "ready") {
+    return (
+      <>
+        <Head><title>{`StreamPump | ${title}`}</title></Head>
+        <WorkspaceShell>
+          {state.kind === "loading" && (
+            <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
+              <p className="text-sm text-[#8ea0ba]">加载内容详情...</p>
+            </div>
+          )}
+          {state.kind === "auth" && (
+            <div className="liquid-card card-radius px-6 py-8">
+              <p className="text-lg font-semibold text-white">登录后查看</p>
+              <a className="glass-button-primary mt-4 inline-flex px-5 py-2.5 text-sm font-semibold" href={loginHref}>登录</a>
+            </div>
+          )}
+          {state.kind === "error" && (
+            <div className="liquid-card card-radius px-6 py-8">
+              <p className="text-sm text-[#f67263]">{state.message}</p>
+            </div>
+          )}
+        </WorkspaceShell>
+      </>
+    );
+  }
+
+  const d = state.data;
+  const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0);
+
+  const previewPanel = (
+    <aside className="space-y-4">
+      <div className="liquid-card card-radius p-4">
+        <div className="flex items-center justify-between">
+          <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${STATUS_TONES[d.status]}`}>
+            {STATUS_LABELS[d.status]}
+          </span>
+          <span className="text-[10px] text-[#5a6b82]">{formatIsoLabel(d.updatedAt)}</span>
+        </div>
+        <p className="mt-3 text-sm font-medium text-white">{d.title ?? "未命名"}</p>
+        <p className="mt-1 text-[11px] text-[#6b7d96]">{d.contentType} · {d.assets.length} 素材 · v{d.version}</p>
+        <p className="mt-2 text-[11px] text-[#5a6b82]">创作者: {shortenWallet(d.creatorWallet)}</p>
+      </div>
+
+      {d.manifestHashHex && (
+        <div className="liquid-card card-radius p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">链上状态</p>
+          <div className="mt-2 space-y-2">
+            <HashRow label="Manifest Hash" value={d.manifestHashHex} />
+            <HashRow label="Anchor PDA" value={d.currentAnchorPda} />
+          </div>
+        </div>
+      )}
+
+      {d.publications.length > 0 && (
+        <div className="liquid-card card-radius p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">已发布</p>
+          {d.publications.map((pub) => (
+            <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={pub.publicationId}>
+              <p className="text-xs font-medium text-white">{pub.platform}</p>
+              <p className="mt-0.5 truncate text-[10px] text-[#5a6b82]">{pub.externalUrl}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+
+  const sections: { id: "assets" | "publish" | "sponsor"; label: string }[] = [
+    { id: "assets", label: "素材管理" },
+    { id: "publish", label: "发布" },
+    { id: "sponsor", label: "赞助合作" },
+  ];
 
   return (
     <>
-      <Head>
-        <title>{`StreamPump | ${manifestTitle}`}</title>
-      </Head>
-      <PageShell
-        eyebrow="Workspace"
-        subtitle="This view is where upload, processing, and finalize status need to feel operationally clear without looking like an ops dashboard."
-        tabs={workspacePageTabs}
-        title={manifestTitle}
-      >
-        {state.kind === "loading" ? <AsyncStateCard body="Loading manifest detail, assets, and publication records from the v1 content API." title="Loading manifest" /> : null}
-        {state.kind === "auth" ? <AsyncStateCard actionHref={loginHref} actionLabel="Open login" body="Manifest detail now uses authenticated content APIs. Sign in to load creator-owned manifest data." title="Session required" /> : null}
-        {state.kind === "error" ? <AsyncStateCard body={state.message} title="Manifest request failed" /> : null}
-        {state.kind === "ready" ? (
-          <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
-            <div className="space-y-5">
-              <section className="glass-card p-5">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Manifest state</p>
-                      <h3 className="mt-2 text-2xl font-semibold text-white">{state.data.status}</h3>
-                      <p className="mt-2 text-sm text-slate-300">Owner: {shortenWallet(state.data.creatorWallet)} · {state.data.contentType}</p>
-                    </div>
-                    <span className="rounded-full bg-white/12 px-3 py-1 text-xs text-slate-100">{formatIsoLabel(state.data.updatedAt)}</span>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {state.data.assets.map((asset) => (
-                      <div className="rounded-3xl border border-dashed border-white/10 bg-white/4 p-4" key={asset.assetId}>
-                        <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 to-slate-700">
-                          <ManifestAssetPreview asset={asset} />
-                        </div>
-                        <p className="mt-3 text-sm font-medium text-white">{asset.assetType} #{asset.orderIndex + 1}</p>
-                        <p className="text-xs text-slate-400">{asset.uploadStatus} · {asset.deliveryStatus}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Read from: {asset.preferredPlaybackSource ?? "Pending"} · Ingest: {asset.ingestStatus}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Upload: {asset.uploadStrategy} · Mux: {asset.muxLastKnownStatus ?? "n/a"}
-                        </p>
-                        {asset.preferredPlaybackUrl ? (
-                          <a
-                            className="mt-2 inline-flex text-xs text-sky-300 transition hover:text-sky-200"
-                            href={asset.preferredPlaybackUrl}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Open asset URL
-                          </a>
-                        ) : null}
-                        {asset.processingError ? (
-                          <p className="mt-2 text-xs text-rose-300">{asset.processingError}</p>
-                        ) : null}
-                        {!asset.processingError && renderabilityHint(asset) ? (
-                          <p className="mt-2 text-xs text-amber-300">{renderabilityHint(asset)}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                    {state.data.assets.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-white/10 bg-white/4 p-4 text-sm text-slate-300 md:col-span-3">
-                        No assets have been attached to this manifest yet.
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
+      <Head><title>{`StreamPump | ${title}`}</title></Head>
+      <WorkspaceShell aside={previewPanel}>
+        {/* Header */}
+        <div>
+          <h2 className="text-lg font-semibold text-white">{d.title ?? "未命名内容"}</h2>
+          <div className="mt-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+            <StepProgress steps={steps} />
+          </div>
+        </div>
 
-              <section className="glass-card p-5">
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Asset upload</p>
-                    <span className="text-xs text-slate-400">Allowed: MP4, MOV, JPEG, PNG, WEBP, HEIC</span>
-                  </div>
-                  <input
-                    accept=".mp4,.mov,.jpg,.jpeg,.png,.webp,.heic,video/mp4,video/quicktime,image/jpeg,image/png,image/webp,image/heic"
-                    className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-950"
-                    multiple
-                    onChange={handleFileSelection}
-                    type="file"
-                  />
-                  {selectedFiles.length > 0 ? (
-                    <div className="rounded-2xl bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Pending upload set</p>
-                      <div className="mt-3 space-y-2">
-                        {selectedFiles.map((file) => (
-                          <div className="flex items-center justify-between gap-3 text-sm text-slate-200" key={`${file.name}-${file.size}-${file.lastModified}`}>
-                            <span className="truncate">
-                              {file.name}
-                              {file.type.toLowerCase().startsWith("video/") ? " · multipart + async mux" : " · single-part s3"}
-                            </span>
-                            <span className="shrink-0 text-xs text-slate-400">{Math.max(1, Math.round(file.size / 1024))} KB</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="flex gap-3">
-                    <button
-                      className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-wait disabled:opacity-70"
-                      disabled={busyAction !== null}
-                      onClick={() => void handleUploadAssets()}
-                      type="button"
-                    >
-                      Upload selected assets
-                    </button>
-                    <button
-                      className="rounded-full border border-white/12 px-4 py-2 text-sm text-slate-200 disabled:opacity-70"
-                      disabled={busyAction !== null || selectedFiles.length === 0}
-                      onClick={() => {
-                        setSelectedFiles([]);
-                        setActionMessage("Pending upload set cleared.");
-                      }}
-                      type="button"
-                    >
-                      Clear selection
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="glass-card p-5">
-                <div className="space-y-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Finalize state</p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Manifest hash</p>
-                      <p className="mt-2 break-all text-sm text-white">{state.data.manifestHashHex ?? "Not finalized"}</p>
-                    </div>
-                    <div className="rounded-2xl bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Anchor PDA</p>
-                      <p className="mt-2 break-all text-sm text-white">{state.data.currentAnchorPda ?? "Not anchored"}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Canonical URL</p>
-                    <p className="mt-2 break-all text-sm text-slate-300">{state.data.internalCanonicalUrl ?? "No canonical URL yet"}</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-wait disabled:opacity-70"
-                      disabled={busyAction !== null}
-                      onClick={() => void handleFinalize()}
-                      type="button"
-                    >
-                      Finalize manifest
-                    </button>
-                  </div>
-                  {actionMessage ? (
-                    <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                      {actionMessage}
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-            </div>
-
-            <section className="glass-card p-5">
-              <div className="space-y-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Publication state</p>
-                {state.data.publications.length > 0 ? (
-                  <div className="space-y-3">
-                    {state.data.publications.map((publication) => (
-                      <div className="rounded-2xl bg-white/5 p-4" key={publication.publicationId}>
-                        <p className="text-sm font-medium text-white">{publication.platform}</p>
-                        <p className="mt-1 break-all text-xs text-slate-300">{publication.externalUrl}</p>
-                        <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-400">{publication.verificationStatus}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm leading-7 text-slate-300">No publication URLs are linked yet. Once a platform post exists, create a publication record here so the manifest can move into the published lifecycle.</p>
-                )}
-
-                <div className="rounded-3xl border border-white/10 bg-white/4 p-4">
-                  <div className="space-y-3">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Create publication</p>
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Platform</span>
-                      <input
-                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
-                        onChange={(event) => setPublicationPlatform(event.target.value.toUpperCase())}
-                        value={publicationPlatform}
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-slate-400">External URL</span>
-                      <input
-                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
-                        onChange={(event) => setPublicationUrl(event.target.value)}
-                        placeholder="https://example.com/post/123"
-                        value={publicationUrl}
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs uppercase tracking-[0.18em] text-slate-400">External post id (optional)</span>
-                      <input
-                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
-                        onChange={(event) => setPublicationPostId(event.target.value)}
-                        placeholder="post-123"
-                        value={publicationPostId}
-                      />
-                    </label>
-                    <button
-                      className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-wait disabled:opacity-70"
-                      disabled={busyAction !== null}
-                      onClick={() => void handleCreatePublication()}
-                      type="button"
-                    >
-                      Create publication record
-                    </button>
+        {/* Asset preview grid */}
+        {d.assets.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {d.assets.map((asset) => (
+              <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0b1016]" key={asset.assetId}>
+                <AssetPreview asset={asset} />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-medium text-white">{asset.assetType} #{asset.orderIndex + 1}</span>
+                    <StatusDot tone={asset.uploadStatus === "UPLOADED" ? "success" : asset.uploadStatus === "FAILED" ? "error" : "processing"} size="xs" />
                   </div>
                 </div>
               </div>
-            </section>
+            ))}
           </div>
-        ) : null}
-      </PageShell>
+        )}
+
+        {/* Section tabs */}
+        <div className="flex gap-1 border-b border-white/[0.06]">
+          {sections.map((s) => (
+            <button
+              className={`relative px-4 py-2.5 text-xs font-medium transition ${activeSection === s.id ? "text-white" : "text-[#6b7d96] hover:text-white"}`}
+              key={s.id}
+              onClick={() => setActiveSection(s.id)}
+              type="button"
+            >
+              {s.label}
+              {activeSection === s.id && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-[#de402a]" />}
+            </button>
+          ))}
+        </div>
+
+        {/* Assets section */}
+        {activeSection === "assets" && (
+          <div className="section-enter space-y-4">
+            <label className="block cursor-pointer">
+              <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] p-6 transition hover:border-[#de402a]/30">
+                <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
+                <p className="text-xs text-[#8ea0ba]">拖拽或点击上传素材</p>
+              </div>
+              <input accept=".mp4,.mov,.jpg,.jpeg,.png,.webp,.heic" className="hidden" multiple onChange={handleFileSelection} type="file" />
+            </label>
+
+            {uploadQueue.length > 0 && (
+              <div className="space-y-2">
+                {uploadQueue.map((item) => (
+                  <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5" key={item.key}>
+                    {item.file.type.startsWith("video/") ? <VideoIcon className="h-4 w-4 text-[#67b8ff]" /> : <ImageIcon className="h-4 w-4 text-[#65ecaf]" />}
+                    <span className="min-w-0 flex-1 truncate text-xs text-white">{item.file.name}</span>
+                    <span className={`text-[10px] font-medium ${UPLOAD_STAGE_TONES[item.stage]}`}>{UPLOAD_STAGE_LABELS[item.stage]}</span>
+                    {(item.stage === "uploading" || item.stage === "hashing" || item.stage === "presigning") && (
+                      <div className="h-3 w-3 animate-spin rounded-full border border-[#67b8ff] border-t-transparent" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
+                disabled={busyAction !== null || selectedFiles.length === 0}
+                onClick={() => void handleUploadAssets()}
+                type="button"
+              >
+                {busyAction === "upload" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
+                <UploadIcon className="h-3.5 w-3.5" />
+                上传素材
+              </button>
+              <button
+                className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
+                disabled={busyAction !== null}
+                onClick={() => void handleFinalize()}
+                type="button"
+              >
+                {busyAction === "finalize" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
+                <CheckCircleIcon className="h-3.5 w-3.5" />
+                完善内容
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Publish section */}
+        {activeSection === "publish" && (
+          <div className="section-enter space-y-4">
+            <div className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">发布平台</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPlatform(e.target.value.toUpperCase())} value={publicationPlatform} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">外部链接</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">外部帖子 ID（可选）</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
+              </label>
+            </div>
+            <button
+              className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
+              disabled={busyAction !== null}
+              onClick={() => void handleCreatePublication()}
+              type="button"
+            >
+              {busyAction === "publication" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
+              <LinkIcon className="h-3.5 w-3.5" />
+              发布到 Feed
+            </button>
+          </div>
+        )}
+
+        {/* Sponsor section */}
+        {activeSection === "sponsor" && (
+          <div className="section-enter space-y-4">
+            {!["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && (
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#f3b33e]/[0.06] px-4 py-3 text-xs text-[#f3c66e]">
+                请先完善并发布内容后再创建赞助合作
+              </div>
+            )}
+            <div className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">赞助商钱包</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setSponsorWallet(e.target.value)} placeholder="赞助商公钥" value={sponsorWallet} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">截止日期</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">基础报酬 (USDC)</span>
+                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">绩效预算 (USDC)</span>
+                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">延迟结算 (USDC)</span>
+                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3BudgetUsdc(e.target.value)} value={track3BudgetUsdc} />
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">指标类型</span>
+                  <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
+                    <option value="VIEWS">浏览量</option><option value="CLICKS">点击量</option><option value="SAVES">收藏量</option>
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">目标值</span>
+                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">延迟天数</span>
+                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3DelayDays(e.target.value)} value={track3DelayDays} />
+                </label>
+              </div>
+            </div>
+            <button
+              className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
+              disabled={busyAction !== null || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status)}
+              onClick={() => void handleCreateProposalIntent()}
+              type="button"
+            >
+              {busyAction === "intent" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
+              <SignatureIcon className="h-3.5 w-3.5" />
+              创建赞助合作
+            </button>
+          </div>
+        )}
+
+        {actionMessage && (
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#8ea0ba]">
+            {actionMessage}
+          </div>
+        )}
+      </WorkspaceShell>
     </>
+  );
+}
+
+function AssetPreview({ asset }: { asset: ManifestAssetRecord }) {
+  const url = resolveRenderableAssetUrl(asset);
+  if (isVideoAsset(asset) && isMuxAssetReady(asset) && asset.muxPlaybackUrl) {
+    return <MediaVideoPlayer className="h-full w-full" controls muted playsInline preload="metadata" src={asset.muxPlaybackUrl} videoClassName="h-full w-full object-cover" fallbackSrc={asset.originUrl && isRenderableUrl(asset.originUrl) ? asset.originUrl : undefined} />;
+  }
+  if (isVideoAsset(asset) && url) {
+    return <MediaVideoPlayer className="h-full w-full" controls muted playsInline preload="metadata" src={url} videoClassName="h-full w-full object-cover" />;
+  }
+  if (!isVideoAsset(asset) && url) {
+    return <img alt={`${asset.assetType} ${asset.orderIndex + 1}`} className="h-full w-full object-cover" src={url} />;
+  }
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center">
+      {isVideoAsset(asset) ? <VideoIcon className="h-5 w-5 text-[#4a5568]" /> : <ImageIcon className="h-5 w-5 text-[#4a5568]" />}
+      <span className="text-[10px] text-[#4a5568]">{asset.ingestStatus === "READY" ? "处理中" : "预览即将可用"}</span>
+    </div>
+  );
+}
+
+function HashRow({ label, value }: { label: string; value: string | null | undefined }) {
+  const display = value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "—";
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] text-[#5a6b82]">{label}</span>
+      <span className="font-mono text-[10px] text-[#93a2bb]">{display}</span>
+    </div>
   );
 }

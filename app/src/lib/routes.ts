@@ -6,6 +6,12 @@ export const PROFILE_PATH = "/me";
 export const LOGIN_PATH = "/login";
 export const WORKSPACE_PATH = "/workspace";
 export const WORKSPACE_CONTENT_NEW_PATH = "/workspace/content/new";
+export const WORKSPACE_LIBRARY_PATH = "/workspace/library";
+export const WORKSPACE_SPONSORSHIPS_PATH = `${WORKSPACE_PATH}#intents`;
+export const WORKSPACE_CAMPAIGNS_PATH = "/workspace/campaigns";
+export const WORKSPACE_ANALYTICS_PATH = "/workspace/analytics";
+export const WORKSPACE_EARNINGS_PATH = "/workspace/earnings";
+export const WORKSPACE_SETTINGS_PATH = "/workspace/settings";
 
 export type RouteItem = {
   href: string;
@@ -125,4 +131,20 @@ export const workspacePageTabs: RouteItem[] = [
     label: "Create Content",
     prefixes: ["/workspace/content"],
   },
+];
+
+export type WorkspaceNavItem = RouteItem & {
+  iconName: string;
+  disabled?: boolean;
+};
+
+export const workspaceSidebarNav: WorkspaceNavItem[] = [
+  { href: WORKSPACE_PATH, label: "总览", iconName: "overview", exact: true },
+  { href: WORKSPACE_CONTENT_NEW_PATH, label: "创作", iconName: "create", prefixes: ["/workspace/content"] },
+  { href: WORKSPACE_LIBRARY_PATH, label: "内容库", iconName: "library", disabled: true },
+  { href: WORKSPACE_SPONSORSHIPS_PATH, label: "赞助合作", iconName: "sponsor", hashes: ["#intents"], prefixes: ["/workspace/intents"] },
+  { href: WORKSPACE_CAMPAIGNS_PATH, label: "Campaign", iconName: "campaign", disabled: true },
+  { href: WORKSPACE_ANALYTICS_PATH, label: "数据", iconName: "analytics", disabled: true },
+  { href: WORKSPACE_EARNINGS_PATH, label: "收益", iconName: "earnings", disabled: true },
+  { href: WORKSPACE_SETTINGS_PATH, label: "设置", iconName: "settings", disabled: true },
 ];
