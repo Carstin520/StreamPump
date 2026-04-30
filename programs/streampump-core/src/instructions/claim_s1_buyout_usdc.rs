@@ -5,6 +5,7 @@ use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer}
 
 use crate::{
     errors::StreamPumpError,
+    events::S1BuyoutUsdcClaimed,
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState, S1UserPosition,
     },
@@ -76,6 +77,9 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,
         StreamPumpError::InvalidCreatorStatus
     );
+    let creator_profile_key = ctx.accounts.creator_profile.key();
+    let s1_user_position_key = ctx.accounts.s1_user_position.key();
+    let s1_buyout_state_key = ctx.accounts.s1_buyout_state.key();
 
     let winning_sponsor = ctx
         .accounts
@@ -112,6 +116,9 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         StreamPumpError::InsufficientBuyoutUsdcLiquidity
     );
 
+    let remaining_usdc;
+    let remaining_supply;
+
     if usdc_share > 0 {
         let offer = &ctx.accounts.buyout_offer;
         let bump_bytes = [offer.bump];
@@ -136,8 +143,8 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
             usdc_share,
         )?;
 
-        let remaining_usdc = checked_sub(buyout_state.claimable_usdc_remaining, usdc_share)?;
-        let remaining_supply =
+        remaining_usdc = checked_sub(buyout_state.claimable_usdc_remaining, usdc_share)?;
+        remaining_supply =
             checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
         buyout_state.claimable_usdc_remaining = remaining_usdc;
         buyout_state.claimable_s1_supply_remaining = remaining_supply;
@@ -154,13 +161,24 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
             ))?;
         }
     } else {
-        let remaining_supply =
+        remaining_supply =
             checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
         buyout_state.claimable_s1_supply_remaining = remaining_supply;
+        remaining_usdc = buyout_state.claimable_usdc_remaining;
     }
 
     position.internal_token_balance = 0;
     position.spump_cost_basis = 0;
+
+    emit!(S1BuyoutUsdcClaimed {
+        user: ctx.accounts.user.key(),
+        creator_profile: creator_profile_key,
+        s1_user_position: s1_user_position_key,
+        s1_buyout_state: s1_buyout_state_key,
+        usdc_amount: usdc_share,
+        remaining_usdc,
+        remaining_supply,
+    });
 
     Ok(())
 }

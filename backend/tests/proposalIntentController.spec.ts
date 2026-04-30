@@ -4,7 +4,9 @@
  */
 import { expect } from "chai";
 import {
+  ProposalIntentStatus,
   BundleStatus,
+  Track2MetricType,
 } from "@prisma/client";
 import {
   Keypair,
@@ -14,9 +16,10 @@ import {
 } from "@solana/web3.js";
 
 import {
+  buildProposalIntentSemantics,
   extractTransactionSignature,
   isBundleReusable,
-} from "../src/controllers/proposalIntentController";
+} from "../src/controllers/proposalIntentShared";
 
 describe("proposalIntentController helpers", () => {
   it("reuses an active built bundle", () => {
@@ -68,5 +71,49 @@ describe("proposalIntentController helpers", () => {
 
     expect(extracted).to.be.a("string");
     expect(extracted.length).to.be.greaterThan(20);
+  });
+
+  it("describes the next signer for intent list/detail serializers", () => {
+    const now = new Date(Date.now() + 60_000);
+    const semantics = buildProposalIntentSemantics(
+      {
+        id: "intent-id",
+        status: ProposalIntentStatus.CREATOR_PARTIALLY_SIGNED,
+        version: 2,
+        creatorWallet: "creator-wallet",
+        sponsorWallet: "sponsor-wallet",
+        sponsorOrgId: null,
+        creatorOrgId: null,
+        manifestId: "manifest-id",
+        lockedManifestHashHex: "a".repeat(64),
+        lockedAnchorPda: "anchor-pda",
+        deadlineUnix: 1_800_000_000n,
+        track1BaseUsdc: 1n,
+        track2MetricType: Track2MetricType.VIEWS,
+        track2TargetValue: 1n,
+        track2MinAchievementBps: 8_000,
+        track2UsdcDeposited: 1n,
+        track3UsdcDeposited: 1n,
+        track3DelayDays: 7,
+        plannedProposalPda: "proposal-pda",
+        plannedUsdcVaultPda: "vault-pda",
+        creatorApprovedAt: now,
+        sponsorApprovedAt: null,
+        chainTxSignature: null,
+        chainSubmittedAt: null,
+        chainConfirmedAt: null,
+        failureReason: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      "creator-wallet",
+      null
+    );
+
+    expect(semantics.currentStep).to.equal("AWAITING_SPONSOR_SIGNATURE");
+    expect(semantics.viewerRole).to.equal("CREATOR");
+    expect(semantics.nextAction).to.equal("SPONSOR_SIGN_AND_SUBMIT");
+    expect(semantics.requiredSigner).to.equal("SPONSOR");
+    expect(semantics.disabledReason).to.equal("SPONSOR_REQUIRED");
   });
 });

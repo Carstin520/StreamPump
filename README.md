@@ -141,9 +141,14 @@ cloudflared tunnel --url http://127.0.0.1:4000
 ### On-chain Program
 
 ```bash
-anchor build
+npm run build:anchor
 anchor test
 ```
+
+`npm run build:anchor` keeps Cargo/Anchor artifacts in `/private/tmp/streampump-anchor-target`
+by default. This avoids macOS Desktop/iCloud file-provider stalls that can leave
+`anchor build` hanging in the repository `target/` directory. Override
+`CARGO_TARGET_DIR` if you need a different local cache path.
 
 For a lighter Rust check:
 

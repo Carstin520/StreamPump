@@ -14,6 +14,7 @@ import bs58 from "bs58";
 import { HttpError } from "./http";
 import { serializeAsset } from "./contentManifestShared";
 import { decodeVersionedTransaction, derivePlannedContentAnchorPda } from "../services/proposalLaunchService";
+import { syncCampaignProofProjectionFromProposalPda } from "../services/marketProjectionService";
 import { prisma } from "../services/prisma";
 
 type SerializedBundleInput = {
@@ -40,6 +41,85 @@ type ProposalIntentWithManifest = ProposalIntent & {
     manifestHashHex: string | null;
     status: ContentManifestStatus;
   };
+};
+
+type ProposalIntentViewerRole = "CREATOR" | "SPONSOR" | "OBSERVER";
+
+const getIntentViewerRole = (
+  intent: Pick<ProposalIntent, "creatorWallet" | "sponsorWallet">,
+  requesterWallet: string
+): ProposalIntentViewerRole => {
+  if (requesterWallet === intent.creatorWallet) return "CREATOR";
+  if (requesterWallet === intent.sponsorWallet) return "SPONSOR";
+  return "OBSERVER";
+};
+
+const disabledForParticipantRole = (
+  viewerRole: ProposalIntentViewerRole,
+  requiredSigner: string
+): string | null => {
+  if (requiredSigner === "NONE") return null;
+  if (requiredSigner === "CREATOR_OR_SPONSOR") {
+    return viewerRole === "OBSERVER" ? "NOT_A_PARTICIPANT" : null;
+  }
+
+  return viewerRole === requiredSigner ? null : `${requiredSigner}_REQUIRED`;
+};
+
+export const buildProposalIntentSemantics = (
+  intent: ProposalIntent,
+  requesterWallet: string,
+  latestBundle?: SerializedBundleInput | null
+) => {
+  const viewerRole = getIntentViewerRole(intent, requesterWallet);
+  const bundleExpired =
+    latestBundle && latestBundle.status !== BundleStatus.CONFIRMED
+      ? isBundleExpired(latestBundle)
+      : false;
+
+  const build = (
+    currentStep: string,
+    nextAction: string | null,
+    requiredSigner: string,
+    disabledReason: string | null = disabledForParticipantRole(viewerRole, requiredSigner)
+  ) => ({
+    currentStep,
+    viewerRole,
+    nextAction,
+    requiredSigner,
+    disabledReason,
+  });
+
+  if (bundleExpired) {
+    return build("BUNDLE_EXPIRED", "REBUILD_BUNDLE", "CREATOR_OR_SPONSOR");
+  }
+
+  switch (intent.status) {
+    case ProposalIntentStatus.DRAFT:
+      return build("DRAFT", "LOCK_TERMS", "CREATOR_OR_SPONSOR");
+    case ProposalIntentStatus.TERMS_LOCKED:
+      return build("TERMS_LOCKED", "BUILD_BUNDLE", "CREATOR_OR_SPONSOR");
+    case ProposalIntentStatus.BUNDLE_BUILT:
+      return build(
+        latestBundle ? "AWAITING_CREATOR_SIGNATURE" : "BUNDLE_MISSING",
+        latestBundle ? "CREATOR_SIGN_BUNDLE" : "BUILD_BUNDLE",
+        latestBundle ? "CREATOR" : "CREATOR_OR_SPONSOR"
+      );
+    case ProposalIntentStatus.CREATOR_PARTIALLY_SIGNED:
+      return build("AWAITING_SPONSOR_SIGNATURE", "SPONSOR_SIGN_AND_SUBMIT", "SPONSOR");
+    case ProposalIntentStatus.SPONSOR_SIGNED:
+      return build("READY_FOR_CLIENT_RELAY", "SUBMIT_SIGNED_TRANSACTION", "SPONSOR");
+    case ProposalIntentStatus.SUBMITTED:
+      return build("AWAITING_CHAIN_CONFIRMATION", "WAIT_FOR_CONFIRMATION", "NONE", null);
+    case ProposalIntentStatus.CONFIRMED:
+      return build("CONFIRMED", "VIEW_CAMPAIGN", "NONE", null);
+    case ProposalIntentStatus.FAILED:
+      return build("FAILED", "REBUILD_BUNDLE", "CREATOR_OR_SPONSOR");
+    case ProposalIntentStatus.EXPIRED:
+      return build("EXPIRED", "REBUILD_BUNDLE", "CREATOR_OR_SPONSOR");
+    default:
+      return build("UNKNOWN", null, "NONE", "UNKNOWN_INTENT_STATUS");
+  }
 };
 
 export const parseTrack2MetricType = (value: unknown): Track2MetricType => {
@@ -221,7 +301,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
     lockedAnchorPda: latestIntent.lockedAnchorPda,
   });
 
-  return prisma.$transaction(async (tx) => {
+  const updatedBundle = await prisma.$transaction(async (tx) => {
     const updatedBundle = await tx.txBundle.update({
       where: { id: params.bundleId },
       data: {
@@ -310,6 +390,12 @@ export const finalizeConfirmedLaunchBundle = async (params: {
 
     return updatedBundle;
   });
+
+  if (latestIntent.plannedProposalPda) {
+    await syncCampaignProofProjectionFromProposalPda(latestIntent.plannedProposalPda);
+  }
+
+  return updatedBundle;
 };
 
 export const serializeProposalIntentListItem = (
@@ -325,26 +411,30 @@ export const serializeProposalIntentListItem = (
     txBundles: SerializedBundleInput[];
   },
   requesterWallet: string
-) => ({
-  ...serializeIntent(intent),
-  manifest: intent.manifest
-    ? {
-        manifestId: intent.manifest.id,
-        title: intent.manifest.title,
-        status: intent.manifest.status,
-        contentType: intent.manifest.contentType,
-        manifestHashHex: intent.manifest.manifestHashHex,
-        currentAnchorPda: intent.manifest.currentAnchorPda,
-      }
-    : null,
-  latestBundle: intent.txBundles[0] ? serializeBundle(intent.txBundles[0]) : null,
-  viewerRole:
-    requesterWallet === intent.creatorWallet
-      ? "CREATOR"
-      : requesterWallet === intent.sponsorWallet
-        ? "SPONSOR"
-        : "OBSERVER",
-});
+) => {
+  const latestBundle = intent.txBundles[0] ?? null;
+  const semantics = buildProposalIntentSemantics(intent, requesterWallet, latestBundle);
+
+  return {
+    ...serializeIntent(intent),
+    manifest: intent.manifest
+      ? {
+          manifestId: intent.manifest.id,
+          title: intent.manifest.title,
+          status: intent.manifest.status,
+          contentType: intent.manifest.contentType,
+          manifestHashHex: intent.manifest.manifestHashHex,
+          currentAnchorPda: intent.manifest.currentAnchorPda,
+        }
+      : null,
+    latestBundle: latestBundle ? serializeBundle(latestBundle) : null,
+    currentStep: semantics.currentStep,
+    viewerRole: semantics.viewerRole,
+    nextAction: semantics.nextAction,
+    requiredSigner: semantics.requiredSigner,
+    disabledReason: semantics.disabledReason,
+  };
+};
 
 export const serializeProposalIntentDetail = (
   intent: ProposalIntent & {
@@ -375,24 +465,33 @@ export const serializeProposalIntentDetail = (
     proposal: Proposal | null;
   },
   requesterWallet: string
-) => ({
-  intent: serializeIntent(intent),
-  viewerRole: requesterWallet === intent.creatorWallet ? "CREATOR" : "SPONSOR",
-  manifest: intent.manifest
-    ? {
-        manifestId: intent.manifest.id,
-        title: intent.manifest.title,
-        contentType: intent.manifest.contentType,
-        status: intent.manifest.status,
-        version: intent.manifest.version,
-        manifestHashHex: intent.manifest.manifestHashHex,
-        currentAnchorPda: intent.manifest.currentAnchorPda,
-        assets: intent.manifest.assets.map(serializeAsset),
-      }
-    : null,
-  proposal: intent.proposal ? serializeProposal(intent.proposal) : null,
-  bundles: intent.txBundles.map(serializeBundle),
-});
+) => {
+  const latestBundle = intent.txBundles[0] ?? null;
+  const semantics = buildProposalIntentSemantics(intent, requesterWallet, latestBundle);
+
+  return {
+    intent: serializeIntent(intent),
+    currentStep: semantics.currentStep,
+    viewerRole: semantics.viewerRole,
+    nextAction: semantics.nextAction,
+    requiredSigner: semantics.requiredSigner,
+    disabledReason: semantics.disabledReason,
+    manifest: intent.manifest
+      ? {
+          manifestId: intent.manifest.id,
+          title: intent.manifest.title,
+          contentType: intent.manifest.contentType,
+          status: intent.manifest.status,
+          version: intent.manifest.version,
+          manifestHashHex: intent.manifest.manifestHashHex,
+          currentAnchorPda: intent.manifest.currentAnchorPda,
+          assets: intent.manifest.assets.map(serializeAsset),
+        }
+      : null,
+    proposal: intent.proposal ? serializeProposal(intent.proposal) : null,
+    bundles: intent.txBundles.map(serializeBundle),
+  };
+};
 
 export const serializePublicProposalView = (proposal: Proposal) => ({
   id: proposal.id,

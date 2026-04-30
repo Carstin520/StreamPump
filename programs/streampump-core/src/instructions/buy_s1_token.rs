@@ -27,6 +27,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::S1TokenBought,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition},
     utils::{calculate_buy_cost, checked_add},
 };
@@ -114,6 +115,7 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     )?;
 
     let creator_key = ctx.accounts.creator_profile.key();
+    let position_key = ctx.accounts.s1_user_position.key();
 
     // EN: Initialize position on first buy, or validate ownership on subsequent buys.
     // ZH: 首次购买时初始化仓位，后续购买时校验所有权。
@@ -145,6 +147,16 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     let creator_profile = &mut ctx.accounts.creator_profile;
     creator_profile.s1_supply = checked_add(creator_profile.s1_supply, args.amount)?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(S1TokenBought {
+        user: ctx.accounts.user.key(),
+        creator_profile: creator_key,
+        s1_user_position: position_key,
+        amount: args.amount,
+        spump_cost,
+        new_balance: position.internal_token_balance,
+        new_supply: creator_profile.s1_supply,
+    });
 
     Ok(())
 }

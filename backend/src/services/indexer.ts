@@ -14,6 +14,7 @@ import {
 import { config } from "../../config/default";
 import { syncProposalProjectionFromChain } from "./chainProjectionService";
 import { getAnchorService } from "./AnchorService";
+import { syncMarketProjectionFromChainInstruction } from "./marketProjectionService";
 import { prisma } from "./prisma";
 
 const INDEXER_FETCH_RETRY_DELAY_MS = 1_000;
@@ -54,6 +55,10 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
   S1BuyoutOfferAccepted: "accept_buyout_offer",
   S1BuyoutOfferReclaimed: "reclaim_expired_buyout_offer",
   S1BuyoutOfferCancelled: "cancel_buyout_offer",
+  S1TokenBought: "buy_s1_token",
+  S1TokenSold: "sell_s1_token",
+  S1Graduated: "execute_s1_graduation",
+  S1BuyoutUsdcClaimed: "claim_s1_buyout_usdc",
   Track1Settled: "settle_track1_base",
   Track2Settled: "settle_track2",
   Track3Settled: "settle_track3_cps",
@@ -140,8 +145,9 @@ const extractEntityFromEventPayload = (payload: Record<string, unknown>): string
     payload.contentAnchor,
     payload.buyoutOffer,
     payload.userProfile,
-    payload.s1BuyoutState,
     payload.creatorProfile,
+    payload.s1UserPosition,
+    payload.s1BuyoutState,
   ];
 
   for (const candidate of entityCandidates) {
@@ -348,6 +354,20 @@ const persistChainInstructions = async (params: {
         signature: params.signature,
         instructionName: instruction.instructionName,
       });
+    }
+
+    try {
+      await syncMarketProjectionFromChainInstruction({
+        signature: params.signature,
+        instructionName: instruction.instructionName,
+        proposalPda: instruction.proposalPda,
+        entityPda: instruction.entityPda,
+        payload: instruction.payload,
+      });
+    } catch (error) {
+      console.warn(
+        `[indexer] market projection failed for ${instruction.instructionName} in ${params.signature}: ${asErrorMessage(error)}`
+      );
     }
   }
 };

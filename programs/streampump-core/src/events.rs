@@ -85,6 +85,53 @@ pub struct S1BuyoutOfferCancelled {
 }
 
 #[event]
+pub struct S1TokenBought {
+    pub user: Pubkey,
+    pub creator_profile: Pubkey,
+    pub s1_user_position: Pubkey,
+    pub amount: u64,
+    pub spump_cost: u64,
+    pub new_balance: u64,
+    pub new_supply: u64,
+}
+
+#[event]
+pub struct S1TokenSold {
+    pub user: Pubkey,
+    pub creator_profile: Pubkey,
+    pub s1_user_position: Pubkey,
+    pub amount: u64,
+    pub gross_return: u64,
+    pub tax_amount: u64,
+    pub net_return: u64,
+    pub new_balance: u64,
+    pub new_supply: u64,
+}
+
+#[event]
+pub struct S1Graduated {
+    pub creator_profile: Pubkey,
+    pub creator: Pubkey,
+    pub s1_buyout_state: Pubkey,
+    pub winning_sponsor: Pubkey,
+    pub claimable_usdc_remaining: u64,
+    pub claimable_s1_supply_remaining: u64,
+    pub creator_spump_bonus: u64,
+    pub status: u8,
+}
+
+#[event]
+pub struct S1BuyoutUsdcClaimed {
+    pub user: Pubkey,
+    pub creator_profile: Pubkey,
+    pub s1_user_position: Pubkey,
+    pub s1_buyout_state: Pubkey,
+    pub usdc_amount: u64,
+    pub remaining_usdc: u64,
+    pub remaining_supply: u64,
+}
+
+#[event]
 pub struct Track1Settled {
     pub proposal: Pubkey,
     pub creator: Pubkey,

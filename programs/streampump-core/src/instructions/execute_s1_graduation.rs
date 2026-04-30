@@ -25,6 +25,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::S1Graduated,
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, MIN_PROPOSAL_CREATOR_LEVEL,
     },
@@ -96,6 +97,13 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         ctx.accounts.s1_buyout_state.winning_sponsor.is_some(),
         StreamPumpError::WinningSponsorNotSelected
     );
+    let winning_sponsor = ctx
+        .accounts
+        .s1_buyout_state
+        .winning_sponsor
+        .ok_or(error!(StreamPumpError::WinningSponsorNotSelected))?;
+    let creator_profile_key = ctx.accounts.creator_profile.key();
+    let s1_buyout_state_key = ctx.accounts.s1_buyout_state.key();
 
     // ────────────────────────────────────────────────────────────────────────
     // EN: Calculate virtual SPUMP: the full sell return from current supply to zero.
@@ -148,6 +156,17 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         creator_profile.last_upgrade_at = now;
     }
     creator_profile.updated_at = now;
+
+    emit!(S1Graduated {
+        creator_profile: creator_profile_key,
+        creator: creator_profile.authority,
+        s1_buyout_state: s1_buyout_state_key,
+        winning_sponsor,
+        claimable_usdc_remaining: s1_buyout_state.claimable_usdc_remaining,
+        claimable_s1_supply_remaining: s1_buyout_state.claimable_s1_supply_remaining,
+        creator_spump_bonus: creator_amount,
+        status: creator_profile.status as u8,
+    });
 
     Ok(())
 }

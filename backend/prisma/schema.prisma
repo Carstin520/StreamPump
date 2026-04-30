@@ -118,6 +118,37 @@ enum IdentityProvider {
   PASSKEY
 }
 
+enum MarketCreatorStage {
+  S1_DISCOVERY
+  S1_BUYOUT
+  S2_ACTIVE
+}
+
+enum BuyoutOfferProjectionStatus {
+  OPEN
+  ACCEPTED
+  CANCELLED
+  RECLAIMED
+}
+
+enum BuyoutProjectionStatus {
+  NONE
+  AUCTION_OPEN
+  OFFER_ACCEPTED
+  RAGE_QUIT_OPEN
+  GRADUATED
+}
+
+enum CampaignProofStatus {
+  DRAFT
+  FUNDED
+  ANCHORED
+  SETTLING
+  SETTLED
+  CANCELLED
+  VOIDED
+}
+
 model Proposal {
   id                         String           @id @default(cuid())
   /// CN: 链上 Proposal PDA，数据库用它和链上账户强绑定。
@@ -403,6 +434,128 @@ model ChainEvent {
   @@unique([signature, instructionIndex])
   @@index([proposalPda, observedAt])
   @@index([instructionName, observedAt])
+}
+
+model CreatorMarketProjection {
+  id                      String             @id @default(cuid())
+  creatorWallet           String             @unique
+  creatorProfilePda       String             @unique
+  handle                  String?
+  displayName             String?
+  stage                   MarketCreatorStage @default(S1_DISCOVERY)
+  level                   Int                @default(1)
+  s1Supply                BigInt             @default(0)
+  currentPriceSpump       BigInt             @default(0)
+  nextPriceSpump          BigInt             @default(0)
+  supporterPoolSpump      BigInt             @default(0)
+  holderCount             Int                @default(0)
+  graduationProgressBps   Int                @default(0)
+  activeCampaignCount     Int                @default(0)
+  latestBuyoutOfferUsdc   BigInt?
+  acceptedBuyoutOfferUsdc BigInt?
+  buyoutStatePda          String?
+  lastEventSignature      String?
+  lastEventAt             DateTime?
+  metadataJson            Json?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([stage, updatedAt])
+  @@index([creatorProfilePda])
+}
+
+model S1PositionProjection {
+  id                     String    @id @default(cuid())
+  userWallet             String
+  creatorWallet          String?
+  creatorProfilePda      String
+  positionPda            String    @unique
+  internalTokenBalance   BigInt    @default(0)
+  spumpCostBasis         BigInt    @default(0)
+  estimatedClaimableUsdc BigInt?
+  lastEventSignature     String?
+  lastEventAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([userWallet, creatorProfilePda])
+  @@index([creatorWallet])
+  @@index([userWallet])
+}
+
+model S1BuyoutOfferProjection {
+  id                   String                      @id @default(cuid())
+  buyoutOfferPda       String                      @unique
+  creatorWallet        String?
+  creatorProfilePda    String
+  sponsorWallet        String
+  usdcAmount           BigInt
+  status               BuyoutOfferProjectionStatus @default(OPEN)
+  createdOnChainAt     DateTime?
+  sponsorCancelAfterAt DateTime?
+  lastEventSignature   String?
+  lastEventAt          DateTime?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  @@index([creatorProfilePda, status])
+  @@index([sponsorWallet, status])
+}
+
+model S1BuyoutProjection {
+  id                         String                 @id @default(cuid())
+  creatorWallet              String?
+  creatorProfilePda          String                 @unique
+  buyoutStatePda             String?                @unique
+  status                     BuyoutProjectionStatus @default(NONE)
+  winningSponsorWallet       String?
+  acceptedOfferPda           String?
+  acceptedOfferUsdc          BigInt?
+  latestOfferPda             String?
+  latestOfferUsdc            BigInt?
+  usdcDeposited              BigInt                 @default(0)
+  claimableUsdcRemaining     BigInt                 @default(0)
+  claimableS1SupplyRemaining BigInt                 @default(0)
+  rageQuitDeadlineAt         DateTime?
+  lastEventSignature         String?
+  lastEventAt                DateTime?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([creatorWallet])
+}
+
+model CampaignProofProjection {
+  id                          String              @id @default(cuid())
+  proposalId                  String?             @unique
+  proposalPda                 String              @unique
+  creatorWallet               String
+  sponsorWallet               String?
+  manifestId                  String?
+  intentId                    String?
+  status                      ProposalStatus
+  proofStatus                 CampaignProofStatus @default(DRAFT)
+  contentHashHex              String?
+  contentAnchorPda            String?
+  contentAnchorTx             String?
+  fundingTxSignature          String?
+  latestSettlementTxSignature String?
+  track1BaseUsdc              BigInt              @default(0)
+  track2UsdcDeposited         BigInt              @default(0)
+  track3UsdcDeposited         BigInt              @default(0)
+  track2MetricType            Track2MetricType
+  track2TargetValue           BigInt              @default(0)
+  track2ActualValue           BigInt?
+  deadlineAt                  DateTime
+  settledAt                   DateTime?
+  metadataJson                Json?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+
+  @@index([proofStatus, updatedAt])
+  @@index([creatorWallet, updatedAt])
+  @@index([sponsorWallet, updatedAt])
 }
 
 model IndexerCursor {

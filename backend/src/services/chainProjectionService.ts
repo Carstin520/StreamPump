@@ -6,6 +6,7 @@ import { OracleSyncStatus, ProposalStatus } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 
 import { OnChainProposalState, getAnchorService } from "./AnchorService";
+import { syncCampaignProofProjectionFromProposal } from "./marketProjectionService";
 import { prisma } from "./prisma";
 
 const toDateFromUnixSeconds = (unixSeconds: bigint): Date | null => {
@@ -99,7 +100,7 @@ export const syncProposalProjectionFromChain = async (params: {
       : existing?.oracleLastError ?? null,
   };
 
-  return prisma.proposal.upsert({
+  const proposal = await prisma.proposal.upsert({
     where: {
       proposalPda: params.proposalPda,
     },
@@ -109,4 +110,7 @@ export const syncProposalProjectionFromChain = async (params: {
       ...payload,
     },
   });
+
+  await syncCampaignProofProjectionFromProposal(proposal);
+  return proposal;
 };

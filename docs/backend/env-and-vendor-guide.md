@@ -51,7 +51,7 @@
 
 ### 2. Solana RPC
 - 推荐：`Helius Developer`
-- 作用：查询 proposal 链上状态、发送 oracle settlement、后续做 bundle relay 和 event indexing
+- 作用：查询 proposal / creator / S1 buyout 链上状态、发送 oracle settlement、后续做 bundle relay 和 event indexing
 - 当前优先级：最高，没有稳定 RPC，链上侧无法正常联调
 - 官方价格参考：
   - Free：`$0/month`，`1M` monthly credits，`10 req/s`
@@ -63,6 +63,13 @@
   - 明显高频链上读取或事件流：`$499/month`
 - 官方来源：
   - https://www.helius.dev/docs/billing/plans
+
+### Market read model 运行说明
+- P0 market API 是只读投影，必须有 `DATABASE_URL` / `DIRECT_URL` 和稳定 `SOLANA_RPC_ENDPOINT`
+- `STREAMPUMP_PROGRAM_ID` 必须和当前环境部署的 Anchor program 一致
+- `STREAMPUMP_IDL_PATH` 建议显式指向同一版 IDL；未设置时 backend 会尝试读取 `target/idl/streampump_core.json`
+- 只跑 P0 read model 时可以先不配置真实 `ORACLE_AUTHORITY_*`
+- 如果要让后端执行 Track settlement 或 server-side Anchor 交易，再补 `ORACLE_AUTHORITY_KEYPAIR_PATH` 或 `ORACLE_AUTHORITY_SECRET_KEY`
 
 ### 3. 对象存储
 - 推荐：`Cloudflare R2` 作为当前最省钱的 S3-compatible 起步方案
@@ -190,6 +197,7 @@
 - Neon `DIRECT_URL`（direct）
 - Solana RPC endpoint
 - StreamPump program id
+- StreamPump IDL path / IDL artifact
 - Oracle authority keypair
 - S3-compatible bucket / key
 - Mux token 与 webhook secret

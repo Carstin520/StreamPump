@@ -27,6 +27,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::S1TokenSold,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition},
     utils::{amount_from_bps, calculate_sell_return, checked_sub},
 };
@@ -142,6 +143,8 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
         StreamPumpError::InvalidCreatorStatus
     );
 
+    let creator_key = ctx.accounts.creator_profile.key();
+    let position_key = ctx.accounts.s1_user_position.key();
     let creator_profile = &ctx.accounts.creator_profile;
     let position = &ctx.accounts.s1_user_position;
     require!(
@@ -236,6 +239,18 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
 
     creator_profile.s1_supply = checked_sub(creator_profile.s1_supply, args.amount)?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(S1TokenSold {
+        user: ctx.accounts.user.key(),
+        creator_profile: creator_key,
+        s1_user_position: position_key,
+        amount: args.amount,
+        gross_return,
+        tax_amount,
+        net_return,
+        new_balance: position.internal_token_balance,
+        new_supply: creator_profile.s1_supply,
+    });
 
     Ok(())
 }

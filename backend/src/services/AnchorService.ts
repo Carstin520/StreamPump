@@ -55,13 +55,89 @@ export interface OnChainProposalState {
   deadlineUnix: bigint;
 }
 
+export interface OnChainCreatorProfileState {
+  authority: PublicKey;
+  handle: string;
+  payoutUsdcAta: PublicKey;
+  level: number;
+  status: "S1_ACTIVE" | "S1_AUCTION_PENDING" | "S1_EXECUTION_PENDING" | "S2_ACTIVE";
+  s1Supply: bigint;
+  lastUpgradeAtUnix: bigint;
+  createdAtUnix: bigint;
+  updatedAtUnix: bigint;
+  bump: number;
+}
+
+export interface OnChainS1BuyoutState {
+  creatorProfile: PublicKey;
+  winningSponsor: PublicKey | null;
+  usdcDeposited: bigint;
+  claimableUsdcRemaining: bigint;
+  claimableS1SupplyRemaining: bigint;
+  rageQuitDeadlineUnix: bigint;
+  bump: number;
+}
+
+export interface OnChainS1BuyoutOfferState {
+  sponsor: PublicKey;
+  creatorProfile: PublicKey;
+  usdcAmount: bigint;
+  createdAtUnix: bigint;
+  sponsorCancelAfterUnix: bigint;
+  bump: number;
+}
+
+export interface OnChainS1UserPositionState {
+  user: PublicKey;
+  creatorProfile: PublicKey;
+  internalTokenBalance: bigint;
+  spumpCostBasis: bigint;
+  bump: number;
+}
+
 type ProtocolConfigAccount = {
   oracleAuthority: PublicKey;
   usdcMint: PublicKey;
 };
 
 type CreatorProfileAccount = {
+  authority: PublicKey;
+  handle: string;
   payoutUsdcAta: PublicKey;
+  level: number;
+  status: unknown;
+  s1Supply: BN | bigint | number;
+  lastUpgradeAt: BN | bigint | number;
+  createdAt: BN | bigint | number;
+  updatedAt: BN | bigint | number;
+  bump: number;
+};
+
+type S1BuyoutStateAccount = {
+  creator: PublicKey;
+  winningSponsor: PublicKey | null;
+  usdcDeposited: BN | bigint | number;
+  claimableUsdcRemaining: BN | bigint | number;
+  claimableS1SupplyRemaining: BN | bigint | number;
+  rageQuitDeadline: BN | bigint | number;
+  bump: number;
+};
+
+type S1BuyoutOfferAccount = {
+  sponsor: PublicKey;
+  creator: PublicKey;
+  usdcAmount: BN | bigint | number;
+  createdAt: BN | bigint | number;
+  sponsorCancelAfter: BN | bigint | number;
+  bump: number;
+};
+
+type S1UserPositionAccount = {
+  user: PublicKey;
+  creator: PublicKey;
+  internalTokenBalance: BN | bigint | number;
+  spumpCostBasis: BN | bigint | number;
+  bump: number;
 };
 
 type ResolvedSettlementAccounts = {
@@ -152,6 +228,29 @@ const mapProposalStatus = (
       return "VOIDED";
     default:
       throw new Error(`Unsupported on-chain proposal status: ${normalized}`);
+  }
+};
+
+const mapCreatorStatus = (
+  value: unknown
+): OnChainCreatorProfileState["status"] => {
+  const normalized = anchorEnumKey(value).toLowerCase();
+
+  switch (normalized) {
+    case "s1_active":
+    case "s1active":
+      return "S1_ACTIVE";
+    case "s1_auction_pending":
+    case "s1auctionpending":
+      return "S1_AUCTION_PENDING";
+    case "s1_execution_pending":
+    case "s1executionpending":
+      return "S1_EXECUTION_PENDING";
+    case "s2_active":
+    case "s2active":
+      return "S2_ACTIVE";
+    default:
+      throw new Error(`Unsupported on-chain creator status: ${normalized}`);
   }
 };
 
@@ -376,9 +475,144 @@ export class AnchorService {
     return contentAnchor;
   }
 
+  deriveS1PositionPda(user: PublicKey, creatorProfilePda: PublicKey): PublicKey {
+    const [position] = PublicKey.findProgramAddressSync(
+      [Buffer.from("s1_position"), user.toBuffer(), creatorProfilePda.toBuffer()],
+      this.program.programId
+    );
+
+    return position;
+  }
+
+  deriveS1BuyoutStatePda(creatorProfilePda: PublicKey): PublicKey {
+    const [buyoutState] = PublicKey.findProgramAddressSync(
+      [Buffer.from("s1_buyout_state"), creatorProfilePda.toBuffer()],
+      this.program.programId
+    );
+
+    return buyoutState;
+  }
+
+  deriveBuyoutOfferPda(sponsor: PublicKey, creatorProfilePda: PublicKey): PublicKey {
+    const [buyoutOffer] = PublicKey.findProgramAddressSync(
+      [Buffer.from("buyout_offer"), sponsor.toBuffer(), creatorProfilePda.toBuffer()],
+      this.program.programId
+    );
+
+    return buyoutOffer;
+  }
+
+  deriveOfferUsdcVaultPda(buyoutOfferPda: PublicKey): PublicKey {
+    const [vault] = PublicKey.findProgramAddressSync(
+      [Buffer.from("offer_usdc_vault"), buyoutOfferPda.toBuffer()],
+      this.program.programId
+    );
+
+    return vault;
+  }
+
   async fetchProtocolConfigAccount(): Promise<any> {
     const { account } = await this.fetchProtocolConfigState();
     return account;
+  }
+
+  async fetchCreatorProfileByWallet(
+    creatorWallet: PublicKey
+  ): Promise<OnChainCreatorProfileState | null> {
+    const pda = this.deriveCreatorProfilePda(creatorWallet);
+    return this.fetchCreatorProfileByPda(pda);
+  }
+
+  async fetchCreatorProfileByPda(
+    creatorProfilePda: PublicKey
+  ): Promise<OnChainCreatorProfileState | null> {
+    const creator = await this.fetchOptionalProgramAccount<CreatorProfileAccount>(
+      "creatorProfile",
+      creatorProfilePda,
+      "fetch creator_profile account"
+    );
+    if (!creator) {
+      return null;
+    }
+
+    return {
+      authority: creator.authority,
+      handle: creator.handle,
+      payoutUsdcAta: creator.payoutUsdcAta,
+      level: Number(creator.level ?? 0),
+      status: mapCreatorStatus(creator.status),
+      s1Supply: toBigInt(creator.s1Supply),
+      lastUpgradeAtUnix: toBigInt(creator.lastUpgradeAt),
+      createdAtUnix: toBigInt(creator.createdAt),
+      updatedAtUnix: toBigInt(creator.updatedAt),
+      bump: Number(creator.bump ?? 0),
+    };
+  }
+
+  async fetchS1BuyoutStateByPda(
+    buyoutStatePda: PublicKey
+  ): Promise<OnChainS1BuyoutState | null> {
+    const buyout = await this.fetchOptionalProgramAccount<S1BuyoutStateAccount>(
+      "s1BuyoutState",
+      buyoutStatePda,
+      "fetch s1_buyout_state account"
+    );
+    if (!buyout) {
+      return null;
+    }
+
+    return {
+      creatorProfile: buyout.creator,
+      winningSponsor: buyout.winningSponsor ?? null,
+      usdcDeposited: toBigInt(buyout.usdcDeposited),
+      claimableUsdcRemaining: toBigInt(buyout.claimableUsdcRemaining),
+      claimableS1SupplyRemaining: toBigInt(buyout.claimableS1SupplyRemaining),
+      rageQuitDeadlineUnix: toBigInt(buyout.rageQuitDeadline),
+      bump: Number(buyout.bump ?? 0),
+    };
+  }
+
+  async fetchS1BuyoutOfferByPda(
+    buyoutOfferPda: PublicKey
+  ): Promise<OnChainS1BuyoutOfferState | null> {
+    const offer = await this.fetchOptionalProgramAccount<S1BuyoutOfferAccount>(
+      "s1BuyoutOffer",
+      buyoutOfferPda,
+      "fetch s1_buyout_offer account"
+    );
+    if (!offer) {
+      return null;
+    }
+
+    return {
+      sponsor: offer.sponsor,
+      creatorProfile: offer.creator,
+      usdcAmount: toBigInt(offer.usdcAmount),
+      createdAtUnix: toBigInt(offer.createdAt),
+      sponsorCancelAfterUnix: toBigInt(offer.sponsorCancelAfter),
+      bump: Number(offer.bump ?? 0),
+    };
+  }
+
+  async fetchS1PositionByPda(
+    positionPda: PublicKey
+  ): Promise<OnChainS1UserPositionState | null> {
+    const position = await this.fetchOptionalProgramAccount<S1UserPositionAccount>(
+      "s1UserPosition",
+      positionPda,
+      "fetch s1_user_position account"
+    );
+    if (!position) {
+      return null;
+    }
+
+    return {
+      user: position.user,
+      creatorProfile: position.creator,
+      internalTokenBalance: toBigInt(position.internalTokenBalance),
+      spumpCostBasis: toBigInt(position.spumpCostBasis),
+      bump: Number(position.bump ?? 0),
+    };
   }
 
   async fetchProposalState(proposalPda: PublicKey): Promise<OnChainProposalState | null> {
@@ -819,6 +1053,27 @@ export class AnchorService {
       (this.program.account as any)[accountName].fetch(accountAddress),
       operation
     ) as Promise<T>;
+  }
+
+  private async fetchOptionalProgramAccount<T>(
+    accountName: string,
+    accountAddress: PublicKey,
+    operation: string
+  ): Promise<T | null> {
+    try {
+      return await this.fetchProgramAccount<T>(accountName, accountAddress, operation);
+    } catch (error) {
+      const message = String(error);
+      if (
+        message.includes("Account does not exist") ||
+        message.includes("AccountNotFound") ||
+        message.includes("could not find account")
+      ) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   private async fetchProtocolConfigState(): Promise<{

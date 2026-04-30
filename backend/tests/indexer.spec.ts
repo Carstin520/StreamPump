@@ -74,6 +74,12 @@ describe("indexer helpers", () => {
     expect(mapEventNameToInstructionName("S1BuyoutOfferSubmitted")).to.equal(
       "submit_buyout_offer"
     );
+    expect(mapEventNameToInstructionName("S1TokenBought")).to.equal("buy_s1_token");
+    expect(mapEventNameToInstructionName("S1TokenSold")).to.equal("sell_s1_token");
+    expect(mapEventNameToInstructionName("S1Graduated")).to.equal("execute_s1_graduation");
+    expect(mapEventNameToInstructionName("S1BuyoutUsdcClaimed")).to.equal(
+      "claim_s1_buyout_usdc"
+    );
     expect(mapEventNameToInstructionName("Track2Settled")).to.equal("settle_track2");
     expect(mapEventNameToInstructionName("UnknownEvent")).to.equal(null);
   });

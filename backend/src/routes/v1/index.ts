@@ -5,8 +5,10 @@
 import { Router } from "express";
 
 import authRoutes from "./authRoutes";
+import campaignRoutes from "./campaignRoutes";
 import contentManifestRoutes from "./contentManifestRoutes";
 import internalMuxRoutes from "./internalMuxRoutes";
+import marketRoutes from "./marketRoutes";
 import publicFeedRoutes from "./publicFeedRoutes";
 import proposalIntentRoutes from "./proposalIntentRoutes";
 import proposalRoutes from "./proposalRoutes";
@@ -15,7 +17,9 @@ import workspaceRoutes from "./workspaceRoutes";
 const router = Router();
 
 router.use("/auth", authRoutes);
+router.use("/campaigns", campaignRoutes);
 router.use("/feed", publicFeedRoutes);
+router.use("/market", marketRoutes);
 router.use("/content", contentManifestRoutes);
 router.use("/proposal-intents", proposalIntentRoutes);
 router.use("/proposals", proposalRoutes);
