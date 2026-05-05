@@ -26,7 +26,6 @@ import {
   s3Service,
 } from "../src/services/S3Service";
 import { uploadDisplayVariant } from "../src/services/imageVariants";
-import { ingestUploadedVideoAssetById } from "../src/services/muxReconciliationService";
 
 type CliOptions = {
   creatorWallet: string;
@@ -463,9 +462,13 @@ const importPost = async (
   postDirectoryPath: string,
   options: CliOptions
 ): Promise<ImportedPostSummary> => {
+  console.log(`[import-local-post-assets] planning ${path.basename(postDirectoryPath)}`);
   const postMarkdownPath = path.join(postDirectoryPath, "post.md");
   const parsedPost = await parsePostMarkdown(postMarkdownPath);
   const assetPlans = await buildAssetPlans(postDirectoryPath, parsedPost);
+  console.log(
+    `[import-local-post-assets] planned ${parsedPost.slug}: ${assetPlans.length} assets`
+  );
   const videoAssetCount = assetPlans.filter((asset) => asset.assetType === AssetType.VIDEO).length;
   const contentType = inferContentType(
     parsedPost,
@@ -547,6 +550,10 @@ const importPost = async (
       12
     )}.${extensionForMimeType(assetPlan.mimeType)}`;
 
+    console.log(
+      `[import-local-post-assets] uploading ${parsedPost.slug} #${assetPlan.orderIndex} ${assetPlan.fileName}`
+    );
+
     const asset = await prisma.contentAsset.create({
       data: {
         manifestId: manifest.id,
@@ -608,6 +615,9 @@ const importPost = async (
         },
       });
 
+      const { ingestUploadedVideoAssetById } = await import(
+        "../src/services/muxReconciliationService"
+      );
       const ingestResult = await ingestUploadedVideoAssetById(asset.id);
       if (ingestResult.status !== "SKIPPED") {
         muxQueuedCount += 1;
@@ -624,6 +634,9 @@ const importPost = async (
     }
 
     uploadedAssets.push(updatedAsset);
+    console.log(
+      `[import-local-post-assets] uploaded ${parsedPost.slug} #${assetPlan.orderIndex} ${storageKey}`
+    );
   }
 
   if (coverAssetId) {
@@ -681,6 +694,18 @@ const importPost = async (
 
 const main = async () => {
   const options = parseArgs(process.argv.slice(2));
+  console.log(
+    JSON.stringify(
+      {
+        dryRun: options.dryRun,
+        postsRoot: options.postsRoot,
+        reimport: options.reimport,
+        skipFinalize: options.skipFinalize,
+      },
+      null,
+      2
+    )
+  );
   const entries = await fs.readdir(options.postsRoot, { withFileTypes: true });
   const postDirectories = entries
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !entry.name.startsWith("_"))
@@ -696,6 +721,7 @@ const main = async () => {
   if (postDirectories.length === 0) {
     throw new Error(`no posts matched under ${options.postsRoot}`);
   }
+  console.log(`[import-local-post-assets] matched ${postDirectories.length} post directories`);
 
   const results: ImportedPostSummary[] = [];
 

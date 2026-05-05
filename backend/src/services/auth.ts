@@ -149,10 +149,8 @@ const parseSessionToken = (
   }
 };
 
-const normalizeManagedWallet = (value?: string | null): string =>
-  value && value.trim()
-    ? new PublicKey(value).toBase58()
-    : Keypair.generate().publicKey.toBase58();
+const createPlatformManagedWalletAddress = (): string =>
+  Keypair.generate().publicKey.toBase58();
 
 const createWalletSession = async (wallet: string) => {
   const sessionId = randomUUID();
@@ -289,7 +287,12 @@ export const exchangeProviderIdentitySession = async (params: {
     },
   });
 
-  const managedWalletAddress = existingIdentity?.managedWalletAddress ?? normalizeManagedWallet(params.managedWalletAddress);
+  // Product model: the platform assigns the managed wallet identity. Client-supplied
+  // wallet addresses are ignored here so users cannot bind arbitrary wallets during
+  // preview/social registration. External user-owned wallets need a separate
+  // challenge/signature link flow.
+  const managedWalletAddress =
+    existingIdentity?.managedWalletAddress ?? createPlatformManagedWalletAddress();
 
   const identity = existingIdentity
     ? await prisma.authIdentity.update({

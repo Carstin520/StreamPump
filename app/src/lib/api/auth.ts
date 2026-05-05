@@ -11,7 +11,6 @@ type ExchangeProviderSessionInput = {
   providerSubject: string;
   email?: string | null;
   displayName?: string | null;
-  managedWalletAddress?: string | null;
 };
 
 export const exchangeProviderSession = (input: ExchangeProviderSessionInput) =>

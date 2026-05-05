@@ -70,6 +70,9 @@ const resolveMethodIdentity = (methodId: LoginMethodRecord["id"]) => {
   return METHOD_IDENTITIES[methodId];
 };
 
+const previewSocialAuthEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH === "true";
+
 const bytesToBase64 = (value: Uint8Array) => {
   let binary = "";
 
@@ -102,6 +105,11 @@ export const AuthOptionsPanel = ({
   );
 
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
+    if (!previewSocialAuthEnabled) {
+      setLastAction("Preview social login is disabled for public demos. Use wallet sign-in.");
+      return;
+    }
+
     setBusyKey(identity.providerSubject);
     setLastAction(`Starting ${successLabel} session...`);
 
@@ -205,6 +213,7 @@ export const AuthOptionsPanel = ({
               {loginMethods.map((method) => {
                 const identity = resolveMethodIdentity(method.id);
                 const methodBusy = busyKey === (identity?.providerSubject ?? "wallet");
+                const socialDisabled = method.id !== "wallet" && !previewSocialAuthEnabled;
 
                 return (
                   <button
@@ -213,7 +222,7 @@ export const AuthOptionsPanel = ({
                         ? "border-[#7a4d27] bg-[linear-gradient(180deg,rgba(60,31,18,0.56)_0%,rgba(25,17,13,0.72)_100%)] text-[#ffd0a6] hover:border-[#b06f34]"
                         : "border-white/[0.08] bg-[#111827]/88 text-white hover:border-white/[0.14] hover:bg-[#151d2b]"
                     } ${methodBusy ? "cursor-wait opacity-80" : ""}`}
-                    disabled={Boolean(busyKey)}
+                    disabled={Boolean(busyKey) || socialDisabled}
                     key={method.id}
                     onClick={() => void handleMethod(method)}
                     type="button"
@@ -224,11 +233,17 @@ export const AuthOptionsPanel = ({
                       </span>
                       <div>
                         <p className="text-sm font-medium">{method.label}</p>
-                        <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>{method.subtitle}</p>
+                        <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
+                          {socialDisabled ? "Preview-only. Use wallet sign-in for the live demo." : method.subtitle}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {method.id === "wallet" ? (
+                      {socialDisabled ? (
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
+                          Demo off
+                        </span>
+                      ) : method.id === "wallet" ? (
                         <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
                           {connecting ? "Connecting" : connected ? "Wallet ready" : "Web3"}
                         </span>

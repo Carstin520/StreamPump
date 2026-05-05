@@ -176,6 +176,16 @@ Anchor tests:
 npm run test:anchor
 ```
 
+## Colosseum Demo Readiness
+
+For the hackathon build, the live demo path is intentionally scoped to S2:
+
+```text
+wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign
+```
+
+S1 discovery, portfolio, buyout, and claim screens are read-model/product-vision previews unless explicitly promoted later. Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, and acceptance checklist.
+
 ## Deployment Notes
 
 The current recommended first deployment path is:

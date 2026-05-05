@@ -12,13 +12,9 @@ import {
 import cron, { ScheduledTask } from "node-cron";
 import { PublicKey } from "@solana/web3.js";
 
+import { config } from "../../config/default";
 import { getAnchorService, OnChainProposalState } from "../services/AnchorService";
 import { prisma } from "../services/prisma";
-
-const TRACK1_CRON = process.env.ORACLE_TRACK1_CRON ?? "0 * * * *";
-const TRACK2_CRON = process.env.ORACLE_TRACK2_CRON ?? "15 2 * * *";
-const TRACK3_CRON = process.env.ORACLE_TRACK3_CRON ?? "45 2 * * *";
-const WORKER_BATCH_SIZE = Number(process.env.ORACLE_WORKER_BATCH_SIZE ?? 200);
 
 type WorkerKey = "track1" | "track2" | "track3";
 
@@ -60,14 +56,29 @@ export class OracleScheduler {
     }
 
     this.started = true;
-    this.scheduleWorker("Track1Worker", TRACK1_CRON, "track1", () => this.runTrack1Worker());
-    this.scheduleWorker("Track2Worker", TRACK2_CRON, "track2", () => this.runTrack2Worker());
-    this.scheduleWorker("Track3Worker", TRACK3_CRON, "track3", () => this.runTrack3Worker());
+    this.scheduleWorker("Track1Worker", config.oracle.track1Cron, "track1", () =>
+      this.runTrack1Worker()
+    );
+    this.scheduleWorker("Track2Worker", config.oracle.track2Cron, "track2", () =>
+      this.runTrack2Worker()
+    );
 
-    if (process.env.ORACLE_RUN_ON_BOOT !== "false") {
+    if (config.oracle.track3AutoSettlementEnabled) {
+      this.scheduleWorker("Track3Worker", config.oracle.track3Cron, "track3", () =>
+        this.runTrack3Worker()
+      );
+    } else {
+      console.log(
+        "[oracle] Track3 auto-settlement disabled by ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED=false"
+      );
+    }
+
+    if (config.oracle.runOnBoot) {
       void this.runWithLock("track1", () => this.runTrack1Worker());
       void this.runWithLock("track2", () => this.runTrack2Worker());
-      void this.runWithLock("track3", () => this.runTrack3Worker());
+      if (config.oracle.track3AutoSettlementEnabled) {
+        void this.runWithLock("track3", () => this.runTrack3Worker());
+      }
     }
   }
 
@@ -124,7 +135,7 @@ export class OracleScheduler {
       orderBy: {
         updatedAt: "asc",
       },
-      take: WORKER_BATCH_SIZE,
+      take: config.oracle.workerBatchSize,
     });
 
     for (const proposal of proposals) {
@@ -146,7 +157,7 @@ export class OracleScheduler {
       orderBy: {
         deadlineAt: "asc",
       },
-      take: WORKER_BATCH_SIZE,
+      take: config.oracle.workerBatchSize,
     });
 
     for (const proposal of proposals) {
@@ -171,7 +182,7 @@ export class OracleScheduler {
       orderBy: {
         deadlineAt: "asc",
       },
-      take: WORKER_BATCH_SIZE,
+      take: config.oracle.workerBatchSize,
     });
 
     const due = candidates.filter((proposal: Proposal) => {
@@ -379,7 +390,7 @@ export class OracleScheduler {
 export const oracleScheduler = new OracleScheduler();
 
 export const startOracleScheduler = (): void => {
-  if (process.env.ORACLE_SCHEDULER_ENABLED === "false") {
+  if (!config.oracle.schedulerEnabled) {
     console.log("[oracle] scheduler disabled by ORACLE_SCHEDULER_ENABLED=false");
     return;
   }

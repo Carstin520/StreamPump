@@ -5,6 +5,7 @@
   "scripts": {
     "build:anchor": "scripts/anchor-build-fast.sh",
     "cover:videos": "scripts/generate-video-cover.sh",
+    "demo:seed:localnet": "ts-node scripts/seed-colosseum-localnet.ts",
     "test:anchor": "anchor test",
     "test:backend": "ts-mocha -p backend/tsconfig.test.json backend/tests/**/*.spec.ts"
   },

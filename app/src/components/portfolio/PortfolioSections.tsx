@@ -148,11 +148,11 @@ export const PortfolioHoldingsSection = ({
                     </div>
 
                     <div className="ml-auto flex overflow-hidden rounded-full border border-white/10">
-                      <button className="border-r border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/6" type="button">
-                        Buy
+                      <button className="cursor-not-allowed border-r border-white/10 px-4 py-2 text-sm text-[#7f90ab]" disabled type="button">
+                        Buy preview
                       </button>
-                      <button className="px-4 py-2 text-sm text-white transition hover:bg-white/6" type="button">
-                        Sell
+                      <button className="cursor-not-allowed px-4 py-2 text-sm text-[#7f90ab]" disabled type="button">
+                        Sell preview
                       </button>
                     </div>
                   </div>
@@ -261,11 +261,12 @@ export const ReentrySection = ({
               <HoldingMetric highlight="green" label="Since exit" value={`+${record.sinceExitPerformancePct.toFixed(1)}%`} />
             </div>
             <button
-              className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/6"
-              onClick={() => onReentry(record)}
+              className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-[#7f90ab]"
+              disabled
+              onClick={() => undefined}
               type="button"
             >
-              Buy back
+              Preview only
               <ChevronRightIcon className="h-4 w-4" />
             </button>
           </div>
@@ -433,8 +434,8 @@ const PendingClaimCard = ({
         <p className="mt-2 text-[32px] font-bold tracking-[-0.04em] text-[#65ecaf]">{formatUsd(record.payoutUsd)}</p>
       </div>
 
-      <button className={`mt-5 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
-        Claim Now
+      <button className={`mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 ${SECONDARY_BUTTON_CLASS}`} disabled onClick={() => undefined} type="button">
+        Claim preview only
         <ChevronRightIcon className="h-4 w-4" />
       </button>
     </div>
@@ -474,8 +475,8 @@ const ActiveClaimCard = ({
         <ClaimMetricCard label="Payout" tone="positive" value={formatUsd(record.payoutUsd)} />
       </div>
 
-      <button className={`mt-5 flex w-full items-center justify-center gap-2 ${PRIMARY_BUTTON_CLASS}`} onClick={onClaim} type="button">
-        Claim {formatUsd(record.payoutUsd)}
+      <button className={`mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 ${SECONDARY_BUTTON_CLASS}`} disabled onClick={() => undefined} type="button">
+        Preview only: {formatUsd(record.payoutUsd)}
         <ChevronRightIcon className="h-4 w-4" />
       </button>
     </div>

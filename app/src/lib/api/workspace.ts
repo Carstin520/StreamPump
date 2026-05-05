@@ -204,6 +204,17 @@ export type ProposalDetailResponse = {
   proposal: ProposalDetailRecord;
 };
 
+export type CreatorMarketProfileResponse = {
+  creator: {
+    creatorWallet: string;
+    creatorProfilePda: string;
+    stage: "S1_DISCOVERY" | "S1_BUYOUT" | "S2_ACTIVE";
+    level: number;
+    handle: string | null;
+    displayName: string | null;
+  };
+};
+
 export type ManifestAssetKind = "IMAGE" | "VIDEO" | "COVER";
 export type BundleSubmitMode = "SERVER_RELAY" | "CLIENT_RELAY";
 export type ManifestAssetUploadStrategy = "SINGLE_PART" | "MULTIPART";
@@ -479,3 +490,6 @@ export const getProposalIntentById = (token: string, intentId: string) =>
 
 export const getProposalById = (proposalId: string, token?: string) =>
   apiClient.get<ProposalDetailResponse>(`/proposals/${proposalId}`, token ? { token } : undefined);
+
+export const getCreatorMarketProfile = (creatorWallet: string) =>
+  apiClient.get<CreatorMarketProfileResponse>(`/market/creators/${creatorWallet}`);

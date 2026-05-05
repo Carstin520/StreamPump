@@ -9,6 +9,7 @@ import {
   ProposalIntentStatus,
 } from "@prisma/client";
 import { Request } from "express";
+import { PublicKey } from "@solana/web3.js";
 
 import {
   HttpError,
@@ -101,6 +102,18 @@ export const createProposalIntent = withController(
         409,
         "MANIFEST_NOT_FINALIZED",
         "manifest must be READY, ANCHORED, PUBLISHED or LOCKED before creating an intent"
+      );
+    }
+
+    const creatorProfile = await getAnchorService().fetchCreatorProfileByWallet(
+      new PublicKey(creatorWallet)
+    );
+
+    if (!creatorProfile || creatorProfile.level < 2 || creatorProfile.status !== "S2_ACTIVE") {
+      throw new HttpError(
+        409,
+        "CREATOR_NOT_S2_READY",
+        "creator must have an on-chain S2_ACTIVE profile with level >= 2 before launching a sponsored proposal"
       );
     }
 

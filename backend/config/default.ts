@@ -21,6 +21,10 @@ export const config = {
     challengeTtlSeconds: env.readNumber(process.env.AUTH_CHALLENGE_TTL_SECONDS, 600),
     sessionTtlSeconds: env.readNumber(process.env.AUTH_SESSION_TTL_SECONDS, 60 * 60 * 24 * 7),
     allowLegacyWalletHeader: env.readBoolean(process.env.AUTH_ALLOW_LEGACY_WALLET_HEADER, false),
+    allowPreviewProviderExchange: env.readBoolean(
+      process.env.AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE,
+      false
+    ),
   },
   solana: {
     rpcEndpoint: env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com"),
@@ -30,14 +34,26 @@ export const config = {
     ),
   },
   indexer: {
-    enabled: env.readBoolean(process.env.INDEXER_ENABLED, true),
+    enabled: env.readBoolean(process.env.INDEXER_ENABLED, false),
     backfillLimit: env.readNumber(process.env.INDEXER_BACKFILL_LIMIT, 100),
     consumerKey: env.readString(process.env.INDEXER_CONSUMER_KEY, "streampump_core_logs"),
   },
+  oracle: {
+    schedulerEnabled: env.readBoolean(process.env.ORACLE_SCHEDULER_ENABLED, false),
+    runOnBoot: env.readBoolean(process.env.ORACLE_RUN_ON_BOOT, false),
+    track3AutoSettlementEnabled: env.readBoolean(
+      process.env.ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED,
+      false
+    ),
+    track1Cron: env.readString(process.env.ORACLE_TRACK1_CRON, "0 * * * *"),
+    track2Cron: env.readString(process.env.ORACLE_TRACK2_CRON, "15 2 * * *"),
+    track3Cron: env.readString(process.env.ORACLE_TRACK3_CRON, "45 2 * * *"),
+    workerBatchSize: env.readNumber(process.env.ORACLE_WORKER_BATCH_SIZE, 200),
+  },
   mux: {
     reconciliation: {
-      enabled: env.readBoolean(process.env.MUX_RECONCILIATION_ENABLED, true),
-      runOnBoot: env.readBoolean(process.env.MUX_RECONCILIATION_RUN_ON_BOOT, true),
+      enabled: env.readBoolean(process.env.MUX_RECONCILIATION_ENABLED, false),
+      runOnBoot: env.readBoolean(process.env.MUX_RECONCILIATION_RUN_ON_BOOT, false),
       cron: env.readString(process.env.MUX_RECONCILIATION_CRON, "*/10 * * * *"),
       batchSize: env.readNumber(process.env.MUX_RECONCILIATION_BATCH_SIZE, 50),
       staleMinutes: env.readNumber(process.env.MUX_RECONCILIATION_STALE_MINUTES, 5),

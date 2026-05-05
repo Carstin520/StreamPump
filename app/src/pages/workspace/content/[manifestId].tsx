@@ -21,6 +21,7 @@ import {
   createContentPublication,
   createProposalIntent,
   finalizeContentManifest,
+  getCreatorMarketProfile,
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
@@ -289,6 +290,12 @@ export default function ManifestDetailPage() {
     if (!Number.isFinite(dMs) || dMs <= Date.now()) { setActionMessage("截止日期须在未来"); return; }
     setBusyAction("intent");
     try {
+      const creatorMarket = await getCreatorMarketProfile(manifest.creatorWallet);
+      if (creatorMarket.creator.stage !== "S2_ACTIVE" || creatorMarket.creator.level < 2) {
+        setActionMessage("当前创作者尚未完成 S2 readiness。请先运行 demo seed/upgrade 流程，再创建赞助合作。");
+        return;
+      }
+
       const intent = await createProposalIntent(token, {
         manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
         deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),

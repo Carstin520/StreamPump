@@ -13,7 +13,13 @@ import {
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { ContentType } from "@/lib/api/types";
-import { createContentManifest } from "@/lib/api/workspace";
+import {
+  completeManifestAssetUpload,
+  createContentManifest,
+  finalizeContentManifest,
+  ManifestAssetKind,
+  presignManifestAssets,
+} from "@/lib/api/workspace";
 import { WORKSPACE_PATH } from "@/lib/routes";
 import {
   buildLoginHrefFromRouter,
@@ -48,9 +54,44 @@ const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 };
 
 const ACCEPTED_UPLOAD_TYPES = ".mp4,.mov,.jpg,.jpeg,.png,.webp,.heic,video/mp4,video/quicktime,image/jpeg,image/png,image/webp,image/heic";
+const ACCEPTED_UPLOAD_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+]);
 
 const parseTags = (value: string) =>
   value.split(",").map((e) => e.trim()).filter(Boolean);
+
+const sha256Hex = async (file: File) => {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const resolveAssetType = (file: File): ManifestAssetKind =>
+  file.type.toLowerCase().startsWith("video/") ? "VIDEO" : "IMAGE";
+
+const uploadToPresignedUrl = async (url: string, file: Blob, contentType?: string) => {
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: contentType ? { "Content-Type": contentType } : undefined,
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed with ${response.status}`);
+  }
+
+  return response;
+};
+
+const normalizeEtag = (value: string | null) =>
+  value?.trim().replace(/^"+|"+$/g, "") || null;
 
 export default function NewContentPage() {
   const router = useRouter();
@@ -114,6 +155,12 @@ export default function NewContentPage() {
       return;
     }
 
+    const invalidFile = selectedFiles.find((file) => !ACCEPTED_UPLOAD_MIME_TYPES.has(file.type.toLowerCase()));
+    if (invalidFile) {
+      setMessage(`不支持的文件格式: ${invalidFile.name}`);
+      return;
+    }
+
     setBusy(true);
     setSaveStatus("saving");
     setMessage(null);
@@ -125,6 +172,53 @@ export default function NewContentPage() {
         captionText,
         tags: parseTags(tagsInput),
       });
+
+      if (selectedFiles.length > 0) {
+        setMessage("草稿已创建，正在上传素材...");
+        const assetInputs = await Promise.all(
+          selectedFiles.map(async (file, index) => ({
+            assetType: resolveAssetType(file),
+            orderIndex: index,
+            sha256Hex: await sha256Hex(file),
+            mimeType: file.type.toLowerCase(),
+            fileSizeBytes: String(file.size),
+          }))
+        );
+        const presigned = await presignManifestAssets(token, manifest.manifestId, assetInputs);
+
+        for (const [index, upload] of presigned.uploads.entries()) {
+          const file = selectedFiles[index];
+          setMessage(`正在上传 ${file.name} (${index + 1}/${selectedFiles.length})`);
+
+          if (upload.uploadStrategy === "MULTIPART") {
+            const completedParts = [];
+
+            for (const part of upload.parts) {
+              const start = (part.partNumber - 1) * upload.partSizeBytes;
+              const chunk = file.slice(start, Math.min(start + upload.partSizeBytes, file.size));
+              const response = await uploadToPresignedUrl(part.presignedUrl, chunk);
+              const etag = normalizeEtag(response.headers.get("etag"));
+
+              if (!etag) {
+                throw new Error(`Missing ETag for ${file.name} part ${part.partNumber}`);
+              }
+
+              completedParts.push({ partNumber: part.partNumber, etag });
+            }
+
+            await completeManifestAssetUpload(token, manifest.manifestId, upload.assetId, {
+              multipartUploadId: upload.multipartUploadId,
+              parts: completedParts,
+            });
+          } else {
+            await uploadToPresignedUrl(upload.presignedUrl, file, file.type);
+            await completeManifestAssetUpload(token, manifest.manifestId, upload.assetId);
+          }
+        }
+
+        setMessage("素材上传完成，正在完善内容...");
+        await finalizeContentManifest(token, manifest.manifestId);
+      }
 
       setSaveStatus("saved");
       void router.push(`/workspace/content/${manifest.manifestId}`);

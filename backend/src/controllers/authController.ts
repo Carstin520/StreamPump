@@ -13,6 +13,7 @@ import {
   findAuthIdentityByWallet,
   verifyWalletAuthChallenge,
 } from "../services/auth";
+import { config } from "../../config/default";
 
 const parseWallet = (value: unknown): string => {
   const wallet = String(value ?? "").trim();
@@ -118,14 +119,19 @@ export const verifyAuthChallenge = async (req: Request, res: Response) => {
 
 export const exchangeProviderSession = async (req: Request, res: Response) => {
   try {
+    if (!config.auth.allowPreviewProviderExchange) {
+      throw new HttpError(
+        403,
+        "PREVIEW_PROVIDER_EXCHANGE_DISABLED",
+        "provider-exchange is disabled; use wallet challenge/signature auth or explicitly enable preview provider exchange for local demos"
+      );
+    }
+
     const session = await exchangeProviderIdentitySession({
       provider: parseIdentityProvider(req.body.provider),
       providerSubject: parseNonEmptyString(req.body.providerSubject, "providerSubject"),
       email: req.body.email ? String(req.body.email).trim() : null,
       displayName: req.body.displayName ? String(req.body.displayName).trim() : null,
-      managedWalletAddress: req.body.managedWalletAddress
-        ? parseWallet(req.body.managedWalletAddress)
-        : null,
     });
 
     ok(res, {

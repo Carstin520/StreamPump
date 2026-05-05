@@ -56,7 +56,7 @@ export default function PortfolioPage() {
         <div className="mx-auto max-w-[1180px] space-y-7 py-6">
           <section>
             <h1 className="text-[42px] font-semibold tracking-[-0.05em] text-white">Your S1 exposure and next actions</h1>
-            <p className="mt-2 text-sm text-[#95a6be]">Manage your creator token holdings and upcoming claims.</p>
+            <p className="mt-2 text-sm text-[#95a6be]">Read-only S1 market preview. Live hackathon transactions are focused on S2 sponsored campaign launch.</p>
           </section>
 
           <PortfolioMetrics exposureTone={exposureTone} totalExposure={totalExposure} waitingActionsCount={waitingActionsCount} />
