@@ -16,7 +16,7 @@ pub const DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS: i64 = 86_400;
 pub const DEFAULT_NEW_USER_EMISSION_BPS: u16 = 2_500;
 pub const DEFAULT_NEW_USER_EMISSION_WINDOW_SECONDS: i64 = 7 * 86_400;
 pub const DEFAULT_S1_MIN_USER_XP: u64 = 10;
-pub const DEFAULT_MAX_S1_DAILY_BUY_AMOUNT: u64 = 150;
+pub const DEFAULT_MAX_S1_DAILY_BUY_SPUMP: u64 = 15_000_000;
 pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
 pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
@@ -124,7 +124,7 @@ pub struct ProtocolConfig {
     pub new_user_emission_bps: u16,
     pub new_user_emission_window_seconds: i64,
     pub s1_min_user_xp: u64,
-    pub max_s1_daily_buy_amount: u64,
+    pub max_s1_daily_buy_spump: u64,
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
     pub min_creator_rating_bps: u16,
@@ -346,12 +346,12 @@ pub struct S1UserPosition {
     pub spump_cost_basis: u64,
     pub first_bought_at: i64,
     pub last_buy_day: i64,
-    pub daily_bought_amount: u64,
+    pub daily_bought_spump: u64,
     pub bump: u8,
 }
 
 impl S1UserPosition {
-    pub const INIT_SPACE: usize = 32 + 32 + 8 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]

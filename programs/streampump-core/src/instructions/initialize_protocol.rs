@@ -14,7 +14,7 @@ use anchor_spl::token_2022::{
 use crate::{
     errors::StreamPumpError,
     state::{
-        ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_AMOUNT, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
+        ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_SPUMP, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
         DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
         DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RATING_BPS, DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
         MAX_S1_RATING_BPS, MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
@@ -35,7 +35,7 @@ pub struct InitializeProtocolArgs {
     pub new_user_emission_bps: u16,
     pub new_user_emission_window_seconds: i64,
     pub s1_min_user_xp: u64,
-    pub max_s1_daily_buy_amount: u64,
+    pub max_s1_daily_buy_spump: u64,
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
     pub min_creator_rating_bps: u16,
@@ -90,7 +90,7 @@ pub(crate) fn handler(
     );
     require!(
         args.s1_min_user_xp >= DEFAULT_S1_MIN_USER_XP
-            && args.max_s1_daily_buy_amount >= DEFAULT_MAX_S1_DAILY_BUY_AMOUNT
+            && args.max_s1_daily_buy_spump >= DEFAULT_MAX_S1_DAILY_BUY_SPUMP
             && args.s1_early_cohort_supply_threshold >= DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD
             && args.s1_early_cohort_buyout_cap_bps > 0
             && args.s1_early_cohort_buyout_cap_bps <= DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
@@ -152,7 +152,7 @@ pub(crate) fn handler(
     config.new_user_emission_bps = args.new_user_emission_bps;
     config.new_user_emission_window_seconds = args.new_user_emission_window_seconds;
     config.s1_min_user_xp = args.s1_min_user_xp;
-    config.max_s1_daily_buy_amount = args.max_s1_daily_buy_amount;
+    config.max_s1_daily_buy_spump = args.max_s1_daily_buy_spump;
     config.s1_early_cohort_supply_threshold = args.s1_early_cohort_supply_threshold;
     config.s1_early_cohort_buyout_cap_bps = args.s1_early_cohort_buyout_cap_bps;
     config.min_creator_rating_bps = args.min_creator_rating_bps;

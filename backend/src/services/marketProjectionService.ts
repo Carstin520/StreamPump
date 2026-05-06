@@ -164,7 +164,7 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
   }
 
   const creatorWallet = creator.authority.toBase58();
-  const [holderCount, activeCampaignCount, latestOffer, buyout] = await Promise.all([
+  const [holderCount, activeCampaignCount, latestOffer, buyout, protocolS1Config] = await Promise.all([
     prisma.s1PositionProjection.count({
       where: {
         creatorProfilePda,
@@ -194,6 +194,7 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
         creatorProfilePda,
       },
     }),
+    anchorService.fetchProtocolS1Config(),
   ]);
 
   const stage = mapCreatorStage(
@@ -213,6 +214,12 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
     pendingRatingReportDigestHex: creator.pendingRatingReportDigestHex,
     lastRatingUpdateAtUnix: creator.lastRatingUpdateAtUnix.toString(),
     lastRatingReportDigestHex: creator.lastRatingReportDigestHex,
+    maxS1DailyBuySpump: protocolS1Config.maxS1DailyBuySpump.toString(),
+    dailySpumpEmissionMultiplierBps: protocolS1Config.dailySpumpEmissionMultiplierBps,
+    newUserEmissionBps: protocolS1Config.newUserEmissionBps,
+    s1MinUserXp: protocolS1Config.s1MinUserXp.toString(),
+    s1EarlyCohortSupplyThreshold: protocolS1Config.s1EarlyCohortSupplyThreshold.toString(),
+    s1EarlyCohortBuyoutCapBps: protocolS1Config.s1EarlyCohortBuyoutCapBps,
   };
 
   return prisma.creatorMarketProjection.upsert({

@@ -8,3 +8,8 @@ export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/private/tmp/streampump-anchor-target}"
 
 anchor build "$@"
+
+if [ -f "$CARGO_TARGET_DIR/deploy/streampump_core.so" ]; then
+  mkdir -p target/deploy
+  cp "$CARGO_TARGET_DIR/deploy/streampump_core.so" target/deploy/streampump_core.so
+fi

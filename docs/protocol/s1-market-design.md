@@ -68,9 +68,10 @@ default new_user_emission_window_seconds = 604,800
 Recommended launch policy:
 
 ```text
-active users < 1,000: 5x-10x
-1,000 - 10,000 active users: decay toward 2x
-10,000+ active users: decay toward 1x
+active users < 1,000: 10x
+1,000 - 10,000 active users: decay 5x -> 2x
+10,000 - 100,000 active users: decay 2x -> 1x
+100,000+ active users: 1x
 ```
 
 This gives early users enough `SPUMP` to experience S1 while allowing the asset to become scarcer as the network grows.
@@ -106,7 +107,7 @@ Current guardrails:
 - Sell has dynamic exit tax while creator is `S1_Active`.
 - Buyout acceptance stops normal S1 buy/sell and opens only a 48-hour rage-quit window.
 - S1 buy requires a registered user profile with fan role and minimum activity score.
-- Each user has a per-creator daily S1 buy cap.
+- Each user has a per-creator daily S1 buy budget cap denominated in burned `SPUMP`, not virtual shares.
 - New user daily `SPUMP` emission is lower during the new-account window.
 - Rating updates are oracle-signed, daily-limited, capped by max daily delta, and delayed before they affect price.
 - Early cohort buyout claims are split into a separate pool capped by protocol bps.
@@ -115,10 +116,14 @@ Default anti-arbitrage parameters:
 
 ```text
 s1_min_user_xp = 10
-max_s1_daily_buy_amount = 150
+max_s1_daily_buy_spump = 15,000,000 base units = 15 SPUMP
 s1_early_cohort_supply_threshold = 500
 s1_early_cohort_buyout_cap_bps = 2,000
 ```
+
+## Readiness Scope
+
+This S1 work is protocol and backend readiness. The live trading UI should still be treated as a separate rollout surface: front-end pages need to show rating provenance, pending-effective rating, daily SPUMP cap usage, and buyout/rage-quit state before S1 is promoted as public trading.
 
 Recommended next additions:
 

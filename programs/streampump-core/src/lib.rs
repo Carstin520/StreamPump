@@ -21,6 +21,13 @@ pub mod streampump_core {
         instructions::initialize_protocol::handler(ctx, args)
     }
 
+    pub fn update_protocol_s1_emission(
+        ctx: Context<UpdateProtocolS1Emission>,
+        args: UpdateProtocolS1EmissionArgs,
+    ) -> Result<()> {
+        instructions::update_protocol_s1_emission::handler(ctx, args)
+    }
+
     pub fn register_creator(
         ctx: Context<RegisterCreator>,
         args: RegisterCreatorArgs,

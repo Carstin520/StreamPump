@@ -108,18 +108,19 @@ export interface OnChainS1UserPositionState {
   spumpCostBasis: bigint;
   firstBoughtAtUnix: bigint;
   lastBuyDay: bigint;
-  dailyBoughtAmount: bigint;
+  dailyBoughtSpump: bigint;
   bump: number;
 }
 
 type ProtocolConfigAccount = {
+  admin: PublicKey;
   oracleAuthority: PublicKey;
   usdcMint: PublicKey;
   dailySpumpEmissionMultiplierBps?: number;
   newUserEmissionBps?: number;
   newUserEmissionWindowSeconds?: BN | bigint | number;
   s1MinUserXp?: BN | bigint | number;
-  maxS1DailyBuyAmount?: BN | bigint | number;
+  maxS1DailyBuySpump?: BN | bigint | number;
   s1EarlyCohortSupplyThreshold?: BN | bigint | number;
   s1EarlyCohortBuyoutCapBps?: number;
   minCreatorRatingBps?: number;
@@ -182,8 +183,31 @@ type S1UserPositionAccount = {
   spumpCostBasis: BN | bigint | number;
   firstBoughtAt?: BN | bigint | number;
   lastBuyDay?: BN | bigint | number;
-  dailyBoughtAmount?: BN | bigint | number;
+  dailyBoughtSpump?: BN | bigint | number;
   bump: number;
+};
+
+export type UpdateCreatorS1RatingParams = {
+  creatorWallet: string;
+  ratingBps: number;
+  graduationTargetSupply: number;
+  reportIdHex: string;
+  reportDigestHex: string;
+  observedAtUnix: bigint;
+};
+
+export type UpdateProtocolS1EmissionParams = {
+  dailySpumpEmissionMultiplierBps: number;
+  newUserEmissionBps: number;
+  newUserEmissionWindowSeconds: number;
+  s1MinUserXp: bigint;
+  maxS1DailyBuySpump: bigint;
+  s1EarlyCohortSupplyThreshold: bigint;
+  s1EarlyCohortBuyoutCapBps: number;
+};
+
+export type ProtocolS1ConfigState = UpdateProtocolS1EmissionParams & {
+  admin: PublicKey;
 };
 
 type ResolvedSettlementAccounts = {
@@ -394,6 +418,20 @@ const loadOptionalContentAnchorSigner = (): Keypair | null => {
   return loadKeypairFromPath(keypairPath, "Content anchor signer");
 };
 
+const loadOptionalProtocolAdminKeypair = (): Keypair | null => {
+  const inlineSecret = process.env.PROTOCOL_ADMIN_SECRET_KEY?.trim();
+  if (inlineSecret) {
+    return parseKeypairSecret(inlineSecret, "PROTOCOL_ADMIN_SECRET_KEY");
+  }
+
+  const keypairPath = process.env.PROTOCOL_ADMIN_KEYPAIR_PATH?.trim();
+  if (!keypairPath) {
+    return null;
+  }
+
+  return loadKeypairFromPath(keypairPath, "Protocol admin");
+};
+
 const parseDigestHex = (digestHex: string, label: string): Uint8Array => {
   const normalized = digestHex.trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(normalized)) {
@@ -438,11 +476,13 @@ export class AnchorService {
   readonly program: Program<Idl>;
   readonly oracleAuthority: Keypair;
   readonly contentAnchorSigner: Keypair | null;
+  readonly protocolAdmin: Keypair | null;
 
   private constructor() {
     this.connection = new Connection(config.solana.rpcEndpoint, PROGRAM_COMMITMENT);
     this.oracleAuthority = loadOracleAuthorityKeypair();
     this.contentAnchorSigner = loadOptionalContentAnchorSigner();
+    this.protocolAdmin = loadOptionalProtocolAdminKeypair();
     this.provider = new AnchorProvider(
       this.connection,
       new Wallet(this.oracleAuthority),
@@ -678,9 +718,90 @@ export class AnchorService {
       spumpCostBasis: toBigInt(position.spumpCostBasis),
       firstBoughtAtUnix: toBigInt(position.firstBoughtAt),
       lastBuyDay: toBigInt(position.lastBuyDay),
-      dailyBoughtAmount: toBigInt(position.dailyBoughtAmount),
+      dailyBoughtSpump: toBigInt(position.dailyBoughtSpump),
       bump: Number(position.bump ?? 0),
     };
+  }
+
+  async fetchProtocolS1Config(): Promise<ProtocolS1ConfigState> {
+    const { account } = await this.fetchProtocolConfigState();
+
+    return {
+      admin: account.admin,
+      dailySpumpEmissionMultiplierBps: Number(account.dailySpumpEmissionMultiplierBps ?? 10_000),
+      newUserEmissionBps: Number(account.newUserEmissionBps ?? 10_000),
+      newUserEmissionWindowSeconds: Number(toBigInt(account.newUserEmissionWindowSeconds)),
+      s1MinUserXp: toBigInt(account.s1MinUserXp),
+      maxS1DailyBuySpump: toBigInt(account.maxS1DailyBuySpump),
+      s1EarlyCohortSupplyThreshold: toBigInt(account.s1EarlyCohortSupplyThreshold),
+      s1EarlyCohortBuyoutCapBps: Number(account.s1EarlyCohortBuyoutCapBps ?? 0),
+    };
+  }
+
+  async updateCreatorS1Rating(params: UpdateCreatorS1RatingParams): Promise<string> {
+    const { pda: protocolConfigPda, account: protocolConfig } =
+      await this.fetchProtocolConfigState();
+    this.assertOracleAuthorityMatches(protocolConfig);
+
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfilePda = this.deriveCreatorProfilePda(creator);
+    const signature = (await this.withRpcTimeout(
+      (this.program.methods as any)
+        .updateCreatorS1Rating({
+          ratingBps: params.ratingBps,
+          graduationTargetSupply: toU64Bn(params.graduationTargetSupply, "graduationTargetSupply"),
+          reportId: Array.from(parseDigestHex(params.reportIdHex, "reportIdHex")),
+          reportDigest: Array.from(parseDigestHex(params.reportDigestHex, "reportDigestHex")),
+          observedAt: new BN(params.observedAtUnix.toString()),
+        })
+        .accounts({
+          oracle: this.oracleAuthority.publicKey,
+          protocolConfig: protocolConfigPda,
+          creatorProfile: creatorProfilePda,
+        })
+        .rpc(),
+      "update creator s1 rating rpc"
+    )) as string;
+
+    await this.confirmSignature(signature, "update creator s1 rating confirm");
+    return signature;
+  }
+
+  async updateProtocolS1Emission(params: UpdateProtocolS1EmissionParams): Promise<string> {
+    if (!this.protocolAdmin) {
+      throw new Error(
+        "Protocol admin keypair is required. Set PROTOCOL_ADMIN_SECRET_KEY or PROTOCOL_ADMIN_KEYPAIR_PATH."
+      );
+    }
+
+    const { pda: protocolConfigPda, account: protocolConfig } =
+      await this.fetchProtocolConfigState();
+    this.assertProtocolAdminMatches(protocolConfig);
+
+    const signature = (await this.withRpcTimeout(
+      (this.program.methods as any)
+        .updateProtocolS1Emission({
+          dailySpumpEmissionMultiplierBps: params.dailySpumpEmissionMultiplierBps,
+          newUserEmissionBps: params.newUserEmissionBps,
+          newUserEmissionWindowSeconds: new BN(String(params.newUserEmissionWindowSeconds)),
+          s1MinUserXp: new BN(params.s1MinUserXp.toString()),
+          maxS1DailyBuySpump: new BN(params.maxS1DailyBuySpump.toString()),
+          s1EarlyCohortSupplyThreshold: new BN(
+            params.s1EarlyCohortSupplyThreshold.toString()
+          ),
+          s1EarlyCohortBuyoutCapBps: params.s1EarlyCohortBuyoutCapBps,
+        })
+        .accounts({
+          admin: this.protocolAdmin.publicKey,
+          protocolConfig: protocolConfigPda,
+        })
+        .signers([this.protocolAdmin])
+        .rpc(),
+      "update protocol s1 emission rpc"
+    )) as string;
+
+    await this.confirmSignature(signature, "update protocol s1 emission confirm");
+    return signature;
   }
 
   async fetchProposalState(proposalPda: PublicKey): Promise<OnChainProposalState | null> {
@@ -1179,6 +1300,17 @@ export class AnchorService {
 
     throw new Error(
       `Loaded oracle authority (${this.oracleAuthority.publicKey.toBase58()}) does not match protocol_config.oracle_authority (${protocolConfig.oracleAuthority.toBase58()})`
+    );
+  }
+
+  private assertProtocolAdminMatches(protocolConfig: ProtocolConfigAccount): void {
+    if (this.protocolAdmin?.publicKey.equals(protocolConfig.admin)) {
+      return;
+    }
+
+    const loadedAdmin = this.protocolAdmin?.publicKey.toBase58() ?? "not configured";
+    throw new Error(
+      `Loaded protocol admin (${loadedAdmin}) does not match protocol_config.admin (${protocolConfig.admin.toBase58()})`
     );
   }
 

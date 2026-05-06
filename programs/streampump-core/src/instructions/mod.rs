@@ -26,6 +26,7 @@ pub mod settle_track3_cps;
 pub mod sponsor_fund;
 pub mod submit_buyout_offer;
 pub mod update_creator_s1_rating;
+pub mod update_protocol_s1_emission;
 pub mod upgrade_creator;
 
 pub use accept_buyout_offer::*;
@@ -56,4 +57,5 @@ pub use settle_track3_cps::*;
 pub use sponsor_fund::*;
 pub use submit_buyout_offer::*;
 pub use update_creator_s1_rating::*;
+pub use update_protocol_s1_emission::*;
 pub use upgrade_creator::*;

@@ -313,7 +313,7 @@ const buildContext = async () => {
         newUserEmissionBps: 2_500, // 25% daily emission during new-user window / 新账号窗口期 25% 日发放
         newUserEmissionWindowSeconds: bn(7 * 24 * 3_600), // 7-day new-user emission window / 7 天新账号窗口
         s1MinUserXp: bn(10), // Minimum activity score to buy S1 / S1 买入最低活跃度
-        maxS1DailyBuyAmount: bn(150), // Per user x creator daily S1 buy cap / 用户×创作者每日买入上限
+        maxS1DailyBuySpump: bn(15000000), // Per user x creator daily S1 buy cap in SPUMP base units / 用户×创作者每日 SPUMP 买入预算上限
         s1EarlyCohortSupplyThreshold: bn(500), // First 500 internal units are early cohort / 前 500 内部份额为早期 cohort
         s1EarlyCohortBuyoutCapBps: 2_000, // Early cohort can claim at most 20% of buyout / 早期 cohort 最多领取买断 20%
         minCreatorRatingBps: 5_000, // 0.5x creator momentum floor / 创作者动量下限

@@ -124,6 +124,18 @@ pub struct CreatorS1RatingUpdated {
 }
 
 #[event]
+pub struct ProtocolS1EmissionUpdated {
+    pub admin: Pubkey,
+    pub daily_spump_emission_multiplier_bps: u16,
+    pub new_user_emission_bps: u16,
+    pub new_user_emission_window_seconds: i64,
+    pub s1_min_user_xp: u64,
+    pub max_s1_daily_buy_spump: u64,
+    pub s1_early_cohort_supply_threshold: u64,
+    pub s1_early_cohort_buyout_cap_bps: u16,
+}
+
+#[event]
 pub struct S1Graduated {
     pub creator_profile: Pubkey,
     pub creator: Pubkey,

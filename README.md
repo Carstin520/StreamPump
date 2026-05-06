@@ -30,9 +30,9 @@ sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 
 Default rating is `10_000` (1.0x), bounded between `5_000` and `20_000` (0.5x-2.0x), with a daily change cap and one-epoch delayed effectiveness. The initial graduation target is `2,500` virtual S1 supply so that the earliest supporters can matter in a small buyout, while later creator cohorts can use higher targets.
 
-Daily `SPUMP` emission is also configurable through the protocol config. The intended launch setting is a higher early multiplier, then a gradual reduction as the platform has more active users. New accounts receive reduced emission during the new-user window.
+Daily `SPUMP` emission is also configurable through the protocol config. The intended launch setting is `10x` below 1,000 active users, then deterministic decay toward `2x` and finally `1x` as the platform matures. New accounts receive reduced emission during the new-user window.
 
-S1 participation now requires a registered user profile with fan role and minimum activity score. The protocol also enforces a per-user per-creator daily buy cap and separates early-cohort buyout claims into a capped pool, so the first supporters can have meaningful upside without being able to absorb an unlimited share of a sponsor buyout.
+S1 participation now requires a registered user profile with fan role and minimum activity score. The protocol also enforces a `15 SPUMP / user / creator / day` buy budget cap and separates early-cohort buyout claims into a capped pool, so the first supporters can have meaningful upside without being able to absorb an unlimited share of a sponsor buyout.
 
 See [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) for the current parameter rationale and anti-arbitrage guardrails.
 
@@ -204,7 +204,7 @@ For the hackathon build, the live demo path is intentionally scoped to S2:
 wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign
 ```
 
-S1 discovery, portfolio, buyout, and claim screens are read-model/product-vision previews unless explicitly promoted later. Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, and acceptance checklist.
+S1 discovery, portfolio, buyout, and claim screens are read-model/product-vision previews unless explicitly promoted later. The current S1 work is protocol/backend readiness, not a public trading UI launch. Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, and acceptance checklist.
 
 ## Deployment Notes
 

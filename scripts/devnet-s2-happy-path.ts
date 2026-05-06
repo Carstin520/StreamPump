@@ -499,7 +499,7 @@ const main = async () => {
         newUserEmissionBps: 2_500,
         newUserEmissionWindowSeconds: new anchor.BN(7 * 24 * 3_600),
         s1MinUserXp: new anchor.BN(10),
-        maxS1DailyBuyAmount: new anchor.BN(150),
+        maxS1DailyBuySpump: new anchor.BN(15_000_000),
         s1EarlyCohortSupplyThreshold: new anchor.BN(500),
         s1EarlyCohortBuyoutCapBps: 2_000,
         minCreatorRatingBps: 5_000,

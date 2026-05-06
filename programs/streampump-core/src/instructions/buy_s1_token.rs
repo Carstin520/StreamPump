@@ -138,7 +138,7 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
         position.spump_cost_basis = 0;
         position.first_bought_at = 0;
         position.last_buy_day = 0;
-        position.daily_bought_amount = 0;
+        position.daily_bought_spump = 0;
         position.bump = ctx.bumps.s1_user_position;
     }
 
@@ -153,13 +153,13 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
         StreamPumpError::S1PositionAccountMismatch
     );
 
-    let new_daily_bought_amount = if position.last_buy_day == current_day {
-        checked_add(position.daily_bought_amount, args.amount)?
+    let new_daily_bought_spump = if position.last_buy_day == current_day {
+        checked_add(position.daily_bought_spump, spump_cost)?
     } else {
-        args.amount
+        spump_cost
     };
     require!(
-        new_daily_bought_amount <= ctx.accounts.protocol_config.max_s1_daily_buy_amount,
+        new_daily_bought_spump <= ctx.accounts.protocol_config.max_s1_daily_buy_spump,
         StreamPumpError::S1DailyBuyLimitExceeded
     );
 
@@ -203,7 +203,7 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     position.early_cohort_balance = checked_add(position.early_cohort_balance, early_amount)?;
     position.spump_cost_basis = checked_add(position.spump_cost_basis, spump_cost)?;
     position.last_buy_day = current_day;
-    position.daily_bought_amount = new_daily_bought_amount;
+    position.daily_bought_spump = new_daily_bought_spump;
 
     let creator_profile = &mut ctx.accounts.creator_profile;
     creator_profile.s1_supply = checked_add(creator_profile.s1_supply, args.amount)?;
