@@ -7,7 +7,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-streampump_core = "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre"
+streampump_core = "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp"
 
 [provider]
 cluster = "Localnet"

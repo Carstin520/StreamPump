@@ -30,7 +30,7 @@ export const config = {
     rpcEndpoint: env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com"),
     programId: env.readString(
       process.env.STREAMPUMP_PROGRAM_ID,
-      "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre"
+      "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp"
     ),
   },
   indexer: {

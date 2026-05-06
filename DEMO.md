@@ -25,6 +25,29 @@ npm install --prefix app
 npm install --prefix backend
 ```
 
+If the repo must stay under the current Desktop path, keep dependency folders out of the file-provider managed tree. The current local workaround is:
+
+```bash
+# root deps
+mv node_modules node_modules.fileprovider-broken-root
+ln -s /tmp/streampump-root-deps/node_modules node_modules
+
+# app deps
+mv app/node_modules app/node_modules.fileprovider-broken
+ln -s /tmp/streampump-app-build/node_modules app/node_modules
+
+# backend deps
+mv backend/node_modules backend/node_modules.fileprovider-broken
+ln -s /tmp/streampump-backend-deps/node_modules backend/node_modules
+```
+
+After moving backend dependencies, regenerate Prisma Client from the real backend schema:
+
+```bash
+cd /tmp/streampump-backend-deps
+npx prisma generate --schema prisma/schema.prisma
+```
+
 Backend demo defaults should be conservative:
 
 ```bash
@@ -75,6 +98,44 @@ npm run demo:seed:localnet
 ```
 
 The seed script writes `.local/colosseum-demo-seed.json` with generated local demo wallets, mints, ATAs, protocol config, and the S2 creator profile PDA.
+
+## Devnet Backend/Chain Smoke
+
+The backend/chain happy path can be run without frontend review:
+
+```bash
+npm run demo:s2:devnet
+```
+
+The script writes reusable devnet actors and the last result to `.local/devnet-s2-happy-path.json`. It uses a disposable SPL token as the protocol USDC mint on devnet.
+
+Latest verified run:
+
+- Program: `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp`
+- Protocol config: `GqQ2wE39EskRYAsy1PV11XRWJTrSQ8ebR6o2J7NbSN2g`
+- Test USDC mint: `5Z5MpM3KaM9mb4hXweS7oEuWja5kEJ4Me1Xycu7wBXQJ`
+- Proposal PDA: `EiBQG5JgFGsNqGWzZwL8LcPDmDeethty234nYWwCsAzA`
+- Proposal vault: `C4QsLYRVfkghoHybQNzWMEDw7hysvh8Jonpc9YR8XX73`
+- Signature: `3zjbGTF1DLTJnsh8tH4oD1XkqxPVegsdKT5nHysJqShRGhmAx2JNzdr7cnrozqwDRD7x39m6XSfKFav39Ttc1KJT`
+
+Role responsibilities in the devnet smoke:
+
+- Admin/deploy payer: owns protocol setup, creates the test USDC mint, creates the Token-2022 SPUMP mint, initializes protocol config, creates creator/sponsor USDC ATAs, and mints test USDC to sponsor.
+- Oracle: signs the creator S2 upgrade.
+- Creator: signs wallet auth, registers the creator profile, and signs the proposal launch bundle.
+- Sponsor: signs wallet auth, signs the final bundle, pays proposal/vault rent, and transfers test USDC into the proposal vault.
+- Backend relay: does not own the proposal terms; it relays the fully signed transaction and finalizes the database projection after confirmation.
+
+Observed SOL usage for the latest run:
+
+| Role | Address | Before smoke | After smoke | Approx. SOL used | Main reason |
+| --- | --- | ---: | ---: | ---: | --- |
+| Admin | `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw` | 2.948 SOL | 2.938406760 SOL | ~0.009593240 | test mint rent, SPUMP mint rent, protocol init, ATAs, mint/setup fees |
+| Oracle | `8ryLHyFQmbx2z28X9B8a7x1Peusaet3Axbe1YA1aSYrk` | 2.500 SOL | 2.497942680 SOL | ~0.002057320 | S2 upgrade receipt rent and tx fee |
+| Creator | `6hZXggy4DhjZTatdqZao55NcghyaFVm3b2RRuPFLXWAL` | 2.500 SOL | 2.498113840 SOL | ~0.001886160 | creator profile rent and tx fee |
+| Sponsor | `eZkrM2k1kHyXoVNSLiaebCLSVMfurQjkSjcJu55JCcc` | 3.200 SOL | 3.191749360 SOL | ~0.008250640 | proposal/vault rent, final tx fee, sponsor funding transaction |
+
+The earlier program deployment used the admin/deploy payer. That account had 10 SOL after faucet funding and about 2.948 SOL before the smoke run, so deployment consumed roughly 7.052 SOL. Treat that mostly as upgradeable program storage/rent and deployment overhead, not as the recurring cost of launching each proposal.
 
 ## Happy Path
 

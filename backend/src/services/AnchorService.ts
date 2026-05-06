@@ -407,6 +407,7 @@ export class AnchorService {
     const idlPath = resolveIdlPath();
     const rawIdl = readFileSync(idlPath, "utf8");
     const idl = JSON.parse(rawIdl) as Idl;
+    (idl as Idl & { address?: string }).address = config.solana.programId;
 
     this.program = new Program(idl, this.provider);
   }
