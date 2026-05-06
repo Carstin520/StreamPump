@@ -122,6 +122,52 @@ s1_early_cohort_buyout_cap_bps = 2,000
 s1_rage_quit_window_seconds = 172,800
 ```
 
+## S1 Buyout Lifecycle
+
+S1 buyout is the graduation bridge from creator discovery into S2 sponsored campaigns:
+
+```text
+S1_Active
+  -> init_s1_buyout
+S1_Auction_Pending
+  -> submit_buyout_offer
+S1_Auction_Pending with escrowed sponsor offer
+  -> accept_buyout_offer
+S1_Execution_Pending with rage-quit window
+  -> execute_s1_graduation
+S2_Active
+  -> claim_s1_buyout_usdc
+S1 positions cleared as holders claim
+```
+
+During `S1_Auction_Pending`, normal S1 buy/sell is blocked. During `S1_Execution_Pending`, normal buy/sell remains blocked and holders can only use `rage_quit_s1` before the configured deadline. After graduation, holders claim USDC against the accepted offer vault and their virtual S1 positions are zeroed.
+
+The buyout split is bucketed at graduation:
+
+```text
+early_supply = min(creator.s1_early_cohort_supply, creator.s1_supply)
+early_pool = min(natural pro-rata, buyout_amount * early_cap_bps / 10_000)
+regular_pool = buyout_amount - early_pool
+```
+
+The creator also receives a SPUMP graduation bonus equal to 50% of the full S1 curve sell return at the final supply. The other 50% is not minted.
+
+## S1 Buyout Happy Path
+
+The fixed localnet acceptance path is `npm run test:s1:happy` with a local validator running the current `streampump_core.so`.
+
+The test uses a short `2` second rage-quit window and restores the production `48h` value afterward. It creates an isolated creator, sponsor, and `21` fans:
+
+```text
+21 fans * 25 S1 shares = 525 total supply
+early cohort threshold = 500 shares
+buyout offer = 1,000 USDC raw amount = 1,000,000,000
+early pool = 200,000,000
+regular pool = 800,000,000
+```
+
+Acceptance requires the creator to reach `S2_Active`, level `>= 2`, one early holder to claim `10,000,000` raw USDC, one regular holder to claim `800,000,000` raw USDC, and both claimant positions to be zeroed.
+
 ## Readiness Scope
 
 This S1 work is protocol and backend readiness. The live trading UI should still be treated as a separate rollout surface: front-end pages need to show rating provenance, pending-effective rating, daily SPUMP cap usage, and buyout/rage-quit state before S1 is promoted as public trading.
@@ -130,3 +176,6 @@ Recommended next additions:
 
 - Frontend display of rating provenance and next update time.
 - S1 buyout read model showing early-supporter concentration before creator accepts an offer.
+- Add a `rage_quit_s1` event and backend projection branch so read models reflect rage-quit exits before graduation.
+- Add market projection handling for cancelled and reclaimed buyout offers.
+- Add early/regular buyout bucket fields to the backend projection if the frontend needs to display claim pool breakdowns directly.
