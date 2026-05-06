@@ -60,6 +60,11 @@ const SPONSOR_TEST_USDC_MINT_AMOUNT = 5_000_000_000n;
 const TRACK1_AMOUNT = 10_000_000n;
 const TRACK2_AMOUNT = 20_000_000n;
 const TRACK3_AMOUNT = 5_000_000n;
+const TRACK2_TARGET_VALUE = 1_000n;
+const TRACK2_MIN_ACHIEVEMENT_BPS = 5_000;
+const MOCK_TRACK2_ACTUAL_VALUE = 800;
+const MOCK_TRACK3_APPROVED_CPS_PAYOUT = 3_000_000n;
+const SETTLEMENT_DEADLINE_BUFFER_SECONDS = 90;
 const RPC_STEP_TIMEOUT_MS = 45_000;
 
 const log = (message: string) => {
@@ -87,6 +92,30 @@ const withTimeout = async <T>(
       clearTimeout(timeout);
     }
   }
+};
+
+const withRetry = async <T>(
+  label: string,
+  operation: () => Promise<T>,
+  attempts = 5
+): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts) {
+        break;
+      }
+
+      const waitMs = attempt * 2_000;
+      log(`${label} failed on attempt ${attempt}/${attempts}; retrying in ${waitMs / 1000}s`);
+      await sleep(waitMs);
+    }
+  }
+
+  throw lastError;
 };
 
 const keypairJson = (keypair: Keypair): StoredKeypair => ({
@@ -146,6 +175,24 @@ const loadOrCreateState = (rpcEndpoint: string, programId: string): SmokeState =
 const sha256Hex = (value: string): string =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitUntilUnixTime = async (targetUnix: bigint, label: string) => {
+  const targetMs = Number(targetUnix) * 1000;
+  const waitMs = Math.max(0, targetMs - Date.now() + 3_000);
+  if (waitMs > 0) {
+    log(`waiting ${Math.ceil(waitMs / 1000)}s for ${label}`);
+    await sleep(waitMs);
+  }
+};
+
+const toSafeNumber = (value: bigint, label: string): number => {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`${label} exceeds JavaScript safe integer range`);
+  }
+  return Number(value);
+};
+
 const requestAirdropIfNeeded = async (
   connection: Connection,
   pubkey: PublicKey,
@@ -203,6 +250,8 @@ const loadBackendModules = async () => {
   const launchService = await import("../backend/src/services/proposalLaunchService");
   log("import backend proposalIntentShared");
   const proposalShared = await import("../backend/src/controllers/proposalIntentShared");
+  log("import backend chainProjectionService");
+  const chainProjectionService = await import("../backend/src/services/chainProjectionService");
 
   return {
     getAnchorService: anchorService.getAnchorService as typeof anchorService.getAnchorService,
@@ -216,6 +265,8 @@ const loadBackendModules = async () => {
       launchService.buildLaunchBundleTransaction as typeof launchService.buildLaunchBundleTransaction,
     finalizeConfirmedLaunchBundle:
       proposalShared.finalizeConfirmedLaunchBundle as typeof proposalShared.finalizeConfirmedLaunchBundle,
+    syncProposalProjectionFromChain:
+      chainProjectionService.syncProposalProjectionFromChain as typeof chainProjectionService.syncProposalProjectionFromChain,
   };
 };
 
@@ -230,16 +281,20 @@ const signInWallet = async (
     }) => Promise<{ accessToken: string }>;
   }
 ) => {
-  const challenge = await auth.createWalletAuthChallenge(wallet.publicKey.toBase58());
+  const challenge = await withRetry(`create auth challenge ${wallet.publicKey.toBase58()}`, () =>
+    auth.createWalletAuthChallenge(wallet.publicKey.toBase58())
+  );
   const signature = ed25519.sign(
     Buffer.from(challenge.message, "utf8"),
     wallet.secretKey.slice(0, 32)
   );
-  return auth.verifyWalletAuthChallenge({
-    wallet: wallet.publicKey.toBase58(),
-    nonce: challenge.nonce,
-    signature: bs58.encode(signature),
-  });
+  return withRetry(`verify auth challenge ${wallet.publicKey.toBase58()}`, () =>
+    auth.verifyWalletAuthChallenge({
+      wallet: wallet.publicKey.toBase58(),
+      nonce: challenge.nonce,
+      signature: bs58.encode(signature),
+    })
+  );
 };
 
 const ensureSpumpMint = async (params: {
@@ -405,6 +460,7 @@ const main = async () => {
 
   log("loading backend modules");
   const backend = await loadBackendModules();
+  await withRetry("database warmup", () => backend.prisma.$queryRawUnsafe("select 1"));
   const anchorService = backend.getAnchorService();
   const protocolConfig = anchorService.deriveProtocolConfigPda();
   state.protocolConfig = protocolConfig.toBase58();
@@ -564,37 +620,41 @@ const main = async () => {
     keccak_256(new TextEncoder().encode(internalCanonicalUrl))
   ).toString("hex");
 
-  const manifest = await backend.prisma.contentManifest.create({
-    data: {
-      creatorWallet: creator.publicKey.toBase58(),
-      contentType: "MIXED_MEDIA_NOTE",
-      status: "READY",
-      title: "Devnet S2 backend smoke",
-      captionText: "Backend-created smoke manifest",
-      tagsJson: ["devnet", "s2", "smoke"],
-      canonicalManifestJson: JSON.parse(canonicalManifest),
-      manifestHashHex,
-      internalCanonicalUrl,
-      internalUrlDigestHex,
-    },
-  });
+  const manifest = await withRetry("create content manifest", () =>
+    backend.prisma.contentManifest.create({
+      data: {
+        creatorWallet: creator.publicKey.toBase58(),
+        contentType: "MIXED_MEDIA_NOTE",
+        status: "READY",
+        title: "Devnet S2 backend smoke",
+        captionText: "Backend-created smoke manifest",
+        tagsJson: ["devnet", "s2", "smoke"],
+        canonicalManifestJson: JSON.parse(canonicalManifest),
+        manifestHashHex,
+        internalCanonicalUrl,
+        internalUrlDigestHex,
+      },
+    })
+  );
 
-  const deadlineUnix = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
-  const intent = await backend.prisma.proposalIntent.create({
-    data: {
-      creatorWallet: creator.publicKey.toBase58(),
-      sponsorWallet: sponsor.publicKey.toBase58(),
-      manifestId: manifest.id,
-      deadlineUnix,
-      track1BaseUsdc: TRACK1_AMOUNT,
-      track2MetricType: "VIEWS",
-      track2TargetValue: 1000n,
-      track2MinAchievementBps: 5000,
-      track2UsdcDeposited: TRACK2_AMOUNT,
-      track3UsdcDeposited: TRACK3_AMOUNT,
-      track3DelayDays: 45,
-    },
-  });
+  const deadlineUnix = BigInt(Math.floor(Date.now() / 1000) + SETTLEMENT_DEADLINE_BUFFER_SECONDS);
+  const intent = await withRetry("create proposal intent", () =>
+    backend.prisma.proposalIntent.create({
+      data: {
+        creatorWallet: creator.publicKey.toBase58(),
+        sponsorWallet: sponsor.publicKey.toBase58(),
+        manifestId: manifest.id,
+        deadlineUnix,
+        track1BaseUsdc: TRACK1_AMOUNT,
+        track2MetricType: "VIEWS",
+        track2TargetValue: TRACK2_TARGET_VALUE,
+        track2MinAchievementBps: TRACK2_MIN_ACHIEVEMENT_BPS,
+        track2UsdcDeposited: TRACK2_AMOUNT,
+        track3UsdcDeposited: TRACK3_AMOUNT,
+        track3DelayDays: 0,
+      },
+    })
+  );
 
   const derived = {
     proposalPda: anchorService.deriveProposalPda(creator.publicKey, deadlineUnix).toBase58(),
@@ -603,22 +663,26 @@ const main = async () => {
       .toBase58(),
   };
 
-  const lockedIntent = await backend.prisma.proposalIntent.update({
-    where: { id: intent.id },
-    data: {
-      status: "TERMS_LOCKED",
-      version: { increment: 1 },
-      lockedManifestHashHex: manifestHashHex,
-      lockedAnchorPda: null,
-      plannedProposalPda: derived.proposalPda,
-      plannedUsdcVaultPda: derived.proposalUsdcVaultPda,
-    },
-  });
+  const lockedIntent = await withRetry("lock proposal intent", () =>
+    backend.prisma.proposalIntent.update({
+      where: { id: intent.id },
+      data: {
+        status: "TERMS_LOCKED",
+        version: { increment: 1 },
+        lockedManifestHashHex: manifestHashHex,
+        lockedAnchorPda: null,
+        plannedProposalPda: derived.proposalPda,
+        plannedUsdcVaultPda: derived.proposalUsdcVaultPda,
+      },
+    })
+  );
 
-  await backend.prisma.contentManifest.update({
-    where: { id: manifest.id },
-    data: { status: "LOCKED" },
-  });
+  await withRetry("lock content manifest", () =>
+    backend.prisma.contentManifest.update({
+      where: { id: manifest.id },
+      data: { status: "LOCKED" },
+    })
+  );
 
   log("building launch bundle through backend service");
   const assembled = await backend.buildLaunchBundleTransaction({
@@ -626,44 +690,50 @@ const main = async () => {
     manifest,
   });
 
-  const bundle = await backend.prisma.txBundle.create({
-    data: backend.buildBundleRecord({
-      intent: lockedIntent,
-      instructionPlan: assembled.instructionPlan,
-      submitMode: "SERVER_RELAY",
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      versionedTxBase64: assembled.versionedTxBase64,
-      recentBlockhash: assembled.recentBlockhash,
-      lastValidBlockHeight: assembled.lastValidBlockHeight,
-    }),
-  });
+  const bundle = await withRetry("create tx bundle", () =>
+    backend.prisma.txBundle.create({
+      data: backend.buildBundleRecord({
+        intent: lockedIntent,
+        instructionPlan: assembled.instructionPlan,
+        submitMode: "SERVER_RELAY",
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        versionedTxBase64: assembled.versionedTxBase64,
+        recentBlockhash: assembled.recentBlockhash,
+        lastValidBlockHeight: assembled.lastValidBlockHeight,
+      }),
+    })
+  );
 
-  await backend.prisma.proposalIntent.update({
-    where: { id: lockedIntent.id },
-    data: { status: "BUNDLE_BUILT", version: { increment: 1 } },
-  });
+  await withRetry("mark bundle built", () =>
+    backend.prisma.proposalIntent.update({
+      where: { id: lockedIntent.id },
+      data: { status: "BUNDLE_BUILT", version: { increment: 1 } },
+    })
+  );
 
   log("signing bundle as creator");
   const tx = VersionedTransaction.deserialize(Buffer.from(bundle.messageBase64!, "base64"));
   tx.sign([creator]);
   const partiallySignedBase64 = Buffer.from(tx.serialize()).toString("base64");
-  await backend.prisma.$transaction([
-    backend.prisma.txBundle.update({
-      where: { id: bundle.id },
-      data: {
-        partiallySignedBase64,
-        status: "PARTIAL",
-      },
-    }),
-    backend.prisma.proposalIntent.update({
-      where: { id: lockedIntent.id },
-      data: {
-        status: "CREATOR_PARTIALLY_SIGNED",
-        version: { increment: 1 },
-        creatorApprovedAt: new Date(),
-      },
-    }),
-  ]);
+  await withRetry("persist creator partial signature", () =>
+    backend.prisma.$transaction([
+      backend.prisma.txBundle.update({
+        where: { id: bundle.id },
+        data: {
+          partiallySignedBase64,
+          status: "PARTIAL",
+        },
+      }),
+      backend.prisma.proposalIntent.update({
+        where: { id: lockedIntent.id },
+        data: {
+          status: "CREATOR_PARTIALLY_SIGNED",
+          version: { increment: 1 },
+          creatorApprovedAt: new Date(),
+        },
+      }),
+    ])
+  );
 
   log("signing and relaying bundle as sponsor");
   tx.sign([sponsor]);
@@ -675,37 +745,95 @@ const main = async () => {
   });
 
   log(`confirmed tx=${signature}`);
-  await backend.prisma.txBundle.update({
-    where: { id: bundle.id },
-    data: {
-      fullySignedBase64,
-      status: "SUBMITTED",
-      chainTxSignature: signature,
-    },
-  });
-  await backend.prisma.proposalIntent.update({
-    where: { id: lockedIntent.id },
-    data: {
-      status: "SUBMITTED",
-      version: { increment: 1 },
-      sponsorApprovedAt: new Date(),
-      chainTxSignature: signature,
-      chainSubmittedAt: new Date(),
-    },
-  });
+  await withRetry("persist submitted tx bundle", () =>
+    backend.prisma.txBundle.update({
+      where: { id: bundle.id },
+      data: {
+        fullySignedBase64,
+        status: "SUBMITTED",
+        chainTxSignature: signature,
+      },
+    })
+  );
+  await withRetry("persist submitted proposal intent", () =>
+    backend.prisma.proposalIntent.update({
+      where: { id: lockedIntent.id },
+      data: {
+        status: "SUBMITTED",
+        version: { increment: 1 },
+        sponsorApprovedAt: new Date(),
+        chainTxSignature: signature,
+        chainSubmittedAt: new Date(),
+      },
+    })
+  );
 
   log("finalizing backend proposal projection");
-  await backend.finalizeConfirmedLaunchBundle({
-    intentId: lockedIntent.id,
-    bundleId: bundle.id,
-    fullySignedTxBase64: fullySignedBase64,
-    chainTxSignature: signature,
-  });
+  await withRetry("finalize backend proposal projection", () =>
+    backend.finalizeConfirmedLaunchBundle({
+      intentId: lockedIntent.id,
+      bundleId: bundle.id,
+      fullySignedTxBase64: fullySignedBase64,
+      chainTxSignature: signature,
+    })
+  );
 
   log("fetching on-chain proposal state");
   const onChainProposal = await anchorService.fetchProposalState(new PublicKey(derived.proposalPda));
   if (!onChainProposal || onChainProposal.status !== "FUNDED") {
     throw new Error(`Expected funded on-chain proposal, got ${JSON.stringify(onChainProposal)}`);
+  }
+
+  log("settling Track1 fixed base pay");
+  const track1Signature = await anchorService.executeSettleTrack1Base(
+    new PublicKey(derived.proposalPda)
+  );
+  await withRetry("sync Track1 projection", () =>
+    backend.syncProposalProjectionFromChain({
+      proposalPda: derived.proposalPda,
+      signature: track1Signature,
+      instructionName: "settle_track1_base",
+    })
+  );
+
+  await waitUntilUnixTime(deadlineUnix, "Track2/Track3 settlement eligibility");
+
+  log(`settling Track2 with mocked actual value=${MOCK_TRACK2_ACTUAL_VALUE}`);
+  const track2Signature = await anchorService.executeSettleTrack2(
+    new PublicKey(derived.proposalPda),
+    MOCK_TRACK2_ACTUAL_VALUE
+  );
+  await withRetry("sync Track2 projection", () =>
+    backend.syncProposalProjectionFromChain({
+      proposalPda: derived.proposalPda,
+      signature: track2Signature,
+      instructionName: "settle_track2",
+    })
+  );
+
+  log(`settling Track3 with mocked approved CPS payout=${MOCK_TRACK3_APPROVED_CPS_PAYOUT}`);
+  const track3Signature = await anchorService.executeSettleTrack3Cps(
+    new PublicKey(derived.proposalPda),
+    toSafeNumber(MOCK_TRACK3_APPROVED_CPS_PAYOUT, "MOCK_TRACK3_APPROVED_CPS_PAYOUT")
+  );
+  await withRetry("sync Track3 projection", () =>
+    backend.syncProposalProjectionFromChain({
+      proposalPda: derived.proposalPda,
+      signature: track3Signature,
+      instructionName: "settle_track3_cps",
+    })
+  );
+
+  log("fetching settled on-chain proposal state");
+  const settledProposal = await anchorService.fetchProposalState(new PublicKey(derived.proposalPda));
+  if (
+    !settledProposal ||
+    !settledProposal.track1Claimed ||
+    settledProposal.track2SettledAtUnix <= 0n ||
+    settledProposal.track3SettledAtUnix <= 0n ||
+    settledProposal.track3CpsPayout !== MOCK_TRACK3_APPROVED_CPS_PAYOUT
+  ) {
+    throw new Error(`Expected fully settled on-chain proposal, got ${JSON.stringify(settledProposal)}`);
   }
 
   state.lastRun = {
@@ -724,6 +852,22 @@ const main = async () => {
     proposalUsdcVaultPda: derived.proposalUsdcVaultPda,
     creatorUsdcAta: creatorUsdcAta.toBase58(),
     sponsorUsdcAta: sponsorUsdcAta.toBase58(),
+    launchSignature: signature,
+    track1Signature,
+    track2Signature,
+    track3Signature,
+    track1BaseUsdc: TRACK1_AMOUNT.toString(),
+    track2Deposited: TRACK2_AMOUNT.toString(),
+    track2TargetValue: TRACK2_TARGET_VALUE.toString(),
+    track2MinAchievementBps: TRACK2_MIN_ACHIEVEMENT_BPS,
+    track2MockActualValue: MOCK_TRACK2_ACTUAL_VALUE,
+    track3Deposited: TRACK3_AMOUNT.toString(),
+    track3DelayDays: 0,
+    track3MockApprovedCpsPayout: MOCK_TRACK3_APPROVED_CPS_PAYOUT.toString(),
+    settledStatus: settledProposal.status,
+    track1Claimed: settledProposal.track1Claimed,
+    track2SettledAtUnix: settledProposal.track2SettledAtUnix.toString(),
+    track3SettledAtUnix: settledProposal.track3SettledAtUnix.toString(),
     signature,
   };
   writeState(state);

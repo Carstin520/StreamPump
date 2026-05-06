@@ -107,33 +107,51 @@ The backend/chain happy path can be run without frontend review:
 npm run demo:s2:devnet
 ```
 
-The script writes reusable devnet actors and the last result to `.local/devnet-s2-happy-path.json`. It uses a disposable SPL token as the protocol USDC mint on devnet.
+The script writes reusable devnet actors and the last result to `.local/devnet-s2-happy-path.json`. It uses a disposable SPL token as the protocol USDC mint on devnet. The current script covers launch plus all three settlement tracks:
+
+```text
+wallet auth -> manifest -> intent -> creator sign -> sponsor sign -> backend relay
+-> Track1 base pay -> Track2 mocked performance settlement -> Track3 mocked CPS settlement
+```
 
 Latest verified run:
 
 - Program: `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp`
 - Protocol config: `GqQ2wE39EskRYAsy1PV11XRWJTrSQ8ebR6o2J7NbSN2g`
 - Test USDC mint: `5Z5MpM3KaM9mb4hXweS7oEuWja5kEJ4Me1Xycu7wBXQJ`
-- Proposal PDA: `EiBQG5JgFGsNqGWzZwL8LcPDmDeethty234nYWwCsAzA`
-- Proposal vault: `C4QsLYRVfkghoHybQNzWMEDw7hysvh8Jonpc9YR8XX73`
-- Signature: `3zjbGTF1DLTJnsh8tH4oD1XkqxPVegsdKT5nHysJqShRGhmAx2JNzdr7cnrozqwDRD7x39m6XSfKFav39Ttc1KJT`
+- Proposal PDA: `4GCvzE8u6A557RCTr3sAdPZrs3Kw3aKXvmVNx5oQoRQm`
+- Proposal vault: `AcmfUSfS9ZV2a74HZRDCVa2MGMq8mWEKGnt4DbuHD3X7`
+- Launch signature: `5YpxYExgwvPUm3eL4QB8TniPyABReCxPCTKd7sy93mhQeK4hBWPWQ1hpmqAQHgBCWLLzCu9hRGyVkLERu5pYv2rx`
+- Track1 signature: `5NbgjLRB284h6VfEm9bdrxKTrk1sY2rnAEseGJf9dYJxYxYaXXMh4CawmzGJ2CiZMy4gBhUsJfxLezDSdeee7wg2`
+- Track2 signature: `LdaL9ced2Jj7biT3zTntKL2LmUqMjAeKBzwTnj1PgpRv23jZTLHEzcRT9dazbTtWM77EDBEv4GbhG8sp2dP7eB2`
+- Track3 signature: `34DCU3FbTVhCm9TJQcArSffX5T1GYS6bJMcfwVtrPmhwJyZEgqpGuaUayKMsb8CVCy1BttGH3i7TV9kRbUuf1NGB`
+
+Latest track setup:
+
+- Track1 fixed base pay: `10` test USDC to creator.
+- Track2 performance budget: `20` test USDC, target `1000` views, cliff `50%`, mocked actual value `800`.
+- Track2 settlement outcome: achieved `80%`; `16` test USDC achieved budget splits into `12.8` to creator and `3.2` fan pool. Because this smoke has no fan endorsement positions, the `3.2` fan pool refunds to sponsor, and `4` unachieved test USDC also refunds to sponsor.
+- Track3 CPS budget: `5` test USDC, `track3DelayDays = 0` for smoke, mocked approved CPS payout `3` test USDC to creator and `2` refund to sponsor.
+- Proposal vault after settlement: `0` test USDC.
 
 Role responsibilities in the devnet smoke:
 
 - Admin/deploy payer: owns protocol setup, creates the test USDC mint, creates the Token-2022 SPUMP mint, initializes protocol config, creates creator/sponsor USDC ATAs, and mints test USDC to sponsor.
-- Oracle: signs the creator S2 upgrade.
+- Oracle: signs the creator S2 upgrade and Track1/Track2/Track3 settlement transactions.
 - Creator: signs wallet auth, registers the creator profile, and signs the proposal launch bundle.
 - Sponsor: signs wallet auth, signs the final bundle, pays proposal/vault rent, and transfers test USDC into the proposal vault.
 - Backend relay: does not own the proposal terms; it relays the fully signed transaction and finalizes the database projection after confirmation.
 
-Observed SOL usage for the latest run:
+Current devnet balances after the latest run:
 
-| Role | Address | Before smoke | After smoke | Approx. SOL used | Main reason |
-| --- | --- | ---: | ---: | ---: | --- |
-| Admin | `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw` | 2.948 SOL | 2.938406760 SOL | ~0.009593240 | test mint rent, SPUMP mint rent, protocol init, ATAs, mint/setup fees |
-| Oracle | `8ryLHyFQmbx2z28X9B8a7x1Peusaet3Axbe1YA1aSYrk` | 2.500 SOL | 2.497942680 SOL | ~0.002057320 | S2 upgrade receipt rent and tx fee |
-| Creator | `6hZXggy4DhjZTatdqZao55NcghyaFVm3b2RRuPFLXWAL` | 2.500 SOL | 2.498113840 SOL | ~0.001886160 | creator profile rent and tx fee |
-| Sponsor | `eZkrM2k1kHyXoVNSLiaebCLSVMfurQjkSjcJu55JCcc` | 3.200 SOL | 3.191749360 SOL | ~0.008250640 | proposal/vault rent, final tx fee, sponsor funding transaction |
+| Role | Address | Current SOL | Main recurring spend |
+| --- | --- | ---: | --- |
+| Admin | `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw` | 2.938361760 | setup/idempotent ATA/mint tx fees; protocol setup is already done |
+| Oracle | `8ryLHyFQmbx2z28X9B8a7x1Peusaet3Axbe1YA1aSYrk` | 2.497927680 | Track settlement tx fees |
+| Creator | `6hZXggy4DhjZTatdqZao55NcghyaFVm3b2RRuPFLXWAL` | 2.498113840 | already registered/S2; signing bundle is off-chain |
+| Sponsor | `eZkrM2k1kHyXoVNSLiaebCLSVMfurQjkSjcJu55JCcc` | 3.183498720 | new proposal/vault rent and launch tx fee |
+
+No new SOL is needed for another smoke run at these balances. The sponsor is the role that will drain fastest because each run creates a new proposal and proposal vault.
 
 The earlier program deployment used the admin/deploy payer. That account had 10 SOL after faucet funding and about 2.948 SOL before the smoke run, so deployment consumed roughly 7.052 SOL. Treat that mostly as upgradeable program storage/rent and deployment overhead, not as the recurring cost of launching each proposal.
 
