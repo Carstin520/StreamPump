@@ -48,6 +48,16 @@ pub enum StreamPumpError {
     InsufficientBuyoutUsdcLiquidity,
     #[msg("Invalid exit tax configuration")]
     InvalidTaxConfig,
+    #[msg("Invalid SPUMP emission configuration")]
+    InvalidEmissionConfig,
+    #[msg("Invalid S1 creator rating configuration")]
+    InvalidCreatorRatingConfig,
+    #[msg("Invalid S1 anti-arbitrage guard configuration")]
+    InvalidS1GuardConfig,
+    #[msg("Creator S1 rating update is too soon")]
+    CreatorRatingUpdateTooSoon,
+    #[msg("Creator S1 rating change exceeds configured daily cap")]
+    CreatorRatingChangeTooLarge,
     #[msg("Creator level upgrade must increase current level")]
     CreatorLevelNotIncreasing,
     #[msg("Invalid creator level value")]
@@ -98,6 +108,12 @@ pub enum StreamPumpError {
     InvalidRoleFlags,
     #[msg("User profile not initialized")]
     UserNotRegistered,
+    #[msg("User activity score is below the minimum required for S1")]
+    InsufficientUserActivityScore,
+    #[msg("User is not eligible to participate in S1")]
+    UserNotEligibleForS1,
+    #[msg("S1 daily buy limit exceeded for this creator")]
+    S1DailyBuyLimitExceeded,
     #[msg("Daily reward already claimed for current day")]
     DailyRewardAlreadyClaimed,
     #[msg("User level must increase")]

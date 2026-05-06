@@ -9,12 +9,32 @@ StreamPump is a Web2.5 creator sponsorship market. Creators package content and 
 StreamPump has two connected product layers:
 
 - **Season 1 / Creator Discovery Market**  
-  Fans use `SPUMP` to back creators early. Creator momentum is tracked by the protocol, and sponsors can make buyout-style offers before a creator graduates into the sponsorship market.
+  Fans use non-transferable `SPUMP` to back creators early. `SPUMP` is burned into creator-specific virtual S1 positions priced by a rating-adjusted bonding curve. Creator momentum is tracked by the protocol, and sponsors can make buyout-style offers before a creator graduates into the sponsorship market.
 
 - **Season 2 / Sponsored Campaign Market**  
   Sponsors fund campaigns with three budget tracks: fixed creator base pay, performance-based budget, and delayed CPS-style payout after the return window closes.
 
 `SPUMP` is designed as a non-transferable Token-2022 participation asset. It is product fuel and reputation-linked participation, not a DEX-first speculative token.
+
+### Season 1 Mechanics
+
+S1 is not a freely transferable fan-token market. Users burn `SPUMP` to receive an internal creator position recorded in `S1UserPosition`; no creator SPL token is minted.
+
+The S1 bonding curve is now parameterized by an oracle-updated creator momentum rating:
+
+```text
+effective_k = base_k * creator_rating_bps / 10_000
+buy cost = effective_k / 2 * ((S + dS)^2 - S^2)
+sell return = effective_k / 2 * (S^2 - (S - dS)^2)
+```
+
+Default rating is `10_000` (1.0x), bounded between `5_000` and `20_000` (0.5x-2.0x), with a daily change cap and one-epoch delayed effectiveness. The initial graduation target is `2,500` virtual S1 supply so that the earliest supporters can matter in a small buyout, while later creator cohorts can use higher targets.
+
+Daily `SPUMP` emission is also configurable through the protocol config. The intended launch setting is a higher early multiplier, then a gradual reduction as the platform has more active users. New accounts receive reduced emission during the new-user window.
+
+S1 participation now requires a registered user profile with fan role and minimum activity score. The protocol also enforces a per-user per-creator daily buy cap and separates early-cohort buyout claims into a capped pool, so the first supporters can have meaningful upside without being able to absorb an unlimited share of a sponsor buyout.
+
+See [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) for the current parameter rationale and anti-arbitrage guardrails.
 
 ## Architecture
 

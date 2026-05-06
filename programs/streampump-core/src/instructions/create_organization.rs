@@ -55,7 +55,10 @@ pub struct CreateOrganization<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn handler(ctx: Context<CreateOrganization>, args: CreateOrganizationArgs) -> Result<()> {
+pub(crate) fn handler(
+    ctx: Context<CreateOrganization>,
+    args: CreateOrganizationArgs,
+) -> Result<()> {
     require!(
         !args.display_name.is_empty() && args.display_name.len() <= MAX_ORGANIZATION_NAME_LEN,
         StreamPumpError::InvalidOrganizationName

@@ -109,6 +109,21 @@ pub struct S1TokenSold {
 }
 
 #[event]
+pub struct CreatorS1RatingUpdated {
+    pub creator_profile: Pubkey,
+    pub creator: Pubkey,
+    pub previous_rating_bps: u16,
+    pub new_rating_bps: u16,
+    pub previous_graduation_target_supply: u64,
+    pub new_graduation_target_supply: u64,
+    pub report_id: [u8; 32],
+    pub report_digest: [u8; 32],
+    pub observed_at: i64,
+    pub effective_at: i64,
+    pub updated_at: i64,
+}
+
+#[event]
 pub struct S1Graduated {
     pub creator_profile: Pubkey,
     pub creator: Pubkey,

@@ -9,7 +9,7 @@ use crate::{
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState, S1UserPosition,
     },
-    utils::{calculate_remaining_pro_rata_share, checked_sub},
+    utils::{calculate_remaining_pro_rata_share, checked_add, checked_sub},
 };
 
 #[derive(Accounts)]
@@ -98,6 +98,11 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         StreamPumpError::InsufficientInternalTokenBalance
     );
     let position_balance = position.internal_token_balance;
+    let early_position_balance = std::cmp::min(
+        position.early_cohort_balance,
+        position.internal_token_balance,
+    );
+    let regular_position_balance = checked_sub(position_balance, early_position_balance)?;
 
     let buyout_state = &mut ctx.accounts.s1_buyout_state;
     require!(
@@ -105,11 +110,25 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         StreamPumpError::InvalidAmount
     );
 
-    let usdc_share = calculate_remaining_pro_rata_share(
-        position_balance,
-        buyout_state.claimable_usdc_remaining,
-        buyout_state.claimable_s1_supply_remaining,
-    )?;
+    let early_usdc_share = if early_position_balance > 0 {
+        calculate_remaining_pro_rata_share(
+            early_position_balance,
+            buyout_state.early_claimable_usdc_remaining,
+            buyout_state.early_claimable_s1_supply_remaining,
+        )?
+    } else {
+        0
+    };
+    let regular_usdc_share = if regular_position_balance > 0 {
+        calculate_remaining_pro_rata_share(
+            regular_position_balance,
+            buyout_state.regular_claimable_usdc_remaining,
+            buyout_state.regular_claimable_s1_supply_remaining,
+        )?
+    } else {
+        0
+    };
+    let usdc_share = checked_add(early_usdc_share, regular_usdc_share)?;
 
     require!(
         ctx.accounts.offer_usdc_vault.amount >= usdc_share,
@@ -148,6 +167,22 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
             checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
         buyout_state.claimable_usdc_remaining = remaining_usdc;
         buyout_state.claimable_s1_supply_remaining = remaining_supply;
+        buyout_state.early_claimable_usdc_remaining = checked_sub(
+            buyout_state.early_claimable_usdc_remaining,
+            early_usdc_share,
+        )?;
+        buyout_state.early_claimable_s1_supply_remaining = checked_sub(
+            buyout_state.early_claimable_s1_supply_remaining,
+            early_position_balance,
+        )?;
+        buyout_state.regular_claimable_usdc_remaining = checked_sub(
+            buyout_state.regular_claimable_usdc_remaining,
+            regular_usdc_share,
+        )?;
+        buyout_state.regular_claimable_s1_supply_remaining = checked_sub(
+            buyout_state.regular_claimable_s1_supply_remaining,
+            regular_position_balance,
+        )?;
 
         if remaining_supply == 0 && ctx.accounts.offer_usdc_vault.amount == 0 {
             token::close_account(CpiContext::new_with_signer(
@@ -164,10 +199,19 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         remaining_supply =
             checked_sub(buyout_state.claimable_s1_supply_remaining, position_balance)?;
         buyout_state.claimable_s1_supply_remaining = remaining_supply;
+        buyout_state.early_claimable_s1_supply_remaining = checked_sub(
+            buyout_state.early_claimable_s1_supply_remaining,
+            early_position_balance,
+        )?;
+        buyout_state.regular_claimable_s1_supply_remaining = checked_sub(
+            buyout_state.regular_claimable_s1_supply_remaining,
+            regular_position_balance,
+        )?;
         remaining_usdc = buyout_state.claimable_usdc_remaining;
     }
 
     position.internal_token_balance = 0;
+    position.early_cohort_balance = 0;
     position.spump_cost_basis = 0;
 
     emit!(S1BuyoutUsdcClaimed {

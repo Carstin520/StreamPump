@@ -4,7 +4,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StreamPumpError,
-    state::{CreatorProfile, CreatorStatus, ProtocolConfig, DEFAULT_CREATOR_LEVEL, MAX_HANDLE_LEN},
+    state::{
+        CreatorProfile, CreatorStatus, ProtocolConfig, DEFAULT_CREATOR_LEVEL,
+        DEFAULT_S1_RATING_BPS, MAX_HANDLE_LEN,
+    },
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -44,6 +47,18 @@ pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) 
         profile.level = DEFAULT_CREATOR_LEVEL;
         profile.status = CreatorStatus::S1_Active;
         profile.s1_supply = 0;
+        profile.s1_early_cohort_supply = 0;
+        profile.s1_rating_bps = DEFAULT_S1_RATING_BPS;
+        profile.s1_graduation_target_supply = ctx
+            .accounts
+            .protocol_config
+            .default_s1_graduation_target_supply;
+        profile.pending_s1_rating_bps = 0;
+        profile.pending_s1_graduation_target_supply = 0;
+        profile.pending_rating_effective_at = 0;
+        profile.pending_rating_report_digest = [0_u8; 32];
+        profile.last_rating_update_at = 0;
+        profile.last_rating_report_digest = [0_u8; 32];
         profile.last_upgrade_at = 0;
         profile.created_at = Clock::get()?.unix_timestamp;
         profile.bump = ctx.bumps.creator_profile;

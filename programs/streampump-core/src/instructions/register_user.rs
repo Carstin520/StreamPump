@@ -45,6 +45,7 @@ pub(crate) fn handler(ctx: Context<RegisterUser>, args: RegisterUserArgs) -> Res
         user_profile.level = DEFAULT_USER_LEVEL;
         user_profile.role_flags = args.role_flags;
         user_profile.xp = 0;
+        user_profile.activity_score = 0;
         user_profile.last_daily_claim_at = 0;
         user_profile.daily_claim_streak = 0;
         user_profile.total_spump_earned = 0;

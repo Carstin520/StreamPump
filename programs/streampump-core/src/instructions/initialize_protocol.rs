@@ -11,7 +11,16 @@ use anchor_spl::token_2022::{
     ID as TOKEN_2022_PROGRAM_ID,
 };
 
-use crate::{errors::StreamPumpError, state::ProtocolConfig, utils::SPUMP_DECIMALS};
+use crate::{
+    errors::StreamPumpError,
+    state::{
+        ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_AMOUNT, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
+        DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
+        DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RATING_BPS, DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
+        MAX_S1_RATING_BPS, MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
+    },
+    utils::SPUMP_DECIMALS,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct InitializeProtocolArgs {
@@ -22,6 +31,18 @@ pub struct InitializeProtocolArgs {
     pub max_exit_tax_bps: u16,
     pub min_exit_tax_bps: u16,
     pub tax_decay_threshold_supply: u64,
+    pub daily_spump_emission_multiplier_bps: u16,
+    pub new_user_emission_bps: u16,
+    pub new_user_emission_window_seconds: i64,
+    pub s1_min_user_xp: u64,
+    pub max_s1_daily_buy_amount: u64,
+    pub s1_early_cohort_supply_threshold: u64,
+    pub s1_early_cohort_buyout_cap_bps: u16,
+    pub min_creator_rating_bps: u16,
+    pub max_creator_rating_bps: u16,
+    pub max_creator_rating_daily_delta_bps: u16,
+    pub s1_rating_effective_delay_seconds: i64,
+    pub default_s1_graduation_target_supply: u64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
 }
@@ -59,6 +80,34 @@ pub(crate) fn handler(
             && args.max_exit_tax_bps >= args.min_exit_tax_bps
             && args.tax_decay_threshold_supply > 0,
         StreamPumpError::InvalidTaxConfig
+    );
+    require!(
+        args.daily_spump_emission_multiplier_bps > 0
+            && args.new_user_emission_bps > 0
+            && args.new_user_emission_bps <= 10_000
+            && args.new_user_emission_window_seconds >= 0,
+        StreamPumpError::InvalidEmissionConfig
+    );
+    require!(
+        args.s1_min_user_xp >= DEFAULT_S1_MIN_USER_XP
+            && args.max_s1_daily_buy_amount >= DEFAULT_MAX_S1_DAILY_BUY_AMOUNT
+            && args.s1_early_cohort_supply_threshold >= DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD
+            && args.s1_early_cohort_buyout_cap_bps > 0
+            && args.s1_early_cohort_buyout_cap_bps <= DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
+        StreamPumpError::InvalidS1GuardConfig
+    );
+    require!(
+        args.min_creator_rating_bps > 0
+            && args.max_creator_rating_bps >= args.min_creator_rating_bps
+            && args.min_creator_rating_bps >= MIN_S1_RATING_BPS
+            && args.max_creator_rating_bps <= MAX_S1_RATING_BPS
+            && args.min_creator_rating_bps <= DEFAULT_S1_RATING_BPS
+            && args.max_creator_rating_bps >= DEFAULT_S1_RATING_BPS
+            && args.max_creator_rating_daily_delta_bps > 0
+            && args.max_creator_rating_daily_delta_bps <= MAX_S1_RATING_DAILY_DELTA_BPS
+            && args.s1_rating_effective_delay_seconds >= DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS
+            && args.default_s1_graduation_target_supply >= DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
+        StreamPumpError::InvalidCreatorRatingConfig
     );
 
     require_keys_eq!(
@@ -99,6 +148,18 @@ pub(crate) fn handler(
     config.max_exit_tax_bps = args.max_exit_tax_bps;
     config.min_exit_tax_bps = args.min_exit_tax_bps;
     config.tax_decay_threshold_supply = args.tax_decay_threshold_supply;
+    config.daily_spump_emission_multiplier_bps = args.daily_spump_emission_multiplier_bps;
+    config.new_user_emission_bps = args.new_user_emission_bps;
+    config.new_user_emission_window_seconds = args.new_user_emission_window_seconds;
+    config.s1_min_user_xp = args.s1_min_user_xp;
+    config.max_s1_daily_buy_amount = args.max_s1_daily_buy_amount;
+    config.s1_early_cohort_supply_threshold = args.s1_early_cohort_supply_threshold;
+    config.s1_early_cohort_buyout_cap_bps = args.s1_early_cohort_buyout_cap_bps;
+    config.min_creator_rating_bps = args.min_creator_rating_bps;
+    config.max_creator_rating_bps = args.max_creator_rating_bps;
+    config.max_creator_rating_daily_delta_bps = args.max_creator_rating_daily_delta_bps;
+    config.s1_rating_effective_delay_seconds = args.s1_rating_effective_delay_seconds;
+    config.default_s1_graduation_target_supply = args.default_s1_graduation_target_supply;
     config.s2_min_followers = args.s2_min_followers;
     config.s2_min_valid_views = args.s2_min_valid_views;
     config.bump = ctx.bumps.protocol_config;

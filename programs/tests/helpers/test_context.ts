@@ -688,6 +688,18 @@ const buildContext = async (): Promise<TestContext> => {
       maxExitTaxBps: 1_500,                             // 15% max exit tax / 最高 15% 退出税
       minExitTaxBps: 500,                               // 5% min exit tax / 最低 5% 退出税
       taxDecayThresholdSupply: bn(1_000_000),          // Supply at which tax decays to min / 税率衰减至最低时的供应量
+      dailySpumpEmissionMultiplierBps: 50_000,          // 5x early-platform daily SPUMP emissions / 早期平台 5 倍日发放
+      newUserEmissionBps: 2_500,                        // 25% daily emission during new-user window / 新账号窗口期 25% 日发放
+      newUserEmissionWindowSeconds: bn(7 * 24 * 3_600), // 7-day new-user emission window / 7 天新账号窗口
+      s1MinUserXp: bn(10),                              // Minimum activity score to buy S1 / S1 买入最低活跃度
+      maxS1DailyBuyAmount: bn(150),                     // Per user x creator daily S1 buy cap / 用户×创作者每日买入上限
+      s1EarlyCohortSupplyThreshold: bn(500),            // First 500 internal units are early cohort / 前 500 内部份额为早期 cohort
+      s1EarlyCohortBuyoutCapBps: 2_000,                 // Early cohort can claim at most 20% of buyout / 早期 cohort 最多领取买断 20%
+      minCreatorRatingBps: 5_000,                       // 0.5x creator momentum floor / 创作者动量下限
+      maxCreatorRatingBps: 20_000,                      // 2.0x creator momentum cap / 创作者动量上限
+      maxCreatorRatingDailyDeltaBps: 1_000,             // ±10% per oracle epoch / 每个预言机周期最多 ±10%
+      s1RatingEffectiveDelaySeconds: bn(24 * 3_600),    // Rating updates take effect next epoch / rating 下一周期生效
+      defaultS1GraduationTargetSupply: bn(2_500),       // Early supporter upside target / 早期支持者收益目标
       s2MinFollowers: bn(100),                         // Min followers for S2 upgrade / S2 升级所需最低粉丝数
       s2MinValidViews: bn(1_000),                      // Min views for S2 upgrade / S2 升级所需最低有效观看数
     })

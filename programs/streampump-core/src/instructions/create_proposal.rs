@@ -23,8 +23,7 @@ use crate::{
     events::ProposalCreated,
     state::{
         ContentHashAnchor, CreatorProfile, Proposal, ProposalContentKind, ProposalMetricType,
-        ProposalStatus, ProtocolConfig,
-        MIN_PROPOSAL_CREATOR_LEVEL,
+        ProposalStatus, ProtocolConfig, MIN_PROPOSAL_CREATOR_LEVEL,
     },
 };
 
@@ -165,7 +164,10 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
             let anchor_data = content_anchor_info.try_borrow_data()?;
             let mut anchor_data_slice: &[u8] = &anchor_data;
             let content_anchor = ContentHashAnchor::try_deserialize(&mut anchor_data_slice)?;
-            (content_anchor.creator_profile, content_anchor.content_digest)
+            (
+                content_anchor.creator_profile,
+                content_anchor.content_digest,
+            )
         };
         require_keys_eq!(
             anchored_creator_profile,

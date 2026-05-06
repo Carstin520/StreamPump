@@ -6,6 +6,19 @@ pub const MAX_ORGANIZATION_NAME_LEN: usize = 48;
 pub const DEFAULT_CREATOR_LEVEL: u8 = 1;
 pub const MIN_PROPOSAL_CREATOR_LEVEL: u8 = 2;
 pub const DEFAULT_USER_LEVEL: u8 = 1;
+pub const DEFAULT_S1_RATING_BPS: u16 = 10_000;
+pub const MIN_S1_RATING_BPS: u16 = 5_000;
+pub const MAX_S1_RATING_BPS: u16 = 20_000;
+pub const MAX_S1_RATING_DAILY_DELTA_BPS: u16 = 1_000;
+pub const DEFAULT_S1_GRADUATION_TARGET_SUPPLY: u64 = 2_500;
+pub const S1_RATING_UPDATE_COOLDOWN_SECONDS: i64 = 86_400;
+pub const DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS: i64 = 86_400;
+pub const DEFAULT_NEW_USER_EMISSION_BPS: u16 = 2_500;
+pub const DEFAULT_NEW_USER_EMISSION_WINDOW_SECONDS: i64 = 7 * 86_400;
+pub const DEFAULT_S1_MIN_USER_XP: u64 = 10;
+pub const DEFAULT_MAX_S1_DAILY_BUY_AMOUNT: u64 = 150;
+pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
+pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
 pub const USER_ROLE_CREATOR: u16 = 1 << 1;
 pub const USER_ROLE_SPONSOR_OPERATOR: u16 = 1 << 2;
@@ -107,13 +120,48 @@ pub struct ProtocolConfig {
     pub max_exit_tax_bps: u16,
     pub min_exit_tax_bps: u16,
     pub tax_decay_threshold_supply: u64,
+    pub daily_spump_emission_multiplier_bps: u16,
+    pub new_user_emission_bps: u16,
+    pub new_user_emission_window_seconds: i64,
+    pub s1_min_user_xp: u64,
+    pub max_s1_daily_buy_amount: u64,
+    pub s1_early_cohort_supply_threshold: u64,
+    pub s1_early_cohort_buyout_cap_bps: u16,
+    pub min_creator_rating_bps: u16,
+    pub max_creator_rating_bps: u16,
+    pub max_creator_rating_daily_delta_bps: u16,
+    pub s1_rating_effective_delay_seconds: i64,
+    pub default_s1_graduation_target_supply: u64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
     pub bump: u8,
 }
 
 impl ProtocolConfig {
-    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 1 + 8 + 2 + 2 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32
+        + 32
+        + 32
+        + 32
+        + 1
+        + 8
+        + 2
+        + 2
+        + 8
+        + 2
+        + 2
+        + 8
+        + 8
+        + 8
+        + 8
+        + 2
+        + 2
+        + 2
+        + 2
+        + 8
+        + 8
+        + 8
+        + 8
+        + 1;
 }
 
 #[account]
@@ -125,6 +173,21 @@ pub struct CreatorProfile {
     pub status: CreatorStatus,
     /// Virtual S1 internal token supply; backing SPUMP is burned on buy.
     pub s1_supply: u64,
+    /// Portion of current S1 supply bought before the configured early-cohort threshold.
+    pub s1_early_cohort_supply: u64,
+    /// Creator quality/momentum multiplier in basis points. 10_000 = 1.0x.
+    pub s1_rating_bps: u16,
+    /// Supply target used by read models to estimate graduation/buyout progress.
+    pub s1_graduation_target_supply: u64,
+    /// Pending rating scheduled by oracle; 0 means no pending rating.
+    pub pending_s1_rating_bps: u16,
+    pub pending_s1_graduation_target_supply: u64,
+    pub pending_rating_effective_at: i64,
+    pub pending_rating_report_digest: [u8; 32],
+    /// Last oracle rating update timestamp.
+    pub last_rating_update_at: i64,
+    /// Digest of the latest off-chain rating report.
+    pub last_rating_report_digest: [u8; 32],
     pub last_upgrade_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -132,7 +195,26 @@ pub struct CreatorProfile {
 }
 
 impl CreatorProfile {
-    pub const INIT_SPACE: usize = 32 + 4 + MAX_HANDLE_LEN + 32 + 1 + 1 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32
+        + 4
+        + MAX_HANDLE_LEN
+        + 32
+        + 1
+        + 1
+        + 8
+        + 8
+        + 2
+        + 8
+        + 2
+        + 8
+        + 8
+        + 32
+        + 8
+        + 32
+        + 8
+        + 8
+        + 8
+        + 1;
 }
 
 #[account]
@@ -141,6 +223,7 @@ pub struct UserProfile {
     pub level: u8,
     pub role_flags: u16,
     pub xp: u64,
+    pub activity_score: u64,
     pub last_daily_claim_at: i64,
     pub daily_claim_streak: u16,
     pub total_spump_earned: u64,
@@ -151,7 +234,7 @@ pub struct UserProfile {
 }
 
 impl UserProfile {
-    pub const INIT_SPACE: usize = 32 + 1 + 2 + 8 + 8 + 2 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 1 + 2 + 8 + 8 + 8 + 2 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -214,9 +297,31 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    pub const INIT_SPACE: usize =
-        32 + 33 + 1 + 32 + 33 + 8 + 1 + 1 + 8 + 2 + 8 + 9 + 8 + 4 + 4 + 8 + 8 + 9 + 2 + 8
-            + 8 + 1 + 1 + 8 + 1;
+    pub const INIT_SPACE: usize = 32
+        + 33
+        + 1
+        + 32
+        + 33
+        + 8
+        + 1
+        + 1
+        + 8
+        + 2
+        + 8
+        + 9
+        + 8
+        + 4
+        + 4
+        + 8
+        + 8
+        + 9
+        + 2
+        + 8
+        + 8
+        + 1
+        + 1
+        + 8
+        + 1;
 }
 
 #[account]
@@ -237,12 +342,16 @@ pub struct S1UserPosition {
     pub user: Pubkey,
     pub creator: Pubkey,
     pub internal_token_balance: u64,
+    pub early_cohort_balance: u64,
     pub spump_cost_basis: u64,
+    pub first_bought_at: i64,
+    pub last_buy_day: i64,
+    pub daily_bought_amount: u64,
     pub bump: u8,
 }
 
 impl S1UserPosition {
-    pub const INIT_SPACE: usize = 32 + 32 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 8 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -254,12 +363,16 @@ pub struct S1BuyoutState {
     pub claimable_usdc_remaining: u64,
     /// Remaining virtual S1 supply still entitled to the buyout proceeds.
     pub claimable_s1_supply_remaining: u64,
+    pub early_claimable_usdc_remaining: u64,
+    pub early_claimable_s1_supply_remaining: u64,
+    pub regular_claimable_usdc_remaining: u64,
+    pub regular_claimable_s1_supply_remaining: u64,
     pub rage_quit_deadline: i64,
     pub bump: u8,
 }
 
 impl S1BuyoutState {
-    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]

@@ -22,7 +22,7 @@ use anchor_spl::{
 use crate::{
     errors::StreamPumpError,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, S1UserPosition},
-    utils::{calculate_sell_return, checked_sub},
+    utils::{calculate_sell_return_with_rating, checked_sub},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -109,7 +109,11 @@ pub(crate) fn handler(ctx: Context<RageQuitS1>, args: RageQuitS1Args) -> Result<
 
     // EN: Full bonding curve return — no exit tax during rage-quit.
     // ZH: 联合曲线全额回报——rage-quit 期间无退出税。
-    let gross_return = calculate_sell_return(creator_profile.s1_supply, args.amount)?;
+    let gross_return = calculate_sell_return_with_rating(
+        creator_profile.s1_supply,
+        args.amount,
+        creator_profile.s1_rating_bps,
+    )?;
 
     // EN: Mint SPUMP back to the user (zero tax = full gross return).
     // ZH: 向用户铸回 SPUMP（零税率 = 全额毛回报）。
@@ -150,9 +154,16 @@ pub(crate) fn handler(ctx: Context<RageQuitS1>, args: RageQuitS1Args) -> Result<
     };
 
     position.internal_token_balance = checked_sub(position.internal_token_balance, args.amount)?;
+    let early_balance_reduction = std::cmp::min(position.early_cohort_balance, args.amount);
+    position.early_cohort_balance =
+        checked_sub(position.early_cohort_balance, early_balance_reduction)?;
     position.spump_cost_basis = checked_sub(position.spump_cost_basis, released_cost_basis)?;
 
     creator_profile.s1_supply = checked_sub(creator_profile.s1_supply, args.amount)?;
+    creator_profile.s1_early_cohort_supply = checked_sub(
+        creator_profile.s1_early_cohort_supply,
+        early_balance_reduction,
+    )?;
     creator_profile.updated_at = now;
 
     Ok(())

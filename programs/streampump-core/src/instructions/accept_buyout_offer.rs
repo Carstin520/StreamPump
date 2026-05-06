@@ -7,6 +7,7 @@ use crate::{
     errors::StreamPumpError,
     events::S1BuyoutOfferAccepted,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState},
+    utils::activate_pending_s1_rating,
 };
 
 const RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3600;
@@ -61,6 +62,7 @@ pub struct AcceptBuyoutOffer<'info> {
 pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let creator_profile = &mut ctx.accounts.creator_profile;
+    activate_pending_s1_rating(creator_profile, now);
     require!(
         creator_profile.status == CreatorStatus::S1_Auction_Pending,
         StreamPumpError::InvalidCreatorStatus
@@ -87,6 +89,10 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     buyout_state.usdc_deposited = buyout_offer.usdc_amount;
     buyout_state.claimable_usdc_remaining = 0;
     buyout_state.claimable_s1_supply_remaining = 0;
+    buyout_state.early_claimable_usdc_remaining = 0;
+    buyout_state.early_claimable_s1_supply_remaining = 0;
+    buyout_state.regular_claimable_usdc_remaining = 0;
+    buyout_state.regular_claimable_s1_supply_remaining = 0;
     buyout_state.rage_quit_deadline = rage_quit_deadline;
     buyout_state.bump = ctx.bumps.s1_buyout_state;
 

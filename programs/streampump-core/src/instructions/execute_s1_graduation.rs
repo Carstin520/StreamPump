@@ -29,7 +29,7 @@ use crate::{
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, MIN_PROPOSAL_CREATOR_LEVEL,
     },
-    utils::calculate_sell_return,
+    utils::{amount_from_bps, calculate_sell_return_with_rating, checked_sub},
 };
 
 #[derive(Accounts)]
@@ -117,7 +117,11 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
     let remaining_virtual_spump = if creator_profile.s1_supply == 0 {
         0
     } else {
-        calculate_sell_return(creator_profile.s1_supply, creator_profile.s1_supply)?
+        calculate_sell_return_with_rating(
+            creator_profile.s1_supply,
+            creator_profile.s1_supply,
+            creator_profile.s1_rating_bps,
+        )?
     };
 
     // EN: 50% to creator, 50% permanently unissued (deflation).
@@ -147,8 +151,36 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
     // ZH: 将创作者毕业到 S2 并在等级低于最低提案等级时提升。
     let creator_profile = &mut ctx.accounts.creator_profile;
     let s1_buyout_state = &mut ctx.accounts.s1_buyout_state;
+    let early_supply = std::cmp::min(
+        creator_profile.s1_early_cohort_supply,
+        creator_profile.s1_supply,
+    );
+    let regular_supply = checked_sub(creator_profile.s1_supply, early_supply)?;
+    let early_usdc = if early_supply > 0 {
+        let early_cap_usdc = amount_from_bps(
+            s1_buyout_state.usdc_deposited,
+            ctx.accounts.protocol_config.s1_early_cohort_buyout_cap_bps,
+        )?;
+        let natural_early_usdc_u128 = (s1_buyout_state.usdc_deposited as u128)
+            .checked_mul(early_supply as u128)
+            .ok_or(StreamPumpError::MathOverflow)?
+            .checked_div(creator_profile.s1_supply as u128)
+            .ok_or(StreamPumpError::MathOverflow)?;
+        let natural_early_usdc = u64::try_from(natural_early_usdc_u128)
+            .map_err(|_| error!(StreamPumpError::MathOverflow))?;
+
+        std::cmp::min(natural_early_usdc, early_cap_usdc)
+    } else {
+        0
+    };
+    let regular_usdc = checked_sub(s1_buyout_state.usdc_deposited, early_usdc)?;
+
     s1_buyout_state.claimable_usdc_remaining = s1_buyout_state.usdc_deposited;
     s1_buyout_state.claimable_s1_supply_remaining = creator_profile.s1_supply;
+    s1_buyout_state.early_claimable_usdc_remaining = early_usdc;
+    s1_buyout_state.early_claimable_s1_supply_remaining = early_supply;
+    s1_buyout_state.regular_claimable_usdc_remaining = regular_usdc;
+    s1_buyout_state.regular_claimable_s1_supply_remaining = regular_supply;
 
     creator_profile.status = CreatorStatus::S2_Active;
     if creator_profile.level < MIN_PROPOSAL_CREATOR_LEVEL {

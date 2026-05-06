@@ -45,7 +45,7 @@ pub struct ClaimEndorsement<'info> {
     pub user: UncheckedAccount<'info>,
 
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
-    pub protocol_config: Account<'info, ProtocolConfig>,
+    pub protocol_config: Box<Account<'info, ProtocolConfig>>,
 
     /// EN: Proposal being claimed against. Resolved Track 2 claims require settlement first;
     ///     expired unfunded proposals can refund principal directly.
@@ -56,7 +56,7 @@ pub struct ClaimEndorsement<'info> {
         seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
         bump = proposal.bump
     )]
-    pub proposal: Account<'info, Proposal>,
+    pub proposal: Box<Account<'info, Proposal>>,
 
     /// EN: User endorsement position PDA — tracks staked amount and claim status.
     /// ZH: 用户背书仓位 PDA——追踪质押金额和领取状态。
@@ -67,7 +67,7 @@ pub struct ClaimEndorsement<'info> {
         constraint = endorsement_position.user == user.key() @ StreamPumpError::Unauthorized,
         constraint = endorsement_position.proposal == proposal.key() @ StreamPumpError::ProposalAccountMismatch
     )]
-    pub endorsement_position: Account<'info, EndorsementPosition>,
+    pub endorsement_position: Box<Account<'info, EndorsementPosition>>,
 
     /// EN: User SPUMP ATA — receives minted SPUMP principal/refund (Token-2022).
     /// ZH: 用户 SPUMP 关联代币账户——接收铸造返还的 SPUMP 本金（Token-2022）。
@@ -76,12 +76,12 @@ pub struct ClaimEndorsement<'info> {
         constraint = user_spump_ata.owner == user.key() @ StreamPumpError::Unauthorized,
         constraint = user_spump_ata.mint == spump_mint.key() @ StreamPumpError::InvalidMint
     )]
-    pub user_spump_ata: InterfaceAccount<'info, InterfaceTokenAccount>,
+    pub user_spump_ata: Box<InterfaceAccount<'info, InterfaceTokenAccount>>,
 
     /// EN: Token-2022 SPUMP mint — protocol_config PDA is its mint authority.
     /// ZH: Token-2022 SPUMP mint——protocol_config PDA 是其铸造权限。
     #[account(mut, address = protocol_config.spump_mint @ StreamPumpError::InvalidMint)]
-    pub spump_mint: InterfaceAccount<'info, Mint>,
+    pub spump_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(address = TOKEN_2022_PROGRAM_ID)]
     pub spump_token_program: Interface<'info, TokenInterface>,
@@ -93,7 +93,7 @@ pub struct ClaimEndorsement<'info> {
         constraint = user_usdc_ata.owner == user.key() @ StreamPumpError::Unauthorized,
         constraint = user_usdc_ata.mint == proposal_usdc_vault.mint @ StreamPumpError::InvalidMint
     )]
-    pub user_usdc_ata: Account<'info, TokenAccount>,
+    pub user_usdc_ata: Box<Account<'info, TokenAccount>>,
 
     /// EN: Proposal USDC vault PDA — holds the Track 2 fan pool after settlement.
     /// ZH: 提案 USDC 金库 PDA——结算后持有 Track2 粉丝池。
@@ -103,7 +103,7 @@ pub struct ClaimEndorsement<'info> {
         bump = proposal.usdc_vault_bump,
         token::authority = proposal
     )]
-    pub proposal_usdc_vault: Account<'info, TokenAccount>,
+    pub proposal_usdc_vault: Box<Account<'info, TokenAccount>>,
 
     pub usdc_token_program: Program<'info, Token>,
 }
@@ -251,9 +251,9 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                             authority: ctx.accounts.protocol_config.to_account_info(),
                         },
                         protocol_signer,
-                ),
-                refund_amount,
-            )?;
+                    ),
+                    refund_amount,
+                )?;
             }
 
             let proposal = &mut ctx.accounts.proposal;

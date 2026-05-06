@@ -28,8 +28,10 @@ use anchor_spl::{
 use crate::{
     errors::StreamPumpError,
     events::S1TokenBought,
-    state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition},
-    utils::{calculate_buy_cost, checked_add},
+    state::{
+        CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition, UserProfile, USER_ROLE_FAN,
+    },
+    utils::{activate_pending_s1_rating, calculate_buy_cost_with_rating, checked_add},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -46,6 +48,13 @@ pub struct BuyS1Token<'info> {
 
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
     pub protocol_config: Account<'info, ProtocolConfig>,
+
+    #[account(
+        seeds = [b"user_profile", user.key().as_ref()],
+        bump = user_profile.bump,
+        constraint = user_profile.authority == user.key() @ StreamPumpError::Unauthorized
+    )]
+    pub user_profile: Account<'info, UserProfile>,
 
     /// EN: Creator profile — must be in S1_Active status.
     /// ZH: Creator 档案——必须处于 S1_Active 状态。
@@ -90,6 +99,19 @@ pub struct BuyS1Token<'info> {
 
 pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<()> {
     require!(args.amount > 0, StreamPumpError::InvalidAmount);
+
+    let now = Clock::get()?.unix_timestamp;
+    let current_day = now.div_euclid(86_400);
+    require!(
+        ctx.accounts.user_profile.activity_score >= ctx.accounts.protocol_config.s1_min_user_xp,
+        StreamPumpError::InsufficientUserActivityScore
+    );
+    require!(
+        ctx.accounts.user_profile.role_flags & USER_ROLE_FAN != 0,
+        StreamPumpError::UserNotEligibleForS1
+    );
+
+    activate_pending_s1_rating(&mut ctx.accounts.creator_profile, now);
     require!(
         ctx.accounts.creator_profile.status == CreatorStatus::S1_Active,
         StreamPumpError::InvalidCreatorStatus
@@ -98,7 +120,65 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     // EN: Calculate SPUMP cost using the linear bonding curve formula.
     // ZH: 通过线性联合曲线公式计算 SPUMP 成本。
     let current_supply = ctx.accounts.creator_profile.s1_supply;
-    let spump_cost = calculate_buy_cost(current_supply, args.amount)?;
+    let spump_cost = calculate_buy_cost_with_rating(
+        current_supply,
+        args.amount,
+        ctx.accounts.creator_profile.s1_rating_bps,
+    )?;
+
+    let creator_key = ctx.accounts.creator_profile.key();
+    let position_key = ctx.accounts.s1_user_position.key();
+
+    let position = &mut ctx.accounts.s1_user_position;
+    if position.user == Pubkey::default() {
+        position.user = ctx.accounts.user.key();
+        position.creator = creator_key;
+        position.internal_token_balance = 0;
+        position.early_cohort_balance = 0;
+        position.spump_cost_basis = 0;
+        position.first_bought_at = 0;
+        position.last_buy_day = 0;
+        position.daily_bought_amount = 0;
+        position.bump = ctx.bumps.s1_user_position;
+    }
+
+    require_keys_eq!(
+        position.user,
+        ctx.accounts.user.key(),
+        StreamPumpError::Unauthorized
+    );
+    require_keys_eq!(
+        position.creator,
+        creator_key,
+        StreamPumpError::S1PositionAccountMismatch
+    );
+
+    let new_daily_bought_amount = if position.last_buy_day == current_day {
+        checked_add(position.daily_bought_amount, args.amount)?
+    } else {
+        args.amount
+    };
+    require!(
+        new_daily_bought_amount <= ctx.accounts.protocol_config.max_s1_daily_buy_amount,
+        StreamPumpError::S1DailyBuyLimitExceeded
+    );
+
+    let early_amount = if current_supply
+        < ctx
+            .accounts
+            .protocol_config
+            .s1_early_cohort_supply_threshold
+    {
+        let remaining_early_capacity = ctx
+            .accounts
+            .protocol_config
+            .s1_early_cohort_supply_threshold
+            .checked_sub(current_supply)
+            .ok_or(StreamPumpError::MathOverflow)?;
+        std::cmp::min(args.amount, remaining_early_capacity)
+    } else {
+        0
+    };
 
     // EN: Burn SPUMP from user — permanent supply reduction.
     // ZH: 从用户销毁 SPUMP——永久减少供应。
@@ -114,38 +194,21 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
         spump_cost,
     )?;
 
-    let creator_key = ctx.accounts.creator_profile.key();
-    let position_key = ctx.accounts.s1_user_position.key();
-
-    // EN: Initialize position on first buy, or validate ownership on subsequent buys.
-    // ZH: 首次购买时初始化仓位，后续购买时校验所有权。
-    let position = &mut ctx.accounts.s1_user_position;
-    if position.user == Pubkey::default() {
-        position.user = ctx.accounts.user.key();
-        position.creator = creator_key;
-        position.internal_token_balance = 0;
-        position.spump_cost_basis = 0;
-        position.bump = ctx.bumps.s1_user_position;
-    }
-
-    require_keys_eq!(
-        position.user,
-        ctx.accounts.user.key(),
-        StreamPumpError::Unauthorized
-    );
-    require_keys_eq!(
-        position.creator,
-        creator_key,
-        StreamPumpError::S1PositionAccountMismatch
-    );
-
     // EN: Update virtual position and creator supply.
     // ZH: 更新虚拟仓位和创作者供应量。
+    if position.first_bought_at == 0 {
+        position.first_bought_at = now;
+    }
     position.internal_token_balance = checked_add(position.internal_token_balance, args.amount)?;
+    position.early_cohort_balance = checked_add(position.early_cohort_balance, early_amount)?;
     position.spump_cost_basis = checked_add(position.spump_cost_basis, spump_cost)?;
+    position.last_buy_day = current_day;
+    position.daily_bought_amount = new_daily_bought_amount;
 
     let creator_profile = &mut ctx.accounts.creator_profile;
     creator_profile.s1_supply = checked_add(creator_profile.s1_supply, args.amount)?;
+    creator_profile.s1_early_cohort_supply =
+        checked_add(creator_profile.s1_early_cohort_supply, early_amount)?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 
     emit!(S1TokenBought {

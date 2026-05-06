@@ -359,6 +359,11 @@ App 端建议的一级导航：
 ### 验收标准
 
 - creator token 和 bonding curve 信息展示清晰
+- creator momentum rating、graduation target、daily SPUMP availability 需要展示为影响价格/进度的协议参数
+- S1 buy 按钮必须检查 user profile、activity score、fan role、每日买入额度
+- pending creator rating 必须显示 effective time，避免用户误以为价格已经变化
+- buyout offer accepted 后禁止显示普通 buy/sell，只保留 rage quit / graduation / claim 状态
+- 页面必须说明 S1 creator token 是内部虚拟仓位，不是可转让 SPL token
 - buy / sell 和 buyout 状态能被清楚区分
 
 ## 5.4 `/portfolio`

@@ -62,6 +62,15 @@ export interface OnChainCreatorProfileState {
   level: number;
   status: "S1_ACTIVE" | "S1_AUCTION_PENDING" | "S1_EXECUTION_PENDING" | "S2_ACTIVE";
   s1Supply: bigint;
+  s1EarlyCohortSupply: bigint;
+  s1RatingBps: number;
+  s1GraduationTargetSupply: bigint;
+  pendingS1RatingBps: number;
+  pendingS1GraduationTargetSupply: bigint;
+  pendingRatingEffectiveAtUnix: bigint;
+  pendingRatingReportDigestHex: string | null;
+  lastRatingUpdateAtUnix: bigint;
+  lastRatingReportDigestHex: string | null;
   lastUpgradeAtUnix: bigint;
   createdAtUnix: bigint;
   updatedAtUnix: bigint;
@@ -74,6 +83,10 @@ export interface OnChainS1BuyoutState {
   usdcDeposited: bigint;
   claimableUsdcRemaining: bigint;
   claimableS1SupplyRemaining: bigint;
+  earlyClaimableUsdcRemaining: bigint;
+  earlyClaimableS1SupplyRemaining: bigint;
+  regularClaimableUsdcRemaining: bigint;
+  regularClaimableS1SupplyRemaining: bigint;
   rageQuitDeadlineUnix: bigint;
   bump: number;
 }
@@ -91,13 +104,29 @@ export interface OnChainS1UserPositionState {
   user: PublicKey;
   creatorProfile: PublicKey;
   internalTokenBalance: bigint;
+  earlyCohortBalance: bigint;
   spumpCostBasis: bigint;
+  firstBoughtAtUnix: bigint;
+  lastBuyDay: bigint;
+  dailyBoughtAmount: bigint;
   bump: number;
 }
 
 type ProtocolConfigAccount = {
   oracleAuthority: PublicKey;
   usdcMint: PublicKey;
+  dailySpumpEmissionMultiplierBps?: number;
+  newUserEmissionBps?: number;
+  newUserEmissionWindowSeconds?: BN | bigint | number;
+  s1MinUserXp?: BN | bigint | number;
+  maxS1DailyBuyAmount?: BN | bigint | number;
+  s1EarlyCohortSupplyThreshold?: BN | bigint | number;
+  s1EarlyCohortBuyoutCapBps?: number;
+  minCreatorRatingBps?: number;
+  maxCreatorRatingBps?: number;
+  maxCreatorRatingDailyDeltaBps?: number;
+  s1RatingEffectiveDelaySeconds?: BN | bigint | number;
+  defaultS1GraduationTargetSupply?: BN | bigint | number;
 };
 
 type CreatorProfileAccount = {
@@ -107,6 +136,15 @@ type CreatorProfileAccount = {
   level: number;
   status: unknown;
   s1Supply: BN | bigint | number;
+  s1EarlyCohortSupply?: BN | bigint | number;
+  s1RatingBps?: number;
+  s1GraduationTargetSupply?: BN | bigint | number;
+  pendingS1RatingBps?: number;
+  pendingS1GraduationTargetSupply?: BN | bigint | number;
+  pendingRatingEffectiveAt?: BN | bigint | number;
+  pendingRatingReportDigest?: number[];
+  lastRatingUpdateAt?: BN | bigint | number;
+  lastRatingReportDigest?: number[];
   lastUpgradeAt: BN | bigint | number;
   createdAt: BN | bigint | number;
   updatedAt: BN | bigint | number;
@@ -119,6 +157,10 @@ type S1BuyoutStateAccount = {
   usdcDeposited: BN | bigint | number;
   claimableUsdcRemaining: BN | bigint | number;
   claimableS1SupplyRemaining: BN | bigint | number;
+  earlyClaimableUsdcRemaining?: BN | bigint | number;
+  earlyClaimableS1SupplyRemaining?: BN | bigint | number;
+  regularClaimableUsdcRemaining?: BN | bigint | number;
+  regularClaimableS1SupplyRemaining?: BN | bigint | number;
   rageQuitDeadline: BN | bigint | number;
   bump: number;
 };
@@ -136,7 +178,11 @@ type S1UserPositionAccount = {
   user: PublicKey;
   creator: PublicKey;
   internalTokenBalance: BN | bigint | number;
+  earlyCohortBalance?: BN | bigint | number;
   spumpCostBasis: BN | bigint | number;
+  firstBoughtAt?: BN | bigint | number;
+  lastBuyDay?: BN | bigint | number;
+  dailyBoughtAmount?: BN | bigint | number;
   bump: number;
 };
 
@@ -543,6 +589,19 @@ export class AnchorService {
       level: Number(creator.level ?? 0),
       status: mapCreatorStatus(creator.status),
       s1Supply: toBigInt(creator.s1Supply),
+      s1EarlyCohortSupply: toBigInt(creator.s1EarlyCohortSupply),
+      s1RatingBps: Number(creator.s1RatingBps ?? 10_000),
+      s1GraduationTargetSupply: toBigInt(creator.s1GraduationTargetSupply ?? 2_500),
+      pendingS1RatingBps: Number(creator.pendingS1RatingBps ?? 0),
+      pendingS1GraduationTargetSupply: toBigInt(creator.pendingS1GraduationTargetSupply),
+      pendingRatingEffectiveAtUnix: toBigInt(creator.pendingRatingEffectiveAt),
+      pendingRatingReportDigestHex: creator.pendingRatingReportDigest
+        ? Buffer.from(creator.pendingRatingReportDigest).toString("hex")
+        : null,
+      lastRatingUpdateAtUnix: toBigInt(creator.lastRatingUpdateAt),
+      lastRatingReportDigestHex: creator.lastRatingReportDigest
+        ? Buffer.from(creator.lastRatingReportDigest).toString("hex")
+        : null,
       lastUpgradeAtUnix: toBigInt(creator.lastUpgradeAt),
       createdAtUnix: toBigInt(creator.createdAt),
       updatedAtUnix: toBigInt(creator.updatedAt),
@@ -568,6 +627,10 @@ export class AnchorService {
       usdcDeposited: toBigInt(buyout.usdcDeposited),
       claimableUsdcRemaining: toBigInt(buyout.claimableUsdcRemaining),
       claimableS1SupplyRemaining: toBigInt(buyout.claimableS1SupplyRemaining),
+      earlyClaimableUsdcRemaining: toBigInt(buyout.earlyClaimableUsdcRemaining),
+      earlyClaimableS1SupplyRemaining: toBigInt(buyout.earlyClaimableS1SupplyRemaining),
+      regularClaimableUsdcRemaining: toBigInt(buyout.regularClaimableUsdcRemaining),
+      regularClaimableS1SupplyRemaining: toBigInt(buyout.regularClaimableS1SupplyRemaining),
       rageQuitDeadlineUnix: toBigInt(buyout.rageQuitDeadline),
       bump: Number(buyout.bump ?? 0),
     };
@@ -611,7 +674,11 @@ export class AnchorService {
       user: position.user,
       creatorProfile: position.creator,
       internalTokenBalance: toBigInt(position.internalTokenBalance),
+      earlyCohortBalance: toBigInt(position.earlyCohortBalance),
       spumpCostBasis: toBigInt(position.spumpCostBasis),
+      firstBoughtAtUnix: toBigInt(position.firstBoughtAt),
+      lastBuyDay: toBigInt(position.lastBuyDay),
+      dailyBoughtAmount: toBigInt(position.dailyBoughtAmount),
       bump: Number(position.bump ?? 0),
     };
   }

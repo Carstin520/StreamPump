@@ -47,6 +47,13 @@ pub mod streampump_core {
         instructions::sell_s1_token::handler(ctx, args)
     }
 
+    pub fn update_creator_s1_rating(
+        ctx: Context<UpdateCreatorS1Rating>,
+        args: UpdateCreatorS1RatingArgs,
+    ) -> Result<()> {
+        instructions::update_creator_s1_rating::handler(ctx, args)
+    }
+
     pub fn init_s1_buyout(ctx: Context<InitS1Buyout>) -> Result<()> {
         instructions::init_s1_buyout::handler(ctx)
     }

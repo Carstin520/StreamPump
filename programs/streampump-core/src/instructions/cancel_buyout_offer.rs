@@ -74,7 +74,8 @@ pub(crate) fn handler(ctx: Context<CancelBuyoutOffer>) -> Result<()> {
     );
 
     let winning_sponsor = ctx.accounts.s1_buyout_state.winning_sponsor;
-    let is_winning_sponsor = matches!(winning_sponsor, Some(sponsor) if sponsor == ctx.accounts.sponsor.key());
+    let is_winning_sponsor =
+        matches!(winning_sponsor, Some(sponsor) if sponsor == ctx.accounts.sponsor.key());
     if is_winning_sponsor {
         require!(
             ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,

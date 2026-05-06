@@ -4,8 +4,8 @@ use solana_keccak_hasher::hash as keccak_hash;
 use crate::{
     errors::StreamPumpError,
     state::{
-        OrganizationType, USER_ROLE_CREATOR, USER_ROLE_MCN_OPERATOR, USER_ROLE_SPONSOR_OPERATOR,
-        VALID_USER_ROLE_MASK,
+        CreatorProfile, OrganizationType, DEFAULT_S1_RATING_BPS, USER_ROLE_CREATOR,
+        USER_ROLE_MCN_OPERATOR, USER_ROLE_SPONSOR_OPERATOR, VALID_USER_ROLE_MASK,
     },
 };
 
@@ -52,9 +52,24 @@ pub fn keccak_digest(input: &[u8]) -> [u8; 32] {
     keccak_hash(input).to_bytes()
 }
 
+fn effective_s1_curve_k(rating_bps: u16) -> Result<u128> {
+    require!(rating_bps > 0, StreamPumpError::InvalidCreatorRatingConfig);
+    let scaled = (S1_BONDING_CURVE_K as u128)
+        .checked_mul(rating_bps as u128)
+        .ok_or(StreamPumpError::MathOverflow)?
+        .checked_div(10_000)
+        .ok_or(StreamPumpError::MathOverflow)?;
+
+    Ok(std::cmp::max(scaled, 1))
+}
+
 /// Calculates buy cost for S1 internal tokens using:
-/// cost = k/2 * ((S + dS)^2 - S^2)
-pub fn calculate_buy_cost(current_supply: u64, amount: u64) -> Result<u64> {
+/// cost = effective_k/2 * ((S + dS)^2 - S^2)
+pub fn calculate_buy_cost_with_rating(
+    current_supply: u64,
+    amount: u64,
+    rating_bps: u16,
+) -> Result<u64> {
     let start = current_supply as u128;
     let delta = amount as u128;
     let end = start
@@ -69,7 +84,7 @@ pub fn calculate_buy_cost(current_supply: u64, amount: u64) -> Result<u64> {
     let diff = end_sq
         .checked_sub(start_sq)
         .ok_or(StreamPumpError::MathOverflow)?;
-    let scaled = (S1_BONDING_CURVE_K as u128)
+    let scaled = effective_s1_curve_k(rating_bps)?
         .checked_mul(diff)
         .ok_or(StreamPumpError::MathOverflow)?;
     let cost = scaled.checked_div(2).ok_or(StreamPumpError::MathOverflow)?;
@@ -77,9 +92,17 @@ pub fn calculate_buy_cost(current_supply: u64, amount: u64) -> Result<u64> {
     u64::try_from(cost).map_err(|_| error!(StreamPumpError::MathOverflow))
 }
 
+pub fn calculate_buy_cost(current_supply: u64, amount: u64) -> Result<u64> {
+    calculate_buy_cost_with_rating(current_supply, amount, DEFAULT_S1_RATING_BPS)
+}
+
 /// Calculates gross sell return for S1 internal tokens using:
-/// return = k/2 * (S^2 - (S - dS)^2)
-pub fn calculate_sell_return(current_supply: u64, amount: u64) -> Result<u64> {
+/// return = effective_k/2 * (S^2 - (S - dS)^2)
+pub fn calculate_sell_return_with_rating(
+    current_supply: u64,
+    amount: u64,
+    rating_bps: u16,
+) -> Result<u64> {
     let start = current_supply as u128;
     let delta = amount as u128;
     let end = start
@@ -94,12 +117,16 @@ pub fn calculate_sell_return(current_supply: u64, amount: u64) -> Result<u64> {
     let diff = start_sq
         .checked_sub(end_sq)
         .ok_or(StreamPumpError::MathOverflow)?;
-    let scaled = (S1_BONDING_CURVE_K as u128)
+    let scaled = effective_s1_curve_k(rating_bps)?
         .checked_mul(diff)
         .ok_or(StreamPumpError::MathOverflow)?;
     let gross = scaled.checked_div(2).ok_or(StreamPumpError::MathOverflow)?;
 
     u64::try_from(gross).map_err(|_| error!(StreamPumpError::MathOverflow))
+}
+
+pub fn calculate_sell_return(current_supply: u64, amount: u64) -> Result<u64> {
+    calculate_sell_return_with_rating(current_supply, amount, DEFAULT_S1_RATING_BPS)
 }
 
 pub fn validate_role_flags(role_flags: u16) -> Result<()> {
@@ -122,6 +149,59 @@ pub fn daily_spump_amount_for_level(level: u8) -> Result<u64> {
     ONE_SPUMP
         .checked_mul(multiplier)
         .ok_or_else(|| error!(StreamPumpError::MathOverflow))
+}
+
+pub fn apply_emission_multiplier(amount: u64, multiplier_bps: u16) -> Result<u64> {
+    require!(multiplier_bps > 0, StreamPumpError::InvalidEmissionConfig);
+    let scaled = (amount as u128)
+        .checked_mul(multiplier_bps as u128)
+        .ok_or(StreamPumpError::MathOverflow)?
+        .checked_div(10_000)
+        .ok_or(StreamPumpError::MathOverflow)?;
+
+    u64::try_from(std::cmp::max(scaled, 1)).map_err(|_| error!(StreamPumpError::MathOverflow))
+}
+
+pub fn apply_new_user_emission_discount(
+    amount: u64,
+    user_created_at: i64,
+    now: i64,
+    window_seconds: i64,
+    new_user_bps: u16,
+) -> Result<u64> {
+    require!(
+        new_user_bps > 0 && new_user_bps <= 10_000 && window_seconds >= 0,
+        StreamPumpError::InvalidEmissionConfig
+    );
+
+    let is_new_user = user_created_at > 0
+        && window_seconds > 0
+        && now
+            < user_created_at
+                .checked_add(window_seconds)
+                .ok_or(StreamPumpError::MathOverflow)?;
+
+    if is_new_user {
+        return amount_from_bps(amount, new_user_bps);
+    }
+
+    Ok(amount)
+}
+
+pub fn activate_pending_s1_rating(creator_profile: &mut CreatorProfile, now: i64) {
+    if creator_profile.pending_s1_rating_bps > 0
+        && creator_profile.pending_rating_effective_at > 0
+        && now >= creator_profile.pending_rating_effective_at
+    {
+        creator_profile.s1_rating_bps = creator_profile.pending_s1_rating_bps;
+        creator_profile.s1_graduation_target_supply =
+            creator_profile.pending_s1_graduation_target_supply;
+        creator_profile.last_rating_report_digest = creator_profile.pending_rating_report_digest;
+        creator_profile.pending_s1_rating_bps = 0;
+        creator_profile.pending_s1_graduation_target_supply = 0;
+        creator_profile.pending_rating_effective_at = 0;
+        creator_profile.pending_rating_report_digest = [0_u8; 32];
+    }
 }
 
 pub fn role_flag_for_organization_type(organization_type: OrganizationType) -> u16 {

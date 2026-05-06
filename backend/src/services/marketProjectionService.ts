@@ -18,7 +18,8 @@ import {
 import { prisma } from "./prisma";
 
 const S1_BONDING_CURVE_K = 1_000n;
-const DEFAULT_GRADUATION_SUPPLY_TARGET = 100_000n;
+const DEFAULT_S1_RATING_BPS = 10_000n;
+const DEFAULT_GRADUATION_SUPPLY_TARGET = 2_500n;
 
 type ChainProjectionEvent = {
   signature: string;
@@ -93,20 +94,28 @@ const unixSecondsToDate = (value: bigint | null): Date | null => {
   return new Date(seconds * 1000);
 };
 
-const calculateBuyCost = (currentSupply: bigint, amount: bigint): bigint => {
+const effectiveCurveK = (ratingBps: number): bigint =>
+  (S1_BONDING_CURVE_K * BigInt(Math.max(1, ratingBps))) / DEFAULT_S1_RATING_BPS;
+
+const calculateBuyCost = (
+  currentSupply: bigint,
+  amount: bigint,
+  ratingBps: number
+): bigint => {
   const end = currentSupply + amount;
-  return (S1_BONDING_CURVE_K * (end * end - currentSupply * currentSupply)) / 2n;
+  return (effectiveCurveK(ratingBps) * (end * end - currentSupply * currentSupply)) / 2n;
 };
 
-const calculateFullCurveValue = (supply: bigint): bigint =>
-  (S1_BONDING_CURVE_K * supply * supply) / 2n;
+const calculateFullCurveValue = (supply: bigint, ratingBps: number): bigint =>
+  (effectiveCurveK(ratingBps) * supply * supply) / 2n;
 
-const calculateGraduationProgressBps = (supply: bigint): number => {
+const calculateGraduationProgressBps = (supply: bigint, targetSupply: bigint): number => {
   if (supply <= 0n) {
     return 0;
   }
 
-  const bps = (supply * 10_000n) / DEFAULT_GRADUATION_SUPPLY_TARGET;
+  const target = targetSupply > 0n ? targetSupply : DEFAULT_GRADUATION_SUPPLY_TARGET;
+  const bps = (supply * 10_000n) / target;
   return Number(bps > 10_000n ? 10_000n : bps);
 };
 
@@ -192,8 +201,19 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
     buyout?.status === BuyoutProjectionStatus.OFFER_ACCEPTED ||
       buyout?.status === BuyoutProjectionStatus.RAGE_QUIT_OPEN
   );
-  const currentPriceSpump = calculateBuyCost(creator.s1Supply, 1n);
-  const supporterPoolSpump = calculateFullCurveValue(creator.s1Supply);
+  const currentPriceSpump = calculateBuyCost(creator.s1Supply, 1n, creator.s1RatingBps);
+  const supporterPoolSpump = calculateFullCurveValue(creator.s1Supply, creator.s1RatingBps);
+  const creatorMomentumMetadata = {
+    s1RatingBps: creator.s1RatingBps,
+    s1EarlyCohortSupply: creator.s1EarlyCohortSupply.toString(),
+    s1GraduationTargetSupply: creator.s1GraduationTargetSupply.toString(),
+    pendingS1RatingBps: creator.pendingS1RatingBps,
+    pendingS1GraduationTargetSupply: creator.pendingS1GraduationTargetSupply.toString(),
+    pendingRatingEffectiveAtUnix: creator.pendingRatingEffectiveAtUnix.toString(),
+    pendingRatingReportDigestHex: creator.pendingRatingReportDigestHex,
+    lastRatingUpdateAtUnix: creator.lastRatingUpdateAtUnix.toString(),
+    lastRatingReportDigestHex: creator.lastRatingReportDigestHex,
+  };
 
   return prisma.creatorMarketProjection.upsert({
     where: {
@@ -209,11 +229,15 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
       nextPriceSpump: currentPriceSpump,
       supporterPoolSpump,
       holderCount,
-      graduationProgressBps: calculateGraduationProgressBps(creator.s1Supply),
+      graduationProgressBps: calculateGraduationProgressBps(
+        creator.s1Supply,
+        creator.s1GraduationTargetSupply
+      ),
       activeCampaignCount,
       latestBuyoutOfferUsdc: latestOffer?.usdcAmount ?? null,
       acceptedBuyoutOfferUsdc: buyout?.acceptedOfferUsdc ?? null,
       buyoutStatePda: buyout?.buyoutStatePda ?? null,
+      metadataJson: creatorMomentumMetadata,
       lastEventSignature: event?.signature,
       lastEventAt: event?.observedAt,
     },
@@ -228,11 +252,15 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
       nextPriceSpump: currentPriceSpump,
       supporterPoolSpump,
       holderCount,
-      graduationProgressBps: calculateGraduationProgressBps(creator.s1Supply),
+      graduationProgressBps: calculateGraduationProgressBps(
+        creator.s1Supply,
+        creator.s1GraduationTargetSupply
+      ),
       activeCampaignCount,
       latestBuyoutOfferUsdc: latestOffer?.usdcAmount ?? null,
       acceptedBuyoutOfferUsdc: buyout?.acceptedOfferUsdc ?? null,
       buyoutStatePda: buyout?.buyoutStatePda ?? null,
+      metadataJson: creatorMomentumMetadata,
       lastEventSignature: event?.signature,
       lastEventAt: event?.observedAt,
     },
@@ -392,6 +420,14 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       },
     });
     await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+    return;
+  }
+
+  if (params.instructionName === "update_creator_s1_rating") {
+    const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
+    if (creatorProfilePda) {
+      await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+    }
     return;
   }
 
@@ -624,6 +660,7 @@ export const serializeCreatorMarketProjection = (
   supporterPoolSpump: creator.supporterPoolSpump.toString(),
   holderCount: creator.holderCount,
   graduationProgressBps: creator.graduationProgressBps,
+  metadata: creator.metadataJson,
   activeCampaignCount: creator.activeCampaignCount,
   latestBuyoutOfferUsdc: serializeBigInt(creator.latestBuyoutOfferUsdc),
   acceptedBuyoutOfferUsdc: serializeBigInt(creator.acceptedBuyoutOfferUsdc),

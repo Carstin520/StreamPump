@@ -29,7 +29,9 @@ use crate::{
     errors::StreamPumpError,
     events::S1TokenSold,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition},
-    utils::{amount_from_bps, calculate_sell_return, checked_sub},
+    utils::{
+        activate_pending_s1_rating, amount_from_bps, calculate_sell_return_with_rating, checked_sub,
+    },
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -138,6 +140,8 @@ fn calculate_dynamic_tax_bps(
 
 pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Result<()> {
     require!(args.amount > 0, StreamPumpError::InvalidAmount);
+    let now = Clock::get()?.unix_timestamp;
+    activate_pending_s1_rating(&mut ctx.accounts.creator_profile, now);
     require!(
         ctx.accounts.creator_profile.status == CreatorStatus::S1_Active,
         StreamPumpError::InvalidCreatorStatus
@@ -154,7 +158,11 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
 
     // EN: Calculate gross SPUMP return from the bonding curve (inverse of buy).
     // ZH: 从联合曲线计算 SPUMP 毛回报（买入的逆运算）。
-    let gross_return = calculate_sell_return(creator_profile.s1_supply, args.amount)?;
+    let gross_return = calculate_sell_return_with_rating(
+        creator_profile.s1_supply,
+        args.amount,
+        creator_profile.s1_rating_bps,
+    )?;
 
     // EN: Apply dynamic exit tax.
     // ZH: 应用动态退出税。
@@ -235,9 +243,16 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     };
 
     position.internal_token_balance = checked_sub(position.internal_token_balance, args.amount)?;
+    let early_balance_reduction = std::cmp::min(position.early_cohort_balance, args.amount);
+    position.early_cohort_balance =
+        checked_sub(position.early_cohort_balance, early_balance_reduction)?;
     position.spump_cost_basis = checked_sub(position.spump_cost_basis, released_cost_basis)?;
 
     creator_profile.s1_supply = checked_sub(creator_profile.s1_supply, args.amount)?;
+    creator_profile.s1_early_cohort_supply = checked_sub(
+        creator_profile.s1_early_cohort_supply,
+        early_balance_reduction,
+    )?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 
     emit!(S1TokenSold {

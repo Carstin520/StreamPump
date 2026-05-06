@@ -9,7 +9,10 @@ use anchor_spl::{
 use crate::{
     errors::StreamPumpError,
     state::{ProtocolConfig, UserProfile},
-    utils::{checked_add, daily_spump_amount_for_level},
+    utils::{
+        apply_emission_multiplier, apply_new_user_emission_discount, checked_add,
+        daily_spump_amount_for_level,
+    },
 };
 
 #[derive(Accounts)]
@@ -66,7 +69,22 @@ pub(crate) fn handler(ctx: Context<ClaimDailySpump>) -> Result<()> {
         user_profile.daily_claim_streak = 1;
     }
 
-    let reward_amount = daily_spump_amount_for_level(user_profile.level)?;
+    let base_reward_amount = daily_spump_amount_for_level(user_profile.level)?;
+    let platform_reward_amount = apply_emission_multiplier(
+        base_reward_amount,
+        ctx.accounts
+            .protocol_config
+            .daily_spump_emission_multiplier_bps,
+    )?;
+    let reward_amount = apply_new_user_emission_discount(
+        platform_reward_amount,
+        user_profile.created_at,
+        now,
+        ctx.accounts
+            .protocol_config
+            .new_user_emission_window_seconds,
+        ctx.accounts.protocol_config.new_user_emission_bps,
+    )?;
 
     let bump_bytes = [ctx.accounts.protocol_config.bump];
     let signer_seeds: [&[u8]; 2] = [b"protocol_config", bump_bytes.as_ref()];
@@ -87,8 +105,7 @@ pub(crate) fn handler(ctx: Context<ClaimDailySpump>) -> Result<()> {
 
     user_profile.last_daily_claim_at = now;
     user_profile.last_reward_at = now;
-    user_profile.total_spump_earned =
-        checked_add(user_profile.total_spump_earned, reward_amount)?;
+    user_profile.total_spump_earned = checked_add(user_profile.total_spump_earned, reward_amount)?;
     user_profile.updated_at = now;
 
     Ok(())

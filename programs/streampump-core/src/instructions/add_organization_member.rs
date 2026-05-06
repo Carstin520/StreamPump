@@ -47,7 +47,10 @@ pub struct AddOrganizationMember<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn handler(ctx: Context<AddOrganizationMember>, args: AddOrganizationMemberArgs) -> Result<()> {
+pub(crate) fn handler(
+    ctx: Context<AddOrganizationMember>,
+    args: AddOrganizationMemberArgs,
+) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let role_flag = role_flag_for_organization_type(ctx.accounts.organization.organization_type);
 

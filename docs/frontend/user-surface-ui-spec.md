@@ -273,17 +273,24 @@ Post Detail 分两种模式：
 核心模块：
 
 - Graduation progress
+- Creator momentum rating
 - Current token price
 - Holder count
 - Top 15 holders
 - Bonding curve chart
 - Target graduation price
+- Daily SPUMP availability / spend cap
+- User profile eligibility / activity score
+- Daily user x creator buy cap remaining
+- Pending creator rating and effective time
 - Potential buyout sponsors
 - 近期内容 feed
 
 目标：
 
-让用户理解这是“成长中 creator”，不是单纯交易资产。
+让用户理解这是“成长中 creator”，不是单纯交易资产。S1 的 creator token 是内部虚拟仓位，不是可转让 SPL token；用户是在 burn `SPUMP` 支持 creator 的早期动量。
+
+当 creator 进入 buyout accepted / rage-quit window 后，页面必须隐藏普通 buy/sell，只展示 rage quit、等待毕业、或毕业后 claim。
 
 #### 8.2 S1 Buyout
 

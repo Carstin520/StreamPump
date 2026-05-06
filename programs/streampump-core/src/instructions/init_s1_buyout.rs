@@ -6,6 +6,7 @@ use crate::{
     errors::StreamPumpError,
     events::S1BuyoutAuctionOpened,
     state::{CreatorProfile, CreatorStatus},
+    utils::activate_pending_s1_rating,
 };
 
 #[derive(Accounts)]
@@ -23,14 +24,16 @@ pub struct InitS1Buyout<'info> {
 }
 
 pub(crate) fn handler(ctx: Context<InitS1Buyout>) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
     let creator_profile = &mut ctx.accounts.creator_profile;
+    activate_pending_s1_rating(creator_profile, now);
     require!(
         creator_profile.status == CreatorStatus::S1_Active,
         StreamPumpError::InvalidCreatorStatus
     );
 
     creator_profile.status = CreatorStatus::S1_Auction_Pending;
-    creator_profile.updated_at = Clock::get()?.unix_timestamp;
+    creator_profile.updated_at = now;
 
     emit!(S1BuyoutAuctionOpened {
         creator_profile: creator_profile.key(),

@@ -71,7 +71,10 @@ pub struct ClaimEngagementReward<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn handler(ctx: Context<ClaimEngagementReward>, args: ClaimEngagementRewardArgs) -> Result<()> {
+pub(crate) fn handler(
+    ctx: Context<ClaimEngagementReward>,
+    args: ClaimEngagementRewardArgs,
+) -> Result<()> {
     require_keys_eq!(
         ctx.accounts.oracle.key(),
         ctx.accounts.protocol_config.oracle_authority,
@@ -129,6 +132,7 @@ pub(crate) fn handler(ctx: Context<ClaimEngagementReward>, args: ClaimEngagement
     }
 
     user_profile.xp = checked_add(user_profile.xp, args.xp_gain)?;
+    user_profile.activity_score = checked_add(user_profile.activity_score, args.xp_gain)?;
     user_profile.last_reward_at = now;
     user_profile.updated_at = now;
 
