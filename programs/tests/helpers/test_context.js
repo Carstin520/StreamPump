@@ -321,6 +321,7 @@ const buildContext = async () => {
         maxCreatorRatingDailyDeltaBps: 1_000, // ±10% per oracle epoch / 每个预言机周期最多 ±10%
         s1RatingEffectiveDelaySeconds: bn(24 * 3_600), // Rating updates take effect next epoch / rating 下一周期生效
         defaultS1GraduationTargetSupply: bn(2_500), // Early supporter upside target / 早期支持者收益目标
+        s1RageQuitWindowSeconds: bn(48 * 3_600), // Production rage-quit window / 生产默认 rage-quit 窗口
         s2MinFollowers: bn(100), // Min followers for S2 upgrade / S2 升级所需最低粉丝数
         s2MinValidViews: bn(1_000), // Min views for S2 upgrade / S2 升级所需最低有效观看数
     })

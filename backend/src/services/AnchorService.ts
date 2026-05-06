@@ -123,6 +123,7 @@ type ProtocolConfigAccount = {
   maxS1DailyBuySpump?: BN | bigint | number;
   s1EarlyCohortSupplyThreshold?: BN | bigint | number;
   s1EarlyCohortBuyoutCapBps?: number;
+  s1RageQuitWindowSeconds?: BN | bigint | number;
   minCreatorRatingBps?: number;
   maxCreatorRatingBps?: number;
   maxCreatorRatingDailyDeltaBps?: number;
@@ -204,6 +205,7 @@ export type UpdateProtocolS1EmissionParams = {
   maxS1DailyBuySpump: bigint;
   s1EarlyCohortSupplyThreshold: bigint;
   s1EarlyCohortBuyoutCapBps: number;
+  s1RageQuitWindowSeconds: number;
 };
 
 export type ProtocolS1ConfigState = UpdateProtocolS1EmissionParams & {
@@ -735,6 +737,7 @@ export class AnchorService {
       maxS1DailyBuySpump: toBigInt(account.maxS1DailyBuySpump),
       s1EarlyCohortSupplyThreshold: toBigInt(account.s1EarlyCohortSupplyThreshold),
       s1EarlyCohortBuyoutCapBps: Number(account.s1EarlyCohortBuyoutCapBps ?? 0),
+      s1RageQuitWindowSeconds: Number(toBigInt(account.s1RageQuitWindowSeconds)),
     };
   }
 
@@ -790,6 +793,7 @@ export class AnchorService {
             params.s1EarlyCohortSupplyThreshold.toString()
           ),
           s1EarlyCohortBuyoutCapBps: params.s1EarlyCohortBuyoutCapBps,
+          s1RageQuitWindowSeconds: new BN(String(params.s1RageQuitWindowSeconds)),
         })
         .accounts({
           admin: this.protocolAdmin.publicKey,

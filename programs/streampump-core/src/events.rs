@@ -133,6 +133,7 @@ pub struct ProtocolS1EmissionUpdated {
     pub max_s1_daily_buy_spump: u64,
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
+    pub s1_rage_quit_window_seconds: i64,
 }
 
 #[event]

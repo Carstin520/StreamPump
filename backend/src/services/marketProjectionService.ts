@@ -220,6 +220,7 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
     s1MinUserXp: protocolS1Config.s1MinUserXp.toString(),
     s1EarlyCohortSupplyThreshold: protocolS1Config.s1EarlyCohortSupplyThreshold.toString(),
     s1EarlyCohortBuyoutCapBps: protocolS1Config.s1EarlyCohortBuyoutCapBps,
+    s1RageQuitWindowSeconds: protocolS1Config.s1RageQuitWindowSeconds,
   };
 
   return prisma.creatorMarketProjection.upsert({

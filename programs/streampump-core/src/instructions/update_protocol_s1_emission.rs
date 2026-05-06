@@ -8,6 +8,7 @@ use crate::{
     state::{
         ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_SPUMP, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
         DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_MIN_USER_XP,
+        DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
     },
 };
 
@@ -20,6 +21,7 @@ pub struct UpdateProtocolS1EmissionArgs {
     pub max_s1_daily_buy_spump: u64,
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
+    pub s1_rage_quit_window_seconds: i64,
 }
 
 #[derive(Accounts)]
@@ -51,7 +53,9 @@ pub(crate) fn handler(
             && args.max_s1_daily_buy_spump >= DEFAULT_MAX_S1_DAILY_BUY_SPUMP
             && args.s1_early_cohort_supply_threshold >= DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD
             && args.s1_early_cohort_buyout_cap_bps > 0
-            && args.s1_early_cohort_buyout_cap_bps <= DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
+            && args.s1_early_cohort_buyout_cap_bps <= DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS
+            && args.s1_rage_quit_window_seconds > 0
+            && args.s1_rage_quit_window_seconds <= DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
         StreamPumpError::InvalidS1GuardConfig
     );
 
@@ -63,6 +67,7 @@ pub(crate) fn handler(
     config.max_s1_daily_buy_spump = args.max_s1_daily_buy_spump;
     config.s1_early_cohort_supply_threshold = args.s1_early_cohort_supply_threshold;
     config.s1_early_cohort_buyout_cap_bps = args.s1_early_cohort_buyout_cap_bps;
+    config.s1_rage_quit_window_seconds = args.s1_rage_quit_window_seconds;
 
     emit!(ProtocolS1EmissionUpdated {
         admin: ctx.accounts.admin.key(),
@@ -73,6 +78,7 @@ pub(crate) fn handler(
         max_s1_daily_buy_spump: config.max_s1_daily_buy_spump,
         s1_early_cohort_supply_threshold: config.s1_early_cohort_supply_threshold,
         s1_early_cohort_buyout_cap_bps: config.s1_early_cohort_buyout_cap_bps,
+        s1_rage_quit_window_seconds: config.s1_rage_quit_window_seconds,
     });
 
     Ok(())

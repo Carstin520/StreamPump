@@ -119,6 +119,7 @@ s1_min_user_xp = 10
 max_s1_daily_buy_spump = 15,000,000 base units = 15 SPUMP
 s1_early_cohort_supply_threshold = 500
 s1_early_cohort_buyout_cap_bps = 2,000
+s1_rage_quit_window_seconds = 172,800
 ```
 
 ## Readiness Scope

@@ -16,8 +16,9 @@ use crate::{
     state::{
         ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_SPUMP, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
         DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
-        DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RATING_BPS, DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
-        MAX_S1_RATING_BPS, MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
+        DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS, DEFAULT_S1_RATING_BPS,
+        DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS, MAX_S1_RATING_BPS,
+        MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
     },
     utils::SPUMP_DECIMALS,
 };
@@ -43,6 +44,7 @@ pub struct InitializeProtocolArgs {
     pub max_creator_rating_daily_delta_bps: u16,
     pub s1_rating_effective_delay_seconds: i64,
     pub default_s1_graduation_target_supply: u64,
+    pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
 }
@@ -109,6 +111,11 @@ pub(crate) fn handler(
             && args.default_s1_graduation_target_supply >= DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
         StreamPumpError::InvalidCreatorRatingConfig
     );
+    require!(
+        args.s1_rage_quit_window_seconds > 0
+            && args.s1_rage_quit_window_seconds <= DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
+        StreamPumpError::InvalidS1GuardConfig
+    );
 
     require_keys_eq!(
         *ctx.accounts.spump_mint.owner,
@@ -160,6 +167,7 @@ pub(crate) fn handler(
     config.max_creator_rating_daily_delta_bps = args.max_creator_rating_daily_delta_bps;
     config.s1_rating_effective_delay_seconds = args.s1_rating_effective_delay_seconds;
     config.default_s1_graduation_target_supply = args.default_s1_graduation_target_supply;
+    config.s1_rage_quit_window_seconds = args.s1_rage_quit_window_seconds;
     config.s2_min_followers = args.s2_min_followers;
     config.s2_min_valid_views = args.s2_min_valid_views;
     config.bump = ctx.bumps.protocol_config;

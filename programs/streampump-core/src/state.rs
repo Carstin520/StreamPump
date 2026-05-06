@@ -19,6 +19,7 @@ pub const DEFAULT_S1_MIN_USER_XP: u64 = 10;
 pub const DEFAULT_MAX_S1_DAILY_BUY_SPUMP: u64 = 15_000_000;
 pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
 pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
+pub const DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3_600;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
 pub const USER_ROLE_CREATOR: u16 = 1 << 1;
 pub const USER_ROLE_SPONSOR_OPERATOR: u16 = 1 << 2;
@@ -132,6 +133,7 @@ pub struct ProtocolConfig {
     pub max_creator_rating_daily_delta_bps: u16,
     pub s1_rating_effective_delay_seconds: i64,
     pub default_s1_graduation_target_supply: u64,
+    pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
     pub bump: u8,
@@ -157,6 +159,7 @@ impl ProtocolConfig {
         + 2
         + 2
         + 2
+        + 8
         + 8
         + 8
         + 8

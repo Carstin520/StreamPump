@@ -364,6 +364,7 @@ describe("streampump-core S1 guards", function () {
             maxS1DailyBuySpump: ctx.bn(15_000_000),
             s1EarlyCohortSupplyThreshold: ctx.bn(500),
             s1EarlyCohortBuyoutCapBps: 2_000,
+            s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
           })
           .accounts({
             admin: ctx.fanA.publicKey,
@@ -383,6 +384,7 @@ describe("streampump-core S1 guards", function () {
         maxS1DailyBuySpump: ctx.bn(15_000_000),
         s1EarlyCohortSupplyThreshold: ctx.bn(500),
         s1EarlyCohortBuyoutCapBps: 2_000,
+        s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
       })
       .accounts({
         admin: ctx.payer.publicKey,

@@ -10,8 +10,6 @@ use crate::{
     utils::activate_pending_s1_rating,
 };
 
-const RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3600;
-
 #[derive(Accounts)]
 pub struct AcceptBuyoutOffer<'info> {
     #[account(mut)]
@@ -80,7 +78,7 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     );
 
     let rage_quit_deadline = now
-        .checked_add(RAGE_QUIT_WINDOW_SECONDS)
+        .checked_add(ctx.accounts.protocol_config.s1_rage_quit_window_seconds)
         .ok_or(StreamPumpError::MathOverflow)?;
 
     let buyout_state = &mut ctx.accounts.s1_buyout_state;

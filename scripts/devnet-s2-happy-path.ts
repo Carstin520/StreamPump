@@ -507,6 +507,7 @@ const main = async () => {
         maxCreatorRatingDailyDeltaBps: 1_000,
         s1RatingEffectiveDelaySeconds: new anchor.BN(24 * 3_600),
         defaultS1GraduationTargetSupply: new anchor.BN(2_500),
+        s1RageQuitWindowSeconds: new anchor.BN(48 * 3_600),
         s2MinFollowers: new anchor.BN(100),
         s2MinValidViews: new anchor.BN(1_000),
       })
