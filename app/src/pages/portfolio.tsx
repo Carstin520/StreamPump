@@ -5,12 +5,14 @@ import { PageShell } from "@/components/layout/PageShell";
 import {
   ActionFlowModal,
   ClaimQueueSection,
+  EndorsementsSection,
   getTrendTone,
   PortfolioFlowState,
   PortfolioHoldingsSection,
   PortfolioMetrics,
   PortfolioTab,
   PortfolioTabBar,
+  RageQuitAlert,
   ReentrySection,
 } from "@/components/portfolio/PortfolioSections";
 import {
@@ -54,10 +56,7 @@ export default function PortfolioPage() {
       </Head>
       <PageShell>
         <div className="mx-auto max-w-[1180px] space-y-7 py-6">
-          <section>
-            <h1 className="text-[42px] font-semibold tracking-[-0.05em] text-white">Your S1 exposure and next actions</h1>
-            <p className="mt-2 text-sm text-[#95a6be]">Read-only S1 market preview. Live hackathon transactions are focused on S2 sponsored campaign launch.</p>
-          </section>
+          <RageQuitAlert />
 
           <PortfolioMetrics exposureTone={exposureTone} totalExposure={totalExposure} waitingActionsCount={waitingActionsCount} />
           <PortfolioTabBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -71,6 +70,10 @@ export default function PortfolioPage() {
 
           {activeTab === "Claim queue" ? (
             <ClaimQueueSection onClaim={(record) => setFlowState({ kind: "claim", record, status: "confirm" })} />
+          ) : null}
+
+          {activeTab === "Endorsements" ? (
+            <EndorsementsSection />
           ) : null}
 
           {activeTab === "Re-entry" ? (

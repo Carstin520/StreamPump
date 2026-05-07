@@ -340,6 +340,7 @@ const VideoStage = ({ post }: { post: PostRecord }) => (
           loop
           muted
           playsInline
+          posterOverlay={false}
           posterPriority
           posterSizes="(max-width: 1280px) 100vw, 72vw"
           posterSrc={post.coverSrc}
@@ -367,16 +368,11 @@ const VideoStage = ({ post }: { post: PostRecord }) => (
           </div>
         </>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_20%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.46)_55%,rgba(0,0,0,0.78)_100%)]" />
-      <div className="pointer-events-none absolute bottom-5 left-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] text-white backdrop-blur-xl">
-        Video post
-      </div>
       {post.durationLabel ? (
         <div className="pointer-events-none absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
           {post.durationLabel}
         </div>
       ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_64%,rgba(0,0,0,0.34)_100%)]" />
     </div>
   </div>
 );

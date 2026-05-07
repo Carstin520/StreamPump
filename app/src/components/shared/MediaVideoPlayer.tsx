@@ -9,6 +9,7 @@ type MediaVideoPlayerProps = Omit<
   className?: string;
   loadingLabel?: string;
   posterClassName?: string;
+  posterOverlay?: boolean;
   posterPriority?: boolean;
   posterSizes?: string;
   posterSrc?: string | null;
@@ -40,6 +41,7 @@ export const MediaVideoPlayer = ({
   muted,
   playsInline = true,
   posterClassName = "object-cover",
+  posterOverlay = true,
   posterPriority = false,
   posterSizes,
   posterSrc = null,
@@ -126,7 +128,7 @@ export const MediaVideoPlayer = ({
             sizes={posterSizes}
             src={posterSrc}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/42 via-black/10 to-transparent" />
+          {posterOverlay ? <div className="absolute inset-0 bg-gradient-to-t from-black/42 via-black/10 to-transparent" /> : null}
           <div className="absolute inset-x-0 bottom-0 flex justify-center pb-5">
             <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/90 backdrop-blur-md">
               {loadingLabel}

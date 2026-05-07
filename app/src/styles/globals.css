@@ -73,7 +73,7 @@ a {
 
   @media (min-width: 1280px) {
     .masonry-grid-home {
-      column-count: 4;
+      column-count: 5;
     }
   }
 
@@ -591,6 +591,14 @@ a {
     background-image:
       radial-gradient(ellipse 100% 80% at 50% 20%, transparent 48%, rgba(9, 13, 20, 0.4) 100%);
   }
+
+  .explore-mesh-bg {
+    background:
+      radial-gradient(circle at 20% 50%, rgba(222, 64, 42, 0.08), transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(101, 236, 175, 0.06), transparent 35%),
+      radial-gradient(circle at 50% 80%, rgba(103, 184, 255, 0.05), transparent 30%);
+    animation: mesh-shift 20s ease-in-out infinite;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -787,6 +795,12 @@ a {
   0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
   45% { opacity: 0.56; transform: translate(22px, -18px) scale(1.04); }
   80% { opacity: 0.43; transform: translate(-14px, 10px) scale(0.97); }
+}
+
+@keyframes mesh-shift {
+  0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  33% { opacity: 0.85; transform: scale(1.05) rotate(1deg); }
+  66% { opacity: 0.95; transform: scale(0.98) rotate(-0.5deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

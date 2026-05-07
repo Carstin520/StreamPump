@@ -29,7 +29,7 @@ const PRIMARY_BUTTON_CLASS =
 const SECONDARY_BUTTON_CLASS =
   "glass-button-ghost px-4 py-3 text-sm font-medium";
 
-export const PORTFOLIO_TABS = ["Portfolio", "Claim queue", "Re-entry"] as const;
+export const PORTFOLIO_TABS = ["Portfolio", "Claim queue", "Endorsements", "Re-entry"] as const;
 
 export type PortfolioTab = (typeof PORTFOLIO_TABS)[number];
 
@@ -532,6 +532,139 @@ const HoldingMetric = ({
     <p className={`mt-1 text-sm font-medium ${highlight === "green" ? "text-[#65ecaf]" : highlight === "pink" ? "text-[#ff8ca8]" : "text-white"}`}>{value}</p>
   </div>
 );
+
+type EndorsementRecord = {
+  id: string;
+  proposalLabel: string;
+  creatorId: string;
+  stakedSpump: number;
+  status: "active" | "success" | "fail" | "voided";
+  track2Progress: number;
+  estimatedUsdcReward: number;
+  claimable: boolean;
+};
+
+const MOCK_ENDORSEMENTS: EndorsementRecord[] = [
+  { id: "e1", proposalLabel: "游戏预告片情绪拆解", creatorId: "neo-park", stakedSpump: 200000, status: "success", track2Progress: 80, estimatedUsdcReward: 160000, claimable: true },
+  { id: "e2", proposalLabel: "重庆说唱现场", creatorId: "wudu-lowfreq", stakedSpump: 50000, status: "active", track2Progress: 42, estimatedUsdcReward: 0, claimable: false },
+  { id: "e3", proposalLabel: "赛道现场切片", creatorId: "corner-heartbeat", stakedSpump: 80000, status: "fail", track2Progress: 28, estimatedUsdcReward: 0, claimable: true },
+];
+
+const ENDORSEMENT_TONES: Record<EndorsementRecord["status"], { border: string; badge: string; badgeText: string; label: string }> = {
+  active: { border: "border-[#67b8ff]/20", badge: "bg-[#67b8ff]/12 text-[#8ad0ff]", badgeText: "Active", label: "text-[#8ad0ff]" },
+  success: { border: "border-[#65ecaf]/20", badge: "bg-[#65ecaf]/12 text-[#8df0c4]", badgeText: "Success", label: "text-[#65ecaf]" },
+  fail: { border: "border-[#f67263]/20", badge: "bg-[#f67263]/12 text-[#f67263]", badgeText: "Failed", label: "text-[#f67263]" },
+  voided: { border: "border-white/10", badge: "bg-white/5 text-[#8ea0ba]", badgeText: "Voided", label: "text-[#8ea0ba]" },
+};
+
+export const EndorsementsSection = () => (
+  <section className="space-y-6">
+    <div>
+      <h2 className="text-lg font-semibold text-white">S2 Endorsements</h2>
+      <p className="mt-1 text-sm text-[#8ea0ba]">Your active and settled SPUMP endorsement positions.</p>
+    </div>
+
+    <div className="grid gap-3 md:grid-cols-3">
+      <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Total staked</p>
+        <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-white">
+          {(MOCK_ENDORSEMENTS.reduce((s, e) => s + e.stakedSpump, 0) / 1000).toFixed(0)}k
+        </p>
+        <p className="mt-1 text-xs text-[#6b7d96]">SPUMP across {MOCK_ENDORSEMENTS.length} positions</p>
+      </div>
+      <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Claimable USDC</p>
+        <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-[#65ecaf]">
+          {formatUsd(MOCK_ENDORSEMENTS.filter((e) => e.claimable && e.status === "success").reduce((s, e) => s + e.estimatedUsdcReward, 0))}
+        </p>
+      </div>
+      <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Active positions</p>
+        <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-white">
+          {MOCK_ENDORSEMENTS.filter((e) => e.status === "active").length}
+        </p>
+      </div>
+    </div>
+
+    <div className="space-y-3">
+      {MOCK_ENDORSEMENTS.map((endorsement) => {
+        const creator = findCreator(endorsement.creatorId);
+        const tone = ENDORSEMENT_TONES[endorsement.status];
+
+        return (
+          <div className={`card-radius border ${tone.border} bg-[#121826] p-4`} key={endorsement.id}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img alt={creator.name} className="h-11 w-11 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-white">{endorsement.proposalLabel}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ${tone.badge}`}>
+                      {tone.badgeText}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[#6b7d96]">{creator.name} · {(endorsement.stakedSpump / 1000).toFixed(0)}k SPUMP staked</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#73849f]">Track 2</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className={`h-full rounded-full transition-all ${endorsement.track2Progress >= 50 ? "bg-[#65ecaf]" : "bg-[#f67263]"}`}
+                        style={{ width: `${endorsement.track2Progress}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-medium ${tone.label}`}>{endorsement.track2Progress}%</span>
+                  </div>
+                </div>
+                {endorsement.claimable ? (
+                  <Link
+                    className="glass-button-primary px-4 py-2 text-xs font-semibold"
+                    href={`/campaigns/${endorsement.id}`}
+                  >
+                    {endorsement.status === "success" ? `Claim ${formatUsd(endorsement.estimatedUsdcReward)}` : "Claim SPUMP"}
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-xs text-[#6b7d96]">
+                    Pending
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+);
+
+export const RageQuitAlert = () => {
+  const creator = findCreator("luna-cai");
+
+  return (
+    <section className="card-radius border border-[#de402a]/25 bg-[linear-gradient(180deg,rgba(60,20,16,0.3)_0%,rgba(18,21,32,0.9)_100%)] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <span className="absolute -inset-1 animate-ping rounded-full bg-[#de402a]/30" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a]/20">
+              <ClockIcon className="h-5 w-5 text-[#ff8a78]" />
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">{creator.name} — Rage Quit Window Active</p>
+            <p className="mt-0.5 text-xs text-[#8ea0ba]">36h 14m remaining · 25 tokens eligible</p>
+          </div>
+        </div>
+        <Link className="glass-button-primary px-5 py-2.5 text-sm font-semibold" href={`/buyout/${creator.id}`}>
+          View Buyout
+        </Link>
+      </div>
+    </section>
+  );
+};
 
 const compactTrendLabels = (labels: string[]) => {
   if (labels.length <= 4) {

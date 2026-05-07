@@ -24,7 +24,7 @@ export const DiscoverSurface = ({
   const { posts } = viewModel;
 
   return (
-    <PageShell>
+    <PageShell topbarMode="scroll-reveal">
       <ExploreView onOpenPost={setSelectedPostId} viewModel={viewModel} />
       {selectedPostId && posts.length > 0 ? (
         <PostDetailExperience
@@ -48,32 +48,17 @@ const ExploreView = ({
   onOpenPost: (postId: string) => void;
   viewModel: ReturnType<typeof usePublicFeedViewModel>;
 }) => (
-  <div className="space-y-5 py-4">
-    <section className="liquid-glass-shell hero-glow section-enter relative px-5 py-6 md:px-7">
-      <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#de402a]/10 blur-3xl" />
-      <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[#92a4bd]">Discover</p>
-          <h1 className="mt-3 max-w-3xl text-[38px] font-semibold leading-[1.02] tracking-[-0.06em] text-white md:text-[52px]">
-            Scroll less noise. Land on posts that already feel like signal.
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#c6d2e3]">
-            Real imported media stays upfront, while creator stage and market context sit behind a calmer layer of glass instead of louder dashboard chrome.
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-          <TrendStat label="Live buyouts" value="12" />
-          <TrendStat label="S2 campaigns" value="84" />
-          <TrendStat label="Signal score" value="+4.2%" />
-        </div>
-      </div>
-    </section>
-
-    <section className="sticky top-24 z-20 pb-2 pt-2">
-      <div className="glass-toolbar flex gap-3 overflow-x-auto px-2 py-2 text-sm">
+  <div className="-mt-3 space-y-4">
+    <section
+      className="sticky z-30 pt-1"
+      style={{
+        top: "var(--scroll-reveal-category-top, calc(var(--scroll-reveal-bar-h, 92px) + 12px))",
+      }}
+    >
+      <div className="glass-toolbar flex items-center gap-2 overflow-x-auto px-2 py-2 text-sm">
         {discoverCategories.map((category) => (
           <button
-            className={`whitespace-nowrap rounded-full px-4 py-2.5 transition duration-200 ${
+            className={`whitespace-nowrap rounded-full px-4 py-2 transition duration-200 ${
               category === "推荐"
                 ? "liquid-pill liquid-pill-active text-white"
                 : "liquid-pill text-[#edf2fb] hover:text-white"
@@ -84,25 +69,55 @@ const ExploreView = ({
             {category}
           </button>
         ))}
-      </div>
-    </section>
-
-    <section className="liquid-panel section-enter flex items-center gap-3 rounded-2xl px-4 py-3.5">
-      <div className="flex items-center gap-2 rounded-full bg-[#24151a] px-3 py-1.5">
-        <div className="h-2 w-2 rounded-full bg-[#de402a]" />
-        <span className="text-xs font-bold tracking-[0.18em] text-[#ff8a78]">HOT RIGHT NOW</span>
-      </div>
-      <div className="h-4 w-px bg-white/10" />
-      <div className="flex items-center gap-2 text-sm text-[#c8d4e6]">
-        <span className="font-semibold text-white">12 LIVE BUYOUTS</span>
-        <span className="text-[#73859f]">·</span>
-        <span className="text-[#a2b0c6]">84 S2 ACTIVE</span>
+        <div className="ml-auto hidden shrink-0 items-center gap-1.5 lg:flex">
+          <LiveStatChip icon="pulse" label="Buyouts" value="12" tone="heat" />
+          <LiveStatChip icon="dot" label="S2" value="84" tone="success" />
+          <LiveStatChip icon="arrow" label="Signal" value="+4.2%" tone="info" />
+        </div>
       </div>
     </section>
 
     <PostsSection onOpenPost={onOpenPost} viewModel={viewModel} />
   </div>
 );
+
+const LiveStatChip = ({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: "pulse" | "dot" | "arrow";
+  label: string;
+  value: string;
+  tone: "heat" | "success" | "info";
+}) => {
+  const toneMap = {
+    heat: { ring: "border-[#de402a]/30", glow: "bg-[#de402a]", text: "text-[#ff8a78]", bg: "bg-[#de402a]/[0.06]" },
+    success: { ring: "border-[#65ecaf]/25", glow: "bg-[#65ecaf]", text: "text-[#8df0c4]", bg: "bg-[#65ecaf]/[0.06]" },
+    info: { ring: "border-[#67b8ff]/25", glow: "bg-[#67b8ff]", text: "text-[#8ad0ff]", bg: "bg-[#67b8ff]/[0.06]" },
+  };
+  const t = toneMap[tone];
+
+  return (
+    <div className={`flex items-center gap-2 rounded-full border ${t.ring} ${t.bg} px-3 py-1.5 backdrop-blur-sm`}>
+      {icon === "pulse" && (
+        <span className="relative flex h-2 w-2">
+          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${t.glow} opacity-50`} />
+          <span className={`relative inline-flex h-2 w-2 rounded-full ${t.glow}`} />
+        </span>
+      )}
+      {icon === "dot" && <span className={`h-1.5 w-1.5 rounded-full ${t.glow}`} />}
+      {icon === "arrow" && (
+        <svg className={`h-3 w-3 ${t.text}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 12 12">
+          <path d="M2 8.5 6 3.5 10 8.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+      <span className="text-[11px] font-semibold tracking-wide text-white">{value}</span>
+      <span className={`text-[10px] ${t.text}`}>{label}</span>
+    </div>
+  );
+};
 
 const PostsSection = ({
   onOpenPost,
@@ -200,10 +215,3 @@ const TrendingView = ({
     </section>
   );
 };
-
-const TrendStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="surface-muted rounded-[24px] px-4 py-4">
-    <p className="text-[10px] uppercase tracking-[0.22em] text-[#8d9eb7]">{label}</p>
-    <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-white">{value}</p>
-  </div>
-);

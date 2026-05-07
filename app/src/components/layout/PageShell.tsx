@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { ReactNode } from "react";
 
 import { UserShell } from "@/components/user/UserShell";
-import { UserTopbar } from "@/components/user/UserTopbar";
+import { UserTopbar, type TopbarMode } from "@/components/user/UserTopbar";
 import { RouteItem, isRouteActive } from "@/lib/routes";
 
 type PageShellProps = {
@@ -14,6 +14,7 @@ type PageShellProps = {
   subtitle?: string;
   tabs?: RouteItem[];
   title?: string;
+  topbarMode?: TopbarMode;
 };
 
 export const PageShell = ({
@@ -24,12 +25,13 @@ export const PageShell = ({
   subtitle,
   tabs,
   title,
+  topbarMode = "sticky",
 }: PageShellProps) => {
   const router = useRouter();
   const showHeaderCard = Boolean(title || subtitle || action || tabs?.length);
 
   return (
-    <UserShell header={<UserTopbar searchPlaceholder={searchPlaceholder} />}>
+    <UserShell header={<UserTopbar mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
       <div className="space-y-6 py-4">
         {showHeaderCard ? (
           <section className="liquid-glass-shell hero-glow section-enter relative p-6 md:p-8">
