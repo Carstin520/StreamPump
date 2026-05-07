@@ -22,8 +22,8 @@ use crate::{
     errors::StreamPumpError,
     events::ProposalCreated,
     state::{
-        ContentHashAnchor, CreatorProfile, Proposal, ProposalContentKind, ProposalMetricType,
-        ProposalStatus, ProtocolConfig, MIN_PROPOSAL_CREATOR_LEVEL,
+        ContentHashAnchor, CreatorProfile, CreatorStatus, Proposal, ProposalContentKind,
+        ProposalMetricType, ProposalStatus, ProtocolConfig, MIN_PROPOSAL_CREATOR_LEVEL,
     },
 };
 
@@ -129,6 +129,10 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     require!(
         ctx.accounts.creator_profile.level >= MIN_PROPOSAL_CREATOR_LEVEL,
         StreamPumpError::InsufficientCreatorLevel
+    );
+    require!(
+        ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,
+        StreamPumpError::InvalidCreatorStatus
     );
 
     let now = Clock::get()?.unix_timestamp;

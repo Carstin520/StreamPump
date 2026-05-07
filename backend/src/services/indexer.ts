@@ -42,6 +42,7 @@ const PROGRAM_INSTRUCTIONS_FOR_PROJECTION = new Set([
   "settle_track1_base",
   "settle_track2",
   "settle_track3_cps",
+  "claim_endorsement",
   "cancel_proposal",
   "emergency_void",
 ]);
@@ -57,7 +58,9 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
   S1BuyoutOfferCancelled: "cancel_buyout_offer",
   S1TokenBought: "buy_s1_token",
   S1TokenSold: "sell_s1_token",
+  S1RageQuit: "rage_quit_s1",
   CreatorS1RatingUpdated: "update_creator_s1_rating",
+  ProtocolS1EmissionUpdated: "update_protocol_s1_emission",
   S1Graduated: "execute_s1_graduation",
   S1BuyoutUsdcClaimed: "claim_s1_buyout_usdc",
   Track1Settled: "settle_track1_base",

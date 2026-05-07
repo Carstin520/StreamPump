@@ -76,6 +76,10 @@ describe("indexer helpers", () => {
     );
     expect(mapEventNameToInstructionName("S1TokenBought")).to.equal("buy_s1_token");
     expect(mapEventNameToInstructionName("S1TokenSold")).to.equal("sell_s1_token");
+    expect(mapEventNameToInstructionName("S1RageQuit")).to.equal("rage_quit_s1");
+    expect(mapEventNameToInstructionName("ProtocolS1EmissionUpdated")).to.equal(
+      "update_protocol_s1_emission"
+    );
     expect(mapEventNameToInstructionName("S1Graduated")).to.equal("execute_s1_graduation");
     expect(mapEventNameToInstructionName("S1BuyoutUsdcClaimed")).to.equal(
       "claim_s1_buyout_usdc"

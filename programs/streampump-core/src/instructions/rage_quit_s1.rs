@@ -21,6 +21,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::S1RageQuit,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, S1UserPosition},
     utils::{calculate_sell_return_with_rating, checked_sub},
 };
@@ -165,6 +166,21 @@ pub(crate) fn handler(ctx: Context<RageQuitS1>, args: RageQuitS1Args) -> Result<
         early_balance_reduction,
     )?;
     creator_profile.updated_at = now;
+
+    emit!(S1RageQuit {
+        user: ctx.accounts.user.key(),
+        creator_profile: creator_profile.key(),
+        s1_user_position: position.key(),
+        s1_buyout_state: ctx.accounts.s1_buyout_state.key(),
+        amount: args.amount,
+        spump_return: gross_return,
+        released_cost_basis,
+        early_balance_reduction,
+        new_balance: position.internal_token_balance,
+        new_supply: creator_profile.s1_supply,
+        early_cohort_supply: creator_profile.s1_early_cohort_supply,
+        rage_quit_deadline: ctx.accounts.s1_buyout_state.rage_quit_deadline,
+    });
 
     Ok(())
 }

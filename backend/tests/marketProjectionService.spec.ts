@@ -10,9 +10,11 @@ import {
 } from "@prisma/client";
 
 import {
+  syncCampaignProofProjectionFromProposal,
   serializeCreatorMarketProjection,
   serializePublicCampaignProof,
 } from "../src/services/marketProjectionService";
+import { prisma } from "../src/services/prisma";
 
 describe("marketProjectionService serializers", () => {
   it("serializes creator market projections without leaking BigInt values", () => {
@@ -179,5 +181,69 @@ describe("marketProjectionService serializers", () => {
     expect(serialized.manifest?.manifestHashHex).to.equal("b".repeat(64));
     expect(serialized.manifest?.assets[0].sha256Hex).to.equal("d".repeat(64));
     expect(serialized.manifest?.publications[0].externalUrlDigestHex).to.equal("e".repeat(64));
+  });
+
+  it("projects cancelled, voided, settling, and settled proof statuses", async () => {
+    const prismaAny = prisma as any;
+    const original = prismaAny.campaignProofProjection;
+    const upserts: any[] = [];
+    prismaAny.campaignProofProjection = {
+      upsert: async (args: any) => {
+        upserts.push(args);
+        return { ...args.create, ...args.update };
+      },
+    };
+
+    const baseProposal = {
+      id: "proposal-id",
+      proposalPda: "proposal-pda",
+      creatorWallet: "creator-wallet",
+      sponsorWallet: "sponsor-wallet",
+      manifestId: null,
+      intentId: null,
+      contentHashHex: "a".repeat(64),
+      contentAnchorPda: null,
+      contentAnchorTx: null,
+      status: ProposalStatus.FUNDED,
+      track1BaseUsdc: 100n,
+      track1Claimed: false,
+      track2MetricType: Track2MetricType.VIEWS,
+      track2TargetValue: 1_000n,
+      track2ActualValue: null,
+      track2UsdcDeposited: 200n,
+      track2SettledAt: null,
+      track3UsdcDeposited: 300n,
+      track3SettledAt: null,
+      onChainTxSignature: "tx",
+      deadlineAt: new Date("2026-04-30T00:00:00.000Z"),
+      updatedAt: new Date("2026-04-30T00:00:00.000Z"),
+    } as any;
+
+    try {
+      await syncCampaignProofProjectionFromProposal({
+        ...baseProposal,
+        status: ProposalStatus.CANCELLED,
+      });
+      await syncCampaignProofProjectionFromProposal({
+        ...baseProposal,
+        status: ProposalStatus.VOIDED,
+      });
+      await syncCampaignProofProjectionFromProposal({
+        ...baseProposal,
+        track1Claimed: true,
+      });
+      await syncCampaignProofProjectionFromProposal({
+        ...baseProposal,
+        track2SettledAt: new Date("2026-04-30T00:01:00.000Z"),
+        track3SettledAt: new Date("2026-04-30T00:02:00.000Z"),
+      });
+    } finally {
+      prismaAny.campaignProofProjection = original;
+    }
+
+    expect(upserts[0].create.proofStatus).to.equal(CampaignProofStatus.CANCELLED);
+    expect(upserts[1].create.proofStatus).to.equal(CampaignProofStatus.VOIDED);
+    expect(upserts[2].create.proofStatus).to.equal(CampaignProofStatus.SETTLING);
+    expect(upserts[3].create.proofStatus).to.equal(CampaignProofStatus.SETTLED);
   });
 });

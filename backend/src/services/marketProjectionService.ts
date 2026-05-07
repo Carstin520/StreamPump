@@ -3,6 +3,7 @@ import {
   BuyoutProjectionStatus,
   CampaignProofStatus,
   ContentManifest,
+  ContentManifestStatus,
   ContentPublication,
   MarketCreatorStage,
   Prisma,
@@ -328,6 +329,22 @@ export const refreshS1PositionProjectionByPda = async (
   return projected;
 };
 
+export const refreshAllCreatorMarketProjections = async (
+  event?: { signature?: string; observedAt?: Date }
+) => {
+  const creators = await prisma.creatorMarketProjection.findMany({
+    select: {
+      creatorProfilePda: true,
+    },
+  });
+
+  return Promise.all(
+    creators.map((creator) =>
+      refreshCreatorMarketProjectionByProfilePda(creator.creatorProfilePda, event)
+    )
+  );
+};
+
 export const syncCampaignProofProjectionFromProposal = async (proposal: Proposal) => {
   const proofStatus = mapProofStatus(proposal);
   const settledAt =
@@ -406,6 +423,53 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
   const observedAt = new Date();
   const event = { signature: params.signature, observedAt };
 
+  if (params.instructionName === "anchor_content_hash") {
+    const contentAnchorPda = readString(eventData, "contentAnchor") ?? params.entityPda;
+    const urlDigestHex = readString(eventData, "urlDigest");
+    const contentDigestHex = readString(eventData, "contentDigest");
+    if (!contentAnchorPda || (!urlDigestHex && !contentDigestHex)) return;
+
+    const manifestAnchorWhere = {
+      OR: [
+        ...(urlDigestHex ? [{ internalUrlDigestHex: urlDigestHex }] : []),
+        ...(contentDigestHex ? [{ manifestHashHex: contentDigestHex }] : []),
+        { currentAnchorPda: contentAnchorPda },
+      ],
+    };
+
+    await prisma.contentManifest.updateMany({
+      where: {
+        AND: [
+          manifestAnchorWhere,
+          {
+            status: {
+              in: [
+                ContentManifestStatus.READY,
+                ContentManifestStatus.LOCKED,
+                ContentManifestStatus.ANCHORED,
+              ],
+            },
+          },
+        ],
+      },
+      data: {
+        status: ContentManifestStatus.ANCHORED,
+        currentAnchorPda: contentAnchorPda,
+        currentAnchorTx: params.signature,
+      },
+    });
+    await prisma.contentManifest.updateMany({
+      where: {
+        AND: [manifestAnchorWhere, { status: ContentManifestStatus.PUBLISHED }],
+      },
+      data: {
+        currentAnchorPda: contentAnchorPda,
+        currentAnchorTx: params.signature,
+      },
+    });
+    return;
+  }
+
   if (params.instructionName === "init_s1_buyout") {
     const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
     if (!creatorProfilePda) return;
@@ -436,6 +500,11 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     if (creatorProfilePda) {
       await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
     }
+    return;
+  }
+
+  if (params.instructionName === "update_protocol_s1_emission") {
+    await refreshAllCreatorMarketProjections(event);
     return;
   }
 
@@ -546,7 +615,37 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     return;
   }
 
-  if (params.instructionName === "buy_s1_token" || params.instructionName === "sell_s1_token") {
+  if (
+    params.instructionName === "cancel_buyout_offer" ||
+    params.instructionName === "reclaim_expired_buyout_offer"
+  ) {
+    const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
+    const buyoutOfferPda = readString(eventData, "buyoutOffer");
+    if (!buyoutOfferPda) return;
+
+    await prisma.s1BuyoutOfferProjection.updateMany({
+      where: { buyoutOfferPda },
+      data: {
+        status:
+          params.instructionName === "cancel_buyout_offer"
+            ? BuyoutOfferProjectionStatus.CANCELLED
+            : BuyoutOfferProjectionStatus.RECLAIMED,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+
+    if (creatorProfilePda) {
+      await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+    }
+    return;
+  }
+
+  if (
+    params.instructionName === "buy_s1_token" ||
+    params.instructionName === "sell_s1_token" ||
+    params.instructionName === "rage_quit_s1"
+  ) {
     const positionPda = readString(eventData, "s1UserPosition") ?? readString(eventData, "position");
     const creatorProfilePda = readString(eventData, "creatorProfile");
     if (positionPda) {

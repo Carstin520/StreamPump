@@ -160,6 +160,22 @@ pub struct S1BuyoutUsdcClaimed {
 }
 
 #[event]
+pub struct S1RageQuit {
+    pub user: Pubkey,
+    pub creator_profile: Pubkey,
+    pub s1_user_position: Pubkey,
+    pub s1_buyout_state: Pubkey,
+    pub amount: u64,
+    pub spump_return: u64,
+    pub released_cost_basis: u64,
+    pub early_balance_reduction: u64,
+    pub new_balance: u64,
+    pub new_supply: u64,
+    pub early_cohort_supply: u64,
+    pub rage_quit_deadline: i64,
+}
+
+#[event]
 pub struct Track1Settled {
     pub proposal: Pubkey,
     pub creator: Pubkey,
