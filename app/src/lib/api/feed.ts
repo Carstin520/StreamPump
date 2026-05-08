@@ -46,6 +46,7 @@ type PublicFeedPostResponse = {
 };
 
 const FALLBACK_POSTER = "/mock/user-surface/posts/cat-portrait.svg";
+const PUBLIC_FEED_TIMEOUT_MS = 2500;
 
 const slugify = (value: string) =>
   value
@@ -232,13 +233,16 @@ export const listPublicFeedPosts = async (
     query: {
       limit: options?.limit ?? 24,
     },
+    timeoutMs: PUBLIC_FEED_TIMEOUT_MS,
   });
 
   return response.posts.map(mapFeedPostToPostRecord);
 };
 
 export const getPublicFeedPostById = async (postId: string): Promise<PostRecord> => {
-  const response = await apiClient.get<PublicFeedPostResponse>(`/feed/posts/${postId}`);
+  const response = await apiClient.get<PublicFeedPostResponse>(`/feed/posts/${postId}`, {
+    timeoutMs: PUBLIC_FEED_TIMEOUT_MS,
+  });
 
   return mapFeedPostToPostRecord(response.post);
 };

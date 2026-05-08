@@ -177,7 +177,7 @@ Important frontend env vars:
 ```text
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000
 NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com
-NEXT_IMAGE_REMOTE_HOSTS=dhtrwpa2mlguo.cloudfront.net
+NEXT_IMAGE_REMOTE_HOSTS=pub-b0acd300bcec4dc5ba5ea36628dd809f.r2.dev
 NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...
 ```
 

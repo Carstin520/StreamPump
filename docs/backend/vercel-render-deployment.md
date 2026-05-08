@@ -75,7 +75,7 @@
   - 示例：`https://mainnet.helius-rpc.com/?api-key=...`
   - 或 devnet endpoint
 - `NEXT_IMAGE_REMOTE_HOSTS`
-  - 示例：`dhtrwpa2mlguo.cloudfront.net`
+  - 示例：`pub-b0acd300bcec4dc5ba5ea36628dd809f.r2.dev`
   - 只填写你控制的公开素材/CDN 域名，逗号分隔；前端会把路径限制在 `/content/**`
 - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
   - 如果当前 web 还要保留 Web3Auth

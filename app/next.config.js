@@ -1,4 +1,4 @@
-const DEFAULT_REMOTE_IMAGE_HOSTS = ["dhtrwpa2mlguo.cloudfront.net"];
+const DEFAULT_REMOTE_IMAGE_HOSTS = ["pub-b0acd300bcec4dc5ba5ea36628dd809f.r2.dev"];
 
 const parseRemoteImageHostEntry = (entry) => {
   const trimmed = entry.trim();

@@ -14,11 +14,16 @@ const API_BASE_URL =
     return backendOrigin ? `${backendOrigin}/api/v1` : "http://localhost:4000/api/v1";
   })();
 
+const DEFAULT_API_TIMEOUT_MS = Number(
+  process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? 8000
+);
+
 type QueryValue = string | number | boolean | undefined | null;
 
 type ApiRequestOptions = Omit<RequestInit, "body"> & {
   body?: BodyInit | Record<string, unknown> | null;
   query?: Record<string, QueryValue>;
+  timeoutMs?: number;
   token?: string;
 };
 
@@ -83,11 +88,39 @@ const request = async <T>(path: string, options: ApiRequestOptions = {}): Promis
     headers.set("Authorization", `Bearer ${options.token}`);
   }
 
-  const response = await fetch(buildUrl(path, options.query), {
-    ...options,
-    headers,
-    body: normalizeBody(options.body, headers),
-  });
+  const timeoutMs = Number.isFinite(options.timeoutMs)
+    ? options.timeoutMs
+    : DEFAULT_API_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeout = timeoutMs > 0
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+  const abortFromCaller = () => controller.abort();
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener("abort", abortFromCaller, { once: true });
+    }
+  }
+
+  const { signal: _signal, timeoutMs: _timeoutMs, ...requestOptions } = options;
+
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(path, options.query), {
+      ...requestOptions,
+      headers,
+      body: normalizeBody(options.body, headers),
+      signal: controller.signal,
+    });
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
 
   if (!response.ok) {
     const payload = await response.text();

@@ -3,6 +3,7 @@ node_modules
 node_modules.fileprovider-broken-root/
 app/node_modules
 app/node_modules.fileprovider-broken/
+app/node_modules.fileprovider-broken-*/
 backend/node_modules
 backend/node_modules.fileprovider-broken/
 .target/
