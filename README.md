@@ -1,26 +1,41 @@
 # StreamPump
 
-StreamPump is a Web2.5 creator sponsorship market. Creators package content and campaign terms, sponsors fund real budgets, fans participate in creator momentum, and final financial settlement happens on Solana.
+<div align="center">
+  <p><strong>A Web2.5 creator sponsorship market where content, creator momentum, sponsor budgets, fan participation, and Solana settlement live in one product loop.</strong></p>
+  <p>中文一句话：StreamPump 不是单纯的 fan token，也不是传统 influencer CRM；它把内容创作、赞助预算、粉丝参与、链上结算放进同一个产品流程。</p>
+  <p>
+    <a href="#current-status">Status</a> ·
+    <a href="#product-model">Product Model</a> ·
+    <a href="#architecture">Architecture</a> ·
+    <a href="#local-setup">Local Setup</a> ·
+    <a href="#demo-path">Demo Path</a>
+  </p>
+  <img src="docs/readme-assets/frontend-discover-wide-2026-05-08.png" alt="StreamPump user discovery surface, May 2026" width="100%">
+</div>
 
-简单说：StreamPump 不是单纯的 fan token，也不是传统 influencer CRM。它把“内容创作、赞助预算、粉丝参与、链上结算”放进同一个产品流程里，让创作者增长可以被资助、被验证、被结算。
+## Current Status
+
+StreamPump is a serious prototype moving toward a usable product. The strongest path today is the **S2 sponsored campaign launch and settlement spine**. The **public creator discovery frontend** is visually advanced, but several actions still need production wiring.
+
+Snapshot as of **2026-05-08**:
+
+| Layer | Progress | What is real now | Main gaps |
+| --- | --- | --- | --- |
+| Solana program | Advanced prototype | Anchor instructions for S1 discovery, S1 buyout, S2 proposal creation, sponsor funding, campaign settlement, content hash anchoring, protocol/user/org state | Not audited; some Tier 2 surfaces are not ready for public frontend exposure |
+| Backend | Integration prototype | Express v1 API, Prisma read/write models, auth/session shell, content manifests, proposal intents, transaction bundles, public feed, market projections, Mux/S3 storage, indexer/reconciliation services | Production identity verification, operator tooling, full media/review workflows, deployment hardening |
+| Frontend | Product shell plus partial API wiring | Next.js user surface for Explore, Trending, Creator, Post, Portfolio, Me, Activity; workspace and campaign pages; wallet/Web3Auth scaffolding | Some S1 market, rewards, buyout, settlement, and workspace actions remain preview or read-only |
+| Demo readiness | Scoped | `wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign` | S1 buy/sell/claim must be presented as product vision unless promoted later |
+| Deployment | Planned | Vercel app + Render backend + Neon/Postgres + S3-compatible storage + Mux documented | No verified checked-in Vercel project config from repo root |
 
 ## Product Model
 
-StreamPump has two connected product layers:
+StreamPump has two connected product layers.
 
-- **Season 1 / Creator Discovery Market**  
-  Fans use non-transferable `SPUMP` to back creators early. `SPUMP` is burned into creator-specific virtual S1 positions priced by a rating-adjusted bonding curve. Creator momentum is tracked by the protocol, and sponsors can make buyout-style offers before a creator graduates into the sponsorship market.
+### Season 1: Creator Discovery Market
 
-- **Season 2 / Sponsored Campaign Market**  
-  Sponsors fund campaigns with three budget tracks: fixed creator base pay, performance-based budget, and delayed CPS-style payout after the return window closes.
-
-`SPUMP` is designed as a non-transferable Token-2022 participation asset. It is product fuel and reputation-linked participation, not a DEX-first speculative token.
-
-### Season 1 Mechanics
+Fans use non-transferable `SPUMP` to back creators early. `SPUMP` is burned into creator-specific virtual S1 positions priced by a rating-adjusted bonding curve. Creator momentum is tracked by the protocol, and sponsors can make buyout-style offers before a creator graduates into the sponsorship market.
 
 S1 is not a freely transferable fan-token market. Users burn `SPUMP` to receive an internal creator position recorded in `S1UserPosition`; no creator SPL token is minted.
-
-The S1 bonding curve is now parameterized by an oracle-updated creator momentum rating:
 
 ```text
 effective_k = base_k * creator_rating_bps / 10_000
@@ -28,70 +43,120 @@ buy cost = effective_k / 2 * ((S + dS)^2 - S^2)
 sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 ```
 
-Default rating is `10_000` (1.0x), bounded between `5_000` and `20_000` (0.5x-2.0x), with a daily change cap and one-epoch delayed effectiveness. The initial graduation target is `2,500` virtual S1 supply so that the earliest supporters can matter in a small buyout, while later creator cohorts can use higher targets.
-
-Daily `SPUMP` emission is also configurable through the protocol config. The intended launch setting is `10x` below 1,000 active users, then deterministic decay toward `2x` and finally `1x` as the platform matures. New accounts receive reduced emission during the new-user window.
-
-S1 participation now requires a registered user profile with fan role and minimum activity score. The protocol also enforces a `15 SPUMP / user / creator / day` buy budget cap and separates early-cohort buyout claims into a capped pool, so the first supporters can have meaningful upside without being able to absorb an unlimited share of a sponsor buyout.
+Default rating is `10_000` (1.0x), bounded between `5_000` and `20_000` (0.5x-2.0x), with daily change caps and delayed effectiveness. Participation is guarded by registered profiles, activity scores, daily buy caps, and capped early-cohort buyout claims.
 
 See [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) for the current parameter rationale and anti-arbitrage guardrails.
+
+### Season 2: Sponsored Campaign Market
+
+Sponsors fund creator campaigns with three budget tracks:
+
+| Track | Purpose |
+| --- | --- |
+| Track 1 | Fixed creator base pay |
+| Track 2 | Performance budget tied to verified metrics |
+| Track 3 | Delayed CPS-style payout after the return window closes |
+
+The intended S2 launch experience is DB-first until money must move, then chain-first for final truth:
+
+```text
+wallet session
+  -> content manifest
+  -> proposal intent
+  -> creator partial signature
+  -> sponsor final signature
+  -> Solana proposal + funded vault
+  -> campaign settlement
+```
 
 ## Architecture
 
 The repo is intentionally hybrid:
 
 - **DB-first for product workflow**: drafts, content manifests, uploads, media processing, proposal intents, retries, and workspace state.
-- **Chain-first for financial truth**: sponsor funding, proposal creation, final settlement, refunds, and protocol token mint/burn paths.
+- **Chain-first for financial truth**: sponsor funding, proposal creation, settlement, refunds, token mint/burn paths, and immutable content anchors.
 
-This keeps common product actions fast while preserving on-chain settlement guarantees for high-value financial actions.
+```mermaid
+flowchart LR
+  Creator["Creator / Sponsor / Fan"] --> App["Next.js app"]
+  App --> API["Express v1 API"]
+  API --> DB["Postgres / Prisma"]
+  API --> Storage["S3-compatible media storage"]
+  API --> Mux["Mux video processing"]
+  API --> Indexer["Indexer + reconciliation jobs"]
+  API --> Solana["Solana / Anchor program"]
+  Oracle["Oracle / operator flows"] --> API
+  Oracle --> Solana
+  Solana --> Indexer
+  Indexer --> DB
+```
 
-## Current Status
+## What Is In This Repo
 
-This is a serious prototype moving toward a usable product, not a polished production app.
+| Path | Role |
+| --- | --- |
+| `programs/streampump-core` | Anchor program for protocol state, S1, S1 buyout, and S2 settlement |
+| `programs/tests` | Anchor TypeScript tests for happy paths, unhappy paths, guards, buyout, and S2 flows |
+| `backend` | Express API, Prisma schema, storage, Mux, auth, indexer, schedulers, and market projections |
+| `app` | Next.js frontend for user discovery, creator pages, portfolio, workspace, campaign, and auth surfaces |
+| `docs` | Protocol notes, frontend design docs, backend API contracts, deployment notes, progress reviews |
+| `local-post-assets` | Local seed content used for development feeds and media smoke tests |
+| `scripts` | Local helper scripts, demo scripts, cover generation, and git hooks |
+| `third_party` | Vendored Rust dependencies used by the Anchor workspace |
 
-Already in place:
+## Frontend Surface
 
-- Anchor program for core S1/S2 protocol state and settlement paths.
-- Non-transferable `SPUMP` checks and core protocol account model.
-- S2 proposal funding and settlement primitives.
-- Content anchoring support on-chain.
-- Backend data model for `ContentManifest`, `ProposalIntent`, `TxBundle`, and confirmed `Proposal` projections.
-- v1 backend routes for wallet/session auth, content manifests, proposal intents, workspace overview, public feed, and proposal reads.
-- Mux, S3-compatible storage, Neon/Postgres, reconciliation, and chain indexing support.
-- Next.js frontend surfaces for discover, activity, trending creators, portfolio, profile, login, post detail, and workspace flows.
+The current user surface is designed as a social product first, not a trading terminal. The goal is to make creator momentum legible through content, profiles, comments, portfolios, and lightweight market status.
 
-Known gaps:
-
-- The frontend still has prototype-driven public/social surfaces.
-- Workspace and campaign flows are only partially wired to production-grade user actions.
-- Daily rewards, quests, dispute/review workflows, and operator dashboards are unfinished.
-- Production media playback, mobile polish, and deployment hardening still need work.
-- Vercel deployment status is currently unverified from this repo because there is no local `.vercel/project.json` or `vercel.json`.
-
-## Monorepo Layout
+Implemented or scaffolded routes include:
 
 ```text
-programs/streampump-core     Anchor program (Rust)
-programs/tests               Anchor TypeScript tests
-backend/                     Express API, Prisma, storage, Mux, indexer, schedulers
-app/                         Next.js frontend
-docs/                        Architecture notes, API contracts, deployment notes
-scripts/                     Local helper scripts and Git hooks
-local-post-assets/           Local seed content for development
-third_party/                 Vendored Rust dependencies used by the Anchor workspace
+/explore
+/trending
+/posts/[postId]
+/creators/[creatorId]
+/market/[creatorId]
+/buyout/[creatorId]
+/portfolio
+/activity
+/rewards
+/me
+/login
+/workspace
+/workspace/content/new
+/workspace/content/[manifestId]
+/workspace/intents/[intentId]
+/workspace/buyout
+/campaigns/[proposalId]
+/campaigns/[proposalId]/endorse
+/campaigns/[proposalId]/settlement
 ```
+
+Design notes live in:
+
+- [docs/frontend/design.md](docs/frontend/design.md)
+- [docs/frontend/user-surface-ui-spec.md](docs/frontend/user-surface-ui-spec.md)
+- [docs/frontend/phase1-frontend-development-plan.md](docs/frontend/phase1-frontend-development-plan.md)
 
 ## Local Setup
 
-Install dependencies per package as needed:
+Prerequisites:
+
+- Node.js 20+
+- npm
+- Rust toolchain
+- Solana CLI and Anchor for on-chain tests
+- Postgres for backend integration work
+
+Install dependencies:
 
 ```bash
 npm install
-cd app && npm install
-cd ../backend && npm install
+npm install --prefix app
+npm install --prefix backend
 ```
 
-Recommended local env files:
+Create local env files:
 
 ```bash
 cp app/.env.example app/.env.local
@@ -109,10 +174,12 @@ npm run dev
 
 Important frontend env vars:
 
-- `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000`
-- `NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com`
-- `NEXT_IMAGE_REMOTE_HOSTS=dhtrwpa2mlguo.cloudfront.net` for remote media optimized through `next/image`
-- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...` only if Web3Auth social login is enabled
+```text
+NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:4000
+NEXT_PUBLIC_RPC_ENDPOINT=https://api.devnet.solana.com
+NEXT_IMAGE_REMOTE_HOSTS=dhtrwpa2mlguo.cloudfront.net
+NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=...
+```
 
 The frontend prefers `NEXT_PUBLIC_BACKEND_BASE_URL` and derives `/api/v1` automatically. `NEXT_PUBLIC_API_BASE_URL` is still accepted as a backward-compatible fallback.
 
@@ -127,16 +194,18 @@ npm run dev
 
 Common backend env vars:
 
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `PORT`
-- `API_BASE_URL`
-- `CORS_ALLOWED_ORIGINS`
-- `AUTH_SESSION_SECRET`
-- `SOLANA_RPC_ENDPOINT`
-- `STREAMPUMP_PROGRAM_ID`
-- `S3_*` or compatible storage settings
-- `MUX_*`
+```text
+DATABASE_URL
+DIRECT_URL
+PORT
+API_BASE_URL
+CORS_ALLOWED_ORIGINS
+AUTH_SESSION_SECRET
+SOLANA_RPC_ENDPOINT
+STREAMPUMP_PROGRAM_ID
+S3_*
+MUX_*
+```
 
 Local media smoke test:
 
@@ -165,10 +234,7 @@ npm run build:anchor
 anchor test
 ```
 
-`npm run build:anchor` keeps Cargo/Anchor artifacts in `/private/tmp/streampump-anchor-target`
-by default. This avoids macOS Desktop/iCloud file-provider stalls that can leave
-`anchor build` hanging in the repository `target/` directory. Override
-`CARGO_TARGET_DIR` if you need a different local cache path.
+`npm run build:anchor` keeps Cargo/Anchor artifacts in `/private/tmp/streampump-anchor-target` by default. This avoids macOS Desktop/iCloud file-provider stalls that can leave `anchor build` hanging in the repository `target/` directory. Override `CARGO_TARGET_DIR` if you need a different local cache path.
 
 For a lighter Rust check:
 
@@ -179,57 +245,61 @@ cargo check
 ## Test Commands
 
 ```bash
-cd app && npm run build
-cd backend && npm run build
+npm run build --prefix app
+npm run build --prefix backend
 cargo check
-```
-
-Backend tests:
-
-```bash
 npm run test:backend
-```
-
-Anchor tests:
-
-```bash
 npm run test:anchor
 ```
 
-## Colosseum Demo Readiness
+Useful focused commands:
 
-For the hackathon build, the live demo path is intentionally scoped to S2:
-
-```text
-wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign
+```bash
+npm run test:s1:happy
+npm run test:s1:unhappy
+npm run test:s1:buyout
+npm run test:s1:buyout:unhappy
+npm run test:s2:unhappy
 ```
 
-S1 discovery, portfolio, buyout, and claim screens are read-model/product-vision previews unless explicitly promoted later. The current S1 work is protocol/backend readiness, not a public trading UI launch. Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, and acceptance checklist.
+## Demo Path
+
+For the current hackathon/demo build, keep the live path intentionally scoped to S2:
+
+```text
+wallet sign-in
+  -> content manifest
+  -> proposal intent
+  -> creator signs launch bundle once
+  -> sponsor signs and submits once
+  -> confirmed Solana campaign
+  -> campaign detail shows PDA, tx signature, manifest hash, content anchor
+```
+
+Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, seed scripts, devnet smoke data, and acceptance checklist.
+
+Important boundary: S1 discovery, portfolio, buyout, and claim screens are currently read-model/product-vision previews unless explicitly promoted later.
 
 ## Deployment Notes
 
-The current recommended first deployment path is:
+Recommended first deployment path:
 
-- `app/` to **Vercel**
-- `backend/` to **Render**
-- Neon for Postgres
-- AWS S3 or compatible storage for object storage
-- Mux for video
+| Surface | Target |
+| --- | --- |
+| Frontend | Vercel with root directory `app` |
+| Backend | Render with root directory `backend` |
+| Database | Neon/Postgres |
+| Object storage | AWS S3 or compatible storage |
+| Video | Mux |
 
-For Vercel, the project must use:
+For Vercel:
 
 - Root Directory: `app`
 - Build Command: `next build`
-- Required env vars:
-  - `NEXT_PUBLIC_BACKEND_BASE_URL`
-  - `NEXT_PUBLIC_RPC_ENDPOINT`
-  - `NEXT_IMAGE_REMOTE_HOSTS`
-- Optional env var:
-  - `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
+- Required env vars: `NEXT_PUBLIC_BACKEND_BASE_URL`, `NEXT_PUBLIC_RPC_ENDPOINT`, `NEXT_IMAGE_REMOTE_HOSTS`
+- Optional env var: `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
 
-Do not deploy from the repository root unless the Vercel project settings or a checked-in config explicitly route the build to `app/`.
-
-For the backend, Render should use `backend` as the root directory. A practical first build command is:
+For Render:
 
 ```bash
 npm ci --include=dev && npm run prisma:generate && npm run build
@@ -250,6 +320,28 @@ npm run prisma:migrate:deploy
 
 More details live in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render-deployment.md).
 
+## Roadmap
+
+Near-term priorities:
+
+- Finish production auth identity verification and session hardening.
+- Wire workspace upload/finalize/publication actions end to end.
+- Promote selected S1 market read models into real frontend actions only after backend and chain projections are ready.
+- Complete production media playback, mobile polish, and Mux reconciliation visibility.
+- Add operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
+- Verify deployment from clean Vercel/Render projects and document environment ownership.
+- Run broader security review before any real-money deployment.
+
+## Documentation Index
+
+- [DEMO.md](DEMO.md): scoped S2 demo runbook.
+- [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md): S1 economics and guardrails.
+- [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md): DB-first launch contract.
+- [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md): backend environment and vendor setup.
+- [docs/backend/aws-media-access-runbook.md](docs/backend/aws-media-access-runbook.md): media storage operations.
+- [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render-deployment.md): deployment notes.
+- [docs/progress-review-2026-04.md](docs/progress-review-2026-04.md): previous progress review.
+
 ## Git Safety
 
 Install local hooks:
@@ -258,14 +350,7 @@ Install local hooks:
 ./scripts/install-git-hooks.sh
 ```
 
-The hooks block common secret files and obvious credential patterns before commit/push. The shared logic lives in `scripts/git-hooks/secret-guard.sh`.
-
-## Recommended Reading
-
-- [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md)
-- [docs/backend/prisma-migration-content-manifest.md](docs/backend/prisma-migration-content-manifest.md)
-- [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render-deployment.md)
-- [docs/progress-review-2026-04.md](docs/progress-review-2026-04.md)
+The hook blocks common secret patterns before commit. Keep real credentials out of `.env.example`, docs, screenshots, and demo logs.
 
 ## License
 
