@@ -464,7 +464,7 @@ App 端建议的一级导航：
 1. 前端选择文件
 2. 计算文件 `sha256`
 3. 调 `presign`
-4. 直接 PUT 到 S3
+4. 直接 PUT 到 R2/S3-compatible presigned URL
 5. 调 `complete`
 6. 若是视频，等待 Mux 状态变化
 7. manifest 全部 ready 后调用 `finalize`

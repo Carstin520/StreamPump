@@ -6,7 +6,7 @@
 - `app` 部署到 **Vercel**
 - `backend` 部署到 **Render**
 - 数据库继续用 **Neon**
-- 对象存储继续用 **AWS S3**
+- 对象存储用 **Cloudflare R2**
 - 视频继续用 **Mux**
 
 这条路线适合你当前仓库的结构：
@@ -19,13 +19,14 @@
 - Render web services: https://render.com/docs/web-services
 - Render service types: https://render.com/docs/service-types
 - Render pricing: https://render.com/pricing
+- Cloudflare R2 pricing: https://developers.cloudflare.com/r2/pricing/
 
 ## 部署前检查
 
 在真正点部署按钮前，先确认这些基础资源已经可用：
 
 1. Neon 数据库已经创建
-2. AWS S3 bucket 已可读写
+2. Cloudflare R2 bucket 已可读写，并已创建 S3-compatible API token
 3. Mux token 和 webhook secret 已准备
 4. Solana RPC endpoint 已准备
 5. `backend/.env.local` 里已经有一份本地可运行配置
@@ -144,15 +145,17 @@ npm run start
 - `ORACLE_AUTHORITY_KEYPAIR_PATH` 或 `ORACLE_AUTHORITY_SECRET_KEY`
 
 #### Storage
-- `S3_REGION`
-- `S3_BUCKET`
-- `S3_ENDPOINT`
-- `S3_ACCESS_KEY_ID`
-- `S3_SECRET_ACCESS_KEY`
-- `S3_PUBLIC_BASE_URL`
+- `R2_REGION=auto`
+- `R2_BUCKET`
+- `R2_ENDPOINT`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_PUBLIC_BASE_URL`
+- `R2_MAX_ASSET_SIZE_BYTES=104857600`
+- `R2_MONTHLY_UPLOAD_LIMIT_BYTES=10737418240`
 - `S3_PUBLIC_FEED_USE_SIGNED_URLS=false`
-  - 如果 CloudFront/S3 公开读取暂时返回 `403 AccessDenied`，可临时设为 `true` 让公共 feed 返回 1 小时签名读取 URL
-  - AWS 修复步骤见 [aws-media-access-runbook.md](./aws-media-access-runbook.md)
+  - 如果 R2 自定义域公开读取暂时返回 `403 AccessDenied`，可临时设为 `true` 让公共 feed 返回 1 小时签名读取 URL
+  - 后端仍兼容旧的 `S3_*` 变量名，因为代码使用 AWS S3 SDK 访问 R2 的 S3-compatible endpoint；新部署优先填写 `R2_*`，非空 `S3_*` 会覆盖 `R2_*`
 
 #### Mux
 - `MUX_TOKEN_ID`

@@ -5,6 +5,9 @@
 import { env } from "./env";
 import "./loadEnv";
 
+const firstNonEmpty = (...values: Array<string | undefined>): string | undefined =>
+  values.find((value) => value !== undefined && value.trim() !== "");
+
 export const config = {
   app: {
     apiBaseUrl: env.readString(process.env.API_BASE_URL, "http://localhost:4000/api/v1"),
@@ -62,13 +65,18 @@ export const config = {
   },
   storage: {
     origin: {
-      region: env.readString(process.env.S3_REGION, "us-east-1"),
-      bucket: env.readString(process.env.S3_BUCKET, ""),
-      endpoint: process.env.S3_ENDPOINT,
-      accessKeyId: process.env.S3_ACCESS_KEY_ID,
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-      publicBaseUrl: process.env.S3_PUBLIC_BASE_URL,
+      region: env.readString(firstNonEmpty(process.env.S3_REGION, process.env.R2_REGION), "auto"),
+      bucket: env.readString(firstNonEmpty(process.env.S3_BUCKET, process.env.R2_BUCKET), ""),
+      endpoint: firstNonEmpty(process.env.S3_ENDPOINT, process.env.R2_ENDPOINT),
+      accessKeyId: firstNonEmpty(process.env.S3_ACCESS_KEY_ID, process.env.R2_ACCESS_KEY_ID),
+      secretAccessKey: firstNonEmpty(
+        process.env.S3_SECRET_ACCESS_KEY,
+        process.env.R2_SECRET_ACCESS_KEY
+      ),
+      publicBaseUrl: firstNonEmpty(process.env.S3_PUBLIC_BASE_URL, process.env.R2_PUBLIC_BASE_URL),
       publicFeedUseSignedUrls: env.readBoolean(process.env.S3_PUBLIC_FEED_USE_SIGNED_URLS, false),
+      maxAssetSizeBytes: env.readNumber(process.env.R2_MAX_ASSET_SIZE_BYTES, 100 * 1024 * 1024),
+      monthlyUploadLimitBytes: env.readNumber(process.env.R2_MONTHLY_UPLOAD_LIMIT_BYTES, 0),
     },
     edge: {
       region: env.readString(process.env.R2_REGION, "auto"),

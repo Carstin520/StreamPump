@@ -3,6 +3,7 @@
  * EN: Content manifest controller that handles manifest creation, asset presign/upload completion, and publication mapping.
  */
 import {
+  AssetType,
   AssetProcessingStatus,
   AssetProcessingSource,
   AssetUploadStatus,
@@ -42,6 +43,7 @@ import {
   normalizeContentType,
   sha256Hex,
 } from "../services/contentManifestService";
+import { config } from "../../config/default";
 import { prisma } from "../services/prisma";
 import {
   assertAllowedMimeType,
@@ -52,7 +54,97 @@ import {
 } from "../services/S3Service";
 import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
 
-const MAX_ASSET_SIZE_BYTES = 100 * 1024 * 1024;
+interface PresignAssetPlan {
+  assetType: AssetType;
+  orderIndex: number;
+  sha256HexDigest: string;
+  mimeType: string;
+  fileSizeBytes: bigint;
+}
+
+const readMaxAssetSizeBytes = (): bigint =>
+  BigInt(Math.max(0, Math.floor(config.storage.origin.maxAssetSizeBytes)));
+
+const readMonthlyUploadLimitBytes = (): bigint =>
+  BigInt(Math.max(0, Math.floor(config.storage.origin.monthlyUploadLimitBytes)));
+
+const currentUtcMonthStart = (): Date => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+};
+
+const parsePresignAssetPlan = (rawAsset: unknown): PresignAssetPlan => {
+  const payload =
+    rawAsset && typeof rawAsset === "object" ? (rawAsset as Record<string, unknown>) : null;
+
+  if (!payload) {
+    throw new HttpError(400, "INVALID_INPUT", "each asset must be an object");
+  }
+
+  const assetType = normalizeAssetType(payload.assetType);
+  const orderIndex = parseNonNegativeInt(payload.orderIndex, "orderIndex");
+  const sha256HexDigest = parseSha256Hex(payload.sha256Hex, "sha256Hex");
+  const mimeType = parseNonEmptyString(payload.mimeType, "mimeType").toLowerCase();
+  const fileSizeBytes = parseNonNegativeBigInt(payload.fileSizeBytes, "fileSizeBytes");
+  const maxAssetSizeBytes = readMaxAssetSizeBytes();
+
+  if (maxAssetSizeBytes > 0n && fileSizeBytes > maxAssetSizeBytes) {
+    throw new HttpError(
+      400,
+      "INVALID_INPUT",
+      `fileSizeBytes exceeds current limit (${maxAssetSizeBytes.toString()} bytes)`
+    );
+  }
+
+  assertAllowedMimeType(mimeType);
+  assertAssetAndMimeTypeMatch(assetType, mimeType);
+
+  return {
+    assetType,
+    orderIndex,
+    sha256HexDigest,
+    mimeType,
+    fileSizeBytes,
+  };
+};
+
+const assertR2MonthlyUploadBudget = async (
+  manifestId: string,
+  requestedBytes: bigint
+): Promise<void> => {
+  const monthlyUploadLimitBytes = readMonthlyUploadLimitBytes();
+
+  if (monthlyUploadLimitBytes <= 0n) {
+    return;
+  }
+
+  const aggregate = await prisma.contentAsset.aggregate({
+    _sum: {
+      fileSizeBytes: true,
+    },
+    where: {
+      createdAt: {
+        gte: currentUtcMonthStart(),
+      },
+      manifestId: {
+        not: manifestId,
+      },
+      uploadStatus: {
+        in: [AssetUploadStatus.PENDING, AssetUploadStatus.UPLOADED],
+      },
+    },
+  });
+  const usedBytes = aggregate._sum.fileSizeBytes ?? 0n;
+  const projectedBytes = usedBytes + requestedBytes;
+
+  if (projectedBytes > monthlyUploadLimitBytes) {
+    throw new HttpError(
+      429,
+      "R2_MONTHLY_UPLOAD_LIMIT_EXCEEDED",
+      `R2 monthly upload budget exceeded: projected ${projectedBytes.toString()} bytes, limit ${monthlyUploadLimitBytes.toString()} bytes`
+    );
+  }
+};
 
 const parseCompletedMultipartParts = (value: unknown): CompletedMultipartPart[] => {
   if (!Array.isArray(value) || value.length === 0) {
@@ -136,38 +228,19 @@ export const presignManifestAssets = withController(
       throw new HttpError(400, "INVALID_INPUT", "assets must be a non-empty array");
     }
 
+    const assetPlans: PresignAssetPlan[] = inputs.map((input: unknown) =>
+      parsePresignAssetPlan(input)
+    );
+    const requestedBytes = assetPlans.reduce(
+      (totalBytes: bigint, assetPlan: PresignAssetPlan) => totalBytes + assetPlan.fileSizeBytes,
+      0n
+    );
+    await assertR2MonthlyUploadBudget(manifest.id, requestedBytes);
+
     const uploads = [];
 
-    for (const rawAsset of inputs) {
-      const assetType = normalizeAssetType((rawAsset as Record<string, unknown>).assetType);
-      const orderIndex = parseNonNegativeInt(
-        (rawAsset as Record<string, unknown>).orderIndex,
-        "orderIndex"
-      );
-      const sha256HexDigest = parseSha256Hex(
-        (rawAsset as Record<string, unknown>).sha256Hex,
-        "sha256Hex"
-      );
-      const mimeType = parseNonEmptyString(
-        (rawAsset as Record<string, unknown>).mimeType,
-        "mimeType"
-      ).toLowerCase();
-      const fileSizeBytes = parseNonNegativeBigInt(
-        (rawAsset as Record<string, unknown>).fileSizeBytes,
-        "fileSizeBytes"
-      );
-
-      if (fileSizeBytes > BigInt(MAX_ASSET_SIZE_BYTES)) {
-        throw new HttpError(
-          400,
-          "INVALID_INPUT",
-          `fileSizeBytes exceeds current limit (${MAX_ASSET_SIZE_BYTES} bytes)`
-        );
-      }
-
-      assertAllowedMimeType(mimeType);
-      assertAssetAndMimeTypeMatch(assetType, mimeType);
-
+    for (const assetPlan of assetPlans) {
+      const { assetType, orderIndex, sha256HexDigest, mimeType, fileSizeBytes } = assetPlan;
       const extension = extensionForMimeType(mimeType);
       const storageKey = `content/${manifest.id}/v/${manifest.version}/${orderIndex}-${sha256HexDigest.slice(
         0,

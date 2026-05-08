@@ -73,7 +73,7 @@
 
 ### 3. 对象存储
 - 推荐：`Cloudflare R2` 作为当前最省钱的 S3-compatible 起步方案
-- 作用：存原始图片/视频素材；当前 `S3_*` 变量就能接 S3-compatible 存储
+- 作用：存原始图片/视频素材；当前后端用 AWS S3 SDK 访问 R2 的 S3-compatible endpoint
 - 当前优先级：最高，没有它就无法跑内容上传
 - 官方价格参考：
   - Free tier：`10 GB-month` storage、`1M` Class A、`10M` Class B
@@ -86,8 +86,11 @@
   - 100 GB 素材：约 `storage $1.50/month`，外加少量操作费
   - 500 GB 素材：约 `storage $7.50/month`
 - 说明：
-  - 当前 `content manifest` 新流程只依赖 `S3_*`
-  - `R2_*` 仅在旧版 `storage.ts` 双写原型中可选使用
+  - 新部署优先填写 `R2_*`
+  - 旧部署如果已经用 `S3_*` 指向 R2，可以继续保留；代码里非空 `S3_*` 优先级高于 `R2_*`
+  - 建议设置 `R2_MAX_ASSET_SIZE_BYTES=104857600`，先限制单个素材为 100MiB
+  - 建议设置 `R2_MONTHLY_UPLOAD_LIMIT_BYTES=10737418240`，先用 10GiB 作为后端月度上传硬上限
+  - 避免长期依赖签名读取 URL 做公共 feed；尽快走 R2 自定义域 + Cloudflare cache，减少直接 `GetObject` 读请求
 - 官方来源：
   - https://developers.cloudflare.com/r2/pricing/
 

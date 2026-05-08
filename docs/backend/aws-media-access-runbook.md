@@ -1,5 +1,7 @@
 # AWS media access runbook
 
+> Legacy note: the current StreamPump origin object-storage target is Cloudflare R2. Keep this runbook only for old AWS S3/CloudFront deployments or migration debugging. New deployments should use `R2_*` variables and an R2 custom domain.
+
 StreamPump public feed media currently depends on:
 
 - S3 bucket: `streampump-origin-dev-dongheng`

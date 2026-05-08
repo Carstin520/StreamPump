@@ -22,10 +22,10 @@ Snapshot as of **2026-05-08**:
 | Layer | Progress | What is real now | Main gaps |
 | --- | --- | --- | --- |
 | Solana program | Advanced prototype | Anchor instructions for S1 discovery, S1 buyout, S2 proposal creation, sponsor funding, campaign settlement, content hash anchoring, protocol/user/org state | Not audited; some Tier 2 surfaces are not ready for public frontend exposure |
-| Backend | Integration prototype | Express v1 API, Prisma read/write models, auth/session shell, content manifests, proposal intents, transaction bundles, public feed, market projections, Mux/S3 storage, indexer/reconciliation services | Production identity verification, operator tooling, full media/review workflows, deployment hardening |
+| Backend | Integration prototype | Express v1 API, Prisma read/write models, auth/session shell, content manifests, proposal intents, transaction bundles, public feed, market projections, Cloudflare R2 storage, Mux, indexer/reconciliation services | Production identity verification, operator tooling, full media/review workflows, deployment hardening |
 | Frontend | Product shell plus partial API wiring | Next.js user surface for Explore, Trending, Creator, Post, Portfolio, Me, Activity; workspace and campaign pages; wallet/Web3Auth scaffolding | Some S1 market, rewards, buyout, settlement, and workspace actions remain preview or read-only |
 | Demo readiness | Scoped | `wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign` | S1 buy/sell/claim must be presented as product vision unless promoted later |
-| Deployment | Planned | Vercel app + Render backend + Neon/Postgres + S3-compatible storage + Mux documented | No verified checked-in Vercel project config from repo root |
+| Deployment | Planned | Vercel app + Render backend + Neon/Postgres + Cloudflare R2 + Mux documented | No verified checked-in Vercel project config from repo root |
 
 ## Product Model
 
@@ -81,7 +81,7 @@ flowchart LR
   Creator["Creator / Sponsor / Fan"] --> App["Next.js app"]
   App --> API["Express v1 API"]
   API --> DB["Postgres / Prisma"]
-  API --> Storage["S3-compatible media storage"]
+  API --> Storage["Cloudflare R2 object storage"]
   API --> Mux["Mux video processing"]
   API --> Indexer["Indexer + reconciliation jobs"]
   API --> Solana["Solana / Anchor program"]
@@ -203,9 +203,25 @@ CORS_ALLOWED_ORIGINS
 AUTH_SESSION_SECRET
 SOLANA_RPC_ENDPOINT
 STREAMPUMP_PROGRAM_ID
-S3_*
+R2_REGION
+R2_BUCKET
+R2_ENDPOINT
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_PUBLIC_BASE_URL
+R2_MAX_ASSET_SIZE_BYTES
+R2_MONTHLY_UPLOAD_LIMIT_BYTES
 MUX_*
 ```
+
+The backend uses the AWS S3 SDK for S3-compatible requests, but the intended object storage provider is **Cloudflare R2**. Existing deployments may still use `S3_*` aliases pointed at R2; if both are present and non-empty, `S3_*` takes precedence for compatibility.
+
+R2 usage guardrails:
+
+- Keep `R2_MAX_ASSET_SIZE_BYTES=104857600` for a 100MiB per-asset upload cap unless you intentionally support larger videos.
+- Set `R2_MONTHLY_UPLOAD_LIMIT_BYTES=10737418240` for a 10GiB backend-side monthly upload budget. Set it to `0` only when you intentionally disable this hard limit.
+- Keep public feed reads on a cacheable R2 custom domain where possible; use signed read URLs only as a temporary fallback because every signed `GetObject` still counts as an R2 read operation.
+- Prefer standard R2 storage for frequently accessed media. Infrequent Access can reduce storage cost, but reads add retrieval fees and objects have a 30-day minimum storage duration.
 
 Local media smoke test:
 
@@ -289,7 +305,7 @@ Recommended first deployment path:
 | Frontend | Vercel with root directory `app` |
 | Backend | Render with root directory `backend` |
 | Database | Neon/Postgres |
-| Object storage | AWS S3 or compatible storage |
+| Object storage | Cloudflare R2 |
 | Video | Mux |
 
 For Vercel:

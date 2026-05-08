@@ -1,6 +1,6 @@
 /**
- * CN: S3 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
- * EN: S3 origin-storage service responsible for content asset presigned upload and download URLs.
+ * CN: R2/S3-compatible 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
+ * EN: R2/S3-compatible origin-storage service for content asset presigned upload and download URLs.
  */
 import {
   CompleteMultipartUploadCommand,
@@ -66,7 +66,7 @@ const buildS3Client = (): S3Client => {
   const { origin } = config.storage;
   const hasExplicitCredentials = Boolean(origin.accessKeyId && origin.secretAccessKey);
 
-  // The same client can target AWS S3 or any S3-compatible vendor by overriding endpoint and credentials.
+  // Cloudflare R2 is the current production target; the AWS SDK client is used for S3 compatibility.
   return new S3Client({
     region: origin.region,
     endpoint: origin.endpoint,
@@ -115,7 +115,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("S3_BUCKET is not configured");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
     }
 
     const command = new PutObjectCommand({
@@ -145,7 +145,7 @@ export class S3Service {
     const normalizedMimeType = normalizeMimeType(mimeType);
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("S3_BUCKET is not configured");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
     }
 
     await this.client.send(
@@ -173,7 +173,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("S3_BUCKET is not configured");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
     }
 
     const createResult = await this.client.send(
@@ -237,7 +237,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("S3_BUCKET is not configured");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
     }
 
     await this.client.send(
@@ -268,7 +268,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("S3_BUCKET is not configured");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
     }
 
     const command = new GetObjectCommand({
