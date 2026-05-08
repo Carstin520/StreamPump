@@ -6,6 +6,7 @@ import {
   getPublicFeedPostById,
   listPublicFeedPosts,
 } from "@/lib/api/feed";
+import { posts as fallbackPublicFeedPosts } from "@/lib/mocks/discover";
 
 export const PUBLIC_FEED_REVALIDATE_SECONDS = 60;
 
@@ -33,11 +34,17 @@ export const loadPublicFeedPageProps = async (): Promise<PublicFeedPageProps> =>
       mediaOrigins: extractPublicMediaOrigins(initialPosts),
     };
   } catch (error) {
+    const fallbackPosts = fallbackPublicFeedPosts.slice(0, 24);
+
     return {
       initialError:
-        error instanceof Error ? error.message : "Failed to load public feed",
-      initialPosts: [],
-      mediaOrigins: [],
+        fallbackPosts.length > 0
+          ? null
+          : error instanceof Error
+            ? error.message
+            : "Failed to load public feed",
+      initialPosts: fallbackPosts,
+      mediaOrigins: extractPublicMediaOrigins(fallbackPosts),
     };
   }
 };

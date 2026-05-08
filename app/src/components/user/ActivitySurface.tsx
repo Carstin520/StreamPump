@@ -11,12 +11,19 @@ import { PageShell } from "@/components/layout/PageShell";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { ActivityTab } from "@/lib/api/types";
+import { PostRecord } from "@/lib/api/types";
 import { compactNumber } from "@/lib/public-data";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
 const ALL_ACTIVITY = "all";
 
-export const ActivitySurface = () => {
+export const ActivitySurface = ({
+  initialError = null,
+  initialPosts = [],
+}: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => {
   const [activeTab, setActiveTab] = useState<ActivityTab>("overview");
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(ALL_ACTIVITY);
   const {
@@ -28,7 +35,10 @@ export const ActivitySurface = () => {
     creatorMap,
     error,
     loading,
-  } = usePublicFeedViewModel();
+  } = usePublicFeedViewModel({
+    initialError,
+    initialPosts,
+  });
 
   const visibleFeedItems = activityFeedItems.filter((item) =>
     selectedCreatorId === ALL_ACTIVITY ? true : item.creatorId === selectedCreatorId,
