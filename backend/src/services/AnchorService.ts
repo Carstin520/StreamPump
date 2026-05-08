@@ -14,7 +14,11 @@ import {
   Program,
   Wallet,
 } from "@coral-xyz/anchor";
-import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import {
   Commitment,
   Connection,
@@ -22,6 +26,7 @@ import {
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
+  TransactionMessage,
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -116,6 +121,7 @@ type ProtocolConfigAccount = {
   admin: PublicKey;
   oracleAuthority: PublicKey;
   usdcMint: PublicKey;
+  spumpMint: PublicKey;
   dailySpumpEmissionMultiplierBps?: number;
   newUserEmissionBps?: number;
   newUserEmissionWindowSeconds?: BN | bigint | number;
@@ -210,6 +216,21 @@ export type UpdateProtocolS1EmissionParams = {
 
 export type ProtocolS1ConfigState = UpdateProtocolS1EmissionParams & {
   admin: PublicKey;
+};
+
+export type UserMissionTypeName =
+  | "DAILY_SESSION_5_MIN"
+  | "LIKE_10_POSTS"
+  | "FOLLOW_3_CREATORS"
+  | "SHARE_1_POST"
+  | "PUBLISH_FIRST_POST"
+  | "COMPLETE_PROFILE"
+  | "SPONSOR_CAMPAIGN_REVIEW";
+
+export type BuiltClientTransaction = {
+  transactionBase64: string;
+  recentBlockhash: string;
+  lastValidBlockHeight: bigint;
 };
 
 type ResolvedSettlementAccounts = {
@@ -571,6 +592,24 @@ export class AnchorService {
     );
 
     return position;
+  }
+
+  deriveUserProfilePda(user: PublicKey): PublicKey {
+    const [userProfile] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_profile"), user.toBuffer()],
+      this.program.programId
+    );
+
+    return userProfile;
+  }
+
+  deriveUserRewardReceiptPda(userProfilePda: PublicKey, reportId: Uint8Array): PublicKey {
+    const [rewardReceipt] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_reward_receipt"), userProfilePda.toBuffer(), Buffer.from(reportId)],
+      this.program.programId
+    );
+
+    return rewardReceipt;
   }
 
   deriveS1BuyoutStatePda(creatorProfilePda: PublicKey): PublicKey {
@@ -1123,6 +1162,422 @@ export class AnchorService {
       .instruction();
   }
 
+  async buildClientSignedTransaction(params: {
+    payerWallet: string;
+    instructions: TransactionInstruction[];
+    backendSigners?: Keypair[];
+  }): Promise<BuiltClientTransaction> {
+    const payer = new PublicKey(params.payerWallet);
+    const latestBlockhash = await this.withRpcTimeout(
+      this.connection.getLatestBlockhash(PROGRAM_COMMITMENT),
+      "fetch latest blockhash for client transaction"
+    );
+    const message = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: params.instructions,
+    }).compileToV0Message();
+    const transaction = new VersionedTransaction(message);
+
+    if (params.backendSigners && params.backendSigners.length > 0) {
+      transaction.sign(params.backendSigners);
+    }
+
+    return {
+      transactionBase64: Buffer.from(transaction.serialize()).toString("base64"),
+      recentBlockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: BigInt(latestBlockhash.lastValidBlockHeight),
+    };
+  }
+
+  async buildRegisterUserInstruction(params: {
+    userWallet: string;
+    roleFlags: number;
+  }): Promise<TransactionInstruction> {
+    const user = new PublicKey(params.userWallet);
+    return (this.program.methods as any)
+      .registerUser({
+        roleFlags: params.roleFlags,
+      })
+      .accounts({
+        authority: user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        userProfile: this.deriveUserProfilePda(user),
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+  }
+
+  async buildClaimDailySpumpInstruction(params: {
+    userWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .claimDailySpump()
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        userProfile: this.deriveUserProfilePda(user),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildBuyS1TokenInstruction(params: {
+    userWallet: string;
+    creatorWallet: string;
+    amount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .buyS1Token({
+        amount: new BN(params.amount.toString()),
+      })
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        userProfile: this.deriveUserProfilePda(user),
+        creatorProfile,
+        s1UserPosition: this.deriveS1PositionPda(user, creatorProfile),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .instruction();
+  }
+
+  async buildSellS1TokenInstruction(params: {
+    userWallet: string;
+    creatorWallet: string;
+    amount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .sellS1Token({
+        amount: new BN(params.amount.toString()),
+      })
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1UserPosition: this.deriveS1PositionPda(user, creatorProfile),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        creatorRevenueSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          creator,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildInitS1BuyoutInstruction(params: {
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const creator = new PublicKey(params.creatorWallet);
+    return (this.program.methods as any)
+      .initS1Buyout()
+      .accounts({
+        creator,
+        creatorProfile: this.deriveCreatorProfilePda(creator),
+      })
+      .instruction();
+  }
+
+  async buildSubmitBuyoutOfferInstruction(params: {
+    sponsorWallet: string;
+    creatorWallet: string;
+    usdcAmount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .submitBuyoutOffer({
+        usdcAmount: new BN(params.usdcAmount.toString()),
+      })
+      .accounts({
+        sponsor,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        buyoutOffer,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .instruction();
+  }
+
+  async buildAcceptBuyoutOfferInstruction(params: {
+    creatorWallet: string;
+    sponsorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const creator = new PublicKey(params.creatorWallet);
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .acceptBuyoutOffer()
+      .accounts({
+        creator,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        buyoutOffer,
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+  }
+
+  async buildCancelBuyoutOfferInstruction(params: {
+    sponsorWallet: string;
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .cancelBuyoutOffer()
+      .accounts({
+        sponsor,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        buyoutOffer,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildReclaimExpiredBuyoutOfferInstruction(params: {
+    sponsorWallet: string;
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .reclaimExpiredBuyoutOffer()
+      .accounts({
+        sponsor,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        buyoutOffer,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildRageQuitS1Instruction(params: {
+    userWallet: string;
+    creatorWallet: string;
+    amount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .rageQuitS1({
+        amount: new BN(params.amount.toString()),
+      })
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        s1UserPosition: this.deriveS1PositionPda(user, creatorProfile),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildExecuteS1GraduationInstruction(params: {
+    executorWallet: string;
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const executor = new PublicKey(params.executorWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .executeS1Graduation()
+      .accounts({
+        executor,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        creatorRevenueSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          creator,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildClaimS1BuyoutUsdcInstruction(params: {
+    userWallet: string;
+    creatorWallet: string;
+    sponsorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .claimS1BuyoutUsdc()
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        s1UserPosition: this.deriveS1PositionPda(user, creatorProfile),
+        buyoutOffer,
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        userUsdcAta: getAssociatedTokenAddressSync(usdcMint, user),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildClaimEngagementRewardInstruction(params: {
+    userWallet: string;
+    missionType: UserMissionTypeName;
+    rewardAmount: bigint;
+    xpGain: bigint;
+    newLevel: number | null;
+    reportIdHex: string;
+    reportDigestHex: string;
+    observedAtUnix: bigint;
+  }): Promise<{ instruction: TransactionInstruction; oracleSigner: Keypair; rewardReceipt: PublicKey }> {
+    const { pda: protocolConfigPda, account: protocolConfig } =
+      await this.fetchProtocolConfigState();
+    this.assertOracleAuthorityMatches(protocolConfig);
+
+    const user = new PublicKey(params.userWallet);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+    const userProfile = this.deriveUserProfilePda(user);
+    const reportId = parseDigestHex(params.reportIdHex, "reportIdHex");
+    const rewardReceipt = this.deriveUserRewardReceiptPda(userProfile, reportId);
+    const missionType = this.mapUserMissionType(params.missionType);
+
+    const instruction = await (this.program.methods as any)
+      .claimEngagementReward({
+        missionType,
+        rewardAmount: new BN(params.rewardAmount.toString()),
+        xpGain: new BN(params.xpGain.toString()),
+        newLevel: params.newLevel,
+        reportId: Array.from(reportId),
+        reportDigest: Array.from(parseDigestHex(params.reportDigestHex, "reportDigestHex")),
+        observedAt: new BN(params.observedAtUnix.toString()),
+      })
+      .accounts({
+        user,
+        oracle: this.oracleAuthority.publicKey,
+        protocolConfig: protocolConfigPda,
+        userProfile,
+        rewardReceipt,
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+
+    return {
+      instruction,
+      oracleSigner: this.oracleAuthority,
+      rewardReceipt,
+    };
+  }
+
   async sendAndConfirmVersionedTransaction(params: {
     serializedTxBase64: string;
     recentBlockhash: string;
@@ -1350,6 +1805,27 @@ export class AnchorService {
     }
 
     return accounts.sponsorUsdcAta;
+  }
+
+  private mapUserMissionType(missionType: UserMissionTypeName): Record<string, unknown> {
+    switch (missionType) {
+      case "DAILY_SESSION_5_MIN":
+        return { dailySession5Min: {} };
+      case "LIKE_10_POSTS":
+        return { like10Posts: {} };
+      case "FOLLOW_3_CREATORS":
+        return { follow3Creators: {} };
+      case "SHARE_1_POST":
+        return { share1Post: {} };
+      case "PUBLISH_FIRST_POST":
+        return { publishFirstPost: {} };
+      case "COMPLETE_PROFILE":
+        return { completeProfile: {} };
+      case "SPONSOR_CAMPAIGN_REVIEW":
+        return { sponsorCampaignReview: {} };
+      default:
+        throw new Error(`Unsupported user mission type: ${String(missionType)}`);
+    }
   }
 
   private resolveCreatorSigner(creator: PublicKey): Keypair {

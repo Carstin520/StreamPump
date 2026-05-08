@@ -12,6 +12,7 @@ import marketRoutes from "./marketRoutes";
 import publicFeedRoutes from "./publicFeedRoutes";
 import proposalIntentRoutes from "./proposalIntentRoutes";
 import proposalRoutes from "./proposalRoutes";
+import s1Routes from "./s1Routes";
 import workspaceRoutes from "./workspaceRoutes";
 
 const router = Router();
@@ -23,6 +24,7 @@ router.use("/market", marketRoutes);
 router.use("/content", contentManifestRoutes);
 router.use("/proposal-intents", proposalIntentRoutes);
 router.use("/proposals", proposalRoutes);
+router.use("/s1", s1Routes);
 router.use("/workspace", workspaceRoutes);
 router.use("/internal/mux", internalMuxRoutes);
 

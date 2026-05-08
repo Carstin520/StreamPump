@@ -216,6 +216,8 @@ MUX_*
 
 The backend uses the AWS S3 SDK for S3-compatible requests, but the intended object storage provider is **Cloudflare R2**. Existing deployments may still use `S3_*` aliases pointed at R2; if both are present and non-empty, `S3_*` takes precedence for compatibility.
 
+S1 action transactions are exposed under `/api/v1/s1/*/build`. These endpoints return unsigned or backend-partially-signed v0 transactions for client wallet signing, plus derived PDA metadata and `requiredSigners`. Submit signed transactions through `POST /api/v1/s1/transactions/submit` and poll `GET /api/v1/s1/transactions/:signature/status`.
+
 R2 usage guardrails:
 
 - Keep `R2_MAX_ASSET_SIZE_BYTES=104857600` for a 100MiB per-asset upload cap unless you intentionally support larger videos.
