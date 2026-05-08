@@ -12,7 +12,25 @@ module.exports = {
         surf: "#E8F1F2",
         accent: "#0070F3",
         heat: "#F95738"
-      }
+      },
+      fontFamily: {
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "SF Pro Text",
+          "Segoe UI",
+          "Segoe UI Variable Text",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          "Source Han Sans SC",
+          "Noto Sans CJK SC",
+          "sans-serif",
+        ],
+      },
     },
   },
   plugins: [],

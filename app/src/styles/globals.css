@@ -38,7 +38,22 @@ body {
     radial-gradient(circle at bottom right, rgba(222, 64, 42, 0.08), transparent 18%),
     linear-gradient(180deg, var(--bg-start), var(--bg-end));
   color: var(--text-main);
-  font-family: "DM Sans", "Avenir Next", sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    "Segoe UI Variable Text",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Source Han Sans SC",
+    "Noto Sans CJK SC",
+    sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
   min-height: 100vh;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
