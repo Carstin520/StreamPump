@@ -1,6 +1,9 @@
 import { VideoHTMLAttributes, useEffect, useRef, useState } from "react";
 
+import { primeHlsJs } from "@/components/shared/hlsPreload";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
+
+export { primeHlsJs } from "@/components/shared/hlsPreload";
 
 type MediaVideoPlayerProps = Omit<
   VideoHTMLAttributes<HTMLVideoElement>,
@@ -20,16 +23,6 @@ type MediaVideoPlayerProps = Omit<
 
 const isHlsSource = (value: string | null | undefined) =>
   typeof value === "string" && /\.m3u8(?:$|\?)/i.test(value);
-
-let hlsModulePromise: Promise<typeof import("hls.js")> | null = null;
-
-export const primeHlsJs = () => {
-  if (!hlsModulePromise) {
-    hlsModulePromise = import("hls.js");
-  }
-
-  return hlsModulePromise;
-};
 
 export const MediaVideoPlayer = ({
   autoPlay,

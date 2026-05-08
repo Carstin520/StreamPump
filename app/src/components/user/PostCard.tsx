@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { primeHlsJs } from "@/components/shared/MediaVideoPlayer";
+import { primeHlsJs } from "@/components/shared/hlsPreload";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { PostRecord } from "@/lib/api/types";
@@ -17,12 +17,16 @@ export const PostCard = ({
   post,
   priority = false,
   onClick,
+  onPreview,
 }: {
   post: PostRecord;
   priority?: boolean;
   onClick?: () => void;
+  onPreview?: () => void;
 }) => {
-  const prewarmVideoPlayer = () => {
+  const handlePreview = () => {
+    onPreview?.();
+
     if (post.type === "VIDEO") {
       void primeHlsJs();
     }
@@ -35,6 +39,7 @@ export const PostCard = ({
           alt={post.title}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
           fill
+          loadingEffect="feed"
           priority={priority}
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
           src={post.coverSrc}
@@ -68,9 +73,9 @@ export const PostCard = ({
   if (onClick) {
     return (
       <button
-        className={`mb-4 inline-block w-full break-inside-avoid text-left ${stageGlow[post.stage]}`}
-        onFocus={prewarmVideoPlayer}
-        onMouseEnter={prewarmVideoPlayer}
+        className={`feed-masonry-item mb-4 inline-block w-full break-inside-avoid text-left ${stageGlow[post.stage]}`}
+        onFocus={handlePreview}
+        onMouseEnter={handlePreview}
         onClick={onClick}
         type="button"
       >
@@ -81,10 +86,10 @@ export const PostCard = ({
 
   return (
     <Link
-      className={`mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
+      className={`feed-masonry-item mb-4 inline-block w-full break-inside-avoid ${stageGlow[post.stage]}`}
       href={`/posts/${post.id}`}
-      onFocus={prewarmVideoPlayer}
-      onMouseEnter={prewarmVideoPlayer}
+      onFocus={handlePreview}
+      onMouseEnter={handlePreview}
     >
       {inner}
     </Link>

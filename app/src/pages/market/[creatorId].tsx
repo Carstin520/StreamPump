@@ -14,6 +14,8 @@ const CURVE_POINTS = 120;
 const DAILY_LIMIT = 15_000_000;
 const MOCK_SPENT = 850;
 const MOCK_HOLDING = 25;
+const BONDING_VIEW_BOX = { w: 800, h: 320 } as const;
+const BONDING_PAD = { t: 24, r: 32, b: 40, l: 56 } as const;
 
 function bondingPrice(supply: number): number {
   return BASE_PRICE * Math.pow(1 + supply / MAX_SUPPLY, 2);
@@ -21,9 +23,6 @@ function bondingPrice(supply: number): number {
 
 /* ---------- Bonding Curve Hero ---------- */
 function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
-  const viewBox = { w: 800, h: 320 };
-  const pad = { t: 24, r: 32, b: 40, l: 56 };
-
   const { path, fillPath, dot, maxP } = useMemo(() => {
     const pts: { x: number; y: number; supply: number; price: number }[] = [];
     for (let i = 0; i <= CURVE_POINTS; i++) {
@@ -32,26 +31,26 @@ function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
       pts.push({ supply: s, price: p, x: 0, y: 0 });
     }
     const maxP = pts[pts.length - 1].price;
-    const chartW = viewBox.w - pad.l - pad.r;
-    const chartH = viewBox.h - pad.t - pad.b;
+    const chartW = BONDING_VIEW_BOX.w - BONDING_PAD.l - BONDING_PAD.r;
+    const chartH = BONDING_VIEW_BOX.h - BONDING_PAD.t - BONDING_PAD.b;
 
     pts.forEach((pt) => {
-      pt.x = pad.l + (pt.supply / MAX_SUPPLY) * chartW;
-      pt.y = pad.t + chartH - (pt.price / maxP) * chartH;
+      pt.x = BONDING_PAD.l + (pt.supply / MAX_SUPPLY) * chartW;
+      pt.y = BONDING_PAD.t + chartH - (pt.price / maxP) * chartH;
     });
 
     const d = pts.map((pt, i) => `${i === 0 ? "M" : "L"}${pt.x},${pt.y}`).join(" ");
-    const fillD = `${d} L${pts[pts.length - 1].x},${pad.t + chartH} L${pts[0].x},${pad.t + chartH} Z`;
+    const fillD = `${d} L${pts[pts.length - 1].x},${BONDING_PAD.t + chartH} L${pts[0].x},${BONDING_PAD.t + chartH} Z`;
 
     const dotSupply = creator.supply;
     const dotPrice = bondingPrice(dotSupply);
-    const dotX = pad.l + (dotSupply / MAX_SUPPLY) * chartW;
-    const dotY = pad.t + chartH - (dotPrice / maxP) * chartH;
+    const dotX = BONDING_PAD.l + (dotSupply / MAX_SUPPLY) * chartW;
+    const dotY = BONDING_PAD.t + chartH - (dotPrice / maxP) * chartH;
 
     return { path: d, fillPath: fillD, dot: { x: dotX, y: dotY }, maxP };
   }, [creator.supply]);
 
-  const chartH = viewBox.h - pad.t - pad.b;
+  const chartH = BONDING_VIEW_BOX.h - BONDING_PAD.t - BONDING_PAD.b;
 
   return (
     <div className="liquid-glass-shell section-enter relative overflow-hidden p-0">
@@ -81,7 +80,7 @@ function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
       <svg
         className="w-full"
         preserveAspectRatio="xMidYMid meet"
-        viewBox={`0 0 ${viewBox.w} ${viewBox.h}`}
+        viewBox={`0 0 ${BONDING_VIEW_BOX.w} ${BONDING_VIEW_BOX.h}`}
       >
         <defs>
           <linearGradient id="curve-grad" x1="0" x2="0" y1="0" y2="1">
@@ -102,11 +101,11 @@ function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
         </defs>
 
         {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-          const y = pad.t + chartH * (1 - frac);
+          const y = BONDING_PAD.t + chartH * (1 - frac);
           return (
             <g key={frac}>
-              <line stroke="rgba(255,255,255,0.05)" strokeDasharray="4 6" x1={pad.l} x2={viewBox.w - pad.r} y1={y} y2={y} />
-              <text fill="#5a6d87" fontSize={10} textAnchor="end" x={pad.l - 8} y={y + 3}>
+              <line stroke="rgba(255,255,255,0.05)" strokeDasharray="4 6" x1={BONDING_PAD.l} x2={BONDING_VIEW_BOX.w - BONDING_PAD.r} y1={y} y2={y} />
+              <text fill="#5a6d87" fontSize={10} textAnchor="end" x={BONDING_PAD.l - 8} y={y + 3}>
                 {(maxP * frac).toFixed(3)}
               </text>
             </g>
@@ -123,7 +122,7 @@ function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
         <circle cx={dot.x} cy={dot.y} fill="#de402a" filter="url(#dot-glow-sm)" r={6} />
         <circle cx={dot.x} cy={dot.y} fill="#fff" r={3.5} />
 
-        <text fill="#5a6d87" fontSize={10} textAnchor="middle" x={viewBox.w / 2} y={viewBox.h - 6}>
+        <text fill="#5a6d87" fontSize={10} textAnchor="middle" x={BONDING_VIEW_BOX.w / 2} y={BONDING_VIEW_BOX.h - 6}>
           SUPPLY
         </text>
       </svg>

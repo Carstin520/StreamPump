@@ -269,3 +269,8 @@ export const usePublicFeedViewModel = (options?: {
     ...derived,
   };
 };
+
+export const useExploreFeedViewModel = (options?: {
+  initialError?: string | null;
+  initialPosts?: PostRecord[];
+}) => usePublicFeedPosts(options);

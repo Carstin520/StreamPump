@@ -88,3 +88,5 @@ export default function LoginPage() {
     </>
   );
 }
+
+(LoginPage as typeof LoginPage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;

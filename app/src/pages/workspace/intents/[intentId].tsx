@@ -568,6 +568,8 @@ export default function IntentDetailPage() {
   );
 }
 
+(IntentDetailPage as typeof IntentDetailPage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;
+
 function TrackCard({ label, sublabel, value }: { label: string; sublabel: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">

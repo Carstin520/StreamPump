@@ -1,13 +1,38 @@
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
-import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
+import {
+  useExploreFeedViewModel,
+  usePublicFeedViewModel,
+} from "@/hooks/usePublicFeedViewModel";
 import { PostRecord } from "@/lib/api/types";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { discoverCategories } from "@/lib/public-data";
-import { PostDetailExperience } from "@/components/post/PostDetailExperience";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
+
+let postDetailExperiencePromise:
+  | Promise<typeof import("@/components/post/PostDetailExperience").PostDetailExperience>
+  | null = null;
+
+const loadPostDetailExperience = () => {
+  if (!postDetailExperiencePromise) {
+    postDetailExperiencePromise = import("@/components/post/PostDetailExperience").then(
+      (mod) => mod.PostDetailExperience,
+    );
+  }
+
+  return postDetailExperiencePromise;
+};
+
+const DynamicPostDetailExperience = dynamic(loadPostDetailExperience, {
+  ssr: false,
+});
+
+const preloadPostDetailExperience = () => {
+  void loadPostDetailExperience();
+};
 
 export const DiscoverSurface = ({
   initialError = null,
@@ -17,7 +42,7 @@ export const DiscoverSurface = ({
   initialPosts?: PostRecord[];
 }) => {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const viewModel = usePublicFeedViewModel({
+  const viewModel = useExploreFeedViewModel({
     initialError,
     initialPosts,
   });
@@ -27,7 +52,7 @@ export const DiscoverSurface = ({
     <PageShell topbarMode="scroll-reveal">
       <ExploreView onOpenPost={setSelectedPostId} viewModel={viewModel} />
       {selectedPostId && posts.length > 0 ? (
-        <PostDetailExperience
+        <DynamicPostDetailExperience
           closeLabel="Back to explore"
           currentPostId={selectedPostId}
           items={posts}
@@ -46,7 +71,7 @@ const ExploreView = ({
   viewModel,
 }: {
   onOpenPost: (postId: string) => void;
-  viewModel: ReturnType<typeof usePublicFeedViewModel>;
+  viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => (
   <div className="-mt-3 space-y-4">
     <section
@@ -124,7 +149,7 @@ const PostsSection = ({
   viewModel,
 }: {
   onOpenPost: (postId: string) => void;
-  viewModel: ReturnType<typeof usePublicFeedViewModel>;
+  viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
   const { error, loading, posts } = viewModel;
 
@@ -158,7 +183,13 @@ const PostsSection = ({
       {!loading && !error && posts.length > 0 ? (
         <div className="masonry-grid masonry-grid-home">
           {posts.map((post, index) => (
-            <PostCard key={post.id} post={post} priority={index < 4} onClick={() => onOpenPost(post.id)} />
+            <PostCard
+              key={post.id}
+              post={post}
+              priority={index < 4}
+              onClick={() => onOpenPost(post.id)}
+              onPreview={preloadPostDetailExperience}
+            />
           ))}
         </div>
       ) : null}
