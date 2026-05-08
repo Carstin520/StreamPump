@@ -88,7 +88,7 @@ const request = async <T>(path: string, options: ApiRequestOptions = {}): Promis
     headers.set("Authorization", `Bearer ${options.token}`);
   }
 
-  const timeoutMs = Number.isFinite(options.timeoutMs)
+  const timeoutMs = typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs)
     ? options.timeoutMs
     : DEFAULT_API_TIMEOUT_MS;
   const controller = new AbortController();
