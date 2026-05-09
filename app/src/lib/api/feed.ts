@@ -227,13 +227,14 @@ export const extractPublicMediaOrigins = (posts: PostRecord[]): string[] => {
 export const listPublicFeedPosts = async (
   options?: {
     limit?: number;
+    timeoutMs?: number;
   }
 ): Promise<PostRecord[]> => {
   const response = await apiClient.get<PublicFeedResponse>("/feed/posts", {
     query: {
       limit: options?.limit ?? 24,
     },
-    timeoutMs: PUBLIC_FEED_TIMEOUT_MS,
+    timeoutMs: options?.timeoutMs ?? PUBLIC_FEED_TIMEOUT_MS,
   });
 
   return response.posts.map(mapFeedPostToPostRecord);

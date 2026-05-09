@@ -35,7 +35,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 const STAGE_LABELS: Record<CreatorSeasonState, string> = {
   S1_DISCOVERY: "S1 Discovery",
-  S1_BUYOUT: "S1 Buyout Candidate",
+  S1_BUYOUT: "S1 Buyout Watch",
   S2_ACTIVE: "S2 Sponsored Creator",
 };
 

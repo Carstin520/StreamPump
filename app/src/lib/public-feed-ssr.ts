@@ -9,6 +9,7 @@ import {
 import { posts as fallbackPublicFeedPosts } from "@/lib/mocks/discover";
 
 export const PUBLIC_FEED_REVALIDATE_SECONDS = 60;
+const PUBLIC_FEED_SSR_TIMEOUT_MS = 8000;
 
 export type PublicFeedPageProps = {
   initialError: string | null;
@@ -26,6 +27,7 @@ export const loadPublicFeedPageProps = async (): Promise<PublicFeedPageProps> =>
   try {
     const initialPosts = await listPublicFeedPosts({
       limit: 24,
+      timeoutMs: PUBLIC_FEED_SSR_TIMEOUT_MS,
     });
 
     return {

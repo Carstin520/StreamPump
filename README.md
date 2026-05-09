@@ -2,7 +2,7 @@
 
 <div align="center">
   <p><strong>A Web2.5 creator sponsorship market where content, creator momentum, sponsor budgets, fan participation, and Solana settlement live in one product loop.</strong></p>
-  <p>中文一句话：StreamPump 不是单纯的 fan token，也不是传统 influencer CRM；它把内容创作、赞助预算、粉丝参与、链上结算放进同一个产品流程。</p>
+  <p>一句话：StreamPump 不是单纯的 fan token，也不是传统 influencer CRM；它把内容创作、赞助预算、粉丝参与、链上结算放进同一个产品流程。</p>
   <p>
     <a href="#current-status">Status</a> ·
     <a href="#product-model">Product Model</a> ·

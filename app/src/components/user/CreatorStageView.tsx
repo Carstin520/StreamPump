@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
+import { ArrowDownIcon, ArrowUpIcon, FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
-import { StagePill } from "@/components/shared/StagePill";
 import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
-import { compactNumber, formatUsd } from "@/lib/public-data";
+import { compactNumber } from "@/lib/public-data";
 
-type ProfileTab = "作品" | "投资档案" | "Signals";
+type ProfileTab = "Posts" | "Investment File" | "Signals";
 
-const shellCard =
-  "app-shell-frame overflow-hidden border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,34,0.94)_0%,rgba(12,18,28,0.92)_100%)]";
+const TABS: ProfileTab[] = ["Posts", "Investment File", "Signals"];
+
+const SPUMP_PER_USD = 40;
 
 export const CreatorStageView = ({
   creator,
@@ -19,339 +19,1030 @@ export const CreatorStageView = ({
   creator: CreatorMarketRecord;
   posts?: PostRecord[];
 }) => {
-  const [activeTab, setActiveTab] = useState<ProfileTab>("作品");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("Posts");
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followPulse, setFollowPulse] = useState(false);
+  const [buyAmount, setBuyAmount] = useState(5);
+
   const creatorPosts = useMemo(
     () => posts.filter((post) => post.creatorId === creator.id),
-    [creator.id, posts]
+    [creator.id, posts],
   );
-  const metrics = getInvestmentMetrics(creator);
 
-  const toggleFollow = () => {
-    setIsFollowing((value) => !value);
-    setFollowPulse(true);
-    window.setTimeout(() => setFollowPulse(false), 340);
-  };
+  const market = useMemo(() => buildMarketModel(creator), [creator]);
+  const buyPreview = useMemo(
+    () => previewBuy(market, buyAmount),
+    [market, buyAmount],
+  );
 
   return (
-    <div className="space-y-6">
-      <section className={shellCard}>
-        <div className="relative h-52 overflow-hidden md:h-60">
-          <ProgressiveImage
-            alt={`${creator.name} banner`}
-            className="h-full w-full object-cover"
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, 1200px"
-            src={creator.heroSrc}
+    <div className="space-y-5 pb-12">
+      <ProfileHero
+        creator={creator}
+        isFollowing={isFollowing}
+        market={market}
+        onToggleFollow={() => setIsFollowing((value) => !value)}
+      />
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-5">
+          <MarketStatsBar creator={creator} market={market} />
+          <BondingCurvePanel buyPreview={buyPreview} market={market} />
+          <LifecycleTimeline creator={creator} market={market} />
+          <ContentSurface
+            activeTab={activeTab}
+            creator={creator}
+            posts={creatorPosts}
+            onTabChange={setActiveTab}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.12)_0%,rgba(7,11,18,0.28)_30%,rgba(7,11,18,0.56)_55%,rgba(7,11,18,0.86)_80%,rgba(7,11,18,0.98)_100%)]" />
         </div>
 
-        <div className="relative px-6 pb-9 md:px-10">
-          <div className="-mt-16 flex flex-col items-center text-center md:-mt-20">
-            <div className="h-28 w-28 overflow-hidden rounded-full border-[4px] border-[#09111b] shadow-[0_24px_56px_rgba(0,0,0,0.38)] md:h-32 md:w-32">
-              <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
-            </div>
+        <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
+          <BuyPanel
+            buyAmount={buyAmount}
+            buyPreview={buyPreview}
+            market={market}
+            onBuyAmountChange={setBuyAmount}
+          />
+          {creator.state === "S1_BUYOUT" ? <BuyoutOfferCard creator={creator} /> : null}
+          <TopHoldersCard creator={creator} />
+        </aside>
+      </div>
+    </div>
+  );
+};
 
-            <h1 className="mt-5 max-w-[620px] truncate text-[38px] font-semibold tracking-[-0.05em] text-white">{creator.name}</h1>
-            <p className="mt-2 max-w-[480px] truncate text-sm text-[#92a3bc]">
-              {creator.handle} · IP属地: {creator.city}
-            </p>
+/* ──────────────────────────  Market model  ────────────────────────── */
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <StagePill stage={creator.state} />
-              <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#dce6f8]">
-                {creator.level}
-              </span>
-            </div>
+type MarketModel = {
+  priceSpump: number;
+  nextPriceSpump: number;
+  change24hPct: number;
+  supply: number;
+  maxSupply: number;
+  graduationPct: number;
+  holders: number;
+  fans: number;
+  supporterPoolUsd: number;
+  targetPriceSpump: number;
+  liquiditySpump: number;
+  state: CreatorMarketRecord["state"];
+  level: number;
+  levelLabel: string;
+};
 
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-8 text-center">
-              <ProfileStat label="关注" value={compactNumber(creator.followingCount)} />
-              <div className="h-8 w-px bg-white/8" />
-              <ProfileStat label="粉丝" value={compactNumber(creator.followersCount)} />
-              <div className="h-8 w-px bg-white/8" />
-              <ProfileStat label="获赞与收藏" value={compactNumber(creator.totalLikesAndSavesCount)} />
-            </div>
+const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
+  const priceSpump = Math.max(1, Math.round(creator.tokenPrice * SPUMP_PER_USD));
+  const targetPriceSpump = Math.max(
+    priceSpump + 8,
+    Math.round(creator.targetGraduationPrice * SPUMP_PER_USD),
+  );
+  const supply = creator.supply;
+  const maxSupply = Math.max(supply * 1.6, supply + 5_000);
+  const change24hPct = Number(((creator.momentumScore - 70) * 0.18).toFixed(2));
+  const nextPriceSpump = Math.round(priceSpump * 1.012);
+  const supporterPoolUsd = creator.supporterDistributableUsd ?? 0;
+  const liquiditySpump = Math.round(priceSpump * supply * 0.18);
+  const level = creator.state === "S2_ACTIVE" ? 5 : creator.state === "S1_BUYOUT" ? 3 : 2;
+  const levelLabel = levelDescriptor(creator);
 
-            <p className="mt-6 line-clamp-3 max-w-2xl text-sm leading-7 text-[#d2d9e6]">{creator.intro}</p>
+  return {
+    priceSpump,
+    nextPriceSpump,
+    change24hPct,
+    supply,
+    maxSupply,
+    graduationPct: creator.graduationProgress,
+    holders: creator.holderCount,
+    fans: creator.followersCount,
+    supporterPoolUsd,
+    targetPriceSpump,
+    liquiditySpump,
+    state: creator.state,
+    level,
+    levelLabel,
+  };
+};
 
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <button className="liquid-glass-btn rounded-full px-6 py-2.5 text-sm font-medium text-white transition hover:bg-white/10" type="button">
-                私信
-              </button>
-              <button
-                className={`rounded-full px-7 py-2.5 text-sm font-semibold transition hover:bg-[#ea523e] ${
-                  isFollowing ? "bg-[#13291f] text-[#90efac]" : "bg-[#de402a] text-white"
-                } ${followPulse ? "tap-bounce-active" : ""}`}
-                onClick={toggleFollow}
-                type="button"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
-                  {isFollowing ? "已关注" : "关注"}
-                </span>
-              </button>
-            </div>
+const levelDescriptor = (creator: CreatorMarketRecord): string => {
+  if (creator.state === "S2_ACTIVE") return "Graduated · Sponsor Active";
+  if (creator.state === "S1_BUYOUT") return "Buyout Watch";
+  if (creator.graduationProgress >= 60) return "Rising Creator";
+  if (creator.graduationProgress >= 30) return "Discovery Stage";
+  return "Early Discovery";
+};
+
+const previewBuy = (market: MarketModel, amount: number) => {
+  const safe = Math.max(0, Math.min(Math.floor(amount), 200));
+  const slippageMultiplier = 1 + safe * 0.0008;
+  const avgPrice = market.priceSpump * slippageMultiplier;
+  const cost = Math.round(avgPrice * safe);
+  const newSupply = market.supply + safe;
+  const priceAfter = Math.round(market.priceSpump * (1 + safe * 0.0016));
+
+  return {
+    amount: safe,
+    avgPrice: Math.round(avgPrice),
+    cost,
+    priceAfter,
+    newSupply,
+  };
+};
+
+type BuyPreview = ReturnType<typeof previewBuy>;
+
+/* ──────────────────────────  Hero  ────────────────────────── */
+
+const ProfileHero = ({
+  creator,
+  isFollowing,
+  market,
+  onToggleFollow,
+}: {
+  creator: CreatorMarketRecord;
+  isFollowing: boolean;
+  market: MarketModel;
+  onToggleFollow: () => void;
+}) => (
+  <section className="relative overflow-hidden rounded-[28px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
+    <div className="relative h-44 md:h-56">
+      <ProgressiveImage
+        alt={`${creator.name} banner`}
+        className="h-full w-full object-cover"
+        fill
+        priority
+        sizes="(max-width: 768px) 100vw, 1280px"
+        src={creator.heroSrc}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.05)_0%,rgba(7,11,18,0.42)_55%,rgba(7,11,18,0.96)_100%)]" />
+      <div className="absolute right-4 top-4 flex items-center gap-2">
+        <StatusBadge market={market} />
+      </div>
+    </div>
+
+    <div className="relative -mt-12 flex flex-col gap-4 px-6 pb-6 md:flex-row md:items-end md:gap-6 md:px-8 md:pb-7">
+      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_18px_48px_rgba(0,0,0,0.5)] md:h-28 md:w-28">
+        <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-[#7486a1]">
+          <span>Level {market.level}</span>
+          <span className="h-1 w-1 rounded-full bg-white/20" />
+          <span className="truncate">{market.levelLabel}</span>
+        </div>
+        <h1 className="mt-2 truncate text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[34px]">
+          {creator.name}
+        </h1>
+        <div className="mt-1 flex items-center gap-2 text-sm text-[#92a3bc]">
+          <span className="truncate">{creator.handle}</span>
+          <span className="text-[#3e4a5e]">·</span>
+          <span className="truncate">{creator.city}</span>
+          <span className="text-[#3e4a5e]">·</span>
+          <span className="truncate text-[#7486a1]">{creator.niche}</span>
+        </div>
+        <p className="mt-3 line-clamp-2 max-w-[640px] text-sm leading-6 text-[#bcc8de]">
+          {creator.intro}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <button
+          className="liquid-glass-btn rounded-full px-5 py-2.5 text-sm text-white transition hover:bg-white/[0.08]"
+          type="button"
+        >
+          Message
+        </button>
+        <button
+          className={`flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
+            isFollowing
+              ? "border border-white/10 bg-[#13291f] text-[#90efac]"
+              : "bg-[#de402a] text-white hover:bg-[#ea523e]"
+          }`}
+          onClick={onToggleFollow}
+          type="button"
+        >
+          {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
+          {isFollowing ? "Following" : "Follow"}
+        </button>
+      </div>
+    </div>
+  </section>
+);
+
+const StatusBadge = ({ market }: { market: MarketModel }) => {
+  if (market.state === "S2_ACTIVE") {
+    return (
+      <span className="flex items-center gap-1.5 rounded-full border border-[#65ecaf]/30 bg-[#0e1f17]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8df0c4] backdrop-blur-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
+        Graduated · S2 Live
+      </span>
+    );
+  }
+  if (market.state === "S1_BUYOUT") {
+    return (
+      <span className="flex items-center gap-1.5 rounded-full border border-[#de402a]/35 bg-[#1f120e]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#ff8a78] backdrop-blur-md">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#de402a] opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#de402a]" />
+        </span>
+        Buyout Watch
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5 rounded-full border border-[#67b8ff]/30 bg-[#0e1726]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff] backdrop-blur-md">
+      <span className="h-1.5 w-1.5 rounded-full bg-[#67b8ff]" />
+      S1 Live · {market.graduationPct}%
+    </span>
+  );
+};
+
+/* ──────────────────────────  Market stats  ────────────────────────── */
+
+const MarketStatsBar = ({
+  creator,
+  market,
+}: {
+  creator: CreatorMarketRecord;
+  market: MarketModel;
+}) => {
+  const positive = market.change24hPct >= 0;
+
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
+      <div className="grid grid-cols-2 divide-y divide-white/[0.05] md:grid-cols-3 md:divide-y-0 md:divide-x lg:grid-cols-6">
+        <PriceCell market={market} />
+        <StatCell label="24h Change" tone={positive ? "positive" : "negative"}>
+          <span className="flex items-center gap-1">
+            {positive ? (
+              <ArrowUpIcon className="h-3.5 w-3.5 text-[#65ecaf]" />
+            ) : (
+              <ArrowDownIcon className="h-3.5 w-3.5 text-[#f67263]" />
+            )}
+            {positive ? "+" : ""}
+            {market.change24hPct.toFixed(2)}%
+          </span>
+        </StatCell>
+        <StatCell label="Holders">{compactNumber(market.holders)}</StatCell>
+        <StatCell label="S1 Supply">{compactNumber(market.supply)}</StatCell>
+        <StatCell label="Supporter Pool">
+          {market.supporterPoolUsd ? `$${compactNumber(market.supporterPoolUsd)}` : "—"}
+        </StatCell>
+        <StatCell label="Graduation">
+          <span className="flex items-center gap-2">
+            <span>{market.graduationPct}%</span>
+            <span className="h-1 w-12 overflow-hidden rounded-full bg-white/[0.06]">
+              <span
+                className="block h-full rounded-full bg-gradient-to-r from-[#de402a] to-[#ff8a78]"
+                style={{ width: `${Math.min(100, market.graduationPct)}%` }}
+              />
+            </span>
+          </span>
+        </StatCell>
+      </div>
+      <div className="border-t border-white/[0.04] px-5 py-2.5 text-[11px] text-[#6f8099]">
+        <span className="text-[#7486a1]">Niche</span>
+        <span className="ml-2 text-[#c8d3e6]">{creator.niche}</span>
+        <span className="ml-4 text-[#7486a1]">Tags</span>
+        <span className="ml-2 text-[#c8d3e6]">{creator.tags.slice(0, 3).map((t) => `#${t}`).join("  ")}</span>
+      </div>
+    </section>
+  );
+};
+
+const PriceCell = ({ market }: { market: MarketModel }) => (
+  <div className="px-5 py-4">
+    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Fans Token Price</p>
+    <p className="mt-1.5 text-[26px] font-semibold tracking-[-0.04em] text-white">
+      {market.priceSpump}
+      <span className="ml-1.5 text-xs font-medium text-[#7486a1]">SPUMP</span>
+    </p>
+  </div>
+);
+
+const StatCell = ({
+  children,
+  label,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  label: string;
+  tone?: "neutral" | "positive" | "negative";
+}) => (
+  <div className="px-5 py-4">
+    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
+    <div
+      className={`mt-1.5 text-base font-semibold tracking-[-0.02em] ${
+        tone === "positive"
+          ? "text-[#65ecaf]"
+          : tone === "negative"
+            ? "text-[#f67263]"
+            : "text-white"
+      }`}
+    >
+      {children}
+    </div>
+  </div>
+);
+
+/* ──────────────────────────  Bonding curve  ────────────────────────── */
+
+const BondingCurvePanel = ({
+  buyPreview,
+  market,
+}: {
+  buyPreview: BuyPreview;
+  market: MarketModel;
+}) => {
+  const path = useMemo(() => buildCurvePath(market), [market]);
+  const currentDot = useMemo(() => mapPointToCurve(market, market.supply), [market]);
+  const previewDot = useMemo(
+    () => mapPointToCurve(market, buyPreview.newSupply),
+    [market, buyPreview],
+  );
+
+  return (
+    <section className="relative overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-5 md:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+            Bonding curve
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">
+            S1 supply × SPUMP price
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#7486a1]">
+          <LegendDot color="#de402a" label="Now" />
+          <LegendDot color="#ffb38a" label="After buy" />
+          <LegendDot color="rgba(255,255,255,0.18)" label="Curve" outline />
+        </div>
+      </header>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="relative h-[220px] overflow-hidden rounded-[18px] border border-white/[0.05] bg-[radial-gradient(circle_at_30%_30%,rgba(222,64,42,0.08),transparent_55%),linear-gradient(180deg,#0d1320_0%,#0a0f18_100%)]">
+          <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 400 220">
+            <defs>
+              <linearGradient id="curveStroke" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stopColor="#79b9ff" stopOpacity="0.8" />
+                <stop offset="60%" stopColor="#ffb38a" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#de402a" stopOpacity="1" />
+              </linearGradient>
+              <linearGradient id="curveFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#de402a" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#de402a" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
+            {[0.25, 0.5, 0.75].map((y) => (
+              <line
+                key={y}
+                stroke="rgba(255,255,255,0.04)"
+                strokeWidth="1"
+                x1="0"
+                x2="400"
+                y1={220 * y}
+                y2={220 * y}
+              />
+            ))}
+
+            <path d={`${path} L 400 220 L 0 220 Z`} fill="url(#curveFill)" />
+            <path d={path} fill="none" stroke="url(#curveStroke)" strokeWidth="2.5" />
+
+            <line
+              stroke="rgba(255,255,255,0.12)"
+              strokeDasharray="3 4"
+              strokeWidth="1"
+              x1={currentDot.x}
+              x2={currentDot.x}
+              y1={currentDot.y}
+              y2="220"
+            />
+
+            {previewDot.x !== currentDot.x ? (
+              <>
+                <line
+                  stroke="rgba(255,179,138,0.35)"
+                  strokeDasharray="3 4"
+                  strokeWidth="1"
+                  x1={previewDot.x}
+                  x2={previewDot.x}
+                  y1={previewDot.y}
+                  y2="220"
+                />
+                <circle cx={previewDot.x} cy={previewDot.y} fill="#ffb38a" r="5" />
+                <circle cx={previewDot.x} cy={previewDot.y} fill="rgba(255,179,138,0.18)" r="11" />
+              </>
+            ) : null}
+
+            <circle cx={currentDot.x} cy={currentDot.y} fill="#de402a" r="6" />
+            <circle cx={currentDot.x} cy={currentDot.y} fill="rgba(222,64,42,0.18)" r="14" />
+          </svg>
+
+          <div className="pointer-events-none absolute bottom-2 left-3 text-[10px] uppercase tracking-[0.18em] text-[#6f8099]">
+            Supply →
+          </div>
+          <div className="pointer-events-none absolute left-3 top-3 text-[10px] uppercase tracking-[0.18em] text-[#6f8099]">
+            Price ↑
           </div>
         </div>
-      </section>
 
-      <section className={`${shellCard} px-6 py-6 md:px-8`}>
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">Investment Profile</h2>
-              <StagePill compact stage={creator.state} />
-            </div>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#93a3bc]">{getInvestmentSubtitle(creator)}</p>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
+          <CurveStat
+            accent="#de402a"
+            hint={`Supply ${compactNumber(market.supply)}`}
+            label="Current"
+            value={`${market.priceSpump} SPUMP`}
+          />
+          <CurveStat
+            accent="#ffd6a8"
+            hint="Marginal next-token cost"
+            label="Next token"
+            value={`${market.nextPriceSpump} SPUMP`}
+          />
+          <CurveStat
+            accent="#ffb38a"
+            hint={`After +${buyPreview.amount} S1`}
+            label="Price after buy"
+            value={`${buyPreview.priceAfter} SPUMP`}
+          />
+          <CurveStat
+            accent="#8ad0ff"
+            hint="Graduation target"
+            label="Target"
+            value={`${market.targetPriceSpump} SPUMP`}
+          />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const LegendDot = ({
+  color,
+  label,
+  outline = false,
+}: {
+  color: string;
+  label: string;
+  outline?: boolean;
+}) => (
+  <span className="flex items-center gap-1.5">
+    <span
+      className="h-2 w-2 rounded-full"
+      style={{
+        background: outline ? "transparent" : color,
+        border: outline ? `1px solid ${color}` : "none",
+      }}
+    />
+    {label}
+  </span>
+);
+
+const CurveStat = ({
+  accent,
+  hint,
+  label,
+  value,
+}: {
+  accent: string;
+  hint: string;
+  label: string;
+  value: string;
+}) => (
+  <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+    <div className="flex items-center gap-1.5">
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
+      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">
+        {label}
+      </span>
+    </div>
+    <p className="mt-1.5 text-sm font-semibold tracking-[-0.01em] text-white">{value}</p>
+    <p className="mt-0.5 text-[10px] text-[#5a6b82]">{hint}</p>
+  </div>
+);
+
+const buildCurvePath = (market: MarketModel) => {
+  const points: Array<[number, number]> = [];
+  const steps = 28;
+
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const supply = t * market.maxSupply;
+    const price = priceAtSupply(market, supply);
+    const x = t * 400;
+    const y = mapPriceToY(market, price);
+    points.push([x, y]);
+  }
+
+  return points
+    .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ");
+};
+
+const priceAtSupply = (market: MarketModel, supply: number) => {
+  const ratio = supply / market.maxSupply;
+  const base = market.priceSpump * 0.4;
+  return base + (market.targetPriceSpump - base) * Math.pow(ratio, 1.6);
+};
+
+const mapPriceToY = (market: MarketModel, price: number) => {
+  const minP = market.priceSpump * 0.4;
+  const maxP = market.targetPriceSpump * 1.05;
+  const clamped = Math.min(Math.max(price, minP), maxP);
+  const t = (clamped - minP) / (maxP - minP);
+  return 220 - t * 200 - 8;
+};
+
+const mapPointToCurve = (market: MarketModel, supply: number) => {
+  const clampedSupply = Math.min(Math.max(supply, 0), market.maxSupply);
+  const x = (clampedSupply / market.maxSupply) * 400;
+  const y = mapPriceToY(market, priceAtSupply(market, clampedSupply));
+  return { x, y };
+};
+
+/* ──────────────────────────  Buy panel  ────────────────────────── */
+
+const BuyPanel = ({
+  buyAmount,
+  buyPreview,
+  market,
+  onBuyAmountChange,
+}: {
+  buyAmount: number;
+  buyPreview: BuyPreview;
+  market: MarketModel;
+  onBuyAmountChange: (value: number) => void;
+}) => {
+  const [pulse, setPulse] = useState(false);
+  const disabled = market.state !== "S1_DISCOVERY";
+  const currentHolding = 0;
+  const futureHolding = currentHolding + buyPreview.amount;
+
+  useEffect(() => {
+    if (!pulse) return;
+    const id = window.setTimeout(() => setPulse(false), 320);
+    return () => window.clearTimeout(id);
+  }, [pulse]);
+
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(18,25,37,0.92)_0%,rgba(11,17,27,0.92)_100%)]">
+      <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+            Trade Fans Token
+          </p>
+          <h3 className="mt-0.5 text-base font-semibold text-white">
+            {disabled ? "Preview Mode" : "Buy S1 Tokens"}
+          </h3>
+        </div>
+        <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
+          1 S1 ≈ {market.priceSpump} SPUMP
+        </span>
+      </header>
+
+      <div className="space-y-4 px-5 py-5">
+        <div>
+          <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-[#6f8099]">
+            <span>Amount</span>
+            <span className="text-[#8ea0ba]">Max 200</span>
           </div>
-          <button
-            className="rounded-full bg-[#de402a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#ea523e]"
-            type="button"
-          >
-            {getPrimaryActionLabel(creator)}
-          </button>
-        </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="liquid-glass-btn h-10 w-10 shrink-0 rounded-2xl text-lg text-white transition hover:bg-white/[0.08]"
+              onClick={() => onBuyAmountChange(Math.max(1, buyAmount - 1))}
+              type="button"
+            >
+              −
+            </button>
+            <input
+              className="input-glass h-12 w-full rounded-2xl bg-transparent px-4 text-center text-2xl font-semibold tracking-[-0.02em] text-white outline-none"
+              max={200}
+              min={1}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (!Number.isFinite(next)) return;
+                onBuyAmountChange(Math.max(0, Math.min(200, Math.floor(next))));
+              }}
+              type="number"
+              value={buyAmount}
+            />
+            <button
+              className="liquid-glass-btn h-10 w-10 shrink-0 rounded-2xl text-lg text-white transition hover:bg-white/[0.08]"
+              onClick={() => onBuyAmountChange(Math.min(200, buyAmount + 1))}
+              type="button"
+            >
+              +
+            </button>
+          </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {metrics.map((metric) => (
-            <div className="glass-card p-4" key={metric.label}>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-[#71819b]">{metric.label}</p>
-              <p className={`mt-2 text-2xl font-semibold tracking-[-0.03em] ${metric.tone}`}>{metric.value}</p>
-              {metric.help ? <p className="mt-1 text-xs text-[#8a99ae]">{metric.help}</p> : null}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className={shellCard}>
-        <div className="border-b border-white/8 px-6 pt-5 md:px-8">
-          <div className="flex items-center gap-7">
-            {(["作品", "投资档案", "Signals"] as ProfileTab[]).map((tab) => (
+          <div className="mt-3 flex items-center gap-2">
+            {[5, 10, 25, 50].map((preset) => (
               <button
-                className={`relative pb-4 text-sm transition ${
-                  activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
+                className={`flex-1 rounded-full border px-2 py-1.5 text-[11px] font-medium transition ${
+                  buyAmount === preset
+                    ? "border-[#de402a]/40 bg-[#de402a]/[0.12] text-[#ff8a78]"
+                    : "border-white/[0.06] bg-white/[0.03] text-[#8ea0ba] hover:bg-white/[0.06] hover:text-white"
                 }`}
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={preset}
+                onClick={() => onBuyAmountChange(preset)}
                 type="button"
               >
-                {tab}
-                {activeTab === tab ? <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[#de402a]" /> : null}
+                {preset}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="px-6 py-6 md:px-8">
-          {activeTab === "作品" ? (
-            <div className="masonry-grid">
-              {creatorPosts.map((post, index) => (
-                <Link className="block" href={`/posts/${post.id}`} key={post.id}>
-                  <div className="glass-card">
-                    <div className={`relative overflow-hidden rounded-t-[24px] ${post.mediaHeightClass}`}>
-                      <ProgressiveImage
-                        alt={post.title}
-                        className="object-cover transition-transform duration-500 hover:scale-[1.02]"
-                        fill
-                        priority={index < 2}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                        src={post.coverSrc}
-                      />
-                      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_45%,rgba(0,0,0,0.18)_65%,rgba(0,0,0,0.36)_100%)]" />
-                      {post.type === "VIDEO" ? (
-                        <div className="liquid-pill absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
-                          Video
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="glass-card-footer px-4 pb-4 pt-4">
-                      <h3 className="line-clamp-2 text-sm font-medium leading-6 text-white">{post.title}</h3>
-                      <div className="mt-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <img
-                            alt={creator.name}
-                            className="h-5 w-5 rounded-full object-cover"
-                            src={creator.avatarSrc}
-                          />
-                          <span className="text-xs text-[#8ea0ba]">{creator.name}</span>
-                        </div>
-                        <span className="text-xs text-[#8ea0ba]">♡ {compactNumber(post.likes)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-
-          {activeTab === "投资档案" ? <InvestmentPanels creator={creator} /> : null}
-
-          {activeTab === "Signals" ? <SignalPanels creator={creator} /> : null}
+        <div className="space-y-2 rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-3.5">
+          <SummaryRow label="Avg price" value={`${buyPreview.avgPrice} SPUMP`} />
+          <SummaryRow accent label="Estimated cost" value={`${buyPreview.cost} SPUMP`} />
+          <SummaryRow
+            label="You will hold"
+            value={`${futureHolding} S1`}
+            sublabel={`+${buyPreview.amount} new`}
+          />
+          <SummaryRow
+            label="Price after buy"
+            value={`${buyPreview.priceAfter} SPUMP`}
+            sublabel={`${(((buyPreview.priceAfter - market.priceSpump) / market.priceSpump) * 100).toFixed(2)}%`}
+          />
         </div>
-      </section>
-    </div>
+
+        <button
+          className={`relative w-full overflow-hidden rounded-2xl py-3.5 text-sm font-semibold transition ${
+            disabled
+              ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
+              : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_18px_34px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
+          } ${pulse ? "tap-bounce-active" : ""}`}
+          onClick={() => setPulse(true)}
+          type="button"
+        >
+          {disabled
+            ? market.state === "S1_BUYOUT"
+              ? "Buyout Live · Buy Locked"
+              : "Graduated · S2 Active"
+            : "Preview Buy"}
+        </button>
+
+        <button
+          className="glass-button-ghost w-full px-4 py-3 text-sm font-medium"
+          type="button"
+        >
+          Add to Watchlist
+        </button>
+
+        {disabled ? null : (
+          <p className="text-center text-[11px] text-[#5a6b82]">
+            Demo flow · on-chain trade lands in next release
+          </p>
+        )}
+      </div>
+    </section>
   );
 };
 
-const ProfileStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-[92px]">
-    <p className="text-xl font-semibold tracking-[-0.03em] text-white">{value}</p>
-    <p className="mt-1 text-xs text-[#8797ae]">{label}</p>
+const SummaryRow = ({
+  accent = false,
+  label,
+  sublabel,
+  value,
+}: {
+  accent?: boolean;
+  label: string;
+  sublabel?: string;
+  value: string;
+}) => (
+  <div className="flex items-center justify-between text-sm">
+    <span className="text-[#7e90a8]">{label}</span>
+    <div className="flex items-center gap-2">
+      {sublabel ? <span className="text-[11px] text-[#5a6b82]">{sublabel}</span> : null}
+      <span className={`font-semibold ${accent ? "text-[#ff8a78]" : "text-white"}`}>{value}</span>
+    </div>
   </div>
 );
 
-const InvestmentPanels = ({ creator }: { creator: CreatorMarketRecord }) => {
-  if (creator.state === "S1_DISCOVERY") {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-white">Creator growth curve</h3>
-            <span className="text-sm text-[#ffb987]">{creator.graduationProgress}% to graduation</span>
-          </div>
-          <div className="mt-5 h-60 rounded-[22px] border border-white/6 bg-[linear-gradient(180deg,#0d1520_0%,#0b1016_100%)] p-5">
-            <div className="relative h-full overflow-hidden rounded-[18px]">
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_24%,rgba(255,255,255,0.04)_25%,transparent_26%,transparent_49%,rgba(255,255,255,0.04)_50%,transparent_51%,transparent_74%,rgba(255,255,255,0.04)_75%,transparent_76%)]" />
-              <div className="absolute inset-x-5 bottom-6 h-[2px] bg-white/8" />
-              <div className="absolute left-6 top-6 text-[11px] uppercase tracking-[0.18em] text-[#7687a1]">Bonding curve</div>
-              <div className="absolute bottom-6 left-6 h-[2px] w-[74%] origin-left rotate-[-17deg] rounded-full bg-gradient-to-r from-[#ff6d90] via-[#8e7fff] to-[#79b9ff]" />
-            </div>
-          </div>
-        </div>
+/* ──────────────────────────  Lifecycle  ────────────────────────── */
 
-        <div className="space-y-4">
-          <InfoCard
-            eyebrow="Graduation watch"
-            title={`${creator.graduationProgress}% of graduation target`}
-            body={`Current price is ${formatUsd(creator.tokenPrice)} with a graduation target at ${formatUsd(creator.targetGraduationPrice)}.`}
-          />
-          <InfoCard
-            eyebrow="Potential buyout sponsors"
-            title="Sponsors currently watching"
-            body={creator.potentialSponsors.join(" · ")}
-          />
+const LIFECYCLE_STEPS: Array<{ id: string; label: string; minProgress: number }> = [
+  { id: "discovery", label: "Discovery", minProgress: 0 },
+  { id: "growth", label: "Growth", minProgress: 30 },
+  { id: "buyout", label: "Buyout Watch", minProgress: 65 },
+  { id: "graduation", label: "Graduation", minProgress: 100 },
+];
+
+const LifecycleTimeline = ({
+  creator,
+  market,
+}: {
+  creator: CreatorMarketRecord;
+  market: MarketModel;
+}) => {
+  const activeIndex = useMemo(() => resolveLifecycleIndex(creator, market), [creator, market]);
+
+  return (
+    <section className="rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-5 py-5 md:px-6">
+      <header className="flex items-center justify-between">
+        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+          On-chain lifecycle
+        </p>
+        <span className="text-[11px] text-[#7486a1]">{market.levelLabel}</span>
+      </header>
+
+      <div className="mt-4 flex items-center gap-2 md:gap-3">
+        {LIFECYCLE_STEPS.map((step, idx) => {
+          const isActive = idx === activeIndex;
+          const isPast = idx < activeIndex;
+          const isUpcoming = idx > activeIndex;
+
+          return (
+            <div className="flex flex-1 items-center" key={step.id}>
+              <div className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold ${
+                    isActive
+                      ? "bg-[#de402a] text-white shadow-[0_0_22px_rgba(222,64,42,0.45)]"
+                      : isPast
+                        ? "bg-[#65ecaf]/20 text-[#8df0c4]"
+                        : "border border-white/10 bg-white/[0.04] text-[#5a6b82]"
+                  }`}
+                >
+                  {isPast ? "✓" : idx + 1}
+                </div>
+                <p
+                  className={`text-[11px] font-medium ${
+                    isActive ? "text-white" : isPast ? "text-[#8df0c4]" : "text-[#6f8099]"
+                  }`}
+                >
+                  {step.label}
+                </p>
+              </div>
+              {idx < LIFECYCLE_STEPS.length - 1 ? (
+                <div className="h-px w-full">
+                  <div
+                    className={`h-full w-full ${
+                      isUpcoming
+                        ? "bg-white/[0.06]"
+                        : "bg-gradient-to-r from-[#65ecaf]/30 via-[#de402a]/30 to-[#de402a]/40"
+                    }`}
+                  />
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+const resolveLifecycleIndex = (creator: CreatorMarketRecord, market: MarketModel): number => {
+  if (creator.state === "S2_ACTIVE") return 3;
+  if (creator.state === "S1_BUYOUT") return 2;
+  if (market.graduationPct >= 30) return 1;
+  return 0;
+};
+
+/* ──────────────────────────  Buyout offer card  ────────────────────────── */
+
+const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const sponsor = creator.potentialSponsors[0] ?? "Sponsor TBD";
+  const amount = creator.buyoutOfferUsd ?? 0;
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-[#de402a]/20 bg-[linear-gradient(180deg,rgba(40,16,16,0.82)_0%,rgba(15,12,18,0.94)_100%)]">
+      <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#de402a] opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#de402a]" />
+          </span>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ff8a78]">
+            Buyout Offer
+          </p>
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[#7486a1]">Live</span>
+      </header>
+      <div className="space-y-3 px-5 py-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-[#7486a1]">Sponsor</p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-white">{sponsor}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-[#7486a1]">Latest offer</p>
+          <p className="mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-white">
+            ${compactNumber(amount)}
+          </p>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#7486a1]">Deadline</p>
+            <p className="mt-0.5 text-sm font-medium text-white">36h 14m</p>
+          </div>
+          <Link
+            className="rounded-full bg-[#de402a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#ea523e]"
+            href={`/buyout/${creator.id}`}
+          >
+            View Buyout
+          </Link>
         </div>
       </div>
-    );
-  }
+    </section>
+  );
+};
 
-  if (creator.state === "S1_BUYOUT") {
+/* ──────────────────────────  Top holders  ────────────────────────── */
+
+const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
+  <section className="rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
+    <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Top holders</p>
+      <span className="text-[10px] uppercase tracking-[0.16em] text-[#5a6b82]">
+        {compactNumber(creator.holderCount)} total
+      </span>
+    </header>
+    <div className="space-y-1 px-3 py-3">
+      {creator.topHolders.map((holder) => (
+        <div
+          className="flex items-center justify-between rounded-xl px-3 py-2 text-sm transition hover:bg-white/[0.03]"
+          key={holder.rank}
+        >
+          <span className="flex items-center gap-2 text-[#c8d3e6]">
+            <span className="text-[11px] font-medium text-[#5a6b82]">#{holder.rank}</span>
+            <span className="font-mono text-xs">{holder.label}</span>
+          </span>
+          <span className="text-sm font-semibold text-white">{holder.share}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
+/* ──────────────────────────  Content surface  ────────────────────────── */
+
+const ContentSurface = ({
+  activeTab,
+  creator,
+  posts,
+  onTabChange,
+}: {
+  activeTab: ProfileTab;
+  creator: CreatorMarketRecord;
+  posts: PostRecord[];
+  onTabChange: (tab: ProfileTab) => void;
+}) => (
+  <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.82)_0%,rgba(9,13,20,0.82)_100%)]">
+    <div className="flex items-center gap-1 border-b border-white/[0.05] px-3">
+      {TABS.map((tab) => (
+        <button
+          className={`relative px-4 py-3 text-sm transition ${
+            activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
+          }`}
+          key={tab}
+          onClick={() => onTabChange(tab)}
+          type="button"
+        >
+          {tab}
+          {activeTab === tab ? (
+            <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-[#de402a]" />
+          ) : null}
+        </button>
+      ))}
+    </div>
+
+    <div className="px-4 py-5 md:px-5 md:py-6">
+      {activeTab === "Posts" ? <PostGrid creator={creator} posts={posts} /> : null}
+      {activeTab === "Investment File" ? <InvestmentFile creator={creator} /> : null}
+      {activeTab === "Signals" ? <SignalsPanel creator={creator} /> : null}
+    </div>
+  </section>
+);
+
+const PostGrid = ({
+  creator,
+  posts,
+}: {
+  creator: CreatorMarketRecord;
+  posts: PostRecord[];
+}) => {
+  if (posts.length === 0) {
     return (
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <InfoCard
-          eyebrow="Supporter outcome"
-          title={`${formatUsd(creator.supporterDistributableUsd ?? 0)} distributable to supporters`}
-          body="The profile should explain payout timing, window state, and what supporters receive when settlement closes."
-        />
-        <InfoCard
-          eyebrow="Settlement timeline"
-          title="Buyout is accepted and moving through the final window"
-          body={(creator.buyoutTimeline ?? []).join(" → ")}
-        />
+      <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-5 py-8 text-center text-sm text-[#7e90a8]">
+        No posts imported yet.
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-      <InfoCard
-        eyebrow="Content selection pool"
-        title="Open sponsor-ready content directions"
-        body={creator.contentPool.join(" · ")}
-      />
-      <InfoCard
-        eyebrow="Execution state"
-        title={`${creator.activeCampaignCount ?? 0} active campaigns · activity score ${creator.activityScore ?? 0}`}
-        body="This creator has moved into S2 and should read like an operating profile layered on top of a creator profile."
-      />
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-3">
+      {posts.map((post, index) => (
+        <Link className="group block" href={`/posts/${post.id}`} key={post.id}>
+          <article className="overflow-hidden rounded-[18px] border border-white/[0.05] bg-[#0d131e] transition hover:border-white/[0.1]">
+            <div className="relative aspect-[4/5] overflow-hidden">
+              <ProgressiveImage
+                alt={post.title}
+                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                fill
+                priority={index < 2}
+                sizes="(max-width: 768px) 50vw, 33vw"
+                src={post.coverSrc}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgba(7,11,18,0.8)_100%)]" />
+              {post.type === "VIDEO" ? (
+                <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white backdrop-blur-md">
+                  <span className="h-0 w-0 border-y-[4px] border-y-transparent border-l-[6px] border-l-white" />
+                  Video
+                  {post.durationLabel ? <span className="text-[#a4b3cb]">·</span> : null}
+                  {post.durationLabel ? <span>{post.durationLabel}</span> : null}
+                </div>
+              ) : null}
+              <div className="absolute inset-x-3 bottom-3 flex items-center justify-between text-[11px] text-white">
+                <span className="truncate font-medium">{post.title}</span>
+                <span className="ml-2 shrink-0 text-[#cbd6e8]">♡ {compactNumber(post.likes)}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2.5 text-[11px]">
+              <div className="flex items-center gap-1.5 text-[#8ea0ba]">
+                <img alt={creator.name} className="h-4 w-4 rounded-full object-cover" src={creator.avatarSrc} />
+                <span className="truncate">{creator.name}</span>
+              </div>
+              <span className="text-[#5a6b82]">{post.timeLabel}</span>
+            </div>
+          </article>
+        </Link>
+      ))}
     </div>
   );
 };
 
-const SignalPanels = ({ creator }: { creator: CreatorMarketRecord }) => (
-  <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-    <div className="glass-card p-5">
-      <p className="text-[11px] uppercase tracking-[0.2em] text-[#7385a2]">Top holders</p>
-      <div className="mt-4 space-y-3">
-        {creator.topHolders.map((holder) => (
-          <div className="flex items-center justify-between rounded-[18px] bg-white/[0.03] px-4 py-3" key={holder.rank}>
-            <span className="text-sm text-[#d5ddea]">
-              #{holder.rank} · {holder.label}
-            </span>
-            <span className="text-sm font-medium text-white">{holder.share}</span>
-          </div>
-        ))}
+const InvestmentFile = ({ creator }: { creator: CreatorMarketRecord }) => (
+  <div className="grid gap-4 lg:grid-cols-2">
+    <FileBlock
+      label="Content pool"
+      rows={creator.contentPool.map((item) => ({ key: item, value: item }))}
+    />
+    <FileBlock
+      label="Likely sponsors"
+      rows={creator.potentialSponsors.map((item) => ({ key: item, value: item }))}
+    />
+    <FileBlock
+      label="Tags"
+      rows={creator.tags.map((tag) => ({ key: tag, value: `#${tag}` }))}
+    />
+    <FileBlock
+      label="Signal"
+      rows={[
+        { key: "momentum", value: `Momentum score · ${creator.momentumScore}` },
+        { key: "buyout", value: `Buyout status · ${creator.buyoutStatus}` },
+        { key: "teaser", value: creator.teaser },
+      ]}
+    />
+  </div>
+);
+
+const FileBlock = ({
+  label,
+  rows,
+}: {
+  label: string;
+  rows: Array<{ key: string; value: string }>;
+}) => (
+  <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
+    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{label}</p>
+    <ul className="mt-2 space-y-1.5">
+      {rows.map((row) => (
+        <li className="text-sm text-[#c8d3e6]" key={row.key}>
+          {row.value}
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+const SignalsPanel = ({ creator }: { creator: CreatorMarketRecord }) => (
+  <div className="grid gap-4 lg:grid-cols-2">
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Momentum</p>
+      <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-white">
+        {creator.momentumScore}
+        <span className="ml-1 text-xs font-medium text-[#7486a1]">/100</span>
+      </p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#67b8ff] via-[#ffb38a] to-[#de402a]"
+          style={{ width: `${Math.min(100, creator.momentumScore)}%` }}
+        />
       </div>
     </div>
-
-    <div className="space-y-4">
-      <InfoCard
-        eyebrow="Sponsor fit"
-        title="Likely strategic matches"
-        body={creator.potentialSponsors.join(" · ")}
-      />
-      <InfoCard
-        eyebrow="Stage continuity"
-        title={creator.state === "S2_ACTIVE" ? "Supporters can still understand the move into S2" : "This profile should keep market state legible"}
-        body={creator.teaser}
-      />
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Activity</p>
+      <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-white">
+        {creator.activityScore ?? Math.round(creator.momentumScore * 0.92)}
+      </p>
+      <p className="mt-1 text-xs text-[#7486a1]">Engagement velocity score</p>
+    </div>
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4 lg:col-span-2">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Teaser</p>
+      <p className="mt-2 text-sm leading-6 text-[#cbd6e8]">{creator.teaser}</p>
     </div>
   </div>
 );
-
-const InfoCard = ({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) => (
-  <div className="glass-card p-5">
-    <p className="text-[11px] uppercase tracking-[0.2em] text-[#7385a2]">{eyebrow}</p>
-    <h3 className="mt-3 text-xl font-semibold leading-8 tracking-[-0.03em] text-white">{title}</h3>
-    <p className="mt-3 text-sm leading-7 text-[#cdd7e7]">{body}</p>
-  </div>
-);
-
-const getPrimaryActionLabel = (creator: CreatorMarketRecord) => {
-  if (creator.state === "S1_DISCOVERY") return "Trade S1 Tokens";
-  if (creator.state === "S1_BUYOUT") return "View Buyout Detail";
-  return "Open S2 Content Pool";
-};
-
-const getInvestmentSubtitle = (creator: CreatorMarketRecord) => {
-  if (creator.state === "S1_DISCOVERY") {
-    return `Invest in ${creator.name}'s discovery momentum and monitor graduation pressure.`;
-  }
-
-  if (creator.state === "S1_BUYOUT") {
-    return `This creator is inside buyout resolution. Emphasize supporter outcome and what happens next.`;
-  }
-
-  return `This creator has moved into sponsor-backed execution and should read like an operating profile, not just a token page.`;
-};
-
-const getInvestmentMetrics = (creator: CreatorMarketRecord) => {
-  if (creator.state === "S1_DISCOVERY") {
-    return [
-      { label: "Current price", value: formatUsd(creator.tokenPrice), tone: "text-[#8ed0ff]", help: undefined },
-      { label: "Holders", value: compactNumber(creator.holderCount), tone: "text-white", help: undefined },
-      { label: "Graduation", value: `${creator.graduationProgress}%`, tone: "text-white", help: "distance to graduation" },
-      { label: "Target price", value: formatUsd(creator.targetGraduationPrice), tone: "text-white", help: undefined },
-    ];
-  }
-
-  if (creator.state === "S1_BUYOUT") {
-    return [
-      { label: "Current price", value: formatUsd(creator.tokenPrice), tone: "text-[#8ed0ff]", help: undefined },
-      { label: "Supporter pool", value: formatUsd(creator.supporterDistributableUsd ?? 0), tone: "text-white", help: "distributable after close" },
-      { label: "Offer value", value: formatUsd(creator.buyoutOfferUsd ?? 0), tone: "text-white", help: undefined },
-      { label: "Holders", value: compactNumber(creator.holderCount), tone: "text-white", help: undefined },
-    ];
-  }
-
-  return [
-    { label: "Current price", value: formatUsd(creator.tokenPrice), tone: "text-[#8ed0ff]", help: undefined },
-    { label: "Active campaigns", value: String(creator.activeCampaignCount ?? 0), tone: "text-white", help: undefined },
-    { label: "Activity score", value: String(creator.activityScore ?? 0), tone: "text-white", help: undefined },
-    { label: "Valuation", value: formatUsd(creator.valuationUsd ?? 0), tone: "text-white", help: undefined },
-  ];
-};

@@ -4,6 +4,7 @@ import type {
   GetStaticProps,
 } from "next";
 import { useRouter } from "next/router";
+import { useCallback } from "react";
 
 import { PostDetailExperience } from "@/components/post/PostDetailExperience";
 import { EXPLORE_PATH } from "@/lib/routes";
@@ -19,6 +20,15 @@ export default function PostDetailPage({
   post,
 }: PublicPostPageProps) {
   const router = useRouter();
+
+  const handleClose = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.replace(EXPLORE_PATH);
+  }, [router]);
 
   if (router.isFallback) {
     return (
@@ -49,9 +59,9 @@ export default function PostDetailPage({
       ) : null}
       {!initialError && post ? (
         <PostDetailExperience
-          closeHref={EXPLORE_PATH}
-          closeLabel="Back to explore"
+          closeLabel="Back"
           items={[post]}
+          onClose={handleClose}
           syncRoute
         />
       ) : null}

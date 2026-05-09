@@ -118,6 +118,8 @@ export type CreatorStageProfile = {
   stage: CreatorSeasonState;
   wallet: string;
   displayName: string;
+  /** Creator handle for workspace header, e.g. @wanxinrk */
+  handle: string;
   avatarSrc: string;
   momentum: number;
   fans: number;
@@ -144,6 +146,10 @@ export type WorkspaceActionItem = {
   iconName: "upload" | "signature" | "sparkles" | "chevron";
   href?: string;
   disabled?: boolean;
+  /** Operating console: Ready / Waiting / Blocked */
+  workflowState?: "ready" | "waiting" | "blocked";
+  /** Short chain / bundle status for the checklist row */
+  chainHint?: string;
 };
 
 export type WorkspaceContentItem = ManifestRecord & {
@@ -170,6 +176,8 @@ export type WorkspacePersona = CreatorStageProfile & {
   sponsorshipItems: WorkspaceSponsorshipItem[];
   previewItem: WorkspacePreviewItem;
   healthItems: WorkspaceHealthItem[];
+  /** True when overview content rows are mock fallback (empty API manifests). */
+  pipelineDemoFallback?: boolean;
 };
 
 const baseProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
@@ -177,6 +185,7 @@ const baseProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
     stage: "S1_DISCOVERY",
     wallet: "7xKp...r3Nq",
     displayName: "胶片落进沙里",
+    handle: "@mikazhou",
     avatarSrc: "/mock/user-surface/avatars/mika-zhou.svg",
     momentum: 72,
     fans: 1840,
@@ -189,6 +198,7 @@ const baseProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
     stage: "S1_BUYOUT",
     wallet: "9mBx...f2Kw",
     displayName: "弯心入坑",
+    handle: "@wanxinrk",
     avatarSrc: "/mock/user-surface/avatars/luna-cai.svg",
     momentum: 91,
     fans: 12400,
@@ -208,6 +218,7 @@ const baseProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
     stage: "S2_ACTIVE",
     wallet: "3kRv...w7Zp",
     displayName: "深夜不下线",
+    handle: "@neocity",
     avatarSrc: "/mock/user-surface/avatars/neo-park.svg",
     momentum: 88,
     fans: 48200,
@@ -322,26 +333,50 @@ export const workspacePersonas: Record<CreatorSeasonState, WorkspacePersona> = {
     actions: [
       {
         iconName: "upload",
-        title: "上传素材",
-        subtitle: "City after dark reel · 3 个文件待上传",
-        ctaLabel: "上传素材",
-        tone: "info",
+        title: "Upload missing assets",
+        subtitle: "City after dark reel · 3 files queued",
+        ctaLabel: "Resume upload",
+        tone: "urgent",
         href: "/workspace/content/new",
+        workflowState: "ready",
+        chainHint: "R2 multipart · 2/5 parts",
       },
       {
         iconName: "signature",
-        title: "创作者签名",
-        subtitle: "Dune afterglow note · 等待签名",
-        ctaLabel: "前往签名",
+        title: "Sign creator partial transaction",
+        subtitle: "intent-mika-grain · Dune afterglow note",
+        ctaLabel: "Preview Sign",
         tone: "urgent",
+        href: "/workspace/intents/intent-mika-grain",
+        workflowState: "ready",
+        chainHint: "bundle built · versioned tx ready",
+      },
+      {
+        iconName: "sparkles",
+        title: "Finalize manifest & lock terms",
+        subtitle: "Game trailer moodboard → Apex Motion draft",
+        ctaLabel: "Open manifest",
+        workflowState: "waiting",
+        chainHint: "manifest hash pending lock",
         disabled: true,
       },
       {
         iconName: "sparkles",
-        title: "创建赞助合作",
-        subtitle: "F1 aesthetics gallery 已可发起",
-        ctaLabel: "创建合作",
+        title: "Claim settled rewards",
+        subtitle: "Track 1 base · Nova Screen campaign",
+        ctaLabel: "Preview Claim",
+        workflowState: "blocked",
+        chainHint: "oracle verifying track 2",
         disabled: true,
+      },
+      {
+        iconName: "chevron",
+        title: "Review sponsor terms",
+        subtitle: "intent-luna-radiantlab · awaiting sponsor countersign",
+        ctaLabel: "Open desk",
+        href: "/workspace/sponsorships",
+        workflowState: "waiting",
+        chainHint: "creator signature recorded",
       },
     ],
     contentItems: manifests.map((manifest, index) => ({
@@ -372,3 +407,7 @@ export const stageProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
 };
 
 export const MOCK_SYSTEM_HEALTH = workspacePersonas.S2_ACTIVE.healthItems;
+
+/** Fallback pipeline rows when API returns no manifests (demo shell). */
+export const DEMO_OVERVIEW_CONTENT_PIPELINE: WorkspaceContentItem[] =
+  workspacePersonas.S2_ACTIVE.contentItems;

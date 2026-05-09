@@ -11,7 +11,12 @@ import {
   PostRecord,
   UserNoteRecord,
 } from "@/lib/api/types";
+import { creators as creatorProfileSeeds } from "@/lib/mocks/discover";
 import { usePublicFeedPosts } from "./usePublicFeedPosts";
+
+const creatorProfileById = new Map(
+  creatorProfileSeeds.map((seed) => [seed.id, seed]),
+);
 
 const activityFeedTabs: ActivityFeedTabRecord[] = [
   { id: "overview", label: "综合" },
@@ -73,14 +78,49 @@ const buildPotentialSponsors = (posts: PostRecord[]) => {
   return tagPool.map((tag) => `${tag} Studio`);
 };
 
+const fallbackIntro = (
+  creatorName: string,
+  topTags: string[],
+  niche: string,
+) => {
+  if (topTags.length > 0) {
+    return `${creatorName} · ${topTags.map((tag) => `#${tag}`).join(" ")}`;
+  }
+  return `${creatorName} · ${niche}`;
+};
+
+const fallbackTeaser = (
+  postsCount: number,
+  topTags: string[],
+  state: CreatorMarketRecord["state"],
+) => {
+  const tagPart = topTags.slice(0, 2).join(" / ") || "creator signal";
+  if (state === "S2_ACTIVE") return `${tagPart} · Sponsor-ready content active`;
+  if (state === "S1_BUYOUT") return `${tagPart} · Buyout attention rising`;
+  return `${tagPart} · ${postsCount} active posts`;
+};
+
 const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
   const primaryPost = posts[0];
-  const state = pickState(posts);
+  const profileSeed = creatorProfileById.get(primaryPost.creatorId);
+  const state = profileSeed?.state ?? pickState(posts);
   const totalLikesAndSavesCount = posts.reduce((total, post) => total + post.likes + post.saves, 0);
-  const topTags = unique(posts.flatMap((post) => post.tags)).slice(0, 3);
+  const derivedTags = unique(posts.flatMap((post) => post.tags)).slice(0, 3);
+  const tags = profileSeed?.tags?.length ? profileSeed.tags : derivedTags;
+  const niche =
+    profileSeed?.niche ?? (derivedTags.join(" x ") || "Imported creator signal");
+  const city = profileSeed?.city ?? primaryPost.location;
+  const intro =
+    profileSeed?.intro ??
+    fallbackIntro(primaryPost.creatorName, derivedTags, niche);
+  const teaser =
+    profileSeed?.teaser ?? fallbackTeaser(posts.length, derivedTags, state);
   const followerBase = 18000 + totalLikesAndSavesCount * 3;
-  const tokenPrice = Number((1.4 + (totalLikesAndSavesCount % 3200) / 1000).toFixed(2));
-  const targetGraduationPrice = Number((tokenPrice * 1.42).toFixed(2));
+  const tokenPrice =
+    profileSeed?.tokenPrice ??
+    Number((1.4 + (totalLikesAndSavesCount % 3200) / 1000).toFixed(2));
+  const targetGraduationPrice =
+    profileSeed?.targetGraduationPrice ?? Number((tokenPrice * 1.42).toFixed(2));
 
   return {
     id: primaryPost.creatorId,
@@ -88,35 +128,50 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
     handle: primaryPost.creatorHandle,
     avatarSrc: primaryPost.creatorAvatarSrc,
     heroSrc: primaryPost.coverSrc,
-    followingCount: 80 + posts.length * 14,
-    followersCount: followerBase,
+    followingCount: profileSeed?.followingCount ?? 80 + posts.length * 14,
+    followersCount: profileSeed?.followersCount ?? followerBase,
     totalLikesAndSavesCount,
-    niche: topTags.join(" x ") || "Imported creator signal",
-    city: primaryPost.location,
-    intro: compactPreview(primaryPost.body || primaryPost.excerpt, 120),
-    level: stageLevelLabel(state),
-    momentumScore: Math.min(96, 54 + posts.length * 8 + Math.round(totalLikesAndSavesCount / 2800)),
+    niche,
+    city,
+    intro,
+    level: profileSeed?.level ?? stageLevelLabel(state),
+    momentumScore:
+      profileSeed?.momentumScore ??
+      Math.min(96, 54 + posts.length * 8 + Math.round(totalLikesAndSavesCount / 2800)),
     tokenPrice,
-    supply: 9600 + posts.length * 1400,
-    graduationProgress: state === "S2_ACTIVE" ? 100 : Math.min(92, 38 + posts.length * 18),
-    buyoutStatus: stageStatusLabel(state),
+    supply: profileSeed?.supply ?? 9600 + posts.length * 1400,
+    graduationProgress:
+      profileSeed?.graduationProgress ??
+      (state === "S2_ACTIVE" ? 100 : Math.min(92, 38 + posts.length * 18)),
+    buyoutStatus: profileSeed?.buyoutStatus ?? stageStatusLabel(state),
     state,
-    teaser: compactPreview(primaryPost.excerpt || primaryPost.body, 72),
-    tags: topTags,
-    holderCount: 820 + posts.length * 380,
-    topHolders: buildTopHolders(primaryPost.creatorId),
+    teaser,
+    tags,
+    holderCount: profileSeed?.holderCount ?? 820 + posts.length * 380,
+    topHolders: profileSeed?.topHolders ?? buildTopHolders(primaryPost.creatorId),
     targetGraduationPrice,
-    potentialSponsors: buildPotentialSponsors(posts),
-    supporterDistributableUsd: 38000 + posts.length * 21000,
-    buyoutOfferUsd: 160000 + posts.length * 98000,
+    potentialSponsors:
+      profileSeed?.potentialSponsors ?? buildPotentialSponsors(posts),
+    supporterDistributableUsd:
+      profileSeed?.supporterDistributableUsd ?? 38000 + posts.length * 21000,
+    buyoutOfferUsd: profileSeed?.buyoutOfferUsd ?? 160000 + posts.length * 98000,
     buyoutTimeline:
-      state === "S1_BUYOUT"
+      profileSeed?.buyoutTimeline ??
+      (state === "S1_BUYOUT"
         ? ["Signal building", "Sponsor attention", "Window approaching"]
-        : undefined,
-    activeCampaignCount: state === "S2_ACTIVE" ? Math.max(1, posts.length - 1) : undefined,
-    activityScore: state === "S2_ACTIVE" ? 72 + posts.length * 4 : undefined,
-    valuationUsd: state === "S2_ACTIVE" ? 480000 + posts.length * 180000 : undefined,
-    contentPool: posts.slice(0, 3).map((post) => compactPreview(post.title, 28)),
+        : undefined),
+    activeCampaignCount:
+      profileSeed?.activeCampaignCount ??
+      (state === "S2_ACTIVE" ? Math.max(1, posts.length - 1) : undefined),
+    activityScore:
+      profileSeed?.activityScore ??
+      (state === "S2_ACTIVE" ? 72 + posts.length * 4 : undefined),
+    valuationUsd:
+      profileSeed?.valuationUsd ??
+      (state === "S2_ACTIVE" ? 480000 + posts.length * 180000 : undefined),
+    contentPool:
+      profileSeed?.contentPool ??
+      posts.slice(0, 3).map((post) => compactPreview(post.title, 28)),
   };
 };
 

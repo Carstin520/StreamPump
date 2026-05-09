@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
@@ -17,7 +17,12 @@ import {
   exchangeProviderSession,
   verifyWalletAuthChallenge,
 } from "@/lib/api/auth";
-import { IdentityProvider, LoginMethodRecord, LoginPreviewMode } from "@/lib/api/types";
+import {
+  AuthSessionRecord,
+  IdentityProvider,
+  LoginMethodRecord,
+  LoginPreviewMode,
+} from "@/lib/api/types";
 import { storeAuthSession } from "@/lib/auth-session";
 import { loginAccounts, loginMethods } from "@/lib/public-data";
 import { WORKSPACE_PATH } from "@/lib/routes";
@@ -62,16 +67,50 @@ const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
   "wallet-preview-account": null,
 };
 
-const resolveMethodIdentity = (methodId: LoginMethodRecord["id"]) => {
-  if (methodId === "wallet") {
-    return null;
-  }
-
-  return METHOD_IDENTITIES[methodId];
-};
-
 const previewSocialAuthEnabled =
-  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH === "true";
+  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH !== "false";
+
+const PREVIEW_MANAGED_WALLET = "C8tzqwn5ghvKEgkcwf822vxQA5fgt7cmr49mqCtyK8fX";
+
+const createPreviewAccessToken = (source: string) =>
+  `preview-local.${source}.${Date.now().toString(36)}`;
+
+const createPreviewExpiresAt = () =>
+  new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+const createLocalProviderSession = (
+  identity: PreviewIdentity,
+  wallet = PREVIEW_MANAGED_WALLET,
+): AuthSessionRecord => ({
+  wallet,
+  accessToken: createPreviewAccessToken(identity.provider.toLowerCase()),
+  expiresAt: createPreviewExpiresAt(),
+  tokenType: "Bearer",
+  identity: {
+    id: `local-${identity.providerSubject}`,
+    provider: identity.provider,
+    providerSubject: identity.providerSubject,
+    email: identity.email ?? null,
+    displayName: identity.displayName ?? null,
+    managedWalletAddress: wallet,
+  },
+});
+
+const createLocalWalletSession = (wallet: string): AuthSessionRecord => ({
+  wallet,
+  accessToken: createPreviewAccessToken("wallet"),
+  expiresAt: createPreviewExpiresAt(),
+  tokenType: "Bearer",
+  identity: null,
+});
+
+const resolveLocalPreviewRedirectHref = (href: string) =>
+  href === WORKSPACE_PATH ? `${WORKSPACE_PATH}?demo=1` : href;
+
+const isUserRejectedWalletRequest = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /reject|denied|cancel/i.test(message);
+};
 
 const bytesToBase64 = (value: Uint8Array) => {
   let binary = "";
@@ -92,7 +131,9 @@ export const AuthOptionsPanel = ({
   const { connected, connecting, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<string>("Preview mode: social login first.");
+  const [emailValue, setEmailValue] = useState("alex@streampump.local");
+  const [lastAction, setLastAction] = useState<string>("选择邮箱、Google、Apple 或钱包继续。");
+  const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
 
   const currentAccount = useMemo(
@@ -104,44 +145,67 @@ export const AuthOptionsPanel = ({
     [currentAccount.id],
   );
 
+  const resolveMethodIdentity = useCallback(
+    (methodId: Exclude<LoginMethodRecord["id"], "wallet">): PreviewIdentity => {
+      if (methodId !== "email") {
+        return METHOD_IDENTITIES[methodId];
+      }
+
+      const email = emailValue.trim() || METHOD_IDENTITIES.email.email || "alex@streampump.local";
+      const providerSubject = `preview-email-${email.toLowerCase()}`;
+
+      return {
+        ...METHOD_IDENTITIES.email,
+        email,
+        providerSubject,
+      };
+    },
+    [emailValue],
+  );
+
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
     if (!previewSocialAuthEnabled) {
-      setLastAction("Preview social login is disabled for public demos. Use wallet sign-in.");
+      setLastAction("社交登录预览被环境变量关闭，请使用钱包登录。");
       return;
     }
 
     setBusyKey(identity.providerSubject);
-    setLastAction(`Starting ${successLabel} session...`);
+    setLastAction(`正在创建 ${successLabel} 会话...`);
 
     try {
       const session = await exchangeProviderSession(identity);
       storeAuthSession(session);
-      setLastAction(`${successLabel} session ready. Redirecting to the requested page.`);
+      setLastAction(`${successLabel} 会话已创建，正在进入产品。`);
       void router.push(nextHref);
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : `Failed to create ${successLabel} session.`);
+      const session = createLocalProviderSession(identity);
+      storeAuthSession(session);
+      setLastAction(`${successLabel} 本地预览会话已创建，后端不可用时也可继续浏览。`);
+      void router.push(resolveLocalPreviewRedirectHref(nextHref));
     } finally {
       setBusyKey(null);
     }
   };
 
-  const handleWalletLogin = async () => {
-    if (!connected || !publicKey) {
-      setVisible(true);
-      setLastAction("Open the wallet picker, connect a Solana wallet, then retry wallet sign-in.");
-      return;
-    }
-
-    if (!signMessage) {
-      setLastAction("The connected wallet does not support signMessage. Use Phantom or another signing-capable wallet.");
+  const completeWalletLogin = useCallback(async () => {
+    if (!publicKey) {
       return;
     }
 
     const walletAddress = publicKey.toBase58();
     setBusyKey("wallet");
-    setLastAction("Requesting wallet auth challenge...");
+    setPendingWalletLogin(false);
+    setLastAction("正在创建钱包登录会话...");
 
     try {
+      if (!signMessage) {
+        const session = createLocalWalletSession(walletAddress);
+        storeAuthSession(session);
+        setLastAction("钱包已连接，本地预览会话已创建。");
+        void router.push(resolveLocalPreviewRedirectHref(nextHref));
+        return;
+      }
+
       const challenge = await createWalletAuthChallenge(walletAddress);
       const signatureBytes = await signMessage(new TextEncoder().encode(challenge.message));
       const session = await verifyWalletAuthChallenge({
@@ -151,13 +215,40 @@ export const AuthOptionsPanel = ({
       });
 
       storeAuthSession(session);
-      setLastAction("Wallet session ready. Redirecting to the requested page.");
+      setLastAction("钱包会话已创建，正在进入产品。");
       void router.push(nextHref);
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : "Failed to create wallet session.");
+      if (isUserRejectedWalletRequest(error)) {
+        setLastAction("钱包签名已取消，未创建会话。");
+        return;
+      }
+
+      const session = createLocalWalletSession(walletAddress);
+      storeAuthSession(session);
+      setLastAction("钱包已连接，本地预览会话已创建。");
+      void router.push(resolveLocalPreviewRedirectHref(nextHref));
     } finally {
       setBusyKey(null);
     }
+  }, [nextHref, publicKey, router, signMessage]);
+
+  useEffect(() => {
+    if (!pendingWalletLogin || !connected || !publicKey || busyKey) {
+      return;
+    }
+
+    void completeWalletLogin();
+  }, [busyKey, completeWalletLogin, connected, pendingWalletLogin, publicKey]);
+
+  const handleWalletLogin = async () => {
+    if (!connected || !publicKey) {
+      setPendingWalletLogin(true);
+      setVisible(true);
+      setLastAction("请选择并连接 Solana 钱包，连接成功后会自动继续登录。");
+      return;
+    }
+
+    await completeWalletLogin();
   };
 
   const handleMethod = async (method: LoginMethodRecord) => {
@@ -166,7 +257,7 @@ export const AuthOptionsPanel = ({
       return;
     }
 
-    await createPreviewSession(METHOD_IDENTITIES[method.id], method.label);
+    await createPreviewSession(resolveMethodIdentity(method.id), method.label);
   };
 
   const handleAccountSwitch = async (accountId: string, accountName: string) => {
@@ -209,9 +300,23 @@ export const AuthOptionsPanel = ({
               <p className="mt-3 text-sm text-[#93a3bb]">登录或注册 StreamPump 账号</p>
             </div>
 
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
+                Email
+              </span>
+              <input
+                className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
+                inputMode="email"
+                onChange={(event) => setEmailValue(event.target.value)}
+                placeholder="you@domain.com"
+                type="email"
+                value={emailValue}
+              />
+            </label>
+
             <div className="space-y-3">
               {loginMethods.map((method) => {
-                const identity = resolveMethodIdentity(method.id);
+                const identity = method.id === "wallet" ? null : resolveMethodIdentity(method.id);
                 const methodBusy = busyKey === (identity?.providerSubject ?? "wallet");
                 const socialDisabled = method.id !== "wallet" && !previewSocialAuthEnabled;
 
@@ -234,20 +339,24 @@ export const AuthOptionsPanel = ({
                       <div>
                         <p className="text-sm font-medium">{method.label}</p>
                         <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
-                          {socialDisabled ? "Preview-only. Use wallet sign-in for the live demo." : method.subtitle}
+                          {socialDisabled ? "社交登录已被环境变量关闭" : method.subtitle}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {socialDisabled ? (
                         <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
-                          Demo off
+                          Env off
                         </span>
                       ) : method.id === "wallet" ? (
                         <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
                           {connecting ? "Connecting" : connected ? "Wallet ready" : "Web3"}
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
+                          Ready
+                        </span>
+                      )}
                       <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
                     </div>
                   </button>

@@ -8,9 +8,9 @@ import { compactNumber } from "@/lib/public-data";
 
 const stageGlow: Record<PostRecord["stage"], string> = {
   NONE: "",
-  S1_DISCOVERY: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(74,153,255,0.05)]",
-  S1_BUYOUT: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(255,89,147,0.05)]",
-  S2_ACTIVE: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(42,211,138,0.04)]",
+  S1_DISCOVERY: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(103,184,255,0.06)]",
+  S1_BUYOUT: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(222,64,42,0.06)]",
+  S2_ACTIVE: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(101,236,175,0.05)]",
 };
 
 export const PostCard = ({

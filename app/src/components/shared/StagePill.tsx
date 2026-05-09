@@ -9,9 +9,9 @@ const stageLabel: Record<Exclude<StageValue, "NONE">, string> = {
 };
 
 const stageTone: Record<Exclude<StageValue, "NONE">, string> = {
-  S1_DISCOVERY: "border-white/10 bg-[#13291f]/80 text-[#90efac]",
-  S1_BUYOUT: "border-white/10 bg-[#2d1621]/80 text-[#ff9fc4]",
-  S2_ACTIVE: "border-white/10 bg-[#15263e]/80 text-[#93c8ff]",
+  S1_DISCOVERY: "border-[#67b8ff]/25 bg-[#0e1726]/80 text-[#8ad0ff]",
+  S1_BUYOUT: "border-[#de402a]/30 bg-[#1f120e]/80 text-[#ff8a78]",
+  S2_ACTIVE: "border-[#65ecaf]/25 bg-[#0e1f17]/80 text-[#8df0c4]",
 };
 
 export const StagePill = ({

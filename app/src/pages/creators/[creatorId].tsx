@@ -123,9 +123,13 @@ export default function CreatorDetailPage({
         <title>{`StreamPump | ${creator.name}`}</title>
       </Head>
       <PageShell>
-        <div className="mb-1">
-          <Link className="inline-flex rounded-full border border-white/8 bg-white/4 px-4 py-2 text-sm text-[#d9e3f2]" href="/trending">
-            返回 Trending Creators
+        <div className="mb-3">
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1.5 text-xs text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
+            href="/trending"
+          >
+            <span aria-hidden>←</span>
+            Trending Creators
           </Link>
         </div>
         <CreatorStageView creator={creator} posts={creatorPosts} />

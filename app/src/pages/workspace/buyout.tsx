@@ -23,14 +23,13 @@ function fmt(n: number) {
 }
 
 const AVATAR_COLORS: Record<string, string> = {
-  AM: "from-[#de402a] to-[#f05540]",
-  GL: "from-[#67b8ff] to-[#4a9fe6]",
-  VH: "from-[#f3b33e] to-[#e6a02e]",
+  AM: "from-[#c0362a] to-[#a83020]",
+  GL: "from-[#4a8dbf] to-[#3a7aaa]",
+  VH: "from-[#c89630] to-[#b08228]",
 };
 
 function OfferCard({
   offer,
-  index,
   isTop,
   onAccept,
   onDecline,
@@ -42,51 +41,49 @@ function OfferCard({
   onDecline: () => void;
 }) {
   return (
-    <div
-      className={`glass-card relative p-5 transition-all ${
-        isTop ? "shadow-[0_0_40px_rgba(243,179,62,0.08)]" : ""
-      }`}
-    >
+    <div className="relative">
       {isTop && (
-        <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-inset ring-[#f3b33e]/25" />
-      )}
-      {isTop && (
-        <span className="absolute -top-2.5 right-5 z-10 rounded-full bg-gradient-to-r from-[#f3b33e] to-[#e6a02e] px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#090d14] shadow-[0_4px_16px_rgba(243,179,62,0.3)]">
+        <span className="absolute -top-2.5 right-5 z-10 rounded-full border border-[#f3b33e]/25 bg-[#1a1408] px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#f3c66e]">
           Highest
         </span>
       )}
-
-      <div className="relative z-10">
+      <div
+        className={`rounded-[20px] border bg-[linear-gradient(160deg,rgba(15,21,32,0.92)_0%,rgba(10,15,23,0.92)_100%)] p-5 transition ${
+          isTop
+            ? "border-[#f3b33e]/15 shadow-[0_0_28px_rgba(243,179,62,0.04)]"
+            : "border-white/[0.06]"
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span
-              className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br text-xs font-bold text-white ${AVATAR_COLORS[offer.avatar] ?? "from-[#5a6b82] to-[#4a5a70]"}`}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br text-[10px] font-bold text-white/80 ${AVATAR_COLORS[offer.avatar] ?? "from-[#5a6b82] to-[#4a5a70]"}`}
             >
               {offer.avatar}
             </span>
             <div>
-              <p className="text-sm font-semibold text-white">{offer.sponsor}</p>
-              <p className="text-xs text-[#5a6b82]">{offer.time}</p>
+              <p className="text-[13px] font-semibold text-white">{offer.sponsor}</p>
+              <p className="text-[11px] text-[#6f8099]">{offer.time}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold tracking-[-0.05em] text-white">
+            <p className="text-lg font-bold tracking-[-0.04em] text-white">
               ${fmt(offer.amount)}
             </p>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-[#8ea0ba]">USDC</p>
+            <p className="text-[10px] text-[#7486a1]">USDC</p>
           </div>
         </div>
 
         <div className="mt-4 flex gap-2">
           <button
-            className="glass-button-primary flex-1 px-4 py-2.5 text-sm font-semibold"
+            className="flex-1 rounded-xl bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] px-4 py-2 text-[12px] font-semibold text-white/90 transition hover:brightness-110"
             onClick={onAccept}
             type="button"
           >
             Accept
           </button>
           <button
-            className="glass-button-ghost flex-1 px-4 py-2.5 text-sm font-medium"
+            className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[12px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
             onClick={onDecline}
             type="button"
           >
@@ -116,51 +113,50 @@ function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="liquid-glass-shell relative z-10 w-full max-w-md p-6">
-        <h3 className="text-xl font-bold tracking-[-0.05em] text-white">Confirm Buyout</h3>
-        <p className="mt-1 text-sm text-[#8ea0ba]">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(14,19,28,0.97)_0%,rgba(9,13,20,0.97)_100%)] p-5 shadow-[0_24px_56px_rgba(0,0,0,0.5)]">
+        <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-white">Confirm buyout</h3>
+        <p className="mt-0.5 text-[12px] text-[#9aabc4]">
           Accept ${fmt(offer.amount)} USDC from {offer.sponsor}
         </p>
 
-        {/* Timeline */}
-        <div className="mt-6 space-y-0">
+        <div className="mt-5 space-y-0">
           {STEPS.map((step, i) => (
             <div className="flex gap-3" key={step.label}>
               <div className="flex flex-col items-center">
                 <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
                     step.active
-                      ? "border-[#de402a]/50 bg-[#de402a]/15 text-[#de402a]"
-                      : "border-white/10 bg-white/[0.04] text-[#5a6b82]"
+                      ? "border-[#de402a]/35 bg-[#1f120e]/80 text-[#ff8a78]"
+                      : "border-white/[0.08] bg-white/[0.03] text-[#6f8099]"
                   }`}
                 >
                   {i + 1}
                 </span>
                 {i < STEPS.length - 1 && (
-                  <div className="my-1 h-8 w-px bg-white/[0.08]" />
+                  <div className="my-1 h-7 w-px bg-white/[0.06]" />
                 )}
               </div>
-              <div className="pb-4 pt-1">
-                <p className={`text-sm font-semibold ${step.active ? "text-white" : "text-[#8ea0ba]"}`}>
+              <div className="pb-3 pt-0.5">
+                <p className={`text-[12px] font-semibold ${step.active ? "text-white" : "text-[#9aabc4]"}`}>
                   {step.label}
                 </p>
-                <p className="text-xs text-[#5a6b82]">{step.detail}</p>
+                <p className="text-[10px] text-[#6f8099]">{step.detail}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 flex gap-3">
+        <div className="mt-4 flex gap-2">
           <button
-            className="glass-button-primary flex-1 px-4 py-3 text-sm font-semibold"
+            className="flex-1 rounded-xl bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] px-4 py-2.5 text-[12px] font-semibold text-white/90 transition hover:brightness-110"
             onClick={onConfirm}
             type="button"
           >
-            Confirm Accept
+            Confirm accept
           </button>
           <button
-            className="glass-button-ghost px-5 py-3 text-sm font-medium"
+            className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[12px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
             onClick={onClose}
             type="button"
           >
@@ -186,44 +182,45 @@ export default function BuyoutPage() {
       </Head>
 
       <WorkspaceShell stage="S1_BUYOUT" wallet={WALLET}>
-        {/* Buyout toggle */}
-        <section className="liquid-glass-shell section-enter p-5 md:p-6">
-          <div className="flex items-center justify-between">
+        <section className="section-enter rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.95)_0%,rgba(8,12,20,0.95)_100%)] px-4 py-3.5 md:px-5">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold tracking-[-0.05em] text-white md:text-3xl">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+                Workspace
+              </p>
+              <h1 className="mt-0.5 text-[18px] font-semibold tracking-[-0.03em] text-white md:text-[20px]">
                 Buyout Auction
               </h1>
-              <p className="mt-1 text-sm text-[#8ea0ba]">
-                {buyoutOpen ? "Buyout Auction Active" : "S1 Discovery — not open for buyout"}
+              <p className="mt-0.5 text-[12px] text-[#9aabc4]">
+                {buyoutOpen ? "Auction is live — sponsors can submit offers" : "S1 Discovery — not open for buyout"}
               </p>
             </div>
 
-            {/* Toggle switch */}
             <button
-              className="relative flex h-8 w-14 shrink-0 items-center rounded-full transition-all duration-300"
+              className="relative flex h-7 w-12 shrink-0 items-center rounded-full transition-all duration-300"
               onClick={() => setBuyoutOpen(!buyoutOpen)}
               style={{
                 background: buyoutOpen
-                  ? "linear-gradient(180deg, #f05540, #de402a)"
-                  : "rgba(255,255,255,0.08)",
+                  ? "linear-gradient(180deg, rgba(222,64,42,0.75), rgba(190,52,34,0.75))"
+                  : "rgba(255,255,255,0.06)",
                 boxShadow: buyoutOpen
-                  ? "0 8px 24px rgba(222,64,42,0.3), inset 0 1px 0 rgba(255,255,255,0.12)"
+                  ? "0 6px 16px rgba(222,64,42,0.18)"
                   : "inset 0 1px 0 rgba(255,255,255,0.04)",
               }}
               type="button"
             >
               <span
-                className="absolute h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300"
+                className="absolute h-5 w-5 rounded-full bg-white/90 shadow-sm transition-all duration-300"
                 style={{
-                  left: buyoutOpen ? "calc(100% - 28px)" : "4px",
+                  left: buyoutOpen ? "calc(100% - 24px)" : "3px",
                 }}
               />
             </button>
           </div>
           {buyoutOpen && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[#65ecaf]" />
-              <span className="text-xs text-[#65ecaf]">Open for Buyout Offers</span>
+            <div className="mt-2 flex items-center gap-1.5 border-t border-white/[0.04] pt-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
+              <span className="text-[10px] text-[#8df0c4]">Open for offers</span>
             </div>
           )}
         </section>
@@ -233,27 +230,27 @@ export default function BuyoutPage() {
             {/* Terms comparison (if 2+ offers) */}
             {sortedOffers.length >= 2 && (
               <section className="section-enter">
-                <h2 className="mb-3 text-sm font-semibold text-[#8ea0ba]">Offer Comparison</h2>
-                <div className="grid grid-cols-3 gap-3">
+                <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Offer Comparison</h2>
+                <div className="grid grid-cols-3 gap-2">
                   {sortedOffers.map((o, i) => (
                     <div
-                      className={`surface-muted relative p-4 text-center transition-all ${
-                        i === 0 ? "ring-1 ring-[#f3b33e]/20" : ""
+                      className={`rounded-[16px] border bg-[linear-gradient(160deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-3.5 text-center transition ${
+                        i === 0 ? "border-[#f3b33e]/15" : "border-white/[0.06]"
                       }`}
                       key={o.sponsor}
                     >
                       <span
-                        className={`flex h-8 w-8 mx-auto items-center justify-center rounded-xl bg-gradient-to-br text-[10px] font-bold text-white ${AVATAR_COLORS[o.avatar] ?? "from-[#5a6b82] to-[#4a5a70]"}`}
+                        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br text-[9px] font-bold text-white/80 ${AVATAR_COLORS[o.avatar] ?? "from-[#5a6b82] to-[#4a5a70]"}`}
                       >
                         {o.avatar}
                       </span>
-                      <p className="mt-2 text-[11px] text-[#8ea0ba]">{o.sponsor}</p>
-                      <p className="mt-1 text-lg font-bold tracking-[-0.05em] text-white">
+                      <p className="mt-1.5 text-[11px] text-[#9aabc4]">{o.sponsor}</p>
+                      <p className="mt-0.5 text-[15px] font-bold tracking-[-0.04em] text-white">
                         ${fmt(o.amount)}
                       </p>
                       {i === 0 && (
-                        <span className="mt-1.5 inline-block rounded-full bg-[#f3b33e]/12 px-2 py-0.5 text-[9px] font-bold text-[#f3b33e]">
-                          BEST
+                        <span className="mt-1 inline-block rounded-md border border-[#f3b33e]/20 bg-[#1a1408]/70 px-1.5 py-0.5 text-[9px] font-medium text-[#f3c66e]">
+                          Best
                         </span>
                       )}
                     </div>
@@ -264,7 +261,7 @@ export default function BuyoutPage() {
 
             {/* Offer inbox */}
             <section className="section-enter">
-              <h2 className="mb-3 text-sm font-semibold text-[#8ea0ba]">
+              <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
                 Incoming Offers ({sortedOffers.length})
               </h2>
               <div className="space-y-4">
@@ -288,9 +285,11 @@ export default function BuyoutPage() {
 
         {!buyoutOpen && (
           <section className="section-enter flex flex-col items-center py-16 text-center">
-            <span className="text-4xl">🔒</span>
-            <h2 className="mt-4 text-xl font-bold tracking-[-0.05em] text-white">Buyout Disabled</h2>
-            <p className="mt-2 max-w-xs text-sm text-[#8ea0ba]">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03] text-[#7e90aa]">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"><path d="M12 2C9.24 2 7 4.24 7 7v3H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2V7c0-2.76-2.24-5-5-5Zm0 2c1.65 0 3 1.35 3 3v3H9V7c0-1.65 1.35-3 3-3Z" fill="currentColor"/></svg>
+            </span>
+            <h2 className="mt-4 text-[15px] font-semibold text-white">Buyout disabled</h2>
+            <p className="mt-1.5 max-w-xs text-[12px] text-[#7e90aa]">
               Toggle the switch above to open your S1 for buyout offers from sponsors.
             </p>
           </section>
