@@ -14,7 +14,7 @@ import {
 import { config } from "../../config/default";
 import { muxService, NormalizedMuxAssetStatus } from "./MuxService";
 import { prisma } from "./prisma";
-import { s3Service } from "./S3Service";
+import { r2Service } from "./R2Service";
 
 type ReconciliationUpdate = Prisma.ContentAssetUpdateInput | null;
 
@@ -252,7 +252,7 @@ export const ingestUploadedVideoAssetById = async (
   }
 
   try {
-    const downloadUrl = await s3Service.generateDownloadUrl(asset.storageKey, 3600);
+    const downloadUrl = await r2Service.generateDownloadUrl(asset.storageKey, 3600);
     const muxAssetId = await muxService.createAsset(downloadUrl);
     const updated = await prisma.contentAsset.update({
       where: { id: asset.id },

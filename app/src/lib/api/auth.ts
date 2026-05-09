@@ -2,6 +2,7 @@ import { apiClient } from "./client";
 import {
   AuthSessionRecord,
   CurrentSessionRecord,
+  EmailAuthChallengeRecord,
   IdentityProvider,
   WalletAuthChallengeRecord,
 } from "./types";
@@ -15,6 +16,16 @@ type ExchangeProviderSessionInput = {
 
 export const exchangeProviderSession = (input: ExchangeProviderSessionInput) =>
   apiClient.post<AuthSessionRecord>("/auth/provider-exchange", {
+    body: input,
+  });
+
+export const requestEmailLoginCode = (email: string) =>
+  apiClient.post<EmailAuthChallengeRecord>("/auth/email/request-code", {
+    body: { email },
+  });
+
+export const verifyEmailLoginCode = (input: { email: string; code: string }) =>
+  apiClient.post<AuthSessionRecord>("/auth/email/verify-code", {
     body: input,
   });
 

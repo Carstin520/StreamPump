@@ -41,6 +41,11 @@ export type WalletAuthChallengeRecord = {
   expiresAt: string;
 };
 
+export type EmailAuthChallengeRecord = {
+  email: string;
+  expiresAt: string;
+};
+
 export type CurrentSessionRecord = {
   wallet: string;
   sessionId: string;

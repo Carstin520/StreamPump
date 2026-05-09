@@ -16,8 +16,8 @@ import "../config/loadEnv";
 import { prisma } from "../src/services/prisma";
 import {
   extensionForMimeType,
-  s3Service,
-} from "../src/services/S3Service";
+  r2Service,
+} from "../src/services/R2Service";
 import { uploadDisplayVariant } from "../src/services/imageVariants";
 import { computeManifestFinalizeState } from "../src/services/contentManifestService";
 
@@ -96,7 +96,7 @@ const uploadSinglePartObject = async (
   mimeType: string,
   storageKey: string,
 ) => {
-  const upload = await s3Service.generateUploadUrl(storageKey, mimeType);
+  const upload = await r2Service.generateUploadUrl(storageKey, mimeType);
   const response = await fetch(upload.presignedUrl, {
     method: "PUT",
     headers: {
@@ -184,7 +184,7 @@ const main = async () => {
       mimeType,
       fileSizeBytes: BigInt(fileBuffer.byteLength),
       storageKey,
-      cdnUrl: s3Service.buildCanonicalUrl(storageKey),
+      cdnUrl: r2Service.buildCanonicalUrl(storageKey),
       uploadStatus: AssetUploadStatus.UPLOADED,
       processingStatus: AssetProcessingStatus.READY,
       processingSource: AssetProcessingSource.CLIENT_COMPLETE,

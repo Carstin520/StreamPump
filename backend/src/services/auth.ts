@@ -2,7 +2,7 @@
  * CN: 钱包认证服务，提供 challenge/signature 登录、会话令牌签发与 Bearer 校验。
  * EN: Wallet authentication service providing challenge/signature login, session token issuance, and Bearer verification.
  */
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { ed25519 } from "@noble/curves/ed25519";
 import { IdentityProvider } from "@prisma/client";
@@ -15,6 +15,8 @@ import { prisma } from "./prisma";
 const CHALLENGE_TTL_MS = config.auth.challengeTtlSeconds * 1000;
 const SESSION_TTL_MS = config.auth.sessionTtlSeconds * 1000;
 const SESSION_SECRET = config.auth.sessionSecret;
+const EMAIL_OTP_TTL_MS = config.email.otpTtlSeconds * 1000;
+const MAX_EMAIL_OTP_ATTEMPTS = 5;
 
 const encodeBase64Url = (value: Buffer | string): string =>
   Buffer.isBuffer(value) ? value.toString("base64url") : Buffer.from(value).toString("base64url");
@@ -26,6 +28,9 @@ const sha256Hex = (value: string): string =>
 
 const signSessionPayload = (payloadBase64Url: string): string =>
   createHmac("sha256", SESSION_SECRET).update(payloadBase64Url, "utf8").digest("base64url");
+
+const hmacHex = (value: string): string =>
+  createHmac("sha256", SESSION_SECRET).update(value, "utf8").digest("hex");
 
 const getSessionDomain = (): string => {
   try {
@@ -152,6 +157,69 @@ const parseSessionToken = (
 const createPlatformManagedWalletAddress = (): string =>
   Keypair.generate().publicKey.toBase58();
 
+const normalizeEmail = (email: string): string => {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("email is invalid");
+  }
+
+  return normalized;
+};
+
+const createEmailCode = (): string => {
+  const configuredCode = config.email.devCode?.trim();
+  if (configuredCode) {
+    return configuredCode;
+  }
+
+  const length = Math.min(Math.max(Math.floor(config.email.otpCodeLength), 4), 10);
+  const max = 10 ** length;
+  return String(randomInt(0, max)).padStart(length, "0");
+};
+
+const hashEmailCode = (email: string, code: string): string =>
+  hmacHex(`email-otp:${email}:${code.trim()}`);
+
+const isEqualString = (left: string, right: string): boolean => {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+};
+
+const sendEmailOtp = async (email: string, code: string): Promise<void> => {
+  if (config.email.deliveryMode === "console") {
+    console.log(`[auth] email OTP for ${email}: ${code}`);
+    return;
+  }
+
+  if (config.email.deliveryMode !== "resend") {
+    throw new Error("EMAIL_DELIVERY_MODE must be console or resend");
+  }
+
+  const apiKey = config.email.resendApiKey?.trim();
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.email.fromAddress,
+      to: [email],
+      subject: "Your StreamPump login code",
+      text: `Your StreamPump login code is ${code}. It expires in ${Math.floor(config.email.otpTtlSeconds / 60)} minutes.`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`failed to send email OTP (${response.status})`);
+  }
+};
+
 const createWalletSession = async (wallet: string) => {
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -264,6 +332,86 @@ export const verifyWalletAuthChallenge = async (params: {
     accessToken,
     expiresAt,
   };
+};
+
+export const createEmailAuthChallenge = async (email: string) => {
+  const normalizedEmail = normalizeEmail(email);
+  const code = createEmailCode();
+  const expiresAt = new Date(Date.now() + EMAIL_OTP_TTL_MS);
+
+  await prisma.emailAuthChallenge.create({
+    data: {
+      email: normalizedEmail,
+      codeHash: hashEmailCode(normalizedEmail, code),
+      expiresAt,
+    },
+  });
+
+  await sendEmailOtp(normalizedEmail, code);
+
+  return {
+    email: normalizedEmail,
+    expiresAt,
+  };
+};
+
+export const verifyEmailAuthChallenge = async (params: {
+  email: string;
+  code: string;
+}) => {
+  const email = normalizeEmail(params.email);
+  const code = params.code.trim();
+  if (!/^\d{4,10}$/.test(code)) {
+    throw new Error("email code is invalid");
+  }
+
+  const challenge = await prisma.emailAuthChallenge.findFirst({
+    where: {
+      email,
+      consumedAt: null,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (!challenge) {
+    throw new Error("email challenge not found or expired");
+  }
+
+  if (challenge.attempts >= MAX_EMAIL_OTP_ATTEMPTS) {
+    throw new Error("email challenge attempt limit exceeded");
+  }
+
+  const valid = isEqualString(challenge.codeHash, hashEmailCode(email, code));
+  if (!valid) {
+    await prisma.emailAuthChallenge.update({
+      where: { id: challenge.id },
+      data: {
+        attempts: {
+          increment: 1,
+        },
+      },
+    });
+    throw new Error("email code is invalid");
+  }
+
+  await prisma.emailAuthChallenge.update({
+    where: { id: challenge.id },
+    data: {
+      consumedAt: new Date(),
+    },
+  });
+
+  return exchangeProviderIdentitySession({
+    provider: IdentityProvider.EMAIL,
+    providerSubject: email,
+    email,
+    displayName: email.split("@")[0],
+  });
 };
 
 export const exchangeProviderIdentitySession = async (params: {

@@ -15,6 +15,8 @@ import {
 import {
   createWalletAuthChallenge,
   exchangeProviderSession,
+  requestEmailLoginCode,
+  verifyEmailLoginCode,
   verifyWalletAuthChallenge,
 } from "@/lib/api/auth";
 import {
@@ -132,6 +134,8 @@ export const AuthOptionsPanel = ({
   const { setVisible } = useWalletModal();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState("alex@streampump.local");
+  const [emailCode, setEmailCode] = useState("");
+  const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<string>("选择邮箱、Google、Apple 或钱包继续。");
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
@@ -251,9 +255,59 @@ export const AuthOptionsPanel = ({
     await completeWalletLogin();
   };
 
+  const handleEmailRequestCode = async () => {
+    const email = emailValue.trim();
+    if (!email) {
+      setLastAction("请输入邮箱地址。");
+      return;
+    }
+
+    setBusyKey("email");
+    setLastAction("正在发送邮箱验证码...");
+
+    try {
+      const challenge = await requestEmailLoginCode(email);
+      setEmailCode("");
+      setEmailCodeExpiresAt(challenge.expiresAt);
+      setLastAction("验证码已发送，请查看邮箱。");
+    } catch (error) {
+      setLastAction(error instanceof Error ? error.message : "邮箱验证码发送失败。");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleEmailVerifyCode = async () => {
+    const email = emailValue.trim();
+    const code = emailCode.trim();
+    if (!email || !code) {
+      setLastAction("请输入邮箱和验证码。");
+      return;
+    }
+
+    setBusyKey("email-verify");
+    setLastAction("正在验证邮箱验证码...");
+
+    try {
+      const session = await verifyEmailLoginCode({ email, code });
+      storeAuthSession(session);
+      setLastAction("邮箱会话已创建，正在进入产品。");
+      void router.push(nextHref);
+    } catch (error) {
+      setLastAction(error instanceof Error ? error.message : "邮箱验证码验证失败。");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   const handleMethod = async (method: LoginMethodRecord) => {
     if (method.id === "wallet") {
       await handleWalletLogin();
+      return;
+    }
+
+    if (method.id === "email") {
+      await handleEmailRequestCode();
       return;
     }
 
@@ -314,11 +368,40 @@ export const AuthOptionsPanel = ({
               />
             </label>
 
+            {emailCodeExpiresAt ? (
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
+                    Verification code
+                  </span>
+                  <input
+                    className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
+                    inputMode="numeric"
+                    maxLength={10}
+                    onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, ""))}
+                    placeholder="6-digit code"
+                    type="text"
+                    value={emailCode}
+                  />
+                </label>
+                <button
+                  className="card-radius flex w-full items-center justify-center border border-[#5fca9f]/25 bg-[#113222] px-4 py-3 text-sm font-semibold text-[#87e7bd] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-70"
+                  disabled={Boolean(busyKey) || !emailCode.trim()}
+                  onClick={() => void handleEmailVerifyCode()}
+                  type="button"
+                >
+                  Verify email code
+                </button>
+              </div>
+            ) : null}
+
             <div className="space-y-3">
               {loginMethods.map((method) => {
                 const identity = method.id === "wallet" ? null : resolveMethodIdentity(method.id);
-                const methodBusy = busyKey === (identity?.providerSubject ?? "wallet");
-                const socialDisabled = method.id !== "wallet" && !previewSocialAuthEnabled;
+                const methodBusy = method.id === "email"
+                  ? busyKey === "email" || busyKey === "email-verify"
+                  : busyKey === (identity?.providerSubject ?? "wallet");
+                const socialDisabled = method.id !== "wallet" && method.id !== "email" && !previewSocialAuthEnabled;
 
                 return (
                   <button
@@ -339,12 +422,22 @@ export const AuthOptionsPanel = ({
                       <div>
                         <p className="text-sm font-medium">{method.label}</p>
                         <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
-                          {socialDisabled ? "社交登录已被环境变量关闭" : method.subtitle}
+                          {method.id === "email"
+                            ? emailCodeExpiresAt
+                              ? "重新发送邮箱验证码"
+                              : "发送一次性邮箱验证码"
+                            : socialDisabled
+                              ? "社交登录已被环境变量关闭"
+                              : method.subtitle}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {socialDisabled ? (
+                      {method.id === "email" ? (
+                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
+                          OTP
+                        </span>
+                      ) : socialDisabled ? (
                         <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
                           Env off
                         </span>

@@ -8,9 +8,11 @@ import { PublicKey } from "@solana/web3.js";
 
 import { handleControllerError, HttpError, ok, parseNonEmptyString } from "./http";
 import {
+  createEmailAuthChallenge,
   createWalletAuthChallenge,
   exchangeProviderIdentitySession,
   findAuthIdentityByWallet,
+  verifyEmailAuthChallenge,
   verifyWalletAuthChallenge,
 } from "../services/auth";
 import { config } from "../../config/default";
@@ -114,6 +116,69 @@ export const verifyAuthChallenge = async (req: Request, res: Response) => {
     }
 
     handleControllerError(res, error, "VERIFY_AUTH_CHALLENGE_FAILED");
+  }
+};
+
+export const requestEmailLoginCode = async (req: Request, res: Response) => {
+  try {
+    const challenge = await createEmailAuthChallenge(
+      parseNonEmptyString(req.body.email, "email")
+    );
+
+    ok(res, {
+      email: challenge.email,
+      expiresAt: challenge.expiresAt.toISOString(),
+    }, 201);
+  } catch (error) {
+    handleControllerError(res, error, "REQUEST_EMAIL_LOGIN_CODE_FAILED");
+  }
+};
+
+export const verifyEmailLoginCode = async (req: Request, res: Response) => {
+  try {
+    const session = await verifyEmailAuthChallenge({
+      email: parseNonEmptyString(req.body.email, "email"),
+      code: parseNonEmptyString(req.body.code, "code"),
+    });
+
+    ok(res, {
+      wallet: session.wallet,
+      accessToken: session.accessToken,
+      expiresAt: session.expiresAt.toISOString(),
+      tokenType: "Bearer",
+      identity: session.identity,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("not found") || error.message.includes("expired")) {
+        handleControllerError(
+          res,
+          new HttpError(404, "EMAIL_AUTH_CHALLENGE_NOT_FOUND", error.message),
+          "VERIFY_EMAIL_LOGIN_CODE_FAILED"
+        );
+        return;
+      }
+
+      if (error.message.includes("attempt limit")) {
+        handleControllerError(
+          res,
+          new HttpError(409, "EMAIL_AUTH_ATTEMPT_LIMIT", error.message),
+          "VERIFY_EMAIL_LOGIN_CODE_FAILED"
+        );
+        return;
+      }
+
+      if (error.message.includes("code")) {
+        handleControllerError(
+          res,
+          new HttpError(401, "EMAIL_AUTH_CODE_INVALID", error.message),
+          "VERIFY_EMAIL_LOGIN_CODE_FAILED"
+        );
+        return;
+      }
+    }
+
+    handleControllerError(res, error, "VERIFY_EMAIL_LOGIN_CODE_FAILED");
   }
 };
 

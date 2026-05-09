@@ -214,7 +214,7 @@ R2_MONTHLY_UPLOAD_LIMIT_BYTES
 MUX_*
 ```
 
-The backend uses the AWS S3 SDK for S3-compatible requests, but the intended object storage provider is **Cloudflare R2**. Existing deployments may still use `S3_*` aliases pointed at R2; if both are present and non-empty, `S3_*` takes precedence for compatibility.
+The backend uses Cloudflare R2 for origin object storage. Runtime configuration should use `R2_*` variable names; the AWS SDK remains only an internal transport detail for R2 presigned requests.
 
 S1 action transactions are exposed under `/api/v1/s1/*/build`. These endpoints return unsigned or backend-partially-signed v0 transactions for client wallet signing, plus derived PDA metadata and `requiredSigners`. Submit signed transactions through `POST /api/v1/s1/transactions/submit` and poll `GET /api/v1/s1/transactions/:signature/status`.
 

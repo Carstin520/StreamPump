@@ -314,7 +314,7 @@ model Proposal {
   - `assetType = VIDEO`
   - `orderIndex = 0`
   - `sha256Hex = video.contentHash`
-  - `storageKey = video.s3ObjectKey`
+  - `storageKey = video.r2ObjectKey`
 - 若 `VideoContent.proposalId` 非空，则把新 manifest 关联到对应 `Proposal`
 
 迁移脚本建议位置：
@@ -432,4 +432,3 @@ function buildCanonicalManifest(input: {
 - `backend/src/services/proposalIntentService.ts`
 - `backend/src/services/txBundleService.ts`
 - `backend/scripts/backfillVideoContentToManifest.ts`
-

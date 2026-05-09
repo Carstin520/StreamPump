@@ -23,8 +23,8 @@ import {
   CompletedMultipartPart,
   extensionForMimeType,
   isVideoMimeType,
-  s3Service,
-} from "../src/services/S3Service";
+  r2Service,
+} from "../src/services/R2Service";
 import { uploadDisplayVariant } from "../src/services/imageVariants";
 
 type CliOptions = {
@@ -384,7 +384,7 @@ const buildAssetPlans = async (
 };
 
 const uploadSinglePartObject = async (filePath: string, mimeType: string, storageKey: string) => {
-  const upload = await s3Service.generateUploadUrl(storageKey, mimeType);
+  const upload = await r2Service.generateUploadUrl(storageKey, mimeType);
   const fileBuffer = await fs.readFile(filePath);
   const response = await fetch(upload.presignedUrl, {
     method: "PUT",
@@ -407,7 +407,7 @@ const uploadMultipartObject = async (
   storageKey: string,
   fileSizeBytes: bigint
 ): Promise<CompletedMultipartPart[]> => {
-  const multipartUpload = await s3Service.createMultipartUpload(storageKey, mimeType, fileSizeBytes);
+  const multipartUpload = await r2Service.createMultipartUpload(storageKey, mimeType, fileSizeBytes);
   const fileBuffer = await fs.readFile(filePath);
   const completedParts: CompletedMultipartPart[] = [];
 
@@ -428,7 +428,7 @@ const uploadMultipartObject = async (
     const etag = response.headers.get("etag")?.trim();
     if (!etag) {
       throw new Error(
-        "multipart upload response is missing ETag. Ensure the S3 bucket CORS config exposes ETag."
+        "multipart upload response is missing ETag. Ensure the R2 bucket CORS config exposes ETag."
       );
     }
 
@@ -438,7 +438,7 @@ const uploadMultipartObject = async (
     });
   }
 
-  await s3Service.completeMultipartUpload(storageKey, multipartUpload.uploadId, completedParts);
+  await r2Service.completeMultipartUpload(storageKey, multipartUpload.uploadId, completedParts);
   return completedParts;
 };
 
@@ -594,7 +594,7 @@ const importPost = async (
       where: { id: asset.id },
       data: {
         uploadStatus: AssetUploadStatus.UPLOADED,
-        cdnUrl: s3Service.buildCanonicalUrl(storageKey),
+        cdnUrl: r2Service.buildCanonicalUrl(storageKey),
       },
     });
 

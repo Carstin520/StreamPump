@@ -50,8 +50,8 @@ import {
   CompletedMultipartPart,
   extensionForMimeType,
   isVideoMimeType,
-  s3Service,
-} from "../services/S3Service";
+  r2Service,
+} from "../services/R2Service";
 import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
 
 interface PresignAssetPlan {
@@ -289,7 +289,7 @@ export const presignManifestAssets = withController(
       });
 
       if (isVideoMimeType(mimeType)) {
-        const multipartUpload = await s3Service.createMultipartUpload(
+        const multipartUpload = await r2Service.createMultipartUpload(
           storageKey,
           mimeType,
           fileSizeBytes
@@ -307,7 +307,7 @@ export const presignManifestAssets = withController(
           parts: multipartUpload.parts,
         });
       } else {
-        const upload = await s3Service.generateUploadUrl(storageKey, mimeType);
+        const upload = await r2Service.generateUploadUrl(storageKey, mimeType);
 
         uploads.push({
           assetId: asset.id,
@@ -376,14 +376,14 @@ export const completeManifestAssetUpload = withController(
       );
       const parts = parseCompletedMultipartParts(req.body?.parts);
 
-      await s3Service.completeMultipartUpload(asset.storageKey, multipartUploadId, parts);
+      await r2Service.completeMultipartUpload(asset.storageKey, multipartUploadId, parts);
     }
 
     let updated = await prisma.contentAsset.update({
       where: { id: asset.id },
       data: {
         uploadStatus: AssetUploadStatus.UPLOADED,
-        cdnUrl: s3Service.buildCanonicalUrl(asset.storageKey),
+        cdnUrl: r2Service.buildCanonicalUrl(asset.storageKey),
       },
     });
 

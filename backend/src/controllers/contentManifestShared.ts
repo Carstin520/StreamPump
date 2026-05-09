@@ -6,7 +6,7 @@ import {
 
 import { HttpError } from "./http";
 import { prisma } from "../services/prisma";
-import { isVideoMimeType } from "../services/S3Service";
+import { isVideoMimeType } from "../services/R2Service";
 import { buildMuxPlaybackUrl } from "../services/MuxService";
 
 export const normalizeAssetType = (value: unknown): AssetType => {

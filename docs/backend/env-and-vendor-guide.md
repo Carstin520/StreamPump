@@ -43,7 +43,7 @@
 - 原因：
   - `Postgres 17` 现在是稳定主线，Neon 当前支持 `14 / 15 / 16 / 17`，并提供 `18 preview`
   - 你现在的项目没有依赖某个旧版本特性，也没有兼容包袱，直接选 `17` 最合理
-  - `AWS` 是默认更稳的选择，Neon 在 AWS 上 region 选择更多，也更贴近你当前 `S3/R2 + Mux + 自建 backend` 的组合架构
+  - `AWS` 是默认更稳的选择，Neon 在 AWS 上 region 选择更多，也更贴近你当前 `R2 + Mux + 自建 backend` 的组合架构
   - `Neon Auth` 不是你当前的认证路线；你现在走的是钱包认证方向，开启它只会增加系统复杂度
 - 什么时候改选：
   - 如果你的应用服务器未来明确全部部署在 Azure，再考虑把 provider 选成 Azure
@@ -72,8 +72,8 @@
 - 如果要让后端执行 Track settlement 或 server-side Anchor 交易，再补 `ORACLE_AUTHORITY_KEYPAIR_PATH` 或 `ORACLE_AUTHORITY_SECRET_KEY`
 
 ### 3. 对象存储
-- 推荐：`Cloudflare R2` 作为当前最省钱的 S3-compatible 起步方案
-- 作用：存原始图片/视频素材；当前后端用 AWS S3 SDK 访问 R2 的 S3-compatible endpoint
+- 推荐：`Cloudflare R2` 作为当前最省钱的对象存储起步方案
+- 作用：存原始图片/视频素材；当前后端用 R2 endpoint 生成 presigned URL
 - 当前优先级：最高，没有它就无法跑内容上传
 - 官方价格参考：
   - Free tier：`10 GB-month` storage、`1M` Class A、`10M` Class B
@@ -86,8 +86,7 @@
   - 100 GB 素材：约 `storage $1.50/month`，外加少量操作费
   - 500 GB 素材：约 `storage $7.50/month`
 - 说明：
-  - 新部署优先填写 `R2_*`
-  - 旧部署如果已经用 `S3_*` 指向 R2，可以继续保留；代码里非空 `S3_*` 优先级高于 `R2_*`
+  - 本地和部署环境统一填写 `R2_*`
   - 建议设置 `R2_MAX_ASSET_SIZE_BYTES=104857600`，先限制单个素材为 100MiB
   - 建议设置 `R2_MONTHLY_UPLOAD_LIMIT_BYTES=10737418240`，先用 10GiB 作为后端月度上传硬上限
   - 避免长期依赖签名读取 URL 做公共 feed；尽快走 R2 自定义域 + Cloudflare cache，减少直接 `GetObject` 读请求
@@ -202,7 +201,7 @@
 - StreamPump program id
 - StreamPump IDL path / IDL artifact
 - Oracle authority keypair
-- S3-compatible bucket / key
+- R2 bucket / key
 - Mux token 与 webhook secret
 
 ## 备注

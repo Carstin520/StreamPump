@@ -63,7 +63,7 @@ const main = async () => {
     body: JSON.stringify({
       contentType: "SHORT_VIDEO",
       title: `Mux Smoke ${id}`,
-      captionText: "Mux smoke test for S3 upload and webhook completion",
+      captionText: "Mux smoke test for R2 upload and webhook completion",
       tags: ["smoke", "mux"],
     }),
   });
@@ -103,7 +103,7 @@ const main = async () => {
   });
 
   if (!putResponse.ok) {
-    throw new Error(`S3 upload failed with ${putResponse.status}`);
+    throw new Error(`R2 upload failed with ${putResponse.status}`);
   }
 
   const completeResponse = await callJson(

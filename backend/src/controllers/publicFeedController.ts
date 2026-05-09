@@ -13,7 +13,7 @@ import { prisma } from "../services/prisma";
 import { serializeAsset } from "./contentManifestShared";
 import { buildDisplayVariantKey } from "../services/imageVariants";
 import { config } from "../../config/default";
-import { s3Service } from "../services/S3Service";
+import { r2Service } from "../services/R2Service";
 
 type JsonObject = Record<string, Prisma.JsonValue>;
 
@@ -122,14 +122,14 @@ const resolveCanonicalUrl = (objectKey: string | null | undefined) => {
     return null;
   }
 
-  const canonicalUrl = s3Service.buildCanonicalUrl(trimmedKey);
+  const canonicalUrl = r2Service.buildCanonicalUrl(trimmedKey);
   return isBrowserRenderableUrl(canonicalUrl) ? canonicalUrl : null;
 };
 
 const resolvePublicOriginUrl = async (storageKey: string) => {
   if (config.storage.origin.publicFeedUseSignedUrls) {
     try {
-      return await s3Service.generateDownloadUrl(storageKey, 60 * 60);
+      return await r2Service.generateDownloadUrl(storageKey, 60 * 60);
     } catch (_error) {
       return null;
     }
@@ -141,7 +141,7 @@ const resolvePublicOriginUrl = async (storageKey: string) => {
   }
 
   try {
-    return await s3Service.generateDownloadUrl(storageKey, 60 * 60);
+    return await r2Service.generateDownloadUrl(storageKey, 60 * 60);
   } catch (_error) {
     return null;
   }
@@ -152,7 +152,7 @@ const resolvePublicImageVariantUrl = async (storageKey: string) => {
 
   if (config.storage.origin.publicFeedUseSignedUrls) {
     try {
-      return await s3Service.generateDownloadUrl(variantKey, 60 * 60);
+      return await r2Service.generateDownloadUrl(variantKey, 60 * 60);
     } catch (_error) {
       return null;
     }
@@ -164,7 +164,7 @@ const resolvePublicImageVariantUrl = async (storageKey: string) => {
   }
 
   try {
-    return await s3Service.generateDownloadUrl(variantKey, 60 * 60);
+    return await r2Service.generateDownloadUrl(variantKey, 60 * 60);
   } catch (_error) {
     return null;
   }

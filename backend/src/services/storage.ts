@@ -1,10 +1,10 @@
 /**
- * CN: 旧版双存储上传服务，将文件写入 origin 存储与 edge 存储。
- * EN: Legacy dual-storage upload service that writes files to both origin and edge object storage.
+ * CN: 旧版双 R2 上传服务，将文件写入 origin 存储与 edge 存储。
+ * EN: Legacy dual-R2 upload service that writes files to both origin and edge object storage.
  */
 import {
   PutObjectCommand,
-  S3Client,
+  S3Client as R2CompatibleClient,
 } from "@aws-sdk/client-s3";
 import { createHash } from "crypto";
 import path from "path";
@@ -40,7 +40,7 @@ const buildClient = (storageConfig: StorageConfig, forcePathStyle = false) => {
   const hasExplicitCredentials =
     storageConfig.accessKeyId && storageConfig.secretAccessKey;
 
-  return new S3Client({
+  return new R2CompatibleClient({
     region: storageConfig.region,
     endpoint: storageConfig.endpoint,
     forcePathStyle,
@@ -68,7 +68,7 @@ const buildPublicUrl = (storageConfig: StorageConfig, objectKey: string) => {
     return `${storageConfig.publicBaseUrl.replace(/\/$/, "")}/${objectKey}`;
   }
 
-  return `s3://${storageConfig.bucket}/${objectKey}`;
+  return `r2://${storageConfig.bucket}/${objectKey}`;
 };
 
 export const uploadToHybridStorage = async (

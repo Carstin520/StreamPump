@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-import { s3Service } from "./S3Service";
+import { r2Service } from "./R2Service";
 
 const DISPLAY_MAX_WIDTH = 1280;
 const DISPLAY_MAX_HEIGHT = 1280;
@@ -52,7 +52,7 @@ export const uploadDisplayVariant = async (
   }
   const variantKey = buildDisplayVariantKey(originalStorageKey);
 
-  await s3Service.putObject(variantKey, new Uint8Array(variantBuffer), "image/webp", {
+  await r2Service.putObject(variantKey, new Uint8Array(variantBuffer), "image/webp", {
     cacheControl: DISPLAY_CACHE_CONTROL,
   });
 
@@ -60,7 +60,7 @@ export const uploadDisplayVariant = async (
 };
 
 export const backfillDisplayVariantFromStorage = async (storageKey: string) => {
-  const downloadUrl = await s3Service.generateDownloadUrl(storageKey, 15 * 60);
+  const downloadUrl = await r2Service.generateDownloadUrl(storageKey, 15 * 60);
   const response = await fetch(downloadUrl);
 
   if (!response.ok) {

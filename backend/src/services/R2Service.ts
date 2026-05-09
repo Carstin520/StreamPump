@@ -1,13 +1,13 @@
 /**
- * CN: R2/S3-compatible 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
- * EN: R2/S3-compatible origin-storage service for content asset presigned upload and download URLs.
+ * CN: Cloudflare R2 原始存储服务，负责内容素材 presigned 上传与下载 URL 生成。
+ * EN: Cloudflare R2 origin-storage service for content asset presigned upload and download URLs.
  */
 import {
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   GetObjectCommand,
   PutObjectCommand,
-  S3Client,
+  S3Client as R2CompatibleClient,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -62,12 +62,12 @@ export const extensionForMimeType = (mimeType: string): string => {
   }
 };
 
-const buildS3Client = (): S3Client => {
+const buildR2Client = (): R2CompatibleClient => {
   const { origin } = config.storage;
   const hasExplicitCredentials = Boolean(origin.accessKeyId && origin.secretAccessKey);
 
-  // Cloudflare R2 is the current production target; the AWS SDK client is used for S3 compatibility.
-  return new S3Client({
+  // Cloudflare R2 uses the AWS SDK client as the transport for presigned object requests.
+  return new R2CompatibleClient({
     region: origin.region,
     endpoint: origin.endpoint,
     credentials: hasExplicitCredentials
@@ -102,11 +102,11 @@ export interface CompletedMultipartPart {
   etag: string;
 }
 
-export class S3Service {
-  private readonly client: S3Client;
+export class R2Service {
+  private readonly client: R2CompatibleClient;
 
   constructor() {
-    this.client = buildS3Client();
+    this.client = buildR2Client();
   }
 
   async generateUploadUrl(objectKey: string, mimeType: string): Promise<PresignedUploadUrlResult> {
@@ -115,7 +115,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET");
     }
 
     const command = new PutObjectCommand({
@@ -145,7 +145,7 @@ export class S3Service {
     const normalizedMimeType = normalizeMimeType(mimeType);
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET");
     }
 
     await this.client.send(
@@ -173,7 +173,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET");
     }
 
     const createResult = await this.client.send(
@@ -237,7 +237,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET");
     }
 
     await this.client.send(
@@ -268,7 +268,7 @@ export class S3Service {
 
     const bucket = config.storage.origin.bucket;
     if (!bucket) {
-      throw new Error("object storage bucket is not configured; set R2_BUCKET or S3_BUCKET");
+      throw new Error("object storage bucket is not configured; set R2_BUCKET");
     }
 
     const command = new GetObjectCommand({
@@ -287,8 +287,8 @@ export class S3Service {
       return `${base.replace(/\/$/, "")}/${objectKey}`;
     }
 
-    return `s3://${config.storage.origin.bucket}/${objectKey}`;
+    return `r2://${config.storage.origin.bucket}/${objectKey}`;
   }
 }
 
-export const s3Service = new S3Service();
+export const r2Service = new R2Service();
