@@ -35,7 +35,7 @@ export const CreatorStageView = ({
   );
 
   return (
-    <div className="space-y-5 pb-12">
+    <div className="space-y-3.5 pb-10">
       <ProfileHero
         creator={creator}
         isFollowing={isFollowing}
@@ -43,10 +43,10 @@ export const CreatorStageView = ({
         onToggleFollow={() => setIsFollowing((value) => !value)}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5">
-          <MarketStatsBar creator={creator} market={market} />
+      <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-3.5">
           <BondingCurvePanel buyPreview={buyPreview} market={market} />
+          <MarketStatsBar creator={creator} market={market} />
           <LifecycleTimeline creator={creator} market={market} />
           <ContentSurface
             activeTab={activeTab}
@@ -56,7 +56,7 @@ export const CreatorStageView = ({
           />
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
+        <aside className="space-y-3.5 lg:sticky lg:top-6 lg:self-start">
           <BuyPanel
             buyAmount={buyAmount}
             buyPreview={buyPreview}
@@ -163,8 +163,8 @@ const ProfileHero = ({
   market: MarketModel;
   onToggleFollow: () => void;
 }) => (
-  <section className="relative overflow-hidden rounded-[28px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
-    <div className="relative h-44 md:h-56">
+  <section className="relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
+    <div className="relative h-36 md:h-44">
       <ProgressiveImage
         alt={`${creator.name} banner`}
         className="h-full w-full object-cover"
@@ -174,46 +174,46 @@ const ProfileHero = ({
         src={creator.heroSrc}
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.05)_0%,rgba(7,11,18,0.42)_55%,rgba(7,11,18,0.96)_100%)]" />
-      <div className="absolute right-4 top-4 flex items-center gap-2">
+      <div className="absolute right-3 top-3 flex items-center gap-2">
         <StatusBadge market={market} />
       </div>
     </div>
 
-    <div className="relative -mt-12 flex flex-col gap-4 px-6 pb-6 md:flex-row md:items-end md:gap-6 md:px-8 md:pb-7">
-      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_18px_48px_rgba(0,0,0,0.5)] md:h-28 md:w-28">
+    <div className="relative -mt-10 flex flex-col gap-3 px-5 pb-5 md:flex-row md:items-end md:gap-5 md:px-6 md:pb-5">
+      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_14px_36px_rgba(0,0,0,0.5)] md:h-22 md:w-22">
         <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-[#7486a1]">
+        <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.22em] text-[#7486a1]">
           <span>Level {market.level}</span>
           <span className="h-1 w-1 rounded-full bg-white/20" />
           <span className="truncate">{market.levelLabel}</span>
         </div>
-        <h1 className="mt-2 truncate text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[34px]">
+        <h1 className="mt-1.5 truncate text-[22px] font-semibold tracking-[-0.04em] text-white md:text-[26px]">
           {creator.name}
         </h1>
-        <div className="mt-1 flex items-center gap-2 text-sm text-[#92a3bc]">
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-[#92a3bc]">
           <span className="truncate">{creator.handle}</span>
           <span className="text-[#3e4a5e]">·</span>
           <span className="truncate">{creator.city}</span>
           <span className="text-[#3e4a5e]">·</span>
           <span className="truncate text-[#7486a1]">{creator.niche}</span>
         </div>
-        <p className="mt-3 line-clamp-2 max-w-[640px] text-sm leading-6 text-[#bcc8de]">
+        <p className="mt-2 line-clamp-2 max-w-[640px] text-xs leading-5 text-[#bcc8de]">
           {creator.intro}
         </p>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <button
-          className="liquid-glass-btn rounded-full px-5 py-2.5 text-sm text-white transition hover:bg-white/[0.08]"
+          className="liquid-glass-btn rounded-full px-4 py-2 text-xs text-white transition hover:bg-white/[0.08]"
           type="button"
         >
           Message
         </button>
         <button
-          className={`flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
+          className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
             isFollowing
               ? "border border-white/10 bg-[#13291f] text-[#90efac]"
               : "bg-[#de402a] text-white hover:bg-[#ea523e]"
@@ -221,7 +221,7 @@ const ProfileHero = ({
           onClick={onToggleFollow}
           type="button"
         >
-          {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
+          {isFollowing ? <FollowCheckIcon className="h-3.5 w-3.5" /> : <FollowPlusIcon className="h-3.5 w-3.5" />}
           {isFollowing ? "Following" : "Follow"}
         </button>
       </div>
@@ -269,15 +269,15 @@ const MarketStatsBar = ({
   const positive = market.change24hPct >= 0;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
-      <div className="grid grid-cols-2 divide-y divide-white/[0.05] md:grid-cols-3 md:divide-y-0 md:divide-x lg:grid-cols-6">
+    <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
+      <div className="grid grid-cols-3 divide-x divide-white/[0.05] lg:grid-cols-6">
         <PriceCell market={market} />
         <StatCell label="24h Change" tone={positive ? "positive" : "negative"}>
           <span className="flex items-center gap-1">
             {positive ? (
-              <ArrowUpIcon className="h-3.5 w-3.5 text-[#65ecaf]" />
+              <ArrowUpIcon className="h-3 w-3 text-[#65ecaf]" />
             ) : (
-              <ArrowDownIcon className="h-3.5 w-3.5 text-[#f67263]" />
+              <ArrowDownIcon className="h-3 w-3 text-[#f67263]" />
             )}
             {positive ? "+" : ""}
             {market.change24hPct.toFixed(2)}%
@@ -285,13 +285,13 @@ const MarketStatsBar = ({
         </StatCell>
         <StatCell label="Holders">{compactNumber(market.holders)}</StatCell>
         <StatCell label="S1 Supply">{compactNumber(market.supply)}</StatCell>
-        <StatCell label="Supporter Pool">
+        <StatCell label="Pool">
           {market.supporterPoolUsd ? `$${compactNumber(market.supporterPoolUsd)}` : "—"}
         </StatCell>
         <StatCell label="Graduation">
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5">
             <span>{market.graduationPct}%</span>
-            <span className="h-1 w-12 overflow-hidden rounded-full bg-white/[0.06]">
+            <span className="h-1 w-8 overflow-hidden rounded-full bg-white/[0.06]">
               <span
                 className="block h-full rounded-full bg-gradient-to-r from-[#de402a] to-[#ff8a78]"
                 style={{ width: `${Math.min(100, market.graduationPct)}%` }}
@@ -300,7 +300,7 @@ const MarketStatsBar = ({
           </span>
         </StatCell>
       </div>
-      <div className="border-t border-white/[0.04] px-5 py-2.5 text-[11px] text-[#6f8099]">
+      <div className="border-t border-white/[0.04] px-4 py-1.5 text-[10px] text-[#6f8099]">
         <span className="text-[#7486a1]">Niche</span>
         <span className="ml-2 text-[#c8d3e6]">{creator.niche}</span>
         <span className="ml-4 text-[#7486a1]">Tags</span>
@@ -311,11 +311,11 @@ const MarketStatsBar = ({
 };
 
 const PriceCell = ({ market }: { market: MarketModel }) => (
-  <div className="px-5 py-4">
-    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Fans Token Price</p>
-    <p className="mt-1.5 text-[26px] font-semibold tracking-[-0.04em] text-white">
+  <div className="min-w-0 px-3.5 py-2.5">
+    <p className="truncate text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Fans Token Price</p>
+    <p className="mt-1 whitespace-nowrap text-lg font-semibold tracking-[-0.04em] text-white">
       {market.priceSpump}
-      <span className="ml-1.5 text-xs font-medium text-[#7486a1]">SPUMP</span>
+      <span className="ml-1 text-[10px] font-medium text-[#7486a1]">SPUMP</span>
     </p>
   </div>
 );
@@ -329,10 +329,10 @@ const StatCell = ({
   label: string;
   tone?: "neutral" | "positive" | "negative";
 }) => (
-  <div className="px-5 py-4">
-    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
+  <div className="min-w-0 px-3.5 py-2.5">
+    <p className="truncate text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
     <div
-      className={`mt-1.5 text-base font-semibold tracking-[-0.02em] ${
+      className={`mt-1 whitespace-nowrap text-sm font-semibold tracking-[-0.02em] ${
         tone === "positive"
           ? "text-[#65ecaf]"
           : tone === "negative"
@@ -362,26 +362,26 @@ const BondingCurvePanel = ({
   );
 
   return (
-    <section className="relative overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-5 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-4 md:p-5">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
             Bonding curve
           </p>
-          <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">
+          <h2 className="mt-0.5 text-base font-semibold tracking-[-0.02em] text-white">
             S1 supply × SPUMP price
           </h2>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#7486a1]">
+        <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-[#7486a1]">
           <LegendDot color="#de402a" label="Now" />
           <LegendDot color="#ffb38a" label="After buy" />
           <LegendDot color="rgba(255,255,255,0.18)" label="Curve" outline />
         </div>
       </header>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="relative h-[220px] overflow-hidden rounded-[18px] border border-white/[0.05] bg-[radial-gradient(circle_at_30%_30%,rgba(222,64,42,0.08),transparent_55%),linear-gradient(180deg,#0d1320_0%,#0a0f18_100%)]">
-          <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 400 220">
+      <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_200px]">
+        <div className="relative aspect-[400/220] overflow-hidden rounded-[14px] border border-white/[0.05] bg-[radial-gradient(circle_at_30%_30%,rgba(222,64,42,0.08),transparent_55%),linear-gradient(180deg,#0d1320_0%,#0a0f18_100%)]">
+          <svg className="h-full w-full" preserveAspectRatio="xMidYMid meet" viewBox="0 0 400 220">
             <defs>
               <linearGradient id="curveStroke" x1="0" x2="1" y1="0" y2="0">
                 <stop offset="0%" stopColor="#79b9ff" stopOpacity="0.8" />
@@ -510,15 +510,15 @@ const CurveStat = ({
   label: string;
   value: string;
 }) => (
-  <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+  <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-2.5 py-2">
     <div className="flex items-center gap-1.5">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">
+      <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">
         {label}
       </span>
     </div>
-    <p className="mt-1.5 text-sm font-semibold tracking-[-0.01em] text-white">{value}</p>
-    <p className="mt-0.5 text-[10px] text-[#5a6b82]">{hint}</p>
+    <p className="mt-1 text-xs font-semibold tracking-[-0.01em] text-white">{value}</p>
+    <p className="mt-0.5 text-[9px] text-[#5a6b82]">{hint}</p>
   </div>
 );
 
@@ -586,37 +586,37 @@ const BuyPanel = ({
   }, [pulse]);
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(18,25,37,0.92)_0%,rgba(11,17,27,0.92)_100%)]">
-      <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+    <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(18,25,37,0.92)_0%,rgba(11,17,27,0.92)_100%)]">
+      <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
             Trade Fans Token
           </p>
-          <h3 className="mt-0.5 text-base font-semibold text-white">
+          <h3 className="mt-0.5 text-sm font-semibold text-white">
             {disabled ? "Preview Mode" : "Buy S1 Tokens"}
           </h3>
         </div>
-        <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
+        <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
           1 S1 ≈ {market.priceSpump} SPUMP
         </span>
       </header>
 
-      <div className="space-y-4 px-5 py-5">
+      <div className="space-y-3 px-4 py-4">
         <div>
-          <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-[#6f8099]">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#6f8099]">
             <span>Amount</span>
             <span className="text-[#8ea0ba]">Max 200</span>
           </div>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-1.5 flex items-center gap-2">
             <button
-              className="liquid-glass-btn h-10 w-10 shrink-0 rounded-2xl text-lg text-white transition hover:bg-white/[0.08]"
+              className="liquid-glass-btn h-8 w-8 shrink-0 rounded-xl text-base text-white transition hover:bg-white/[0.08]"
               onClick={() => onBuyAmountChange(Math.max(1, buyAmount - 1))}
               type="button"
             >
               −
             </button>
             <input
-              className="input-glass h-12 w-full rounded-2xl bg-transparent px-4 text-center text-2xl font-semibold tracking-[-0.02em] text-white outline-none"
+              className="input-glass h-10 w-full rounded-xl bg-transparent px-3 text-center text-xl font-semibold tracking-[-0.02em] text-white outline-none"
               max={200}
               min={1}
               onChange={(event) => {
@@ -628,7 +628,7 @@ const BuyPanel = ({
               value={buyAmount}
             />
             <button
-              className="liquid-glass-btn h-10 w-10 shrink-0 rounded-2xl text-lg text-white transition hover:bg-white/[0.08]"
+              className="liquid-glass-btn h-8 w-8 shrink-0 rounded-xl text-base text-white transition hover:bg-white/[0.08]"
               onClick={() => onBuyAmountChange(Math.min(200, buyAmount + 1))}
               type="button"
             >
@@ -636,10 +636,10 @@ const BuyPanel = ({
             </button>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-1.5">
             {[5, 10, 25, 50].map((preset) => (
               <button
-                className={`flex-1 rounded-full border px-2 py-1.5 text-[11px] font-medium transition ${
+                className={`flex-1 rounded-full border px-2 py-1 text-[10px] font-medium transition ${
                   buyAmount === preset
                     ? "border-[#de402a]/40 bg-[#de402a]/[0.12] text-[#ff8a78]"
                     : "border-white/[0.06] bg-white/[0.03] text-[#8ea0ba] hover:bg-white/[0.06] hover:text-white"
@@ -654,7 +654,7 @@ const BuyPanel = ({
           </div>
         </div>
 
-        <div className="space-y-2 rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-3.5">
+        <div className="space-y-1.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
           <SummaryRow label="Avg price" value={`${buyPreview.avgPrice} SPUMP`} />
           <SummaryRow accent label="Estimated cost" value={`${buyPreview.cost} SPUMP`} />
           <SummaryRow
@@ -670,10 +670,10 @@ const BuyPanel = ({
         </div>
 
         <button
-          className={`relative w-full overflow-hidden rounded-2xl py-3.5 text-sm font-semibold transition ${
+          className={`relative w-full overflow-hidden rounded-xl py-2.5 text-xs font-semibold transition ${
             disabled
               ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
-              : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_18px_34px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
+              : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
           } ${pulse ? "tap-bounce-active" : ""}`}
           onClick={() => setPulse(true)}
           type="button"
@@ -686,14 +686,14 @@ const BuyPanel = ({
         </button>
 
         <button
-          className="glass-button-ghost w-full px-4 py-3 text-sm font-medium"
+          className="glass-button-ghost w-full px-3 py-2 text-xs font-medium"
           type="button"
         >
           Add to Watchlist
         </button>
 
         {disabled ? null : (
-          <p className="text-center text-[11px] text-[#5a6b82]">
+          <p className="text-center text-[10px] text-[#5a6b82]">
             Demo flow · on-chain trade lands in next release
           </p>
         )}
@@ -713,10 +713,10 @@ const SummaryRow = ({
   sublabel?: string;
   value: string;
 }) => (
-  <div className="flex items-center justify-between text-sm">
+  <div className="flex items-center justify-between text-xs">
     <span className="text-[#7e90a8]">{label}</span>
-    <div className="flex items-center gap-2">
-      {sublabel ? <span className="text-[11px] text-[#5a6b82]">{sublabel}</span> : null}
+    <div className="flex items-center gap-1.5">
+      {sublabel ? <span className="text-[10px] text-[#5a6b82]">{sublabel}</span> : null}
       <span className={`font-semibold ${accent ? "text-[#ff8a78]" : "text-white"}`}>{value}</span>
     </div>
   </div>
@@ -741,15 +741,15 @@ const LifecycleTimeline = ({
   const activeIndex = useMemo(() => resolveLifecycleIndex(creator, market), [creator, market]);
 
   return (
-    <section className="rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-5 py-5 md:px-6">
+    <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-4 py-3.5 md:px-5">
       <header className="flex items-center justify-between">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+        <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
           On-chain lifecycle
         </p>
-        <span className="text-[11px] text-[#7486a1]">{market.levelLabel}</span>
+        <span className="text-[10px] text-[#7486a1]">{market.levelLabel}</span>
       </header>
 
-      <div className="mt-4 flex items-center gap-2 md:gap-3">
+      <div className="mt-3 flex items-center gap-2 md:gap-3">
         {LIFECYCLE_STEPS.map((step, idx) => {
           const isActive = idx === activeIndex;
           const isPast = idx < activeIndex;
@@ -757,11 +757,11 @@ const LifecycleTimeline = ({
 
           return (
             <div className="flex flex-1 items-center" key={step.id}>
-              <div className="flex flex-1 flex-col items-center gap-2">
+              <div className="flex flex-1 flex-col items-center gap-1.5">
                 <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold ${
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ${
                     isActive
-                      ? "bg-[#de402a] text-white shadow-[0_0_22px_rgba(222,64,42,0.45)]"
+                      ? "bg-[#de402a] text-white shadow-[0_0_18px_rgba(222,64,42,0.45)]"
                       : isPast
                         ? "bg-[#65ecaf]/20 text-[#8df0c4]"
                         : "border border-white/10 bg-white/[0.04] text-[#5a6b82]"
@@ -770,7 +770,7 @@ const LifecycleTimeline = ({
                   {isPast ? "✓" : idx + 1}
                 </div>
                 <p
-                  className={`text-[11px] font-medium ${
+                  className={`text-[10px] font-medium ${
                     isActive ? "text-white" : isPast ? "text-[#8df0c4]" : "text-[#6f8099]"
                   }`}
                 >
@@ -809,37 +809,37 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
   const sponsor = creator.potentialSponsors[0] ?? "Sponsor TBD";
   const amount = creator.buyoutOfferUsd ?? 0;
   return (
-    <section className="overflow-hidden rounded-[24px] border border-[#de402a]/20 bg-[linear-gradient(180deg,rgba(40,16,16,0.82)_0%,rgba(15,12,18,0.94)_100%)]">
-      <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+    <section className="overflow-hidden rounded-[18px] border border-[#de402a]/20 bg-[linear-gradient(180deg,rgba(40,16,16,0.82)_0%,rgba(15,12,18,0.94)_100%)]">
+      <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#de402a] opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#de402a]" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#de402a]" />
           </span>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ff8a78]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff8a78]">
             Buyout Offer
           </p>
         </div>
-        <span className="text-[10px] uppercase tracking-[0.18em] text-[#7486a1]">Live</span>
+        <span className="text-[9px] uppercase tracking-[0.18em] text-[#7486a1]">Live</span>
       </header>
-      <div className="space-y-3 px-5 py-4">
+      <div className="space-y-2.5 px-4 py-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-[#7486a1]">Sponsor</p>
-          <p className="mt-0.5 truncate text-sm font-semibold text-white">{sponsor}</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-[#7486a1]">Sponsor</p>
+          <p className="mt-0.5 truncate text-xs font-semibold text-white">{sponsor}</p>
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-[#7486a1]">Latest offer</p>
-          <p className="mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-white">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-[#7486a1]">Latest offer</p>
+          <p className="mt-0.5 text-lg font-semibold tracking-[-0.02em] text-white">
             ${compactNumber(amount)}
           </p>
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+        <div className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-white/[0.02] px-2.5 py-2">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[#7486a1]">Deadline</p>
-            <p className="mt-0.5 text-sm font-medium text-white">36h 14m</p>
+            <p className="text-[9px] uppercase tracking-[0.16em] text-[#7486a1]">Deadline</p>
+            <p className="mt-0.5 text-xs font-medium text-white">36h 14m</p>
           </div>
           <Link
-            className="rounded-full bg-[#de402a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#ea523e]"
+            className="rounded-full bg-[#de402a] px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-[#ea523e]"
             href={`/buyout/${creator.id}`}
           >
             View Buyout
@@ -853,24 +853,24 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
 /* ──────────────────────────  Top holders  ────────────────────────── */
 
 const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
-  <section className="rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
-    <header className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Top holders</p>
-      <span className="text-[10px] uppercase tracking-[0.16em] text-[#5a6b82]">
+  <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
+    <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Top holders</p>
+      <span className="text-[9px] uppercase tracking-[0.16em] text-[#5a6b82]">
         {compactNumber(creator.holderCount)} total
       </span>
     </header>
-    <div className="space-y-1 px-3 py-3">
+    <div className="space-y-0.5 px-2.5 py-2">
       {creator.topHolders.map((holder) => (
         <div
-          className="flex items-center justify-between rounded-xl px-3 py-2 text-sm transition hover:bg-white/[0.03]"
+          className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition hover:bg-white/[0.03]"
           key={holder.rank}
         >
-          <span className="flex items-center gap-2 text-[#c8d3e6]">
-            <span className="text-[11px] font-medium text-[#5a6b82]">#{holder.rank}</span>
-            <span className="font-mono text-xs">{holder.label}</span>
+          <span className="flex items-center gap-1.5 text-[#c8d3e6]">
+            <span className="text-[10px] font-medium text-[#5a6b82]">#{holder.rank}</span>
+            <span className="font-mono text-[11px]">{holder.label}</span>
           </span>
-          <span className="text-sm font-semibold text-white">{holder.share}</span>
+          <span className="text-xs font-semibold text-white">{holder.share}</span>
         </div>
       ))}
     </div>
@@ -890,11 +890,11 @@ const ContentSurface = ({
   posts: PostRecord[];
   onTabChange: (tab: ProfileTab) => void;
 }) => (
-  <section className="overflow-hidden rounded-[24px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.82)_0%,rgba(9,13,20,0.82)_100%)]">
-    <div className="flex items-center gap-1 border-b border-white/[0.05] px-3">
+  <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.82)_0%,rgba(9,13,20,0.82)_100%)]">
+    <div className="flex items-center gap-0.5 border-b border-white/[0.05] px-2.5">
       {TABS.map((tab) => (
         <button
-          className={`relative px-4 py-3 text-sm transition ${
+          className={`relative px-3 py-2.5 text-xs transition ${
             activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
           }`}
           key={tab}
@@ -903,13 +903,13 @@ const ContentSurface = ({
         >
           {tab}
           {activeTab === tab ? (
-            <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-[#de402a]" />
+            <span className="absolute inset-x-2.5 bottom-0 h-[2px] rounded-full bg-[#de402a]" />
           ) : null}
         </button>
       ))}
     </div>
 
-    <div className="px-4 py-5 md:px-5 md:py-6">
+    <div className="px-3.5 py-4 md:px-4 md:py-4">
       {activeTab === "Posts" ? <PostGrid creator={creator} posts={posts} /> : null}
       {activeTab === "Investment File" ? <InvestmentFile creator={creator} /> : null}
       {activeTab === "Signals" ? <SignalsPanel creator={creator} /> : null}
@@ -1006,11 +1006,11 @@ const FileBlock = ({
   label: string;
   rows: Array<{ key: string; value: string }>;
 }) => (
-  <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
-    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{label}</p>
-    <ul className="mt-2 space-y-1.5">
+  <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
+    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{label}</p>
+    <ul className="mt-1.5 space-y-1">
       {rows.map((row) => (
-        <li className="text-sm text-[#c8d3e6]" key={row.key}>
+        <li className="text-xs text-[#c8d3e6]" key={row.key}>
           {row.value}
         </li>
       ))}
@@ -1019,30 +1019,30 @@ const FileBlock = ({
 );
 
 const SignalsPanel = ({ creator }: { creator: CreatorMarketRecord }) => (
-  <div className="grid gap-4 lg:grid-cols-2">
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Momentum</p>
-      <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-white">
+  <div className="grid gap-3 lg:grid-cols-2">
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
+      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Momentum</p>
+      <p className="mt-1.5 text-2xl font-semibold tracking-[-0.03em] text-white">
         {creator.momentumScore}
-        <span className="ml-1 text-xs font-medium text-[#7486a1]">/100</span>
+        <span className="ml-1 text-[10px] font-medium text-[#7486a1]">/100</span>
       </p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.05]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#67b8ff] via-[#ffb38a] to-[#de402a]"
           style={{ width: `${Math.min(100, creator.momentumScore)}%` }}
         />
       </div>
     </div>
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Activity</p>
-      <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-white">
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
+      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Activity</p>
+      <p className="mt-1.5 text-2xl font-semibold tracking-[-0.03em] text-white">
         {creator.activityScore ?? Math.round(creator.momentumScore * 0.92)}
       </p>
-      <p className="mt-1 text-xs text-[#7486a1]">Engagement velocity score</p>
+      <p className="mt-0.5 text-[10px] text-[#7486a1]">Engagement velocity score</p>
     </div>
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-4 py-4 lg:col-span-2">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Teaser</p>
-      <p className="mt-2 text-sm leading-6 text-[#cbd6e8]">{creator.teaser}</p>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3 lg:col-span-2">
+      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Teaser</p>
+      <p className="mt-1.5 text-xs leading-5 text-[#cbd6e8]">{creator.teaser}</p>
     </div>
   </div>
 );

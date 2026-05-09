@@ -10,6 +10,8 @@ type PageShellProps = {
   action?: ReactNode;
   children: ReactNode;
   eyebrow?: string;
+  hideSearch?: boolean;
+  hideTopbar?: boolean;
   searchPlaceholder?: string;
   subtitle?: string;
   tabs?: RouteItem[];
@@ -21,6 +23,8 @@ export const PageShell = ({
   action,
   children,
   eyebrow = "StreamPump",
+  hideSearch,
+  hideTopbar,
   searchPlaceholder,
   subtitle,
   tabs,
@@ -31,7 +35,7 @@ export const PageShell = ({
   const showHeaderCard = Boolean(title || subtitle || action || tabs?.length);
 
   return (
-    <UserShell header={<UserTopbar mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
+    <UserShell header={hideTopbar ? undefined : <UserTopbar hideSearch={hideSearch} mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
       <div className="space-y-6 py-4">
         {showHeaderCard ? (
           <section className="liquid-glass-shell hero-glow section-enter relative p-6 md:p-8">

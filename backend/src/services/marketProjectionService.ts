@@ -159,6 +159,81 @@ const mapProofStatus = (proposal: Proposal): CampaignProofStatus => {
 const serializeBigInt = (value: bigint | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toString();
 
+type S1GraduatedBuyoutProjectionPatch = {
+  creatorWallet: string | null;
+  buyoutStatePda: string | null;
+  winningSponsorWallet: string | null;
+  acceptedOfferPda: string | null;
+  acceptedOfferUsdc: bigint | null;
+  usdcDeposited: bigint | null;
+  claimableUsdcRemaining: bigint | null;
+  claimableS1SupplyRemaining: bigint | null;
+};
+
+const compactNullablePatch = (data: Record<string, unknown>): Record<string, any> =>
+  Object.fromEntries(Object.entries(data).filter(([, value]) => value !== null && value !== undefined));
+
+const resolveGraduatedBuyoutProjectionPatch = async (
+  creatorProfilePda: string,
+  eventData: Record<string, unknown>
+): Promise<S1GraduatedBuyoutProjectionPatch> => {
+  const existing = await prisma.s1BuyoutProjection.findUnique({
+    where: { creatorProfilePda },
+  });
+  const buyoutStatePda = readString(eventData, "s1BuyoutState") ?? existing?.buyoutStatePda ?? null;
+  const onChain =
+    buyoutStatePda
+      ? await getAnchorService().fetchS1BuyoutStateByPda(new PublicKey(buyoutStatePda)).catch(() => null)
+      : null;
+  const offerPda = existing?.acceptedOfferPda ?? existing?.latestOfferPda ?? null;
+  const fallbackOffer = await prisma.s1BuyoutOfferProjection.findFirst({
+    where: {
+      creatorProfilePda,
+      ...(offerPda ? { buyoutOfferPda: offerPda } : {}),
+    },
+    orderBy: {
+      usdcAmount: "desc",
+    },
+  });
+  const acceptedOfferUsdc =
+    existing?.acceptedOfferUsdc ??
+    fallbackOffer?.usdcAmount ??
+    existing?.latestOfferUsdc ??
+    null;
+
+  return {
+    creatorWallet: readString(eventData, "creator") ?? existing?.creatorWallet ?? null,
+    buyoutStatePda,
+    winningSponsorWallet:
+      readString(eventData, "winningSponsor") ??
+      onChain?.winningSponsor?.toBase58() ??
+      existing?.winningSponsorWallet ??
+      fallbackOffer?.sponsorWallet ??
+      null,
+    acceptedOfferPda:
+      existing?.acceptedOfferPda ??
+      fallbackOffer?.buyoutOfferPda ??
+      existing?.latestOfferPda ??
+      null,
+    acceptedOfferUsdc,
+    usdcDeposited:
+      onChain?.usdcDeposited ??
+      existing?.usdcDeposited ??
+      acceptedOfferUsdc ??
+      null,
+    claimableUsdcRemaining:
+      readBigInt(eventData, "claimableUsdcRemaining") ??
+      onChain?.claimableUsdcRemaining ??
+      existing?.claimableUsdcRemaining ??
+      null,
+    claimableS1SupplyRemaining:
+      readBigInt(eventData, "claimableS1SupplyRemaining") ??
+      onChain?.claimableS1SupplyRemaining ??
+      existing?.claimableS1SupplyRemaining ??
+      null,
+  };
+};
+
 export const refreshCreatorMarketProjectionByProfilePda = async (
   creatorProfilePda: string,
   event?: { signature?: string; observedAt?: Date }
@@ -666,32 +741,36 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
   if (params.instructionName === "execute_s1_graduation") {
     const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
     if (!creatorProfilePda) return;
-    const buyoutStatePda = readString(eventData, "s1BuyoutState");
-    const creatorWallet = readString(eventData, "creator");
-    const winningSponsorWallet = readString(eventData, "winningSponsor");
+    const graduatedPatch = await resolveGraduatedBuyoutProjectionPatch(creatorProfilePda, eventData);
 
     await prisma.s1BuyoutProjection.upsert({
       where: { creatorProfilePda },
       update: {
-        creatorWallet,
-        buyoutStatePda,
+        ...compactNullablePatch({
+          creatorWallet: graduatedPatch.creatorWallet,
+          buyoutStatePda: graduatedPatch.buyoutStatePda,
+          winningSponsorWallet: graduatedPatch.winningSponsorWallet,
+          acceptedOfferPda: graduatedPatch.acceptedOfferPda,
+          acceptedOfferUsdc: graduatedPatch.acceptedOfferUsdc,
+          usdcDeposited: graduatedPatch.usdcDeposited,
+          claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining,
+          claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining,
+        }),
         status: BuyoutProjectionStatus.GRADUATED,
-        winningSponsorWallet,
-        claimableUsdcRemaining: readBigInt(eventData, "claimableUsdcRemaining") ?? undefined,
-        claimableS1SupplyRemaining:
-          readBigInt(eventData, "claimableS1SupplyRemaining") ?? undefined,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
       create: {
-        creatorWallet,
+        creatorWallet: graduatedPatch.creatorWallet,
         creatorProfilePda,
-        buyoutStatePda,
+        buyoutStatePda: graduatedPatch.buyoutStatePda,
         status: BuyoutProjectionStatus.GRADUATED,
-        winningSponsorWallet,
-        claimableUsdcRemaining: readBigInt(eventData, "claimableUsdcRemaining") ?? 0n,
-        claimableS1SupplyRemaining:
-          readBigInt(eventData, "claimableS1SupplyRemaining") ?? 0n,
+        winningSponsorWallet: graduatedPatch.winningSponsorWallet,
+        acceptedOfferPda: graduatedPatch.acceptedOfferPda,
+        acceptedOfferUsdc: graduatedPatch.acceptedOfferUsdc,
+        usdcDeposited: graduatedPatch.usdcDeposited ?? 0n,
+        claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining ?? 0n,
+        claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining ?? 0n,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -913,6 +992,52 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
       updatedAt: campaign.updatedAt.toISOString(),
     })),
   };
+};
+
+export const reconcileGraduatedS1BuyoutProjection = async (
+  creatorWalletOrProfilePda: string,
+  event: { signature?: string; observedAt?: Date } = {}
+) => {
+  const creator = await prisma.creatorMarketProjection.findFirst({
+    where: {
+      OR: [
+        { creatorWallet: creatorWalletOrProfilePda },
+        { creatorProfilePda: creatorWalletOrProfilePda },
+      ],
+    },
+  });
+  const creatorProfilePda = creator?.creatorProfilePda ?? creatorWalletOrProfilePda;
+  const existing = await prisma.s1BuyoutProjection.findUnique({
+    where: { creatorProfilePda },
+  });
+  if (!existing || existing.status !== BuyoutProjectionStatus.GRADUATED) {
+    return null;
+  }
+
+  const patch = await resolveGraduatedBuyoutProjectionPatch(creatorProfilePda, {
+    creatorProfile: creatorProfilePda,
+    creator: creator?.creatorWallet ?? existing.creatorWallet ?? undefined,
+    s1BuyoutState: existing.buyoutStatePda ?? undefined,
+  });
+  const updated = await prisma.s1BuyoutProjection.update({
+    where: { creatorProfilePda },
+    data: {
+      ...compactNullablePatch({
+        creatorWallet: patch.creatorWallet,
+        buyoutStatePda: patch.buyoutStatePda,
+        winningSponsorWallet: patch.winningSponsorWallet,
+        acceptedOfferPda: patch.acceptedOfferPda,
+        acceptedOfferUsdc: patch.acceptedOfferUsdc,
+        usdcDeposited: patch.usdcDeposited,
+        claimableUsdcRemaining: patch.claimableUsdcRemaining,
+        claimableS1SupplyRemaining: patch.claimableS1SupplyRemaining,
+      }),
+      lastEventSignature: event.signature ?? existing.lastEventSignature,
+      lastEventAt: event.observedAt ?? existing.lastEventAt,
+    },
+  });
+  await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+  return updated;
 };
 
 export const getPortfolioProjection = async (userWallet: string) => {

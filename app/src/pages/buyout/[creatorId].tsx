@@ -1,137 +1,102 @@
+import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import {
+  DemoCreatorBanner,
+  S1ErrorState,
+  S1LoadingSkeleton,
+  S1TransactionDrawer,
+  WalletSessionAlert,
+} from "@/components/s1/S1TransactionDrawer";
 import { StagePill } from "@/components/shared/StagePill";
-import { CreatorMarketRecord } from "@/lib/api/types";
-import { findCreator, formatUsd } from "@/lib/public-data";
+import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
+import {
+  buildS1ClaimUsdcTransaction,
+  buildS1RageQuitTransaction,
+  DEMO_S1_CREATOR_WALLET,
+  getS1MarketProfile,
+  getS1Portfolio,
+  S1BuyoutStatus,
+  S1MarketProfileResponse,
+  S1PortfolioResponse,
+} from "@/lib/api/s1";
+import { getStoredAuthSession } from "@/lib/auth-session";
+import {
+  displayCreatorHandle,
+  displayCreatorName,
+  findPortfolioPosition,
+  formatS1Amount,
+  formatUsdcAmount,
+  hasClaimableUsdc,
+  resolveCreatorWalletForRoute,
+  resolveFallbackCreator,
+  shortenWallet,
+} from "@/lib/s1-market-view";
 
-/* ─── Mock buyout data ─── */
-const MOCK_OFFERS = [
-  { sponsor: "Apex Motion", avatar: "AM", amount: 850_000 },
-  { sponsor: "Gridline Lab", avatar: "GL", amount: 720_000 },
-];
+/* ------------------------------------------------------------------ */
+/*  Phase helpers                                                      */
+/* ------------------------------------------------------------------ */
 
-const MOCK_DEADLINE_MS = Date.now() + 36 * 60 * 60 * 1000;
-const USER_TOKENS = 25;
-const EARLY_POOL_USD = 200_000;
-const REGULAR_POOL_USD = 800_000;
-
-type BuyoutPhase = "offers_open" | "offer_accepted" | "rage_quit" | "graduated";
+type BuyoutPhase = "none" | "offers_open" | "offer_accepted" | "rage_quit" | "graduated";
 
 const PHASES: { key: BuyoutPhase; label: string }[] = [
-  { key: "offers_open", label: "Offers Open" },
-  { key: "offer_accepted", label: "Offer Accepted" },
-  { key: "rage_quit", label: "Rage Quit Window" },
+  { key: "offers_open", label: "Offers open" },
+  { key: "offer_accepted", label: "Accepted" },
+  { key: "rage_quit", label: "Rage quit window" },
   { key: "graduated", label: "Graduated" },
 ];
 
-function phaseFromState(state: CreatorMarketRecord["state"]): BuyoutPhase {
-  switch (state) {
-    case "S1_BUYOUT":
-      return "rage_quit";
-    case "S2_ACTIVE":
-      return "graduated";
-    default:
-      return "offers_open";
-  }
+function phaseFromStatus(status: S1BuyoutStatus | undefined | null): BuyoutPhase {
+  if (!status || status === "NONE") return "none";
+  if (status === "GRADUATED") return "graduated";
+  if (status === "EXECUTION_PENDING") return "rage_quit";
+  if (status === "ACCEPTED") return "offer_accepted";
+  return "offers_open";
 }
 
-/* ─── Countdown Ring ─── */
-function CountdownRing({ deadline }: { deadline: number }) {
-  const [now, setNow] = useState(Date.now());
+/* ------------------------------------------------------------------ */
+/*  Phase stepper                                                      */
+/* ------------------------------------------------------------------ */
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const remaining = Math.max(0, deadline - now);
-  const total = 48 * 60 * 60 * 1000;
-  const progress = 1 - remaining / total;
-
-  const hours = Math.floor(remaining / 3_600_000);
-  const minutes = Math.floor((remaining % 3_600_000) / 60_000);
-  const seconds = Math.floor((remaining % 60_000) / 1000);
-
-  const SIZE = 280;
-  const STROKE = 8;
-  const RADIUS = (SIZE - STROKE) / 2;
-  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const offset = CIRCUMFERENCE * (1 - progress);
-
-  return (
-    <div className="relative mx-auto flex items-center justify-center" style={{ width: SIZE, height: SIZE }}>
-      <svg width={SIZE} height={SIZE} className="-rotate-90">
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth={STROKE}
-        />
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          fill="none"
-          stroke="#de402a"
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          className="transition-[stroke-dashoffset] duration-1000 ease-linear"
-          style={{ filter: "drop-shadow(0 0 8px rgba(222,64,42,0.5))" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[40px] font-semibold tracking-[-0.05em] text-white tabular-nums">
-          {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-        </span>
-        <span className="mt-1 text-xs uppercase tracking-[0.2em] text-[#8ea0ba]">Rage Quit Window</span>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Phase Stepper ─── */
 function PhaseStepper({ current }: { current: BuyoutPhase }) {
-  const currentIdx = PHASES.findIndex((p) => p.key === current);
+  const idx = Math.max(0, PHASES.findIndex((p) => p.key === current));
 
   return (
-    <div className="flex items-center justify-center gap-0">
+    <div className="flex items-center justify-between gap-0 overflow-x-auto rounded-[14px] border border-white/[0.05] bg-white/[0.015] px-3 py-3 sm:px-5">
       {PHASES.map((phase, i) => {
-        const isActive = i === currentIdx;
-        const isDone = i < currentIdx;
-
+        const done = i < idx;
+        const active = i === idx && current !== "none";
         return (
-          <div key={phase.key} className="flex items-center">
-            {i > 0 && (
+          <div className="flex items-center" key={phase.key}>
+            {i > 0 ? (
+              <div className={`mx-1 h-[1.5px] w-6 sm:w-10 ${done ? "bg-[#65ecaf]/60" : "bg-white/[0.06]"}`} />
+            ) : null}
+            <div className="flex flex-col items-center gap-1.5">
               <div
-                className={`h-[2px] w-8 sm:w-12 ${isDone ? "bg-[#65ecaf]" : "bg-white/10"}`}
-              />
-            )}
-            <div className="flex flex-col items-center gap-2">
-              <div
-                className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
-                  isActive
-                    ? "border-[#de402a] bg-[#de402a]/20 shadow-[0_0_12px_rgba(222,64,42,0.5)]"
-                    : isDone
-                      ? "border-[#65ecaf] bg-[#65ecaf]/20"
-                      : "border-white/20 bg-transparent"
+                className={`flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] transition-all ${
+                  active
+                    ? "border-[#de402a] bg-[#de402a]/15 shadow-[0_0_10px_rgba(222,64,42,0.35)]"
+                    : done
+                      ? "border-[#65ecaf]/60 bg-[#65ecaf]/10"
+                      : "border-white/[0.12] bg-transparent"
                 }`}
               >
-                {isDone && (
-                  <svg className="h-3 w-3 text-[#65ecaf]" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                {done ? (
+                  <svg className="h-2.5 w-2.5 text-[#65ecaf]" fill="none" viewBox="0 0 12 12">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
                   </svg>
-                )}
-                {isActive && <div className="h-2 w-2 rounded-full bg-[#de402a]" />}
+                ) : active ? (
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#de402a]" />
+                ) : null}
               </div>
               <span
-                className={`whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] ${
-                  isActive ? "text-white" : isDone ? "text-[#65ecaf]" : "text-[#8ea0ba]/60"
+                className={`whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.1em] ${
+                  active ? "text-white" : done ? "text-[#8df0c4]/80" : "text-[#5a6d87]"
                 }`}
               >
                 {phase.label}
@@ -144,194 +109,552 @@ function PhaseStepper({ current }: { current: BuyoutPhase }) {
   );
 }
 
-/* ─── Offer Card ─── */
-function OfferCard({ sponsor, avatar, amount }: { sponsor: string; avatar: string; amount: number }) {
+/* ------------------------------------------------------------------ */
+/*  Summary metrics                                                    */
+/* ------------------------------------------------------------------ */
+
+function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buyout"]; phase: BuyoutPhase }) {
+  if (!buyout || phase === "none") return null;
+
+  const items: { label: string; value: string; color?: string }[] = [];
+
+  if (buyout.acceptedOfferUsdc) {
+    items.push({ label: "Accepted offer", value: formatUsdcAmount(buyout.acceptedOfferUsdc), color: "text-[#65ecaf]" });
+  } else if (buyout.latestOfferUsdc) {
+    items.push({ label: "Latest offer", value: formatUsdcAmount(buyout.latestOfferUsdc) });
+  }
+
+  if (buyout.winningSponsorWallet) {
+    items.push({ label: "Winning sponsor", value: shortenWallet(buyout.winningSponsorWallet) });
+  }
+
+  if (buyout.usdcDeposited) {
+    items.push({ label: "USDC deposited", value: formatUsdcAmount(buyout.usdcDeposited), color: "text-[#67b8ff]" });
+  }
+
+  if (buyout.claimableUsdcRemaining) {
+    items.push({ label: "Claimable USDC", value: formatUsdcAmount(buyout.claimableUsdcRemaining), color: "text-[#65ecaf]" });
+  }
+
+  if (buyout.claimableS1SupplyRemaining) {
+    items.push({ label: "Claimable S1 supply", value: formatS1Amount(buyout.claimableS1SupplyRemaining) });
+  }
+
+  if (items.length === 0) return null;
+
   return (
-    <div className="liquid-card flex items-center gap-4 p-5">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm font-bold text-[#67b8ff]">
-        {avatar}
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium text-white">{sponsor}</p>
-        <p className="mt-0.5 text-xs text-[#8ea0ba]">Sponsor Offer</p>
-      </div>
-      <div className="text-right">
-        <p className="text-lg font-semibold tracking-[-0.03em] text-white">{formatUsd(amount)}</p>
-        <p className="text-[10px] uppercase tracking-[0.1em] text-[#65ecaf]">USDC</p>
-      </div>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {items.map((it) => (
+        <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={it.label}>
+          <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
+          <p className={`mt-1 text-sm font-semibold tracking-[-0.02em] ${it.color ?? "text-white"}`}>{it.value}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ─── Rage Quit Panel ─── */
-function RageQuitPanel({ active }: { active: boolean }) {
-  const [tokensToExit, setTokensToExit] = useState(0);
-  const exitValue = tokensToExit * (EARLY_POOL_USD / USER_TOKENS);
+/* ------------------------------------------------------------------ */
+/*  Countdown                                                          */
+/* ------------------------------------------------------------------ */
 
-  return (
-    <div
-      className={`glass-card relative overflow-hidden rounded-[28px] border p-6 ${
-        active ? "border-[#de402a]/30" : "border-white/5 opacity-50"
-      }`}
-    >
-      {active && (
-        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-[28px] bg-[radial-gradient(circle_at_center,rgba(222,64,42,0.08),transparent_70%)]" />
-      )}
-      <div className="relative">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#de402a]">Rage Quit</h3>
-          <span className="text-xs text-[#8ea0ba]">{USER_TOKENS} tokens held</span>
-        </div>
+function Countdown({ deadline }: { deadline: string | null | undefined }) {
+  const [now, setNow] = useState(Date.now());
 
-        <div className="mt-5">
-          <input
-            type="range"
-            min={0}
-            max={USER_TOKENS}
-            value={tokensToExit}
-            onChange={(e) => setTokensToExit(Number(e.target.value))}
-            disabled={!active}
-            className="w-full accent-[#de402a]"
-          />
-          <div className="mt-2 flex justify-between text-xs text-[#8ea0ba]">
-            <span>{tokensToExit} tokens to exit</span>
-            <span>≈ {formatUsd(exitValue)}</span>
-          </div>
-        </div>
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
-        <button
-          disabled={!active || tokensToExit === 0}
-          className={`mt-5 w-full rounded-full py-3 text-sm font-semibold transition-all ${
-            active && tokensToExit > 0
-              ? "bg-[#de402a] text-white shadow-[0_0_24px_rgba(222,64,42,0.4)] hover:bg-[#e8553f]"
-              : "cursor-not-allowed bg-white/5 text-white/30"
-          }`}
-        >
-          {active ? "Exit Position" : "Window Closed"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Claim Panel ─── */
-function ClaimPanel() {
-  return (
-    <div className="glass-card space-y-4 rounded-[28px] p-6">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim USDC</h3>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="surface-muted rounded-2xl p-4">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[#f3b33e]">Early Cohort</p>
-          <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">{formatUsd(EARLY_POOL_USD)}</p>
-          <p className="mt-1 text-xs text-[#8ea0ba]">Pool share</p>
-        </div>
-        <div className="surface-muted rounded-2xl p-4">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[#67b8ff]">Regular</p>
-          <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">{formatUsd(REGULAR_POOL_USD)}</p>
-          <p className="mt-1 text-xs text-[#8ea0ba]">Pool share</p>
-        </div>
-      </div>
-
-      <div className="surface-muted flex items-center justify-between rounded-2xl p-4">
-        <div>
-          <p className="text-xs text-[#8ea0ba]">Your position</p>
-          <p className="mt-1 text-lg font-semibold text-white">{USER_TOKENS} tokens · Early</p>
-        </div>
-        <button className="rounded-full bg-[#65ecaf] px-5 py-2.5 text-sm font-semibold text-[#090d14] transition hover:bg-[#7bf0bd]">
-          Claim
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Discovery Placeholder ─── */
-function DiscoveryState({ creator }: { creator: CreatorMarketRecord }) {
-  return (
-    <div className="flex flex-col items-center gap-6 py-12 text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/5">
-        <svg className="h-8 w-8 text-[#8ea0ba]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M12 6v6l4 2M12 2a10 10 0 100 20 10 10 0 000-20z" />
-        </svg>
-      </div>
-      <div>
-        <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Buyout Not Yet Initiated</h2>
-        <p className="mt-2 text-sm text-[#8ea0ba]">
-          {creator.name} is still in discovery phase
-        </p>
-      </div>
-      <div className="w-full max-w-xs">
-        <div className="flex justify-between text-xs text-[#8ea0ba]">
-          <span>Graduation Progress</span>
-          <span>{Math.round(creator.graduationProgress * 100)}%</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#67b8ff] to-[#65ecaf] transition-all"
-            style={{ width: `${creator.graduationProgress * 100}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Page ─── */
-export default function BuyoutLiveRoom() {
-  const router = useRouter();
-  const creatorId = router.query.creatorId as string | undefined;
-  const creator = useMemo(() => (creatorId ? findCreator(creatorId) : undefined), [creatorId]);
-
-  if (!creator) {
+  if (!deadline) {
     return (
-      <PageShell title="Buyout Room">
-        <div className="py-20 text-center text-[#8ea0ba]">Creator not found</div>
+      <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-5 text-center text-xs text-[#8ea0ba]">
+        No active rage quit deadline.
+      </div>
+    );
+  }
+
+  const ms = Math.max(0, Date.parse(deadline) - now);
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  const expired = ms <= 0;
+
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-[14px] border border-[#de402a]/20 bg-[#1a120e]/60 py-6">
+      <span
+        className={`font-mono text-[36px] font-semibold tracking-[-0.04em] tabular-nums ${expired ? "text-[#ff8a78]/60" : "text-white"}`}
+      >
+        {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
+      </span>
+      <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
+        {expired ? "Rage quit window expired" : "Rage quit deadline"}
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Offers list                                                        */
+/* ------------------------------------------------------------------ */
+
+function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["offers"]; acceptedPda: string | null }) {
+  if (offers.length === 0) {
+    return (
+      <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.015] p-4 text-center text-xs text-[#8ea0ba]">
+        No sponsor offers yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-[14px] border border-white/[0.05]">
+      {/* Header row */}
+      <div className="grid grid-cols-[1fr_1fr_90px_80px] gap-2 border-b border-white/[0.04] bg-white/[0.015] px-3.5 py-2">
+        {["Sponsor", "Amount", "Status", "Expires"].map((h) => (
+          <span className="text-[9px] font-medium uppercase tracking-[0.14em] text-[#5a6d87]" key={h}>{h}</span>
+        ))}
+      </div>
+      {offers.map((offer) => {
+        const isAccepted = offer.buyoutOfferPda === acceptedPda;
+        return (
+          <div
+            className={`grid grid-cols-[1fr_1fr_90px_80px] items-center gap-2 border-b border-white/[0.03] px-3.5 py-2.5 last:border-0 ${
+              isAccepted ? "bg-[#65ecaf]/[0.04]" : "bg-transparent"
+            }`}
+            key={offer.buyoutOfferPda}
+          >
+            <span className="truncate font-mono text-[11px] font-medium text-white">{shortenWallet(offer.sponsorWallet)}</span>
+            <span className="text-[12px] font-semibold text-white">{formatUsdcAmount(offer.usdcAmount)}</span>
+            <span className={`text-[10px] font-medium ${isAccepted ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
+              {isAccepted ? "Accepted" : offer.status}
+            </span>
+            <span className="text-[10px] text-[#6f8099]">
+              {offer.sponsorCancelAfterAt ? new Date(offer.sponsorCancelAfterAt).toLocaleDateString() : "—"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rage quit panel                                                    */
+/* ------------------------------------------------------------------ */
+
+function RageQuitPanel({
+  active,
+  creatorWallet,
+  onRefresh,
+  positionBalance,
+  sessionWallet,
+}: {
+  active: boolean;
+  creatorWallet: string;
+  onRefresh: () => Promise<void>;
+  positionBalance: string;
+  sessionWallet: string | null;
+}) {
+  const maxTokens = Math.max(0, Number(positionBalance || 0));
+  const [amount, setAmount] = useState(maxTokens > 0 ? 1 : 0);
+  const flow = useS1TransactionFlow();
+  const wallet = useWallet();
+
+  const connectedWallet = wallet.publicKey?.toBase58() ?? null;
+  const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
+  const signedIn = Boolean(sessionWallet && wallet.connected && !walletMismatch);
+
+  useEffect(() => {
+    setAmount(maxTokens > 0 ? Math.min(1, maxTokens) : 0);
+  }, [maxTokens]);
+
+  const execute = useCallback(async () => {
+    const submitted = await flow.execute((token) =>
+      buildS1RageQuitTransaction(token, { creatorWallet, amount }),
+    );
+    if (submitted) await onRefresh();
+  }, [flow, creatorWallet, amount, onRefresh]);
+
+  const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+
+  return (
+    <div className={`rounded-[14px] border p-5 ${active ? "border-[#de402a]/25 bg-[#1a120e]/50" : "border-white/[0.05] bg-white/[0.015] opacity-70"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#de402a]">Rage Quit</h3>
+        <span className="text-[10px] text-[#8ea0ba]">{formatS1Amount(positionBalance)} S1 held</span>
+      </div>
+
+      {maxTokens <= 0 ? (
+        <p className="mt-3 text-xs text-[#6f8099]">No S1 position to rage quit.</p>
+      ) : (
+        <>
+          <div className="mt-3 flex items-baseline justify-between gap-3">
+            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#5a6d87]">Exit amount</span>
+            <div className="flex items-center gap-2">
+              <input
+                className="w-16 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-right text-sm font-bold text-white outline-none transition focus:border-white/[0.16]"
+                disabled={!active}
+                max={maxTokens}
+                min={1}
+                onChange={(e) => setAmount(Math.max(1, Math.min(maxTokens, Number(e.target.value) || 1)))}
+                type="number"
+                value={amount}
+              />
+              <button
+                className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold text-[#8ea0ba] transition hover:text-white disabled:opacity-40"
+                disabled={!active}
+                onClick={() => setAmount(maxTokens)}
+                type="button"
+              >
+                Max
+              </button>
+            </div>
+          </div>
+
+          <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
+
+          {!signedIn ? (
+            <div className="mt-4 space-y-2">
+              <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
+              <Link
+                className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+                href={`/login?next=/buyout/${creatorWallet}`}
+              >
+                {walletMismatch ? "Sign in again" : "Sign in to rage quit"}
+              </Link>
+            </div>
+          ) : (
+            <button
+              className={`mt-4 w-full rounded-full py-2.5 text-[12px] font-semibold transition-all ${
+                active && amount > 0
+                  ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.8)_0%,rgba(190,52,34,0.8)_100%)] text-white shadow-[0_6px_20px_rgba(222,64,42,0.2)] hover:brightness-110"
+                  : "cursor-not-allowed bg-white/[0.04] text-white/30"
+              } disabled:cursor-not-allowed disabled:opacity-40`}
+              disabled={!active || amount <= 0 || busy}
+              onClick={() => void execute()}
+              type="button"
+            >
+              {busy ? "Processing..." : "Exit position"}
+            </button>
+          )}
+        </>
+      )}
+
+      <div className="mt-3">
+        <S1TransactionDrawer
+          actionLabel="Rage Quit"
+          amountLabel={`${amount} S1`}
+          flow={flow.state}
+          onClose={flow.reset}
+          onRetry={active ? () => void execute() : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Claim panel                                                        */
+/* ------------------------------------------------------------------ */
+
+function ClaimPanel({
+  claimableUsdc,
+  creatorWallet,
+  onRefresh,
+  positionBalance,
+  sessionWallet,
+  sponsorWallet,
+}: {
+  claimableUsdc: string | null;
+  creatorWallet: string;
+  onRefresh: () => Promise<void>;
+  positionBalance: string;
+  sessionWallet: string | null;
+  sponsorWallet: string | null;
+}) {
+  const flow = useS1TransactionFlow();
+  const wallet = useWallet();
+
+  const connectedWallet = wallet.publicKey?.toBase58() ?? null;
+  const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
+  const signedIn = Boolean(sessionWallet && wallet.connected && !walletMismatch);
+  const canClaim = signedIn && sponsorWallet && hasClaimableUsdc(claimableUsdc) && Number(positionBalance || 0) > 0;
+
+  const execute = useCallback(async () => {
+    if (!sponsorWallet) return;
+    const submitted = await flow.execute((token) =>
+      buildS1ClaimUsdcTransaction(token, { creatorWallet, sponsorWallet }),
+    );
+    if (submitted) await onRefresh();
+  }, [flow, creatorWallet, sponsorWallet, onRefresh]);
+
+  const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+
+  return (
+    <div className="rounded-[14px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 p-5">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim USDC</h3>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+          <p className="text-[9px] uppercase tracking-[0.14em] text-[#f3b33e]">Your position</p>
+          <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatS1Amount(positionBalance)} S1</p>
+        </div>
+        <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+          <p className="text-[9px] uppercase tracking-[0.14em] text-[#67b8ff]">Claimable</p>
+          <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatUsdcAmount(claimableUsdc)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-white/[0.04] bg-white/[0.015] px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[10px] text-[#8ea0ba]">{canClaim ? "Ready to claim" : "Watch only"}</p>
+          <p className="mt-0.5 font-mono text-[11px] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
+        </div>
+        {signedIn ? (
+          <button
+            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[12px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canClaim || busy}
+            onClick={() => void execute()}
+            type="button"
+          >
+            {busy ? "Processing..." : "Claim"}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <WalletMultiButton className="!rounded-full !text-sm" />
+            <Link
+              className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+              href={`/login?next=/buyout/${creatorWallet}`}
+            >
+              {walletMismatch ? "Sign in again" : "Sign in to claim"}
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
+
+      <div className="mt-3">
+        <S1TransactionDrawer
+          actionLabel="Claim USDC"
+          flow={flow.state}
+          onClose={flow.reset}
+          onRetry={canClaim ? () => void execute() : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
+
+function BuyoutPage() {
+  const router = useRouter();
+  const creatorId = String(router.query.creatorId ?? "");
+  const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
+  const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
+  const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
+  const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
+  const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!creatorWallet) return;
+    const session = getStoredAuthSession();
+    setSessionWallet(session?.wallet ?? null);
+    const marketProfile = await getS1MarketProfile(creatorWallet);
+    setProfile(marketProfile);
+
+    if (session?.accessToken) {
+      try {
+        setPortfolio(await getS1Portfolio(session.accessToken));
+      } catch {
+        setPortfolio(null);
+      }
+    } else {
+      setPortfolio(null);
+    }
+  }, [creatorWallet]);
+
+  useEffect(() => {
+    if (!creatorWallet) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    refresh()
+      .catch((e) => {
+        if (!cancelled) {
+          setProfile(null);
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [creatorWallet, refresh]);
+
+  const title = displayCreatorName(profile, fallbackCreator);
+  const handle = displayCreatorHandle(profile, fallbackCreator);
+  const phase = phaseFromStatus(profile?.buyout?.status);
+  const position = findPortfolioPosition(portfolio, creatorWallet ?? "");
+  const positionBalance = position?.internalTokenBalance ?? "0";
+
+  const rageQuitActive =
+    phase === "rage_quit" &&
+    Boolean(profile?.buyout?.rageQuitDeadlineAt) &&
+    Date.parse(profile?.buyout?.rageQuitDeadlineAt ?? "") > Date.now();
+
+  if (!creatorId || loading) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-4xl">
+          <S1LoadingSkeleton />
+        </div>
       </PageShell>
     );
   }
 
-  const phase = phaseFromState(creator.state);
+  if (!creatorWallet) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-4xl space-y-4 py-6">
+          <S1ErrorState
+            error="This route is a local creator preview slug, not a live S1 wallet address."
+            title={`No live buyout for ${fallbackCreator.name}`}
+          />
+          <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-4xl space-y-4 py-6">
+          <S1ErrorState error={error} title={`Could not load buyout for ${fallbackCreator.name}`} />
+          <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+        </div>
+      </PageShell>
+    );
+  }
 
   return (
-    <PageShell
-      eyebrow="S1 Buyout"
-      title={`${creator.name}`}
-      subtitle={`@${creator.handle} · ${creator.niche}`}
-      action={<StagePill stage={creator.state} />}
-    >
-      {creator.state === "S1_DISCOVERY" && <DiscoveryState creator={creator} />}
+    <>
+      <Head><title>{`StreamPump | ${title} Buyout Room`}</title></Head>
+      <PageShell>
+        <div className="mx-auto max-w-4xl space-y-4">
+          <DemoCreatorBanner creatorWallet={profile.creator.creatorWallet} />
 
-      {creator.state === "S1_BUYOUT" && (
-        <div className="space-y-8">
-          <PhaseStepper current={phase} />
-          <CountdownRing deadline={MOCK_DEADLINE_MS} />
-
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8ea0ba]">Sponsor Offers</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {MOCK_OFFERS.map((o) => (
-                <OfferCard key={o.sponsor} {...o} />
-              ))}
+          {/* Header */}
+          <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-[#7e90aa] transition hover:bg-white/[0.08]"
+                href={`/market/${creatorWallet}`}
+              >
+                <span aria-hidden className="text-sm">‹</span>
+              </Link>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 Buyout Room</p>
+                <h1 className="mt-0.5 truncate text-xl font-bold tracking-[-0.03em] text-white">{title}</h1>
+                <p className="mt-0.5 truncate text-xs text-[#8ea0ba]">
+                  @{handle} · {shortenWallet(profile.creator.creatorWallet)}
+                </p>
+              </div>
+              <StagePill className="hidden sm:inline-flex" stage={profile.creator.stage} />
             </div>
-          </section>
-
-          <RageQuitPanel active={phase === "rage_quit"} />
-        </div>
-      )}
-
-      {creator.state === "S2_ACTIVE" && (
-        <div className="space-y-8">
-          <PhaseStepper current={phase} />
-          <div className="flex flex-col items-center gap-2 py-4">
-            <span className="liquid-pill px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-[#65ecaf]">
-              Graduated
-            </span>
-            <p className="text-sm text-[#8ea0ba]">Buyout complete — claim your USDC</p>
           </div>
-          <ClaimPanel />
+
+          {/* Phase stepper */}
+          <PhaseStepper current={phase} />
+
+          {/* Buyout metrics */}
+          <BuyoutMetrics buyout={profile.buyout} phase={phase} />
+
+          {/* No buyout state */}
+          {phase === "none" ? (
+            <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-8 text-center">
+              <p className="text-base font-semibold text-white">No active buyout</p>
+              <p className="mt-1.5 text-xs text-[#8ea0ba]">
+                This creator is in S1 discovery. Buyout offers may appear when the market matures.
+              </p>
+              <Link
+                className="mt-4 inline-flex items-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+                href={`/market/${creatorWallet}`}
+              >
+                ← Back to market
+              </Link>
+            </div>
+          ) : null}
+
+          {/* Countdown for rage quit */}
+          {phase === "rage_quit" ? <Countdown deadline={profile.buyout?.rageQuitDeadlineAt} /> : null}
+
+          {/* Two-column layout: offers + action panel */}
+          {phase !== "none" ? (
+            <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+              {/* Offers */}
+              <section className="space-y-2">
+                <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8ea0ba]">
+                  Sponsor offers
+                </h2>
+                <OffersList
+                  acceptedPda={profile.buyout?.acceptedOfferPda ?? null}
+                  offers={profile.offers}
+                />
+              </section>
+
+              {/* Action panels */}
+              <div className="space-y-4">
+                {(phase === "rage_quit" || phase === "offer_accepted") ? (
+                  <RageQuitPanel
+                    active={rageQuitActive}
+                    creatorWallet={profile.creator.creatorWallet}
+                    onRefresh={refresh}
+                    positionBalance={positionBalance}
+                    sessionWallet={sessionWallet}
+                  />
+                ) : null}
+
+                {phase === "graduated" ? (
+                  <ClaimPanel
+                    claimableUsdc={position?.estimatedClaimableUsdc ?? null}
+                    creatorWallet={profile.creator.creatorWallet}
+                    onRefresh={refresh}
+                    positionBalance={positionBalance}
+                    sessionWallet={sessionWallet}
+                    sponsorWallet={profile.buyout?.winningSponsorWallet ?? null}
+                  />
+                ) : null}
+
+                {/* Position summary */}
+                <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Your S1 position</p>
+                  <p className="mt-1 text-lg font-bold text-white">{formatS1Amount(positionBalance)} S1</p>
+                  {position?.estimatedClaimableUsdc && hasClaimableUsdc(position.estimatedClaimableUsdc) ? (
+                    <p className="mt-0.5 text-[11px] text-[#65ecaf]">
+                      Claimable: {formatUsdcAmount(position.estimatedClaimableUsdc)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
-      )}
-    </PageShell>
+      </PageShell>
+    </>
   );
 }
+
+(BuyoutPage as typeof BuyoutPage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;
+
+export default BuyoutPage;

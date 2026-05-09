@@ -222,13 +222,13 @@ const TrendingView = ({
   });
 
   return (
-    <section className="mx-auto max-w-[1280px] space-y-8 py-6">
-      <div className="flex items-end justify-between">
+    <section className="mx-auto max-w-[1280px] space-y-5 py-4">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white">Trending Creators</h1>
-          <p className="mt-2 text-sm text-[#97a7be]">Discover investable creators with real imported media already attached.</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">Trending Creators</h1>
+          <p className="mt-1 text-xs text-[#97a7be]">Discover investable creators with real imported media already attached.</p>
         </div>
-        <div className="rounded-full border border-[#de402a]/20 bg-[#2c1715] px-4 py-2 text-sm font-medium text-[#ff8f7f]">
+        <div className="rounded-full border border-[#65ecaf]/20 bg-[#0e1f17] px-3 py-1.5 text-xs font-medium text-[#8df0c4]">
           Market Up +4.2%
         </div>
       </div>
@@ -237,7 +237,7 @@ const TrendingView = ({
       {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
 
       {!loading && !error ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {creators.map((creator, index) => (
             <TrendingCreatorCard creator={creator} key={creator.id} priority={index < 2} />
           ))}

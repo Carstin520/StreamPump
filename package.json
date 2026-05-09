@@ -6,6 +6,7 @@
     "build:anchor": "scripts/anchor-build-fast.sh",
     "cover:videos": "scripts/generate-video-cover.sh",
     "demo:protocol:migrate": "ts-node --transpile-only scripts/devnet-migrate-protocol-config.ts",
+    "demo:s1:backfill-buyout": "ts-node --transpile-only scripts/backfill-s1-buyout-projection.ts",
     "demo:seed:localnet": "ts-node scripts/seed-colosseum-localnet.ts",
     "demo:s1:devnet": "ts-node --transpile-only scripts/devnet-s1-buyout-claim-seed.ts",
     "demo:s2:devnet": "ts-node --transpile-only scripts/devnet-s2-happy-path.ts",

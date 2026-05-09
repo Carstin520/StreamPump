@@ -30,7 +30,7 @@ export default function MePage({
       <Head>
         <title>StreamPump | Me</title>
       </Head>
-      <PageShell searchPlaceholder="搜索创作者、持仓、奖励">
+      <PageShell hideTopbar>
         {loading ? (
           <div className="py-10 text-sm text-[#8ea0ba]">Loading portfolio…</div>
         ) : null}

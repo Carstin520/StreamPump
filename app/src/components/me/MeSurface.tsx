@@ -57,13 +57,13 @@ export const MeSurface = ({
   const ledger = useMemo(() => buildActivityLedger(), []);
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-5 px-1 py-4">
+    <div className="mx-auto max-w-[1280px] space-y-3.5 px-1 py-3">
       <IdentityHero currentUser={currentUser} portfolio={portfolio} />
 
       <SnapshotStrip portfolio={portfolio} watchlistCount={watchlist.length} />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
+      <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="space-y-3">
           <TabBar activeTab={activeTab} onChange={setActiveTab} />
 
           {activeTab === "Holdings" ? <HoldingsTable rows={portfolio.holdings} /> : null}
@@ -75,7 +75,7 @@ export const MeSurface = ({
           ) : null}
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <aside className="space-y-3 lg:sticky lg:top-6 lg:self-start">
           <RewardsSummaryCard portfolio={portfolio} />
           <QuickActionsCard />
         </aside>
@@ -231,7 +231,7 @@ const buildActivityLedger = (): LedgerEntry[] => [
     id: "act-5",
     kind: "reward",
     title: "Claim window opens",
-    detail: "弯心入坑 supporter pool",
+    detail: "弯心入坑 pool",
     creatorId: "luna-cai",
     amountLabel: "$498.96",
     amountTone: "positive",
@@ -289,9 +289,8 @@ const IdentityHero = ({
   const isUp = portfolio.change24hPct >= 0;
 
   return (
-    <section className="relative overflow-hidden rounded-[28px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
-      {/* Subtle blurred media strip — low-key, just texture, not a hero photo */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 opacity-40">
+    <section className="relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 opacity-40">
         <ProgressiveImage
           alt=""
           aria-hidden
@@ -304,29 +303,28 @@ const IdentityHero = ({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.55)_0%,rgba(7,11,18,1)_100%)]" />
       </div>
 
-      <div className="relative grid gap-6 p-5 md:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-10">
-        {/* Identity left */}
-        <div className="flex min-w-0 gap-4 md:gap-5">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_18px_48px_rgba(0,0,0,0.5)] md:h-24 md:w-24">
+      <div className="relative grid gap-4 p-4 md:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-8">
+        <div className="flex min-w-0 gap-3 md:gap-4">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_14px_36px_rgba(0,0,0,0.5)] md:h-20 md:w-20">
             <img alt={currentUser.name} className="h-full w-full object-cover" src={currentUser.avatarSrc} />
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-[#7486a1]">
+            <div className="flex flex-wrap items-center gap-1.5 text-[9px] uppercase tracking-[0.2em] text-[#7486a1]">
               <RoleBadge tone="investor">Investor</RoleBadge>
               <RoleBadge tone="backer">Creator Backer</RoleBadge>
               <RoleBadge tone="sponsor">S2 Sponsor-ready</RoleBadge>
             </div>
-            <h1 className="mt-2 truncate text-[26px] font-semibold tracking-[-0.04em] text-white md:text-[30px]">
+            <h1 className="mt-1.5 truncate text-[22px] font-semibold tracking-[-0.04em] text-white md:text-[26px]">
               {currentUser.name}
             </h1>
-            <p className="mt-0.5 truncate text-sm text-[#92a3bc]">
+            <p className="mt-0.5 truncate text-xs text-[#92a3bc]">
               {currentUser.handle} · {currentUser.location}
             </p>
 
             <button
               aria-label="Copy wallet"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 font-mono text-[11px] text-[#bcc8de] transition hover:border-white/[0.12] hover:text-white"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] text-[#bcc8de] transition hover:border-white/[0.12] hover:text-white"
               type="button"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
@@ -334,32 +332,31 @@ const IdentityHero = ({
               <CopyIcon className="h-3 w-3 text-[#7486a1]" />
             </button>
 
-            <p className="mt-3 line-clamp-2 max-w-[420px] text-sm leading-6 text-[#bcc8de]">
+            <p className="mt-2 line-clamp-2 max-w-[420px] text-xs leading-5 text-[#bcc8de]">
               {currentUser.bio}
             </p>
           </div>
         </div>
 
-        {/* Portfolio value right */}
-        <div className="rounded-[20px] border border-white/[0.05] bg-white/[0.02] p-4 md:p-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="rounded-[16px] border border-white/[0.05] bg-white/[0.02] p-3.5 md:p-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+              <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
                 Total Portfolio Value
               </p>
-              <p className="mt-1 text-[34px] font-semibold tracking-[-0.04em] text-white md:text-[40px]">
+              <p className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[32px]">
                 {formatUsd(portfolio.totalValueUsd)}
               </p>
-              <div className="mt-1 flex items-center gap-2 text-xs">
+              <div className="mt-1 flex items-center gap-2 text-[10px]">
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                     isUp ? "bg-[#65ecaf]/[0.12] text-[#8df0c4]" : "bg-[#f67263]/[0.12] text-[#f67263]"
                   }`}
                 >
                   {isUp ? (
-                    <ArrowUpIcon className="h-3 w-3" />
+                    <ArrowUpIcon className="h-2.5 w-2.5" />
                   ) : (
-                    <ArrowDownIcon className="h-3 w-3" />
+                    <ArrowDownIcon className="h-2.5 w-2.5" />
                   )}
                   {portfolio.change24hPct.toFixed(2)}%
                 </span>
@@ -381,13 +378,13 @@ const IdentityHero = ({
               className="shrink-0"
               color={isUp ? "#65ecaf" : "#f67263"}
               fillColor={isUp ? "rgba(101,236,175,0.14)" : "rgba(246,114,99,0.14)"}
-              height={56}
+              height={44}
               points={trend}
-              width={140}
+              width={110}
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <HeroStat label="24h PnL" tone={isUp ? "positive" : "negative"} value={`${isUp ? "+" : ""}${portfolio.change24hPct.toFixed(2)}%`} />
             <HeroStat label="Realized" value={formatUsd(portfolio.realizedRewardsUsd)} tone="positive" />
             <HeroStat label="Positions" value={String(portfolio.activePositions)} />
@@ -429,10 +426,10 @@ const HeroStat = ({
   tone?: "neutral" | "positive" | "negative";
   value: string;
 }) => (
-  <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5">
-    <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
+  <div className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-2.5 py-2">
+    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
     <p
-      className={`mt-1 text-base font-semibold tracking-[-0.02em] ${
+      className={`mt-0.5 text-sm font-semibold tracking-[-0.02em] ${
         tone === "positive"
           ? "text-[#8df0c4]"
           : tone === "negative"
@@ -503,13 +500,13 @@ const SnapshotTile = ({
   tone?: "neutral" | "positive" | "negative";
   value: string;
 }) => (
-  <div className="rounded-2xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3.5">
+  <div className="rounded-xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-3 py-2.5">
     <div className="flex items-center gap-1.5">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
+      <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
     </div>
     <p
-      className={`mt-1.5 text-[20px] font-semibold tracking-[-0.03em] ${
+      className={`mt-1 text-base font-semibold tracking-[-0.03em] ${
         tone === "positive"
           ? "text-[#8df0c4]"
           : tone === "negative"
@@ -519,7 +516,7 @@ const SnapshotTile = ({
     >
       {value}
     </p>
-    <p className="mt-0.5 truncate text-[11px] text-[#6f8099]">{hint}</p>
+    <p className="mt-0.5 truncate text-[10px] text-[#6f8099]">{hint}</p>
   </div>
 );
 
@@ -532,10 +529,10 @@ const TabBar = ({
   activeTab: MeTab;
   onChange: (tab: MeTab) => void;
 }) => (
-  <div className="flex items-center gap-1 overflow-x-auto border-b border-white/[0.06]">
+  <div className="flex items-center gap-0.5 overflow-x-auto border-b border-white/[0.06]">
     {ME_TABS.map((tab) => (
       <button
-        className={`relative whitespace-nowrap px-4 py-3 text-sm transition ${
+        className={`relative whitespace-nowrap px-3 py-2.5 text-xs transition ${
           activeTab === tab ? "font-semibold text-white" : "text-[#7f90aa] hover:text-white"
         }`}
         key={tab}
@@ -544,7 +541,7 @@ const TabBar = ({
       >
         {tab}
         {activeTab === tab ? (
-          <span className="absolute inset-x-3 bottom-[-1px] h-[2px] rounded-full bg-[#de402a]" />
+          <span className="absolute inset-x-2.5 bottom-[-1px] h-[2px] rounded-full bg-[#de402a]" />
         ) : null}
       </button>
     ))}
@@ -559,16 +556,15 @@ const HoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => {
   }
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-      {/* Header (desktop only) */}
-      <div className="hidden border-b border-white/[0.04] px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr_auto] lg:items-center lg:gap-4">
+    <div className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
+      <div className="hidden border-b border-white/[0.04] px-3.5 py-2 text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr_auto] lg:items-center lg:gap-3">
         <span>Creator</span>
         <span className="text-right">Price</span>
         <span className="text-right">Holding</span>
         <span className="text-right">Avg cost</span>
         <span className="text-right">PnL</span>
         <span>Graduation</span>
-        <span className="w-[180px]">Actions</span>
+        <span className="w-[160px]">Actions</span>
       </div>
 
       <div className="divide-y divide-white/[0.04]">
@@ -585,44 +581,44 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
   const isUp = pnlUsd >= 0;
 
   return (
-    <div className="grid items-center gap-3 px-4 py-3.5 lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr_auto] lg:gap-4">
-      <Link className="flex min-w-0 items-center gap-3" href={`/creators/${creator.id}`}>
-        <img alt={creator.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" src={creator.avatarSrc} />
+    <div className="grid items-center gap-2.5 px-3.5 py-2.5 lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr_auto] lg:gap-3">
+      <Link className="flex min-w-0 items-center gap-2.5" href={`/creators/${creator.id}`}>
+        <img alt={creator.name} className="h-8 w-8 shrink-0 rounded-lg object-cover" src={creator.avatarSrc} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-white">{creator.name}</p>
+            <p className="truncate text-xs font-semibold text-white">{creator.name}</p>
             <StagePill compact stage={creator.state} />
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">
-            {creator.handle} · {compactNumber(creator.holderCount)} holders
+          <p className="mt-0.5 truncate text-[10px] text-[#7e90aa]">
+            {creator.handle} · {compactNumber(creator.holderCount)} hol…
           </p>
         </div>
       </Link>
 
       <div className="lg:text-right">
         <MobileMetricLabel>Price</MobileMetricLabel>
-        <p className="text-sm font-semibold text-white">{formatUsd(holding.currentPriceUsd ?? creator.tokenPrice)}</p>
-        <p className="text-[10px] text-[#7e90aa]">SPUMP {Math.round((holding.currentPriceUsd ?? creator.tokenPrice) * 40)}</p>
+        <p className="text-xs font-semibold text-white">{formatUsd(holding.currentPriceUsd ?? creator.tokenPrice)}</p>
+        <p className="text-[9px] text-[#7e90aa]">SPUMP {Math.round((holding.currentPriceUsd ?? creator.tokenPrice) * 40)}</p>
       </div>
 
       <div className="lg:text-right">
         <MobileMetricLabel>Holding</MobileMetricLabel>
-        <p className="text-sm font-semibold text-white">{holding.tokenCount} S1</p>
-        <p className="text-[10px] text-[#7e90aa]">{formatUsd(marketValueUsd)}</p>
+        <p className="text-xs font-semibold text-white">{holding.tokenCount} S1</p>
+        <p className="text-[9px] text-[#7e90aa]">{formatUsd(marketValueUsd)}</p>
       </div>
 
       <div className="lg:text-right">
         <MobileMetricLabel>Avg cost</MobileMetricLabel>
-        <p className="text-sm text-[#cbd6e7]">{formatUsd(holding.avgEntryUsd)}</p>
+        <p className="text-xs text-[#cbd6e7]">{formatUsd(holding.avgEntryUsd)}</p>
       </div>
 
       <div className="lg:text-right">
         <MobileMetricLabel>PnL</MobileMetricLabel>
-        <p className={`text-sm font-semibold ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
+        <p className={`text-xs font-semibold ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
           {isUp ? "+" : ""}
           {formatUsd(pnlUsd)}
         </p>
-        <p className={`text-[10px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
+        <p className={`text-[9px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
           {isUp ? "+" : ""}
           {pnlPct.toFixed(2)}%
         </p>
@@ -630,18 +626,18 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
 
       <div>
         <MobileMetricLabel>Graduation</MobileMetricLabel>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#de402a] to-[#ff8a78]"
               style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
             />
           </div>
-          <span className="shrink-0 text-[11px] font-medium text-[#cbd6e7]">{creator.graduationProgress}%</span>
+          <span className="shrink-0 text-[10px] font-medium text-[#cbd6e7]">{creator.graduationProgress}%</span>
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-1.5">
+      <div className="flex items-center justify-end gap-1">
         <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="primary">
           {creator.state === "S1_BUYOUT" ? "Locked" : "Buy"}
         </RowAction>
@@ -649,7 +645,7 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
           Sell
         </RowAction>
         <Link
-          className="flex h-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 text-[11px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
+          className="flex h-7 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[10px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
           href={`/creators/${creator.id}`}
         >
           View
@@ -675,7 +671,7 @@ const RowAction = ({
   kind: "primary" | "ghost";
 }) => {
   const base =
-    "flex h-8 items-center justify-center rounded-lg px-2.5 text-[11px] font-semibold transition";
+    "flex h-7 items-center justify-center rounded-md px-2 text-[10px] font-semibold transition";
   if (disabled) {
     return (
       <span className={`${base} cursor-not-allowed border border-white/[0.05] bg-white/[0.02] text-[#5a6b82]`}>
@@ -809,7 +805,7 @@ const RewardsPanel = ({ portfolio }: { portfolio: PortfolioModel }) => (
         amount={formatUsd(portfolio.claimableBuyoutUsd)}
         cta="Preview Claim"
         ctaTone="primary"
-        label="Buyout Supporter Pool"
+        label="Buyout Pool"
         status="2d 0h window"
       />
       <RewardItem
@@ -830,27 +826,27 @@ const RewardsPanel = ({ portfolio }: { portfolio: PortfolioModel }) => (
       />
     </div>
 
-    <div className="rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] p-4 md:p-5">
+    <div className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] p-3.5 md:p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
             Total claimable
           </p>
-          <p className="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-white">
+          <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">
             {formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}
           </p>
-          <p className="mt-0.5 text-[11px] text-[#7486a1]">
+          <p className="mt-0.5 text-[10px] text-[#7486a1]">
             3 rewards ready · 1 pending settlement
           </p>
         </div>
         <button
-          className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
+          className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
           type="button"
         >
           Preview Claim All
         </button>
       </div>
-      <p className="mt-2 text-[11px] text-[#5a6b82]">
+      <p className="mt-1.5 text-[10px] text-[#5a6b82]">
         Demo flow · on-chain claim lands in next release
       </p>
     </div>
@@ -872,20 +868,20 @@ const RewardItem = ({
   label: string;
   status: string;
 }) => (
-  <div className="flex items-center justify-between gap-3 rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-4 py-3.5">
+  <div className="flex items-center justify-between gap-2.5 rounded-[14px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-3 py-2.5">
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
       </div>
-      <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-white">{amount}</p>
-      <p className="mt-0.5 text-[11px] text-[#7486a1]">{status}</p>
+      <p className="mt-0.5 truncate text-base font-semibold tracking-[-0.02em] text-white">{amount}</p>
+      <p className="mt-0.5 text-[10px] text-[#7486a1]">{status}</p>
     </div>
     <button
       className={
         ctaTone === "primary"
-          ? "shrink-0 rounded-full bg-[#de402a] px-3.5 py-1.5 text-[12px] font-semibold text-white hover:bg-[#ea523e]"
-          : "shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-3.5 py-1.5 text-[12px] font-medium text-[#cbd6e7] hover:border-white/[0.12] hover:text-white"
+          ? "shrink-0 rounded-full bg-[#de402a] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[#ea523e]"
+          : "shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-[11px] font-medium text-[#cbd6e7] hover:border-white/[0.12] hover:text-white"
       }
       type="button"
     >
@@ -1049,31 +1045,31 @@ const SavedContent = ({
 /* ──────────────────────────────  Right rail  ────────────────────────────── */
 
 const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
-  <section className="rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-    <header className="border-b border-white/[0.05] px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+  <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
+    <header className="border-b border-white/[0.05] px-3.5 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
         Claim Center
       </p>
-      <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-white">
+      <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">
         {formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}
       </p>
-      <p className="mt-0.5 text-[11px] text-[#7486a1]">3 rewards ready · 1 pending</p>
+      <p className="mt-0.5 text-[10px] text-[#7486a1]">3 rewards ready · 1 pending</p>
     </header>
 
-    <div className="space-y-1 px-2 py-2">
+    <div className="space-y-0.5 px-1.5 py-1.5">
       <RailRow accent="#65ecaf" label="Daily SPUMP" sub="Streak 12d" value={`+${portfolio.dailySpumpReward}`} />
       <RailRow accent="#ffb38a" label="Buyout pool" sub="弯心入坑" value={formatUsd(portfolio.claimableBuyoutUsd)} />
       <RailRow accent="#67b8ff" label="Campaign" sub="Pending" value={formatUsd(portfolio.pendingCampaignUsd)} />
     </div>
 
-    <div className="border-t border-white/[0.05] p-3">
+    <div className="border-t border-white/[0.05] p-2.5">
       <button
-        className="w-full rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.28)] hover:brightness-[1.05]"
+        className="w-full rounded-lg bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(222,64,42,0.28)] hover:brightness-[1.05]"
         type="button"
       >
         Preview Claim All
       </button>
-      <p className="mt-2 text-center text-[10px] text-[#5a6b82]">Demo · real claim coming soon</p>
+      <p className="mt-1.5 text-center text-[9px] text-[#5a6b82]">Demo · real claim coming soon</p>
     </div>
   </section>
 );
@@ -1089,26 +1085,26 @@ const RailRow = ({
   sub: string;
   value: string;
 }) => (
-  <div className="flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 transition hover:bg-white/[0.03]">
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
+  <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-white/[0.03]">
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
       <div className="min-w-0">
-        <p className="truncate text-[12px] font-medium text-white">{label}</p>
-        <p className="truncate text-[10px] text-[#7486a1]">{sub}</p>
+        <p className="truncate text-[11px] font-medium text-white">{label}</p>
+        <p className="truncate text-[9px] text-[#7486a1]">{sub}</p>
       </div>
     </div>
-    <p className="shrink-0 text-[12px] font-semibold text-white">{value}</p>
+    <p className="shrink-0 text-[11px] font-semibold text-white">{value}</p>
   </div>
 );
 
 const QuickActionsCard = () => (
-  <section className="rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-    <header className="border-b border-white/[0.05] px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+  <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
+    <header className="border-b border-white/[0.05] px-3.5 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
         Quick Actions
       </p>
     </header>
-    <div className="grid grid-cols-2 gap-2 p-3">
+    <div className="grid grid-cols-2 gap-1.5 p-2.5">
       <QuickAction href={EXPLORE_PATH} label="Explore" />
       <QuickAction href={TRENDING_PATH} label="Trending" />
       <QuickAction href={REWARDS_PATH} label="Rewards" />
@@ -1119,7 +1115,7 @@ const QuickActionsCard = () => (
 
 const QuickAction = ({ href, label }: { href: string; label: string }) => (
   <Link
-    className="flex items-center justify-center rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 text-[12px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white"
+    className="flex items-center justify-center rounded-lg border border-white/[0.05] bg-white/[0.02] px-2.5 py-2 text-[11px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white"
     href={href}
   >
     {label}

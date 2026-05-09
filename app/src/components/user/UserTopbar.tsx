@@ -15,9 +15,11 @@ const SEARCH_AUTO_HIDE_MS = 10_000;
 export const UserTopbar = ({
   mode = "sticky",
   searchPlaceholder = "搜索帖子、创作者、品牌合作",
+  hideSearch = false,
 }: {
   mode?: TopbarMode;
   searchPlaceholder?: string;
+  hideSearch?: boolean;
 }) => {
   if (mode === "scroll-reveal") {
     return <ScrollRevealTopbar searchPlaceholder={searchPlaceholder} />;
@@ -25,7 +27,7 @@ export const UserTopbar = ({
 
   return (
     <header className="sticky top-0 z-30 pt-4">
-      <TopbarInner searchPlaceholder={searchPlaceholder} />
+      <TopbarInner hideSearch={hideSearch} searchPlaceholder={searchPlaceholder} />
     </header>
   );
 };
@@ -253,23 +255,29 @@ const ScrollRevealTopbar = ({
 };
 
 const TopbarInner = ({
+  hideSearch = false,
   searchPlaceholder,
 }: {
+  hideSearch?: boolean;
   searchPlaceholder: string;
 }) => (
-  <div className="glass-toolbar flex min-h-[76px] items-center justify-between gap-4 px-3 py-3 lg:px-4">
-    <div className="flex-1 lg:max-w-xl">
-      <div className="input-glass group relative rounded-full">
-        <input
-          className="h-12 w-full rounded-full bg-transparent pl-5 pr-12 text-sm text-white outline-none placeholder:text-[#6f7d95]"
-          placeholder={searchPlaceholder}
-          type="text"
-        />
-        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#8ea0ba] transition group-focus-within:text-white">
-          ⌕
-        </span>
+  <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
+    {hideSearch ? (
+      <div className="flex-1" />
+    ) : (
+      <div className="flex-1 lg:max-w-xl">
+        <div className="input-glass group relative rounded-full">
+          <input
+            className="h-10 w-full rounded-full bg-transparent pl-5 pr-12 text-sm text-white outline-none placeholder:text-[#6f7d95]"
+            placeholder={searchPlaceholder}
+            type="text"
+          />
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#8ea0ba] transition group-focus-within:text-white">
+            ⌕
+          </span>
+        </div>
       </div>
-    </div>
+    )}
 
     <div className="ml-4 flex items-center gap-3">
       <Link

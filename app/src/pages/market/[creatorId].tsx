@@ -1,203 +1,318 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useMemo, useState } from "react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import {
+  DemoCreatorBanner,
+  S1ErrorState,
+  S1LoadingSkeleton,
+  S1TransactionDrawer,
+  WalletSessionAlert,
+} from "@/components/s1/S1TransactionDrawer";
 import { StagePill } from "@/components/shared/StagePill";
-import { CreatorMarketRecord } from "@/lib/api/types";
-import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
+import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
+import {
+  buildS1BuyTransaction,
+  buildS1SellTransaction,
+  DEMO_S1_CREATOR_WALLET,
+  getS1MarketProfile,
+  getS1Portfolio,
+  S1MarketProfileResponse,
+  S1PortfolioResponse,
+} from "@/lib/api/s1";
+import { getStoredAuthSession } from "@/lib/auth-session";
+import {
+  displayCreatorHandle,
+  displayCreatorName,
+  findPortfolioPosition,
+  formatS1Amount,
+  formatSpump,
+  formatUsdcAmount,
+  resolveCreatorWalletForRoute,
+  resolveFallbackCreator,
+  shortenWallet,
+} from "@/lib/s1-market-view";
+import { compactNumber } from "@/lib/public-data";
 
-const BASE_PRICE = 0.001;
-const MAX_SUPPLY = 50_000;
-const CURVE_POINTS = 120;
-const DAILY_LIMIT = 15_000_000;
-const MOCK_SPENT = 850;
-const MOCK_HOLDING = 25;
-const BONDING_VIEW_BOX = { w: 800, h: 320 } as const;
-const BONDING_PAD = { t: 24, r: 32, b: 40, l: 56 } as const;
+/* ------------------------------------------------------------------ */
+/*  Bonding curve chart                                                */
+/* ------------------------------------------------------------------ */
 
-function bondingPrice(supply: number): number {
-  return BASE_PRICE * Math.pow(1 + supply / MAX_SUPPLY, 2);
+const CHART = { w: 800, h: 260, pad: { t: 20, r: 28, b: 36, l: 52 } } as const;
+
+function buildCurvePath(supply: number) {
+  const maxSupply = Math.max(50_000, supply * 2, 100);
+  const chartW = CHART.w - CHART.pad.l - CHART.pad.r;
+  const chartH = CHART.h - CHART.pad.t - CHART.pad.b;
+  const pts = Array.from({ length: 90 }, (_, i) => {
+    const f = i / 89;
+    return {
+      x: CHART.pad.l + f * chartW,
+      y: CHART.pad.t + chartH - Math.pow(f, 1.8) * chartH,
+    };
+  });
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  const fill = `${path} L${pts[pts.length - 1].x},${CHART.pad.t + chartH} L${pts[0].x},${CHART.pad.t + chartH} Z`;
+  const progress = Math.min(1, supply / maxSupply);
+  const dx = CHART.pad.l + progress * chartW;
+  const dy = CHART.pad.t + chartH - Math.pow(progress, 1.8) * chartH;
+  return { path, fill, dx, dy };
 }
 
-/* ---------- Bonding Curve Hero ---------- */
-function BondingCurveHero({ creator }: { creator: CreatorMarketRecord }) {
-  const { path, fillPath, dot, maxP } = useMemo(() => {
-    const pts: { x: number; y: number; supply: number; price: number }[] = [];
-    for (let i = 0; i <= CURVE_POINTS; i++) {
-      const s = (i / CURVE_POINTS) * MAX_SUPPLY;
-      const p = bondingPrice(s);
-      pts.push({ supply: s, price: p, x: 0, y: 0 });
-    }
-    const maxP = pts[pts.length - 1].price;
-    const chartW = BONDING_VIEW_BOX.w - BONDING_PAD.l - BONDING_PAD.r;
-    const chartH = BONDING_VIEW_BOX.h - BONDING_PAD.t - BONDING_PAD.b;
-
-    pts.forEach((pt) => {
-      pt.x = BONDING_PAD.l + (pt.supply / MAX_SUPPLY) * chartW;
-      pt.y = BONDING_PAD.t + chartH - (pt.price / maxP) * chartH;
-    });
-
-    const d = pts.map((pt, i) => `${i === 0 ? "M" : "L"}${pt.x},${pt.y}`).join(" ");
-    const fillD = `${d} L${pts[pts.length - 1].x},${BONDING_PAD.t + chartH} L${pts[0].x},${BONDING_PAD.t + chartH} Z`;
-
-    const dotSupply = creator.supply;
-    const dotPrice = bondingPrice(dotSupply);
-    const dotX = BONDING_PAD.l + (dotSupply / MAX_SUPPLY) * chartW;
-    const dotY = BONDING_PAD.t + chartH - (dotPrice / maxP) * chartH;
-
-    return { path: d, fillPath: fillD, dot: { x: dotX, y: dotY }, maxP };
-  }, [creator.supply]);
-
-  const chartH = BONDING_VIEW_BOX.h - BONDING_PAD.t - BONDING_PAD.b;
+function CurveChart({ supply }: { supply: number }) {
+  const { path, fill, dx, dy } = useMemo(
+    () => buildCurvePath(Number.isFinite(supply) ? supply : 0),
+    [supply],
+  );
+  const chartH = CHART.h - CHART.pad.t - CHART.pad.b;
 
   return (
-    <div className="liquid-glass-shell section-enter relative overflow-hidden p-0">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(222,64,42,0.12),transparent_60%)]" />
+    <svg className="w-full" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${CHART.w} ${CHART.h}`}>
+      <defs>
+        <linearGradient id="c-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#de402a" stopOpacity={0.28} />
+          <stop offset="100%" stopColor="#de402a" stopOpacity={0} />
+        </linearGradient>
+        <linearGradient id="c-line" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0%" stopColor="#de402a" stopOpacity={0.35} />
+          <stop offset="50%" stopColor="#de402a" />
+          <stop offset="100%" stopColor="#f3b33e" />
+        </linearGradient>
+      </defs>
+      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+        <line
+          key={f}
+          stroke="rgba(255,255,255,0.04)"
+          strokeDasharray="4 6"
+          x1={CHART.pad.l}
+          x2={CHART.w - CHART.pad.r}
+          y1={CHART.pad.t + chartH * (1 - f)}
+          y2={CHART.pad.t + chartH * (1 - f)}
+        />
+      ))}
+      <path d={fill} fill="url(#c-fill)" />
+      <path d={path} fill="none" stroke="url(#c-line)" strokeLinecap="round" strokeWidth={2.5} />
+      <circle cx={dx} cy={dy} fill="#de402a" opacity={0.2} r={16} />
+      <circle cx={dx} cy={dy} fill="#de402a" r={5.5} />
+      <circle cx={dx} cy={dy} fill="#fff" r={2.5} />
+      <text fill="#4f6178" fontSize={9} textAnchor="middle" x={CHART.w / 2} y={CHART.h - 6}>
+        S1 SUPPLY
+      </text>
+    </svg>
+  );
+}
 
-      <div className="relative px-5 pt-5 pb-2 md:px-8 md:pt-7">
-        <div className="flex items-center gap-3">
-          <Link
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/5 text-[#8ea0ba] transition hover:bg-white/10"
-            href="/trending"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-          {creator.avatarSrc && (
-            <img alt="" className="h-9 w-9 rounded-full border border-white/10 object-cover" src={creator.avatarSrc} />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{creator.name}</p>
-            <p className="text-xs text-[#8ea0ba]">{creator.handle}</p>
+/* ------------------------------------------------------------------ */
+/*  Price card                                                         */
+/* ------------------------------------------------------------------ */
+
+function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">Current price</p>
+          <p className="mt-1.5 text-[32px] font-bold leading-none tracking-[-0.05em] text-white md:text-[40px]">
+            {formatSpump(profile.creator.currentPriceSpump)}
+          </p>
+          <p className="mt-2 text-xs text-[#8ea0ba]">
+            Next: {formatSpump(profile.creator.nextPriceSpump)}
+          </p>
+        </div>
+        <StagePill stage={profile.creator.stage} />
+      </div>
+      <div className="-mx-2 mt-3">
+        <CurveChart supply={Number(profile.creator.s1Supply ?? 0)} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Stats grid                                                         */
+/* ------------------------------------------------------------------ */
+
+function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
+  const grad = Math.round(profile.creator.graduationProgressBps / 100);
+  const stats = [
+    { label: "Supply", value: formatS1Amount(profile.creator.s1Supply), color: "text-white" },
+    { label: "Holders", value: compactNumber(profile.creator.holderCount), color: "text-[#67b8ff]" },
+    {
+      label: "Graduation",
+      value: `${grad}%`,
+      color: grad >= 100 ? "text-[#65ecaf]" : "text-[#f3b33e]",
+    },
+    { label: "Pool", value: formatSpump(profile.creator.supporterPoolSpump), color: "text-white" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      {stats.map((s) => (
+        <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3" key={s.label}>
+          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{s.label}</p>
+          <p className={`mt-1 text-lg font-bold tracking-[-0.04em] ${s.color}`}>{s.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Buyout summary                                                     */
+/* ------------------------------------------------------------------ */
+
+function BuyoutSummary({ buyout, creatorWallet }: { buyout: S1MarketProfileResponse["buyout"]; creatorWallet: string }) {
+  const status = buyout?.status ?? "NONE";
+  const statusLabel: Record<string, string> = {
+    NONE: "No buyout",
+    OFFER_OPEN: "Offers open",
+    ACCEPTED: "Accepted",
+    EXECUTION_PENDING: "Execution pending",
+    GRADUATED: "Graduated",
+  };
+
+  return (
+    <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Buyout</p>
+          <p className="mt-1 text-sm font-semibold text-white">{statusLabel[status] ?? status}</p>
+        </div>
+        {buyout?.latestOfferUsdc ? (
+          <div className="text-right">
+            <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Latest offer</p>
+            <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(buyout.latestOfferUsdc)}</p>
           </div>
-          <StagePill className="ml-auto" stage={creator.state} />
+        ) : null}
+      </div>
+      <Link
+        className="mt-2 inline-flex items-center text-[10px] font-medium text-[#67b8ff] transition hover:text-white"
+        href={`/buyout/${creatorWallet}`}
+      >
+        Open buyout room →
+      </Link>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  User position                                                      */
+/* ------------------------------------------------------------------ */
+
+function PositionCard({
+  portfolio,
+  profile,
+}: {
+  portfolio: S1PortfolioResponse | null;
+  profile: S1MarketProfileResponse;
+}) {
+  const pos = findPortfolioPosition(portfolio, profile.creator.creatorWallet);
+
+  return (
+    <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-3.5">
+      <div className="flex items-center gap-3.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#65ecaf]/10 text-[10px] font-bold text-[#65ecaf]">
+          S1
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Your position</p>
+          <p className="mt-0.5 text-base font-bold tracking-[-0.03em] text-white">
+            {pos ? `${formatS1Amount(pos.internalTokenBalance)} S1` : "No position"}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-white">{pos ? formatSpump(pos.spumpCostBasis) : "—"}</p>
+          <p className="text-[9px] text-[#5a6d87]">Cost basis</p>
         </div>
       </div>
-
-      <svg
-        className="w-full"
-        preserveAspectRatio="xMidYMid meet"
-        viewBox={`0 0 ${BONDING_VIEW_BOX.w} ${BONDING_VIEW_BOX.h}`}
-      >
-        <defs>
-          <linearGradient id="curve-grad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#de402a" stopOpacity={0.32} />
-            <stop offset="100%" stopColor="#de402a" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="line-grad" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="#de402a" stopOpacity={0.4} />
-            <stop offset="50%" stopColor="#de402a" />
-            <stop offset="100%" stopColor="#f3b33e" />
-          </linearGradient>
-          <filter id="dot-glow">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-          </filter>
-          <filter id="dot-glow-sm">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
-          </filter>
-        </defs>
-
-        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-          const y = BONDING_PAD.t + chartH * (1 - frac);
-          return (
-            <g key={frac}>
-              <line stroke="rgba(255,255,255,0.05)" strokeDasharray="4 6" x1={BONDING_PAD.l} x2={BONDING_VIEW_BOX.w - BONDING_PAD.r} y1={y} y2={y} />
-              <text fill="#5a6d87" fontSize={10} textAnchor="end" x={BONDING_PAD.l - 8} y={y + 3}>
-                {(maxP * frac).toFixed(3)}
-              </text>
-            </g>
-          );
-        })}
-
-        <path d={fillPath} fill="url(#curve-grad)" />
-        <path d={path} fill="none" stroke="url(#line-grad)" strokeLinecap="round" strokeWidth={2.5} />
-
-        <circle cx={dot.x} cy={dot.y} fill="#de402a" filter="url(#dot-glow)" opacity={0.6} r={12}>
-          <animate attributeName="opacity" dur="2s" repeatCount="indefinite" values="0.6;0.25;0.6" />
-          <animate attributeName="r" dur="2s" repeatCount="indefinite" values="12;18;12" />
-        </circle>
-        <circle cx={dot.x} cy={dot.y} fill="#de402a" filter="url(#dot-glow-sm)" r={6} />
-        <circle cx={dot.x} cy={dot.y} fill="#fff" r={3.5} />
-
-        <text fill="#5a6d87" fontSize={10} textAnchor="middle" x={BONDING_VIEW_BOX.w / 2} y={BONDING_VIEW_BOX.h - 6}>
-          SUPPLY
-        </text>
-      </svg>
+      {pos?.estimatedClaimableUsdc && Number(pos.estimatedClaimableUsdc) > 0 ? (
+        <div className="mt-2 flex items-center justify-between border-t border-white/[0.04] pt-2">
+          <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Claimable</p>
+          <p className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(pos.estimatedClaimableUsdc)}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/* ---------- Price Header ---------- */
-function PriceHeader({ creator }: { creator: CreatorMarketRecord }) {
-  const change24h = 12.4;
-  const sparkline = useMemo(() => {
-    const pts = 24;
-    const data: number[] = [];
-    let v = creator.tokenPrice * 0.9;
-    for (let i = 0; i < pts; i++) {
-      v += (Math.random() - 0.42) * 0.12;
-      data.push(Math.max(0.01, v));
-    }
-    data[pts - 1] = creator.tokenPrice;
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    const range = max - min || 1;
-    return data.map((v, i) => ({ x: (i / (pts - 1)) * 100, y: 28 - ((v - min) / range) * 24 }));
-  }, [creator.tokenPrice]);
+/* ------------------------------------------------------------------ */
+/*  Trade panel                                                        */
+/* ------------------------------------------------------------------ */
 
-  const sparkD = sparkline.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+const AMOUNT_CHIPS = [1, 5, 10, 25] as const;
 
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#5a6d87]">SPUMP PRICE</p>
-        <p className="mt-1 text-[52px] font-bold leading-none tracking-[-0.05em] text-white md:text-[64px]">
-          {formatUsd(creator.tokenPrice)}
-        </p>
-        <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#65ecaf]">
-          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-            <path clipRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" fillRule="evenodd" transform="rotate(180 10 10)" />
-          </svg>
-          +{change24h}% 24h
-        </p>
-      </div>
-      <svg className="h-8 w-28 opacity-80" viewBox="0 0 100 32">
-        <path d={sparkD} fill="none" stroke="#65ecaf" strokeLinecap="round" strokeWidth={1.8} />
-      </svg>
-    </div>
-  );
-}
-
-/* ---------- Trade Panel ---------- */
-function TradePanel({ creator }: { creator: CreatorMarketRecord }) {
+function TradePanel({
+  creatorWallet,
+  onRefresh,
+  portfolio,
+  profile,
+  sessionWallet,
+}: {
+  creatorWallet: string;
+  onRefresh: () => Promise<void>;
+  portfolio: S1PortfolioResponse | null;
+  profile: S1MarketProfileResponse;
+  sessionWallet: string | null;
+}) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(10);
+  const flow = useS1TransactionFlow();
+  const wallet = useWallet();
 
-  const slippage = side === "buy" ? 1.02 : 0.98;
-  const cost = amount * creator.tokenPrice * slippage;
+  const pos = findPortfolioPosition(portfolio, creatorWallet);
+  const maxSell = Math.max(0, Number(pos?.internalTokenBalance || 0));
+  const hasPosition = maxSell > 0;
 
-  const handleSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmount(Number(e.target.value));
-  }, []);
+  const sessionToken = getStoredAuthSession()?.accessToken ?? null;
+  const connectedWallet = wallet.publicKey?.toBase58() ?? null;
+  const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
+  const canTrade = Boolean(sessionToken && wallet.connected && !walletMismatch);
+  const sellOverLimit = side === "sell" && hasPosition && amount > maxSell;
+
+  const estimatedCost = useMemo(() => {
+    const price = Number(profile.creator.currentPriceSpump || 0) / 1e9;
+    return price * amount;
+  }, [amount, profile.creator.currentPriceSpump]);
+
+  const executeTrade = useCallback(async () => {
+    const submitted = await flow.execute((token) =>
+      side === "buy"
+        ? buildS1BuyTransaction(token, { creatorWallet, amount })
+        : buildS1SellTransaction(token, { creatorWallet, amount }),
+    );
+    if (submitted) await onRefresh();
+  }, [side, amount, creatorWallet, flow, onRefresh]);
+
+  const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+
+  const ctaLabel = (): string => {
+    if (!wallet.connected) return "Connect wallet";
+    if (!sessionToken) return "Sign in to trade";
+    if (walletMismatch) return "Wallet mismatch";
+    if (side === "sell" && !hasPosition) return "No position to sell";
+    if (sellOverLimit) return "Amount exceeds position";
+    return side === "buy" ? "Buy S1" : "Sell S1";
+  };
 
   return (
-    <div className="liquid-card section-enter space-y-5 p-5 md:p-6">
-      {/* Buy / Sell toggle */}
-      <div className="flex gap-1 rounded-full border border-white/8 bg-white/4 p-1">
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4 md:p-5">
+      {/* Buy / Sell tabs */}
+      <div className="flex gap-1 rounded-full border border-white/[0.06] bg-white/[0.02] p-0.5">
         {(["buy", "sell"] as const).map((s) => (
           <button
-            className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-all ${
+            className={`flex-1 rounded-full py-2 text-[12px] font-semibold transition-all ${
               side === s
                 ? s === "buy"
-                  ? "glass-button-primary"
-                  : "bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
+                  ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.75)_0%,rgba(190,52,34,0.75)_100%)] text-white shadow-[0_4px_14px_rgba(222,64,42,0.25)]"
+                  : "bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
                 : "text-[#5a6d87] hover:text-white"
             }`}
             key={s}
-            onClick={() => setSide(s)}
+            onClick={() => { setSide(s); flow.reset(); }}
             type="button"
           >
             {s === "buy" ? "Buy" : "Sell"}
@@ -205,197 +320,290 @@ function TradePanel({ creator }: { creator: CreatorMarketRecord }) {
         ))}
       </div>
 
-      {/* Amount slider */}
-      <div>
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Amount</span>
-          <span className="text-2xl font-bold tracking-[-0.04em] text-white">{amount}</span>
+      {/* Amount input */}
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Amount</span>
+          <input
+            className="w-20 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-right text-lg font-bold tracking-[-0.03em] text-white outline-none transition focus:border-white/[0.16]"
+            max={side === "sell" && hasPosition ? maxSell : undefined}
+            min={1}
+            onChange={(e) => setAmount(Math.max(1, Number(e.target.value) || 1))}
+            type="number"
+            value={amount}
+          />
         </div>
-        <input
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/8 accent-[#de402a] outline-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#de402a] [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(222,64,42,0.5)]"
-          max={100}
-          min={1}
-          onChange={handleSlider}
-          type="range"
-          value={amount}
+
+        {/* Quick chips */}
+        <div className="mt-2.5 flex gap-1.5">
+          {AMOUNT_CHIPS.map((v) => (
+            <button
+              className={`flex-1 rounded-lg py-1.5 text-[10px] font-semibold transition ${
+                amount === v
+                  ? "border border-[#de402a]/40 bg-[#de402a]/10 text-[#ff8a78]"
+                  : "border border-white/[0.06] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.12] hover:text-white"
+              }`}
+              key={v}
+              onClick={() => setAmount(v)}
+              type="button"
+            >
+              {v}
+            </button>
+          ))}
+          {side === "sell" && hasPosition ? (
+            <button
+              className={`flex-1 rounded-lg py-1.5 text-[10px] font-semibold transition ${
+                amount === maxSell
+                  ? "border border-[#de402a]/40 bg-[#de402a]/10 text-[#ff8a78]"
+                  : "border border-white/[0.06] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.12] hover:text-white"
+              }`}
+              onClick={() => setAmount(maxSell)}
+              type="button"
+            >
+              Max
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Price info */}
+      <div className="mt-4 space-y-1.5 rounded-xl border border-white/[0.04] bg-white/[0.015] p-3">
+        <Row label="Current price" value={formatSpump(profile.creator.currentPriceSpump)} />
+        <Row label="Next price" value={formatSpump(profile.creator.nextPriceSpump)} />
+        <div className="h-px bg-white/[0.04]" />
+        <Row
+          label={side === "buy" ? "Est. cost" : "Est. return"}
+          value={`~${estimatedCost.toFixed(3)} SPUMP`}
+          bold
         />
-        <div className="mt-1 flex justify-between text-[10px] text-[#5a6d87]">
-          <span>1</span>
-          <span>25</span>
-          <span>50</span>
-          <span>75</span>
-          <span>100</span>
+        {sellOverLimit ? (
+          <p className="mt-2 text-[10px] font-medium text-[#ff8a78]">
+            Sell amount cannot exceed your {formatS1Amount(String(maxSell))} S1 position.
+          </p>
+        ) : null}
+      </div>
+
+      {/* Wallet / session info */}
+      <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
+
+      {/* CTA */}
+      {!wallet.connected ? (
+        <div className="mt-4 space-y-2">
+          <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
+          <Link
+            className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+            href={`/login?next=/market/${creatorWallet}`}
+          >
+            Sign in to trade
+          </Link>
         </div>
-      </div>
-
-      {/* Cost preview */}
-      <div className="surface-muted space-y-2 p-4">
-        <div className="flex justify-between text-xs text-[#8ea0ba]">
-          <span>Unit Price</span>
-          <span className="text-white">{formatUsd(creator.tokenPrice)}</span>
-        </div>
-        <div className="flex justify-between text-xs text-[#8ea0ba]">
-          <span>Slippage ({side === "buy" ? "+2%" : "-2%"})</span>
-          <span className="text-white">{formatUsd(Math.abs(cost - amount * creator.tokenPrice))}</span>
-        </div>
-        <div className="h-px bg-white/6" />
-        <div className="flex justify-between text-sm font-semibold">
-          <span className="text-[#8ea0ba]">Total {side === "buy" ? "Cost" : "Return"}</span>
-          <span className="text-white">{formatUsd(cost)} SPUMP</span>
-        </div>
-      </div>
-
-      {/* Submit */}
-      <button
-        className={`glass-button-primary w-full py-3.5 text-sm font-bold tracking-wide ${
-          side === "sell" ? "!bg-gradient-to-b !from-white/16 !to-white/10 !shadow-[0_18px_34px_rgba(0,0,0,0.22)]" : ""
-        }`}
-        type="button"
-      >
-        {side === "buy" ? "Buy S1 Token" : "Sell S1 Token"}
-      </button>
-    </div>
-  );
-}
-
-/* ---------- Position Card ---------- */
-function PositionCard({ creator }: { creator: CreatorMarketRecord }) {
-  const value = MOCK_HOLDING * creator.tokenPrice;
-  const pnl = 18.6;
-
-  return (
-    <div className="liquid-pill flex items-center gap-4 rounded-[28px] px-5 py-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#65ecaf]/12 text-[#65ecaf]">
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-[#5a6d87]">YOUR POSITION</p>
-        <p className="text-lg font-bold tracking-[-0.03em] text-white">
-          {MOCK_HOLDING} tokens
-        </p>
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-semibold text-white">{formatUsd(value)}</p>
-        <p className="text-xs font-semibold text-[#65ecaf]">+{pnl}%</p>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Daily Limit Bar ---------- */
-function DailyLimitBar() {
-  const pct = (MOCK_SPENT / DAILY_LIMIT) * 100;
-  const nearLimit = pct > 75;
-
-  return (
-    <div className="surface-muted space-y-2.5 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#5a6d87]">DAILY SPUMP LIMIT</span>
-        <span className={`text-xs font-semibold ${nearLimit ? "text-[#f3b33e]" : "text-[#8ea0ba]"}`}>
-          {compactNumber(MOCK_SPENT)} / {compactNumber(DAILY_LIMIT)}
-        </span>
-      </div>
-      <div className="relative h-2 overflow-hidden rounded-full bg-white/6">
-        <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-all ${
-            nearLimit
-              ? "bg-gradient-to-r from-[#f3b33e] to-[#de402a] shadow-[0_0_14px_rgba(243,179,62,0.4)]"
-              : "bg-gradient-to-r from-[#67b8ff] to-[#65ecaf]"
+      ) : !sessionToken ? (
+        <Link
+          className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[13px] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
+          href={`/login?next=/market/${creatorWallet}`}
+        >
+          Sign in to trade
+        </Link>
+      ) : (
+        <button
+          className={`mt-4 w-full rounded-full py-3 text-[13px] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+            side === "buy"
+              ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] hover:brightness-110"
+              : "bg-white/10 text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] hover:bg-white/14"
           }`}
-          style={{ width: `${Math.min(pct, 100)}%` }}
+          disabled={!canTrade || busy || (side === "sell" && (!hasPosition || sellOverLimit))}
+          onClick={() => void executeTrade()}
+          type="button"
+        >
+          {busy ? "Processing..." : ctaLabel()}
+        </button>
+      )}
+
+      {/* Shared transaction drawer */}
+      <div className="mt-3">
+        <S1TransactionDrawer
+          actionLabel={side === "buy" ? "Buy S1" : "Sell S1"}
+          amountLabel={`${amount} S1`}
+          flow={flow.state}
+          onClose={flow.reset}
+          onRetry={() => void executeTrade()}
         />
       </div>
     </div>
   );
 }
 
-/* ---------- Stats Grid ---------- */
-function StatsGrid({ creator }: { creator: CreatorMarketRecord }) {
-  const stats = [
-    {
-      label: "Price",
-      value: formatUsd(creator.tokenPrice),
-      sub: `Target ${formatUsd(creator.targetGraduationPrice)}`,
-      color: "text-white",
-    },
-    {
-      label: "Holders",
-      value: compactNumber(creator.holderCount),
-      sub: `${creator.topHolders[0]?.share ?? "—"} top wallet`,
-      color: "text-[#67b8ff]",
-    },
-    {
-      label: "Supply",
-      value: compactNumber(creator.supply),
-      sub: `of ${compactNumber(MAX_SUPPLY)} max`,
-      color: "text-white",
-    },
-    {
-      label: "Graduation",
-      value: `${creator.graduationProgress}%`,
-      sub: creator.graduationProgress >= 100 ? "Complete" : `${100 - creator.graduationProgress}% remaining`,
-      color: creator.graduationProgress >= 100 ? "text-[#65ecaf]" : "text-[#f3b33e]",
-    },
-  ];
-
+function Row({ bold, label, value }: { bold?: boolean; label: string; value: string }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {stats.map((s) => (
-        <div className="surface-muted space-y-1 p-4" key={s.label}>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{s.label}</p>
-          <p className={`text-2xl font-bold tracking-[-0.04em] ${s.color}`}>{s.value}</p>
-          <p className="text-[11px] text-[#5a6d87]">{s.sub}</p>
-        </div>
-      ))}
+    <div className="flex items-baseline justify-between gap-3">
+      <span className={`text-[10px] ${bold ? "font-semibold text-[#8ea0ba]" : "text-[#6f8099]"}`}>{label}</span>
+      <span className={`text-[11px] ${bold ? "font-bold text-white" : "font-medium text-white"}`}>{value}</span>
     </div>
   );
 }
 
-/* ---------- Page ---------- */
-export default function S1TokenTradingPage() {
+/* ------------------------------------------------------------------ */
+/*  Header                                                             */
+/* ------------------------------------------------------------------ */
+
+function MarketHeader({
+  fallbackAvatar,
+  profile,
+  title,
+  handle,
+}: {
+  fallbackAvatar: string;
+  profile: S1MarketProfileResponse;
+  title: string;
+  handle: string;
+}) {
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
+      <div className="flex items-center gap-3.5">
+        <Link className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-[#7e90aa] transition hover:bg-white/[0.08]" href="/trending">
+          <span aria-hidden className="text-sm">‹</span>
+        </Link>
+        <img alt="" className="h-10 w-10 rounded-full border border-white/[0.08] object-cover" src={fallbackAvatar} />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-bold tracking-[-0.03em] text-white">{title}</h1>
+          <p className="truncate text-xs text-[#8ea0ba]">
+            @{handle} · {shortenWallet(profile.creator.creatorWallet)}
+          </p>
+        </div>
+        <StagePill className="hidden sm:inline-flex" stage={profile.creator.stage} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
+
+function MarketPage() {
   const router = useRouter();
   const creatorId = String(router.query.creatorId ?? "");
-  const creator = findCreator(creatorId);
+  const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
+  const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
+  const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
+  const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
+  const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!creatorId) {
+  const refresh = useCallback(async () => {
+    if (!creatorWallet) return;
+
+    const session = getStoredAuthSession();
+    setSessionWallet(session?.wallet ?? null);
+    const marketProfile = await getS1MarketProfile(creatorWallet);
+    setProfile(marketProfile);
+
+    if (session?.accessToken) {
+      try {
+        setPortfolio(await getS1Portfolio(session.accessToken));
+      } catch {
+        setPortfolio(null);
+      }
+    } else {
+      setPortfolio(null);
+    }
+  }, [creatorWallet]);
+
+  useEffect(() => {
+    if (!creatorWallet) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    refresh()
+      .catch((e) => {
+        if (!cancelled) {
+          setProfile(null);
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [creatorWallet, refresh]);
+
+  const title = displayCreatorName(profile, fallbackCreator);
+  const handle = displayCreatorHandle(profile, fallbackCreator);
+
+  if (!creatorId || loading) {
     return (
-      <>
-        <Head>
-          <title>StreamPump | Market</title>
-        </Head>
-        <PageShell>
-          <div className="py-10 text-sm text-[#8ea0ba]">Loading...</div>
-        </PageShell>
-      </>
+      <PageShell>
+        <div className="mx-auto max-w-5xl">
+          <S1LoadingSkeleton />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (!creatorWallet) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-5xl space-y-4 py-6">
+          <S1ErrorState
+            error="This route is a local creator preview slug, not a live S1 wallet address."
+            title={`No live market for ${fallbackCreator.name}`}
+          />
+          <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-5xl space-y-4 py-6">
+          <S1ErrorState error={error} title={`Could not load market for ${fallbackCreator.name}`} />
+          <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+        </div>
+      </PageShell>
     );
   }
 
   return (
     <>
-      <Head>
-        <title>{`StreamPump | ${creator.name} Market`}</title>
-      </Head>
+      <Head><title>{`StreamPump | ${title} S1 Market`}</title></Head>
       <PageShell>
-        <div className="mx-auto max-w-5xl space-y-5">
-          {/* Hero curve */}
-          <BondingCurveHero creator={creator} />
+        <div className="mx-auto max-w-5xl space-y-4">
+          <DemoCreatorBanner creatorWallet={profile.creator.creatorWallet} />
 
-          <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+          <MarketHeader
+            fallbackAvatar={fallbackCreator.avatarSrc}
+            handle={handle}
+            profile={profile}
+            title={title}
+          />
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
             {/* Left column */}
-            <div className="space-y-5">
-              <div className="liquid-card section-enter p-5 md:p-7">
-                <PriceHeader creator={creator} />
-              </div>
-              <StatsGrid creator={creator} />
+            <div className="space-y-4">
+              <PriceCard profile={profile} />
+              <StatsGrid profile={profile} />
+              <BuyoutSummary buyout={profile.buyout} creatorWallet={profile.creator.creatorWallet} />
             </div>
 
-            {/* Right column - trade controls */}
-            <div className="space-y-4">
-              <TradePanel creator={creator} />
-              <PositionCard creator={creator} />
-              <DailyLimitBar />
+            {/* Right column */}
+            <div className="space-y-3">
+              <TradePanel
+                creatorWallet={profile.creator.creatorWallet}
+                onRefresh={refresh}
+                portfolio={portfolio}
+                profile={profile}
+                sessionWallet={sessionWallet}
+              />
+              <PositionCard portfolio={portfolio} profile={profile} />
             </div>
           </div>
         </div>
@@ -403,3 +611,7 @@ export default function S1TokenTradingPage() {
     </>
   );
 }
+
+(MarketPage as typeof MarketPage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;
+
+export default MarketPage;

@@ -293,6 +293,12 @@ describe("S1 market projection happy path", () => {
     expect(s1BuyoutProjection.get(creatorProfilePda).status).to.equal(
       BuyoutProjectionStatus.RAGE_QUIT_OPEN
     );
+    expect(s1BuyoutProjection.get(creatorProfilePda).winningSponsorWallet).to.equal(
+      sponsor.toBase58()
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).acceptedOfferPda).to.equal(
+      buyoutOfferPda
+    );
 
     onChainCreator.status = "S2_ACTIVE";
     onChainCreator.level = 2;
@@ -305,7 +311,6 @@ describe("S1 market projection happy path", () => {
         creatorProfile: creatorProfilePda,
         s1BuyoutState: buyoutStatePda,
         creator: creator.toBase58(),
-        winningSponsor: sponsor.toBase58(),
         claimableUsdcRemaining: "1000000000",
         claimableS1SupplyRemaining: "525",
       },
@@ -315,6 +320,15 @@ describe("S1 market projection happy path", () => {
     );
     expect(s1BuyoutProjection.get(creatorProfilePda).status).to.equal(
       BuyoutProjectionStatus.GRADUATED
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).winningSponsorWallet).to.equal(
+      sponsor.toBase58()
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).acceptedOfferPda).to.equal(
+      buyoutOfferPda
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).acceptedOfferUsdc).to.equal(
+      1_000_000_000n
     );
 
     onChainBuyoutState.claimableUsdcRemaining = 990_000_000n;
