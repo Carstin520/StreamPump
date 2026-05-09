@@ -81,7 +81,7 @@ check_file_content() {
 "
   fi
 
-  if printf '%s' "$file_content" | grep -E -n '(^|[[:space:]])(DATABASE_URL|DIRECT_URL|S3_SECRET_ACCESS_KEY|R2_SECRET_ACCESS_KEY|MUX_TOKEN_SECRET|MUX_WEBHOOK_SECRET|ORACLE_AUTHORITY_SECRET_KEY|CONTENT_ANCHOR_SIGNER_SECRET_KEY)[[:space:]]*=[[:space:]]*.+$' >/dev/null 2>&1; then
+  if printf '%s' "$file_content" | grep -E -n '(^|[[:space:]])(DATABASE_URL|DIRECT_URL|S3_SECRET_ACCESS_KEY|R2_SECRET_ACCESS_KEY|MUX_TOKEN_SECRET|MUX_WEBHOOK_SECRET|ORACLE_AUTHORITY_SECRET_KEY|PROTOCOL_ADMIN_SECRET_KEY|DEMO_USDC_MINT_AUTHORITY_SECRET_KEY|CONTENT_ANCHOR_SIGNER_SECRET_KEY)[[:space:]]*=[[:space:]]*.+$' >/dev/null 2>&1; then
     CONTENT_MATCHES="${CONTENT_MATCHES}${file_path}: secret-looking environment variable assignment
 "
   fi

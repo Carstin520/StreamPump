@@ -2,7 +2,7 @@
  * CN: 链上日志索引器，基于交易签名拉取交易详情、解码指令并同步数据库投影。
  * EN: On-chain log indexer that fetches transaction details by signature, decodes instructions, and syncs DB projections.
  */
-import { BorshCoder, EventParser } from "@coral-xyz/anchor";
+import { BN, BorshCoder, EventParser } from "@coral-xyz/anchor";
 import {
   Connection,
   ParsedInstruction,
@@ -80,6 +80,9 @@ const sleep = async (delayMs: number) =>
     setTimeout(resolve, delayMs);
   });
 
+const normalizeInstructionName = (name: string): string =>
+  name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
 const isPartiallyDecodedInstruction = (
   instruction: ParsedInstruction | PartiallyDecodedInstruction
 ): instruction is PartiallyDecodedInstruction => "accounts" in instruction && "data" in instruction;
@@ -96,6 +99,10 @@ export const normalizeIndexerJson = (value: unknown): unknown => {
 
   if (typeof value === "bigint") {
     return value.toString();
+  }
+
+  if (BN.isBN(value)) {
+    return (value as BN).toString();
   }
 
   if (value instanceof PublicKey) {
@@ -136,8 +143,15 @@ export const mapInstructionAccounts = (params: {
 export const selectPrimaryEntityPda = (accounts: Record<string, string | null>): string | null =>
   accounts.proposal ??
   accounts.creator_profile ??
+  accounts.creatorProfile ??
   accounts.content_anchor ??
+  accounts.contentAnchor ??
   accounts.proposal_usdc_vault ??
+  accounts.proposalUsdcVault ??
+  accounts.s1UserPosition ??
+  accounts.s1_buyout_state ??
+  accounts.s1BuyoutState ??
+  accounts.buyoutOffer ??
   null;
 
 export const mapEventNameToInstructionName = (eventName: string): string | null =>
@@ -225,7 +239,7 @@ const decodeProgramInstructions = (
     return [
       {
         instructionIndex,
-        instructionName: decodedInstruction.name,
+        instructionName: normalizeInstructionName(decodedInstruction.name),
         proposalPda: namedAccounts.proposal ?? null,
         entityPda: selectPrimaryEntityPda(namedAccounts),
         payload: {
@@ -320,7 +334,9 @@ const persistChainInstructions = async (params: {
   slot: bigint;
   programId: string;
   instructions: DecodedChainInstruction[];
-}) => {
+}): Promise<number> => {
+  let persistedCount = 0;
+
   for (const instruction of params.instructions) {
     await prisma.chainEvent.upsert({
       where: {
@@ -373,7 +389,11 @@ const persistChainInstructions = async (params: {
         `[indexer] market projection failed for ${instruction.instructionName} in ${params.signature}: ${asErrorMessage(error)}`
       );
     }
+
+    persistedCount += 1;
   }
+
+  return persistedCount;
 };
 
 const updateIndexerCursor = async (slot: bigint, signature: string) => {
@@ -393,22 +413,73 @@ const updateIndexerCursor = async (slot: bigint, signature: string) => {
   });
 };
 
-const processSignature = async (params: {
-  connection: Connection;
-  targetProgram: PublicKey;
+const resolveSignatureSlot = async (
+  connection: Connection,
+  signature: string
+): Promise<bigint | null> => {
+  const response = await connection.getSignatureStatuses([signature], {
+    searchTransactionHistory: true,
+  });
+  const slot = response.value[0]?.slot;
+  return typeof slot === "number" ? BigInt(slot) : null;
+};
+
+export type IngestConfirmedProgramTransactionResult = {
   signature: string;
-  slot: bigint;
-}) => {
-  const response = await fetchParsedTransactionWithRetry(params.connection, params.signature);
-  if (!response || response.meta?.err) {
-    await updateIndexerCursor(params.slot, params.signature);
-    return;
+  slot: string | null;
+  status: "NOT_FOUND" | "FAILED" | "NO_PROGRAM_INSTRUCTIONS" | "SYNCED";
+  instructionCount: number;
+};
+
+export const ingestConfirmedProgramTransaction = async (
+  signature: string,
+  options: {
+    connection?: Connection;
+    targetProgram?: PublicKey;
+    slot?: bigint;
+    updateCursor?: boolean;
+  } = {}
+): Promise<IngestConfirmedProgramTransactionResult> => {
+  const connection = options.connection ?? new Connection(config.solana.rpcEndpoint, "confirmed");
+  const targetProgram = options.targetProgram ?? new PublicKey(config.solana.programId);
+  const shouldUpdateCursor = options.updateCursor ?? false;
+  const response = await fetchParsedTransactionWithRetry(connection, signature);
+  const responseSlot =
+    typeof (response as { slot?: number } | null)?.slot === "number"
+      ? BigInt((response as { slot: number }).slot)
+      : null;
+  const slot = options.slot ?? responseSlot ?? (await resolveSignatureSlot(connection, signature));
+
+  if (!response) {
+    if (shouldUpdateCursor && slot !== null) {
+      await updateIndexerCursor(slot, signature);
+    }
+
+    return {
+      signature,
+      slot: slot?.toString() ?? null,
+      status: "NOT_FOUND",
+      instructionCount: 0,
+    };
   }
 
-  const decodedInstructions = decodeProgramInstructions(response, params.targetProgram);
+  if (response.meta?.err) {
+    if (shouldUpdateCursor && slot !== null) {
+      await updateIndexerCursor(slot, signature);
+    }
+
+    return {
+      signature,
+      slot: slot?.toString() ?? null,
+      status: "FAILED",
+      instructionCount: 0,
+    };
+  }
+
+  const decodedInstructions = decodeProgramInstructions(response, targetProgram);
   const parsedEvents = parseAnchorEvents({
     logMessages: response.meta?.logMessages ?? [],
-    targetProgram: params.targetProgram,
+    targetProgram,
   });
   const instructions =
     parsedEvents.length > 0
@@ -419,17 +490,49 @@ const processSignature = async (params: {
       : decodedInstructions;
 
   if (instructions.length === 0) {
-    await updateIndexerCursor(params.slot, params.signature);
-    return;
+    if (shouldUpdateCursor && slot !== null) {
+      await updateIndexerCursor(slot, signature);
+    }
+
+    return {
+      signature,
+      slot: slot?.toString() ?? null,
+      status: "NO_PROGRAM_INSTRUCTIONS",
+      instructionCount: 0,
+    };
   }
 
-  await persistChainInstructions({
-    signature: params.signature,
-    slot: params.slot,
-    programId: params.targetProgram.toBase58(),
+  const instructionCount = await persistChainInstructions({
+    signature,
+    slot: slot ?? 0n,
+    programId: targetProgram.toBase58(),
     instructions,
   });
-  await updateIndexerCursor(params.slot, params.signature);
+
+  if (shouldUpdateCursor && slot !== null) {
+    await updateIndexerCursor(slot, signature);
+  }
+
+  return {
+    signature,
+    slot: slot?.toString() ?? null,
+    status: "SYNCED",
+    instructionCount,
+  };
+};
+
+const processSignature = async (params: {
+  connection: Connection;
+  targetProgram: PublicKey;
+  signature: string;
+  slot: bigint;
+}) => {
+  await ingestConfirmedProgramTransaction(params.signature, {
+    connection: params.connection,
+    targetProgram: params.targetProgram,
+    slot: params.slot,
+    updateCursor: true,
+  });
 };
 
 const backfillRecentSignatures = async (connection: Connection, targetProgram: PublicKey) => {

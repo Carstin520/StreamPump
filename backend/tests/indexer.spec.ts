@@ -1,7 +1,10 @@
 import { expect } from "chai";
 import { Keypair } from "@solana/web3.js";
 
+import { AnchorService } from "../src/services/AnchorService";
+import { prisma } from "../src/services/prisma";
 import {
+  ingestConfirmedProgramTransaction,
   mapEventNameToInstructionName,
   mergeAnchorEventsWithInstructions,
   mapInstructionAccounts,
@@ -139,5 +142,51 @@ describe("indexer helpers", () => {
     expect(merged[0].instructionName).to.equal("create_proposal");
     expect(merged[1].payload.source).to.equal("anchor_event");
     expect(merged[1].payload.eventName).to.equal("ProposalFunded");
+  });
+
+  it("manual transaction ingest does not advance the indexer cursor", async () => {
+    const originalAnchor = AnchorService.getInstance;
+    const originalIndexerCursor = (prisma as any).indexerCursor;
+    let cursorWrites = 0;
+
+    (AnchorService as any).getInstance = () => ({
+      program: {
+        idl: {
+          instructions: [],
+        },
+      },
+    });
+    (prisma as any).indexerCursor = {
+      upsert: async () => {
+        cursorWrites += 1;
+      },
+    };
+
+    try {
+      const result = await ingestConfirmedProgramTransaction("sig-no-cursor", {
+        connection: {
+          getParsedTransaction: async () => ({
+            slot: 456,
+            meta: {
+              err: null,
+              logMessages: [],
+            },
+            transaction: {
+              message: {
+                instructions: [],
+              },
+            },
+          }),
+        } as any,
+        targetProgram: Keypair.generate().publicKey,
+        updateCursor: false,
+      });
+
+      expect(result.status).to.equal("NO_PROGRAM_INSTRUCTIONS");
+      expect(cursorWrites).to.equal(0);
+    } finally {
+      (AnchorService as any).getInstance = originalAnchor;
+      (prisma as any).indexerCursor = originalIndexerCursor;
+    }
   });
 });

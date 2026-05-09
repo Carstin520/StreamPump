@@ -21,6 +21,13 @@ pub mod streampump_core {
         instructions::initialize_protocol::handler(ctx, args)
     }
 
+    pub fn migrate_legacy_protocol_config(
+        ctx: Context<MigrateLegacyProtocolConfig>,
+        args: MigrateLegacyProtocolConfigArgs,
+    ) -> Result<()> {
+        instructions::migrate_legacy_protocol_config::handler(ctx, args)
+    }
+
     pub fn update_protocol_s1_emission(
         ctx: Context<UpdateProtocolS1Emission>,
         args: UpdateProtocolS1EmissionArgs,

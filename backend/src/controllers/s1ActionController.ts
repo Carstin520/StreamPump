@@ -15,6 +15,7 @@ import {
   withController,
 } from "./http";
 import { getAnchorService, UserMissionTypeName } from "../services/AnchorService";
+import { ingestConfirmedProgramTransaction } from "../services/indexer";
 
 const USER_ROLE_FAN = 1 << 0;
 const ZERO_SIGNATURE = new Uint8Array(64);
@@ -150,6 +151,41 @@ const buildResponse = async (params: {
     requiredSigners: params.requiredSigners,
     derived: params.derived,
   };
+};
+
+export type S1ProjectionSyncResponse =
+  | {
+      status: "SYNCED";
+      instructionCount: number;
+      indexerStatus: string;
+    }
+  | {
+      status: "FAILED";
+      instructionCount?: number;
+      indexerStatus?: string;
+      error?: string;
+    };
+
+export const syncSubmittedS1Projection = async (
+  signature: string,
+  ingest: typeof ingestConfirmedProgramTransaction = ingestConfirmedProgramTransaction
+): Promise<S1ProjectionSyncResponse> => {
+  try {
+    const projectionSync = await ingest(signature, {
+      updateCursor: false,
+    });
+
+    return {
+      status: projectionSync.status === "SYNCED" ? "SYNCED" : "FAILED",
+      instructionCount: projectionSync.instructionCount,
+      indexerStatus: projectionSync.status,
+    };
+  } catch (error) {
+    return {
+      status: "FAILED",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 };
 
 export const buildRegisterUserTransaction = withController(
@@ -464,7 +500,10 @@ export const submitS1Transaction = withController("SUBMIT_S1_TRANSACTION_FAILED"
     ),
   });
 
-  ok(res, { signature });
+  ok(res, {
+    signature,
+    projectionSync: await syncSubmittedS1Projection(signature),
+  });
 });
 
 export const getS1TransactionStatus = withController(

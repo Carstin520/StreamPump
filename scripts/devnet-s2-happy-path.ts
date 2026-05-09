@@ -32,6 +32,8 @@ import { ed25519 } from "@noble/curves/ed25519";
 import { keccak_256 } from "@noble/hashes/sha3";
 import bs58 from "bs58";
 
+import "../backend/config/loadEnv";
+
 type StoredKeypair = {
   publicKey: string;
   secretKey: number[];
@@ -55,6 +57,8 @@ type SmokeState = {
 };
 
 const OUTPUT_PATH = path.resolve(process.cwd(), ".local/devnet-s2-happy-path.json");
+const ADMIN_KEYPAIR_PATH = path.resolve(process.cwd(), ".local/devnet-admin-keypair.json");
+const DEMO_AUTHORITIES_PATH = path.resolve(process.cwd(), ".local/devnet-demo-authorities.json");
 const DEFAULT_RPC = "https://api.devnet.solana.com";
 const SPONSOR_TEST_USDC_MINT_AMOUNT = 5_000_000_000n;
 const TRACK1_AMOUNT = 10_000_000n;
@@ -126,12 +130,41 @@ const keypairJson = (keypair: Keypair): StoredKeypair => ({
 const keypairFromStored = (stored: StoredKeypair): Keypair =>
   Keypair.fromSecretKey(Uint8Array.from(stored.secretKey));
 
+const keypairFromEnv = (envName: string): Keypair | null => {
+  const value = process.env[envName]?.trim();
+  if (!value) {
+    return null;
+  }
+
+  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(value) as number[]));
+};
+
+type DemoAuthoritiesState = {
+  admin?: StoredKeypair;
+  oracle?: StoredKeypair;
+};
+
 const readJson = <T>(filePath: string): T | null => {
   if (!existsSync(filePath)) {
     return null;
   }
 
   return JSON.parse(readFileSync(filePath, "utf8")) as T;
+};
+
+const keypairFromFile = (filePath: string): Keypair | null => {
+  const stored = readJson<number[]>(filePath);
+  if (!stored) {
+    return null;
+  }
+
+  return Keypair.fromSecretKey(Uint8Array.from(stored));
+};
+
+const keypairFromDemoAuthorities = (name: keyof DemoAuthoritiesState): Keypair | null => {
+  const authorities = readJson<DemoAuthoritiesState>(DEMO_AUTHORITIES_PATH);
+  const stored = authorities?.[name];
+  return stored ? keypairFromStored(stored) : null;
 };
 
 const writeState = (state: SmokeState) => {
@@ -197,7 +230,8 @@ const requestAirdropIfNeeded = async (
   connection: Connection,
   pubkey: PublicKey,
   minLamports: number,
-  label: string
+  label: string,
+  funder?: Keypair
 ) => {
   log(`checking SOL balance for ${label}: ${pubkey.toBase58()}`);
   const balance = await withTimeout(
@@ -206,6 +240,24 @@ const requestAirdropIfNeeded = async (
   );
   if (balance >= minLamports) {
     log(`${label} has ${(balance / LAMPORTS_PER_SOL).toFixed(3)} SOL`);
+    return;
+  }
+
+  if (funder && !funder.publicKey.equals(pubkey)) {
+    const topUpLamports = minLamports - balance;
+    log(`transferring ${topUpLamports / LAMPORTS_PER_SOL} SOL from admin to ${label}`);
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: funder.publicKey,
+          toPubkey: pubkey,
+          lamports: topUpLamports,
+        })
+      ),
+      [funder],
+      { commitment: "confirmed" }
+    );
     return;
   }
 
@@ -429,10 +481,19 @@ const main = async () => {
   const state = loadOrCreateState(rpcEndpoint, programId);
   log(`state file: ${OUTPUT_PATH}`);
 
-  const admin = keypairFromStored(state.admin);
-  const oracle = keypairFromStored(state.oracle);
+  const admin =
+    keypairFromEnv("PROTOCOL_ADMIN_SECRET_KEY") ??
+    keypairFromFile(ADMIN_KEYPAIR_PATH) ??
+    keypairFromStored(state.admin);
+  const oracle =
+    keypairFromEnv("ORACLE_AUTHORITY_SECRET_KEY") ??
+    keypairFromDemoAuthorities("oracle") ??
+    keypairFromStored(state.oracle);
   const creator = keypairFromStored(state.creator);
   const sponsor = keypairFromStored(state.sponsor);
+  state.admin = keypairJson(admin);
+  state.oracle = keypairJson(oracle);
+  writeState(state);
   log(`admin=${admin.publicKey.toBase58()}`);
   log(`oracle=${oracle.publicKey.toBase58()}`);
   log(`creator=${creator.publicKey.toBase58()}`);
@@ -441,6 +502,7 @@ const main = async () => {
   process.env.SOLANA_RPC_ENDPOINT = rpcEndpoint;
   process.env.STREAMPUMP_PROGRAM_ID = programId;
   process.env.ORACLE_AUTHORITY_SECRET_KEY = JSON.stringify(Array.from(oracle.secretKey));
+  process.env.PROTOCOL_ADMIN_SECRET_KEY = JSON.stringify(Array.from(admin.secretKey));
   process.env.CONTENT_ANCHOR_SIGNER_SECRET_KEY = JSON.stringify(Array.from(creator.secretKey));
   process.env.INDEXER_ENABLED = "false";
   process.env.ORACLE_SCHEDULER_ENABLED = "false";
@@ -451,11 +513,17 @@ const main = async () => {
 
   for (const [label, keypair, sol] of [
     ["admin", admin, 2],
-    ["oracle", oracle, 2],
-    ["creator", creator, 2],
-    ["sponsor", sponsor, 3],
+    ["oracle", oracle, 0.5],
+    ["creator", creator, 0.5],
+    ["sponsor", sponsor, 1.5],
   ] as const) {
-    await requestAirdropIfNeeded(connection, keypair.publicKey, sol * LAMPORTS_PER_SOL, label);
+    await requestAirdropIfNeeded(
+      connection,
+      keypair.publicKey,
+      sol * LAMPORTS_PER_SOL,
+      label,
+      admin
+    );
   }
 
   log("loading backend modules");
@@ -524,15 +592,21 @@ const main = async () => {
     const existingConfig = await anchorService.fetchProtocolConfigAccount();
     protocolUsdcMint = existingConfig.usdcMint as PublicKey;
     if (state.usdcMint && !protocolUsdcMint.equals(new PublicKey(state.usdcMint))) {
-      throw new Error(
-        `Existing protocol_config uses ${protocolUsdcMint.toBase58()} as usdc_mint, but this smoke state expects ${state.usdcMint}. Use a fresh devnet program/config or remove .local/devnet-s2-happy-path.json before first initialization.`
+      log(
+        `state usdc_mint ${state.usdcMint} differs from protocol_config ${protocolUsdcMint.toBase58()}; using protocol_config mint`
       );
     }
     state.usdcMint = protocolUsdcMint.toBase58();
 
+    if (!(existingConfig.admin as PublicKey).equals(admin.publicKey)) {
+      throw new Error(
+        `Existing protocol_config admin ${(existingConfig.admin as PublicKey).toBase58()} does not match configured admin ${admin.publicKey.toBase58()}. Set PROTOCOL_ADMIN_SECRET_KEY for the existing admin or use a fresh devnet config.`
+      );
+    }
+
     if (!(existingConfig.oracleAuthority as PublicKey).equals(oracle.publicKey)) {
       throw new Error(
-        `Existing protocol_config oracle ${(existingConfig.oracleAuthority as PublicKey).toBase58()} does not match generated oracle ${oracle.publicKey.toBase58()}. Set ORACLE_AUTHORITY_SECRET_KEY for the existing oracle or use a fresh devnet config.`
+        `Existing protocol_config oracle ${(existingConfig.oracleAuthority as PublicKey).toBase58()} does not match configured oracle ${oracle.publicKey.toBase58()}. Set ORACLE_AUTHORITY_SECRET_KEY for the existing oracle or run demo:protocol:migrate first.`
       );
     }
   }

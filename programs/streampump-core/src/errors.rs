@@ -128,4 +128,8 @@ pub enum StreamPumpError {
     MissingSpumpNonTransferableExtension,
     #[msg("SPUMP mint authority must be the protocol config PDA")]
     InvalidSpumpMintAuthority,
+    #[msg("Legacy protocol config has already been migrated")]
+    LegacyProtocolConfigAlreadyMigrated,
+    #[msg("Invalid legacy protocol config account")]
+    InvalidLegacyProtocolConfig,
 }

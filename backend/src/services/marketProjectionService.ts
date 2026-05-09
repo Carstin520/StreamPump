@@ -63,7 +63,12 @@ const unwrapEventPayload = (payload: Record<string, unknown>): Record<string, un
   }
 
   if (isRecord(payload.args)) {
-    return payload.args;
+    const nestedArgs = isRecord(payload.args.args) ? payload.args.args : {};
+    return {
+      ...(isRecord(payload.accounts) ? payload.accounts : {}),
+      ...payload.args,
+      ...nestedArgs,
+    };
   }
 
   return payload;
