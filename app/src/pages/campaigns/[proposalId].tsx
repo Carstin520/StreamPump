@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
@@ -145,6 +146,12 @@ export default function CampaignDetailPage() {
                 <p className="mt-2">Track 2 settled: {state.data.proposal.track2SettledAt ? formatIsoLabel(state.data.proposal.track2SettledAt) : "Not settled"}</p>
                 <p className="mt-2">Track 3 settled: {state.data.proposal.track3SettledAt ? formatIsoLabel(state.data.proposal.track3SettledAt) : "Not settled / private"}</p>
               </div>
+              <Link
+                className="block rounded-2xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.25)] transition hover:brightness-[1.05]"
+                href={`/campaigns/${state.data.proposal.id}/settlement`}
+              >
+                Open settlement dashboard
+              </Link>
             </Panel>
           </div>
         ) : null}

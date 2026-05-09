@@ -1,15 +1,16 @@
 # StreamPump Colosseum Demo Runbook
 
-This runbook keeps the hackathon demo focused on one credible web3 path:
+This runbook keeps the hackathon demo focused on two controlled web3 paths:
 
-1. Wallet sign-in.
-2. Creator creates and finalizes content.
-3. Creator creates a sponsor proposal intent.
-4. Creator signs the launch bundle once.
-5. Sponsor signs once and submits.
-6. Campaign detail shows Solana proof: proposal PDA, transaction signature, manifest hash, and content anchor.
+1. Seed a devnet S1 creator market with a graduated buyout and claimable holder positions.
+2. Open the live S1 market, buy/sell S1, inspect buyout state, claim USDC, and verify portfolio.
+3. Creator creates and finalizes S2 content.
+4. Creator creates a sponsor proposal intent.
+5. Creator signs the launch bundle once.
+6. Sponsor signs once and submits.
+7. Campaign detail and settlement pages show Solana proof: proposal PDA, transaction signature, manifest hash, content anchor, and track state.
 
-S1 discovery, portfolio, buyout, and claim screens are product vision/read-model previews for the hackathon build. They are intentionally not presented as live trading surfaces.
+S1 buyout formation is still prepared by seed/operator scripts. The productized live S1 demo path starts from a seeded creator market and graduated/claimable buyout state.
 
 ## Environment
 
@@ -53,7 +54,7 @@ Backend demo defaults should be conservative:
 ```bash
 AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false
 AUTH_ALLOW_LEGACY_WALLET_HEADER=false
-INDEXER_ENABLED=false
+INDEXER_ENABLED=true
 MUX_RECONCILIATION_ENABLED=false
 MUX_RECONCILIATION_RUN_ON_BOOT=false
 ORACLE_SCHEDULER_ENABLED=false
@@ -77,6 +78,27 @@ Run Anchor tests when local validator/tooling is stable:
 ```bash
 npm run test:anchor
 ```
+
+## S1 Demo Preconditions
+
+The live S1 frontend expects a seeded devnet creator with market, buyout, and portfolio projections:
+
+```bash
+# Only needed when the legacy devnet protocol config has not been migrated.
+npm run demo:protocol:migrate
+
+npm run demo:s1:devnet
+```
+
+The seed writes `.local/devnet-s1-buyout-claim-seed.json` with the creator wallet, sponsor, early/regular holders, buyout state PDA, offer PDA, and key signatures. Use the emitted creator wallet for:
+
+```text
+/market/:creatorWallet
+/buyout/:creatorWallet
+/portfolio
+```
+
+The S1 buy/sell/claim UI is live against backend transaction builders and devnet transactions. The buyout offer/accept/graduation sequence is not a product UI yet; it is prepared by the seed script so the demo can start from a graduated, claimable state.
 
 ## S2 Demo Preconditions
 
@@ -104,6 +126,7 @@ The seed script writes `.local/colosseum-demo-seed.json` with generated local de
 The backend/chain happy path can be run without frontend review:
 
 ```bash
+npm run demo:s1:devnet
 npm run demo:s2:devnet
 ```
 
@@ -182,6 +205,7 @@ npm run dev --prefix app
 
 ## Demo Boundaries
 
-- Do not claim S1 buy/sell/claim is live in this build.
+- Do not claim S1 buyout formation is productized in this build; offers, acceptance, and graduation are seeded/operator-driven.
 - Do not enable Track3 automatic settlement. Track3 CPS still needs a real merchant/reconciliation source.
+- Do not present S2 endorsement or third-party Track3 reconciliation as live integrations.
 - Keep oracle scheduler off for the public demo unless manually testing Track1/Track2 with known seeded data.

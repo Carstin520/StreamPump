@@ -15,16 +15,16 @@
 
 ## Current Status
 
-StreamPump is a serious prototype moving toward a usable product. The strongest path today is the **S2 sponsored campaign launch and settlement spine**. The **public creator discovery frontend** is visually advanced, but several actions still need production wiring.
+StreamPump is a serious prototype moving toward a usable product. The strongest paths today are the **controlled S1 market / buyout demo** and the **S2 sponsored campaign launch and settlement spine**. The public creator discovery frontend is visually advanced, while selected onboarding/operator actions still need production wiring.
 
-Snapshot as of **2026-05-08**:
+Snapshot as of **2026-05-10**:
 
 | Layer | Progress | What is real now | Main gaps |
 | --- | --- | --- | --- |
 | Solana program | Advanced prototype | Anchor instructions for S1 discovery, S1 buyout, S2 proposal creation, sponsor funding, campaign settlement, content hash anchoring, protocol/user/org state | Not audited; some Tier 2 surfaces are not ready for public frontend exposure |
-| Backend | Integration prototype | Express v1 API, Prisma read/write models, auth/session shell, content manifests, proposal intents, transaction bundles, public feed, market projections, Cloudflare R2 storage, Mux, indexer/reconciliation services | Production identity verification, operator tooling, full media/review workflows, deployment hardening |
-| Frontend | Product shell plus partial API wiring | Next.js user surface for Explore, Trending, Creator, Post, Portfolio, Me, Activity; workspace and campaign pages; wallet/Web3Auth scaffolding | Some S1 market, rewards, buyout, settlement, and workspace actions remain preview or read-only |
-| Demo readiness | Scoped | `wallet sign-in -> content manifest -> proposal intent -> creator sign -> sponsor sign -> confirmed Solana campaign` | S1 buy/sell/claim must be presented as product vision unless promoted later |
+| Backend | Integration prototype | Express v1 API, Prisma read/write models, auth/session shell, content manifests, proposal intents, S1 transaction builders, proposal transaction bundles, public feed, market projections, Cloudflare R2 storage, Mux, indexer/reconciliation services | Production identity verification, operator tooling, full media/review workflows, deployment hardening |
+| Frontend | Demo-ready product shell | Next.js user surface for Explore, Trending, Creator, Post, Portfolio, Me, Activity; live S1 market/buyout/portfolio surfaces; workspace, campaign, and settlement pages; wallet/Web3Auth scaffolding | Rewards, S2 endorsement, buyout formation, and some workspace actions remain preview/operator-driven |
+| Demo readiness | Controlled | S1 buy/sell/portfolio/claim against seeded devnet state; S2 proposal launch plus settlement smoke path | S1 buyout offer/accept/graduation is seeded, not productized; S2 Track3 CPS uses operator/mock settlement inputs |
 | Deployment | Planned | Vercel app + Render backend + Neon/Postgres + Cloudflare R2 + Mux documented | No verified checked-in Vercel project config from repo root |
 
 ## Product Model
@@ -282,21 +282,32 @@ npm run test:s2:unhappy
 
 ## Demo Path
 
-For the current hackathon/demo build, keep the live path intentionally scoped to S2:
+For the current hackathon/demo build, keep the live path intentionally scoped to two controlled flows:
 
 ```text
-wallet sign-in
+S1 controlled demo
+  -> seed devnet S1 market + graduated buyout
+  -> open live /market/:creatorWallet
+  -> buy or sell S1 with wallet session
+  -> open /buyout/:creatorWallet
+  -> claim USDC from a seeded holder position
+  -> verify /portfolio read model
+```
+
+```text
+S2 campaign demo
+  -> wallet sign-in
   -> content manifest
   -> proposal intent
   -> creator signs launch bundle once
   -> sponsor signs and submits once
   -> confirmed Solana campaign
-  -> campaign detail shows PDA, tx signature, manifest hash, content anchor
+  -> campaign detail and settlement pages show PDA, tx signature, manifest hash, content anchor, and track state
 ```
 
 Use [DEMO.md](DEMO.md) for the exact runbook, required env toggles, seed scripts, devnet smoke data, and acceptance checklist.
 
-Important boundary: S1 discovery, portfolio, buyout, and claim screens are currently read-model/product-vision previews unless explicitly promoted later.
+Important boundary: S1 buyout creation, sponsor offers, creator acceptance, and graduation execution are still prepared by seed/operator scripts for the demo. S2 endorsement and third-party Track3 reconciliation are not presented as live external integrations.
 
 ## Deployment Notes
 
@@ -344,7 +355,7 @@ Near-term priorities:
 
 - Finish production auth identity verification and session hardening.
 - Wire workspace upload/finalize/publication actions end to end.
-- Promote selected S1 market read models into real frontend actions only after backend and chain projections are ready.
+- Productize S1 buyout formation UI after the controlled S1 demo path is stable.
 - Complete production media playback, mobile polish, and Mux reconciliation visibility.
 - Add operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
 - Verify deployment from clean Vercel/Render projects and document environment ownership.
@@ -352,7 +363,7 @@ Near-term priorities:
 
 ## Documentation Index
 
-- [DEMO.md](DEMO.md): scoped S2 demo runbook.
+- [DEMO.md](DEMO.md): controlled S1/S2 demo runbook.
 - [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md): S1 economics and guardrails.
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md): DB-first launch contract.
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md): backend environment and vendor setup.

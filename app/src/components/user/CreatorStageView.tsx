@@ -5,6 +5,7 @@ import { ArrowDownIcon, ArrowUpIcon, FollowCheckIcon, FollowPlusIcon } from "@/c
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
 import { compactNumber } from "@/lib/public-data";
+import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
 
 type ProfileTab = "Posts" | "Investment File" | "Signals";
 
@@ -60,6 +61,7 @@ export const CreatorStageView = ({
           <BuyPanel
             buyAmount={buyAmount}
             buyPreview={buyPreview}
+            creator={creator}
             market={market}
             onBuyAmountChange={setBuyAmount}
           />
@@ -566,16 +568,19 @@ const mapPointToCurve = (market: MarketModel, supply: number) => {
 const BuyPanel = ({
   buyAmount,
   buyPreview,
+  creator,
   market,
   onBuyAmountChange,
 }: {
   buyAmount: number;
   buyPreview: BuyPreview;
+  creator: CreatorMarketRecord;
   market: MarketModel;
   onBuyAmountChange: (value: number) => void;
 }) => {
   const [pulse, setPulse] = useState(false);
   const disabled = market.state !== "S1_DISCOVERY";
+  const liveCreatorWallet = resolveCreatorWalletForRoute(creator.id);
   const currentHolding = 0;
   const futureHolding = currentHolding + buyPreview.amount;
 
@@ -593,7 +598,7 @@ const BuyPanel = ({
             Trade Fans Token
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-white">
-            {disabled ? "Preview Mode" : "Buy S1 Tokens"}
+            {liveCreatorWallet ? "Live S1 Market" : disabled ? "Preview Mode" : "Buy S1 Tokens"}
           </h3>
         </div>
         <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
@@ -669,34 +674,53 @@ const BuyPanel = ({
           />
         </div>
 
-        <button
-          className={`relative w-full overflow-hidden rounded-xl py-2.5 text-xs font-semibold transition ${
-            disabled
-              ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
-              : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
-          } ${pulse ? "tap-bounce-active" : ""}`}
-          onClick={() => setPulse(true)}
-          type="button"
-        >
-          {disabled
-            ? market.state === "S1_BUYOUT"
-              ? "Buyout Live · Buy Locked"
-              : "Graduated · S2 Active"
-            : "Preview Buy"}
-        </button>
+        {liveCreatorWallet ? (
+          <div className="grid gap-2">
+            <Link
+              className="block rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-3 py-2.5 text-center text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] transition hover:brightness-[1.05]"
+              href={`/market/${liveCreatorWallet}`}
+            >
+              Open live market
+            </Link>
+            <Link
+              className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
+              href={`/buyout/${liveCreatorWallet}`}
+            >
+              Open buyout room
+            </Link>
+          </div>
+        ) : (
+          <>
+            <button
+              className={`relative w-full overflow-hidden rounded-xl py-2.5 text-xs font-semibold transition ${
+                disabled
+                  ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
+                  : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
+              } ${pulse ? "tap-bounce-active" : ""}`}
+              onClick={() => setPulse(true)}
+              type="button"
+            >
+              {disabled
+                ? market.state === "S1_BUYOUT"
+                  ? "Buyout Live · Buy Locked"
+                  : "Graduated · S2 Active"
+                : "Preview Buy"}
+            </button>
 
-        <button
-          className="glass-button-ghost w-full px-3 py-2 text-xs font-medium"
-          type="button"
-        >
-          Add to Watchlist
-        </button>
+            <button
+              className="glass-button-ghost w-full px-3 py-2 text-xs font-medium"
+              type="button"
+            >
+              Add to Watchlist
+            </button>
+          </>
+        )}
 
-        {disabled ? null : (
+        {!liveCreatorWallet && !disabled ? (
           <p className="text-center text-[10px] text-[#5a6b82]">
             Demo flow · on-chain trade lands in next release
           </p>
-        )}
+        ) : null}
       </div>
     </section>
   );
