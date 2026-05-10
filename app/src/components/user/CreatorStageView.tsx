@@ -2,8 +2,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { ArrowDownIcon, ArrowUpIcon, FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
+import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
+import { createMockPriceHistory } from "@/lib/price-history";
 import { compactNumber } from "@/lib/public-data";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
 
@@ -46,7 +48,7 @@ export const CreatorStageView = ({
 
       <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3.5">
-          <BondingCurvePanel buyPreview={buyPreview} market={market} />
+          <PriceHistoryPanel creator={creator} market={market} />
           <MarketStatsBar creator={creator} market={market} />
           <LifecycleTimeline creator={creator} market={market} />
           <ContentSurface
@@ -347,220 +349,51 @@ const StatCell = ({
   </div>
 );
 
-/* ──────────────────────────  Bonding curve  ────────────────────────── */
+/* ──────────────────────────  Price history  ────────────────────────── */
 
-const BondingCurvePanel = ({
-  buyPreview,
+const PriceHistoryPanel = ({
+  creator,
   market,
 }: {
-  buyPreview: BuyPreview;
+  creator: CreatorMarketRecord;
   market: MarketModel;
 }) => {
-  const path = useMemo(() => buildCurvePath(market), [market]);
-  const currentDot = useMemo(() => mapPointToCurve(market, market.supply), [market]);
-  const previewDot = useMemo(
-    () => mapPointToCurve(market, buyPreview.newSupply),
-    [market, buyPreview],
+  const priceHistory = useMemo(
+    () =>
+      createMockPriceHistory({
+        basePrice: market.priceSpump,
+        key: creator.id,
+      }),
+    [creator.id, market.priceSpump],
   );
 
   return (
     <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-4 md:p-5">
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-            Bonding curve
+            Price history
           </p>
           <h2 className="mt-0.5 text-base font-semibold tracking-[-0.02em] text-white">
-            S1 supply × SPUMP price
+            S1 market price
           </h2>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-[#7486a1]">
-          <LegendDot color="#de402a" label="Now" />
-          <LegendDot color="#ffb38a" label="After buy" />
-          <LegendDot color="rgba(255,255,255,0.18)" label="Curve" outline />
+        <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-right">
+          <p className="text-[9px] uppercase tracking-[0.16em] text-[#6f8099]">Current</p>
+          <p className="mt-0.5 text-xs font-semibold text-white">{market.priceSpump} SPUMP</p>
         </div>
       </header>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_200px]">
-        <div className="relative aspect-[400/220] overflow-hidden rounded-[14px] border border-white/[0.05] bg-[radial-gradient(circle_at_30%_30%,rgba(222,64,42,0.08),transparent_55%),linear-gradient(180deg,#0d1320_0%,#0a0f18_100%)]">
-          <svg className="h-full w-full" preserveAspectRatio="xMidYMid meet" viewBox="0 0 400 220">
-            <defs>
-              <linearGradient id="curveStroke" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0%" stopColor="#79b9ff" stopOpacity="0.8" />
-                <stop offset="60%" stopColor="#ffb38a" stopOpacity="0.85" />
-                <stop offset="100%" stopColor="#de402a" stopOpacity="1" />
-              </linearGradient>
-              <linearGradient id="curveFill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#de402a" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#de402a" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            {[0.25, 0.5, 0.75].map((y) => (
-              <line
-                key={y}
-                stroke="rgba(255,255,255,0.04)"
-                strokeWidth="1"
-                x1="0"
-                x2="400"
-                y1={220 * y}
-                y2={220 * y}
-              />
-            ))}
-
-            <path d={`${path} L 400 220 L 0 220 Z`} fill="url(#curveFill)" />
-            <path d={path} fill="none" stroke="url(#curveStroke)" strokeWidth="2.5" />
-
-            <line
-              stroke="rgba(255,255,255,0.12)"
-              strokeDasharray="3 4"
-              strokeWidth="1"
-              x1={currentDot.x}
-              x2={currentDot.x}
-              y1={currentDot.y}
-              y2="220"
-            />
-
-            {previewDot.x !== currentDot.x ? (
-              <>
-                <line
-                  stroke="rgba(255,179,138,0.35)"
-                  strokeDasharray="3 4"
-                  strokeWidth="1"
-                  x1={previewDot.x}
-                  x2={previewDot.x}
-                  y1={previewDot.y}
-                  y2="220"
-                />
-                <circle cx={previewDot.x} cy={previewDot.y} fill="#ffb38a" r="5" />
-                <circle cx={previewDot.x} cy={previewDot.y} fill="rgba(255,179,138,0.18)" r="11" />
-              </>
-            ) : null}
-
-            <circle cx={currentDot.x} cy={currentDot.y} fill="#de402a" r="6" />
-            <circle cx={currentDot.x} cy={currentDot.y} fill="rgba(222,64,42,0.18)" r="14" />
-          </svg>
-
-          <div className="pointer-events-none absolute bottom-2 left-3 text-[10px] uppercase tracking-[0.18em] text-[#6f8099]">
-            Supply →
-          </div>
-          <div className="pointer-events-none absolute left-3 top-3 text-[10px] uppercase tracking-[0.18em] text-[#6f8099]">
-            Price ↑
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-          <CurveStat
-            accent="#de402a"
-            hint={`Supply ${compactNumber(market.supply)}`}
-            label="Current"
-            value={`${market.priceSpump} SPUMP`}
-          />
-          <CurveStat
-            accent="#ffd6a8"
-            hint="Marginal next-token cost"
-            label="Next token"
-            value={`${market.nextPriceSpump} SPUMP`}
-          />
-          <CurveStat
-            accent="#ffb38a"
-            hint={`After +${buyPreview.amount} S1`}
-            label="Price after buy"
-            value={`${buyPreview.priceAfter} SPUMP`}
-          />
-          <CurveStat
-            accent="#8ad0ff"
-            hint="Graduation target"
-            label="Target"
-            value={`${market.targetPriceSpump} SPUMP`}
-          />
-        </div>
+      <div className="mt-3">
+        <PriceHistoryChart
+          currencyLabel="SPUMP"
+          defaultRange="1M"
+          height={250}
+          points={priceHistory}
+        />
       </div>
     </section>
   );
-};
-
-const LegendDot = ({
-  color,
-  label,
-  outline = false,
-}: {
-  color: string;
-  label: string;
-  outline?: boolean;
-}) => (
-  <span className="flex items-center gap-1.5">
-    <span
-      className="h-2 w-2 rounded-full"
-      style={{
-        background: outline ? "transparent" : color,
-        border: outline ? `1px solid ${color}` : "none",
-      }}
-    />
-    {label}
-  </span>
-);
-
-const CurveStat = ({
-  accent,
-  hint,
-  label,
-  value,
-}: {
-  accent: string;
-  hint: string;
-  label: string;
-  value: string;
-}) => (
-  <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-2.5 py-2">
-    <div className="flex items-center gap-1.5">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">
-        {label}
-      </span>
-    </div>
-    <p className="mt-1 text-xs font-semibold tracking-[-0.01em] text-white">{value}</p>
-    <p className="mt-0.5 text-[9px] text-[#5a6b82]">{hint}</p>
-  </div>
-);
-
-const buildCurvePath = (market: MarketModel) => {
-  const points: Array<[number, number]> = [];
-  const steps = 28;
-
-  for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
-    const supply = t * market.maxSupply;
-    const price = priceAtSupply(market, supply);
-    const x = t * 400;
-    const y = mapPriceToY(market, price);
-    points.push([x, y]);
-  }
-
-  return points
-    .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
-    .join(" ");
-};
-
-const priceAtSupply = (market: MarketModel, supply: number) => {
-  const ratio = supply / market.maxSupply;
-  const base = market.priceSpump * 0.4;
-  return base + (market.targetPriceSpump - base) * Math.pow(ratio, 1.6);
-};
-
-const mapPriceToY = (market: MarketModel, price: number) => {
-  const minP = market.priceSpump * 0.4;
-  const maxP = market.targetPriceSpump * 1.05;
-  const clamped = Math.min(Math.max(price, minP), maxP);
-  const t = (clamped - minP) / (maxP - minP);
-  return 220 - t * 200 - 8;
-};
-
-const mapPointToCurve = (market: MarketModel, supply: number) => {
-  const clampedSupply = Math.min(Math.max(supply, 0), market.maxSupply);
-  const x = (clampedSupply / market.maxSupply) * 400;
-  const y = mapPriceToY(market, priceAtSupply(market, clampedSupply));
-  return { x, y };
 };
 
 /* ──────────────────────────  Buy panel  ────────────────────────── */

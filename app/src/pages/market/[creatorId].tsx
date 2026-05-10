@@ -13,6 +13,7 @@ import {
   S1TransactionDrawer,
   WalletSessionAlert,
 } from "@/components/s1/S1TransactionDrawer";
+import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
 import { StagePill } from "@/components/shared/StagePill";
 import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
 import {
@@ -37,80 +38,22 @@ import {
   shortenWallet,
 } from "@/lib/s1-market-view";
 import { compactNumber } from "@/lib/public-data";
-
-/* ------------------------------------------------------------------ */
-/*  Bonding curve chart                                                */
-/* ------------------------------------------------------------------ */
-
-const CHART = { w: 800, h: 260, pad: { t: 20, r: 28, b: 36, l: 52 } } as const;
-
-function buildCurvePath(supply: number) {
-  const maxSupply = Math.max(50_000, supply * 2, 100);
-  const chartW = CHART.w - CHART.pad.l - CHART.pad.r;
-  const chartH = CHART.h - CHART.pad.t - CHART.pad.b;
-  const pts = Array.from({ length: 90 }, (_, i) => {
-    const f = i / 89;
-    return {
-      x: CHART.pad.l + f * chartW,
-      y: CHART.pad.t + chartH - Math.pow(f, 1.8) * chartH,
-    };
-  });
-  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-  const fill = `${path} L${pts[pts.length - 1].x},${CHART.pad.t + chartH} L${pts[0].x},${CHART.pad.t + chartH} Z`;
-  const progress = Math.min(1, supply / maxSupply);
-  const dx = CHART.pad.l + progress * chartW;
-  const dy = CHART.pad.t + chartH - Math.pow(progress, 1.8) * chartH;
-  return { path, fill, dx, dy };
-}
-
-function CurveChart({ supply }: { supply: number }) {
-  const { path, fill, dx, dy } = useMemo(
-    () => buildCurvePath(Number.isFinite(supply) ? supply : 0),
-    [supply],
-  );
-  const chartH = CHART.h - CHART.pad.t - CHART.pad.b;
-
-  return (
-    <svg className="w-full" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${CHART.w} ${CHART.h}`}>
-      <defs>
-        <linearGradient id="c-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#de402a" stopOpacity={0.28} />
-          <stop offset="100%" stopColor="#de402a" stopOpacity={0} />
-        </linearGradient>
-        <linearGradient id="c-line" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#de402a" stopOpacity={0.35} />
-          <stop offset="50%" stopColor="#de402a" />
-          <stop offset="100%" stopColor="#f3b33e" />
-        </linearGradient>
-      </defs>
-      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-        <line
-          key={f}
-          stroke="rgba(255,255,255,0.04)"
-          strokeDasharray="4 6"
-          x1={CHART.pad.l}
-          x2={CHART.w - CHART.pad.r}
-          y1={CHART.pad.t + chartH * (1 - f)}
-          y2={CHART.pad.t + chartH * (1 - f)}
-        />
-      ))}
-      <path d={fill} fill="url(#c-fill)" />
-      <path d={path} fill="none" stroke="url(#c-line)" strokeLinecap="round" strokeWidth={2.5} />
-      <circle cx={dx} cy={dy} fill="#de402a" opacity={0.2} r={16} />
-      <circle cx={dx} cy={dy} fill="#de402a" r={5.5} />
-      <circle cx={dx} cy={dy} fill="#fff" r={2.5} />
-      <text fill="#4f6178" fontSize={9} textAnchor="middle" x={CHART.w / 2} y={CHART.h - 6}>
-        S1 SUPPLY
-      </text>
-    </svg>
-  );
-}
+import { createMockPriceHistory, parseAtomicSpumpToNumber } from "@/lib/price-history";
 
 /* ------------------------------------------------------------------ */
 /*  Price card                                                         */
 /* ------------------------------------------------------------------ */
 
 function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
+  const priceHistory = useMemo(
+    () =>
+      createMockPriceHistory({
+        basePrice: parseAtomicSpumpToNumber(profile.creator.currentPriceSpump),
+        key: profile.creator.creatorWallet,
+      }),
+    [profile.creator.creatorWallet, profile.creator.currentPriceSpump],
+  );
+
   return (
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -126,7 +69,13 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
         <StagePill stage={profile.creator.stage} />
       </div>
       <div className="-mx-2 mt-3">
-        <CurveChart supply={Number(profile.creator.s1Supply ?? 0)} />
+        <PriceHistoryChart
+          className="px-2"
+          currencyLabel="SPUMP"
+          defaultRange="1M"
+          height={260}
+          points={priceHistory}
+        />
       </div>
     </div>
   );
