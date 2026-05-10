@@ -2,6 +2,8 @@ import Head from "next/head";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
+import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 
 const creator = findCreator("neo-park");
@@ -23,8 +25,6 @@ const ENDORSERS = [
   { name: "0x91...2E", amount: 18_000 },
 ];
 
-const EXISTING_ENDORSED = ENDORSERS.reduce((s, e) => s + e.amount, 0);
-
 const DIAL_SIZE = 240;
 const DIAL_STROKE = 10;
 const DIAL_RADIUS = (DIAL_SIZE - DIAL_STROKE) / 2;
@@ -42,14 +42,18 @@ function clamp(v: number, min: number, max: number) {
 
 export default function EndorsePage() {
   const [stakeAmount, setStakeAmount] = useState(10_000);
+  const [endorsers, setEndorsers] = useState(ENDORSERS);
+  const [demoSummary, setDemoSummary] = useState<string | null>(null);
+  const demoFlow = useDemoActionFlow();
   const dialRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
 
   const fraction = stakeAmount / FAN_BALANCE;
   const dashOffset = DIAL_CIRCUMFERENCE * (1 - fraction);
 
-  const totalEndorsed = EXISTING_ENDORSED + stakeAmount;
-  const successUsdc = (stakeAmount / totalEndorsed) * FAN_POOL_SHARE;
+  const totalEndorsed = endorsers.reduce((s, e) => s + e.amount, 0);
+  const projectedEndorsed = totalEndorsed + stakeAmount;
+  const successUsdc = (stakeAmount / projectedEndorsed) * FAN_POOL_SHARE;
   const failLoss = stakeAmount * 0.05;
 
   const handleDialInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -87,6 +91,22 @@ export default function EndorsePage() {
   }, []);
 
   const formattedStake = useMemo(() => compactNumber(stakeAmount), [stakeAmount]);
+
+  const handleConfirmEndorse = useCallback(
+    (options?: { fail?: boolean }) => {
+      demoFlow.submit({
+        fail: options?.fail,
+        onSuccess: () => {
+          setEndorsers((items) => {
+            const withoutYou = items.filter((item) => item.name !== "You");
+            return [{ name: "You", amount: stakeAmount }, ...withoutYou];
+          });
+          setDemoSummary(`Endorsed with ${compactNumber(stakeAmount)} SPUMP.`);
+        },
+      });
+    },
+    [demoFlow, stakeAmount],
+  );
 
   return (
     <>
@@ -335,7 +355,7 @@ export default function EndorsePage() {
                 Current Endorsers
               </p>
               <div className="mt-4 space-y-3">
-                {ENDORSERS.map((e) => (
+                {endorsers.map((e) => (
                   <div
                     key={e.name}
                     className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3"
@@ -378,9 +398,34 @@ export default function EndorsePage() {
             </section>
 
             {/* ── Action button ── */}
-            <button className="glass-button-primary section-enter w-full rounded-full py-4 text-base font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]">
-              Endorse with {compactNumber(stakeAmount)} SPUMP
+            <button
+              className="glass-button-primary section-enter w-full rounded-full py-4 text-base font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={demoFlow.busy || demoFlow.state.status === "success"}
+              onClick={demoFlow.begin}
+              type="button"
+            >
+              {demoFlow.busy
+                ? "Submitting..."
+                : demoFlow.state.status === "success"
+                  ? "Endorsed"
+                  : `Endorse with ${compactNumber(stakeAmount)} SPUMP`}
             </button>
+            <DemoActionStatusCard
+              amountLabel={`${compactNumber(stakeAmount)} SPUMP`}
+              confirmLabel="Confirm Endorse"
+              description="Confirm this mock SPUMP endorsement. The endorser list and total update locally after submission."
+              onCancel={demoFlow.reset}
+              onConfirm={handleConfirmEndorse}
+              onRetry={demoFlow.retry}
+              state={demoFlow.state}
+              successLabel="Endorsed"
+              title="Endorse confirmation"
+            />
+            {demoSummary ? (
+              <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
+                {demoSummary}
+              </div>
+            ) : null}
           </div>
         </div>
       </PageShell>

@@ -13,7 +13,9 @@ import {
   S1TransactionDrawer,
   WalletSessionAlert,
 } from "@/components/s1/S1TransactionDrawer";
+import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { StagePill } from "@/components/shared/StagePill";
+import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
 import {
   buildS1ClaimUsdcTransaction,
@@ -298,18 +300,23 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
 function RageQuitPanel({
   active,
   creatorWallet,
+  isDemoRoute,
+  onDemoExit,
   onRefresh,
   positionBalance,
   sessionWallet,
 }: {
   active: boolean;
   creatorWallet: string;
+  isDemoRoute?: boolean;
+  onDemoExit?: (amount: number) => void;
   onRefresh: () => Promise<void>;
   positionBalance: string;
   sessionWallet: string | null;
 }) {
   const maxTokens = Math.max(0, Number(positionBalance || 0));
   const [amount, setAmount] = useState(maxTokens > 0 ? 1 : 0);
+  const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
 
@@ -328,7 +335,18 @@ function RageQuitPanel({
     if (submitted) await onRefresh();
   }, [flow, creatorWallet, amount, onRefresh]);
 
+  const executeDemoExit = useCallback(
+    (options?: { fail?: boolean }) => {
+      demoFlow.submit({
+        fail: options?.fail,
+        onSuccess: () => onDemoExit?.(amount),
+      });
+    },
+    [amount, demoFlow, onDemoExit],
+  );
+
   const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+  const demoBusy = demoFlow.state.status === "submitted";
 
   return (
     <div className={`rounded-[14px] border p-5 ${active ? "border-[#de402a]/25 bg-[#1a120e]/50" : "border-white/[0.05] bg-white/[0.015] opacity-70"}`}>
@@ -346,17 +364,17 @@ function RageQuitPanel({
             <div className="flex items-center gap-2">
               <input
                 className="w-16 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-right text-sm font-bold text-white outline-none transition focus:border-white/[0.16]"
-                disabled={!active}
+                disabled={!active || demoBusy}
                 max={maxTokens}
                 min={1}
-                onChange={(e) => setAmount(Math.max(1, Math.min(maxTokens, Number(e.target.value) || 1)))}
+                onChange={(e) => { setAmount(Math.max(1, Math.min(maxTokens, Number(e.target.value) || 1))); demoFlow.reset(); }}
                 type="number"
                 value={amount}
               />
               <button
                 className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold text-[#8ea0ba] transition hover:text-white disabled:opacity-40"
-                disabled={!active}
-                onClick={() => setAmount(maxTokens)}
+                disabled={!active || demoBusy}
+                onClick={() => { setAmount(maxTokens); demoFlow.reset(); }}
                 type="button"
               >
                 Max
@@ -364,9 +382,49 @@ function RageQuitPanel({
             </div>
           </div>
 
+          <input
+            className="mt-3 w-full accent-[#de402a]"
+            disabled={!active || demoBusy}
+            max={maxTokens}
+            min={1}
+            onChange={(e) => { setAmount(Number(e.target.value)); demoFlow.reset(); }}
+            type="range"
+            value={amount}
+          />
+
           <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
 
-          {!signedIn ? (
+          {isDemoRoute ? (
+            <>
+              <button
+                className={`mt-4 w-full rounded-full py-2.5 text-[12px] font-semibold transition-all ${
+                  active && amount > 0
+                    ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.8)_0%,rgba(190,52,34,0.8)_100%)] text-white shadow-[0_6px_20px_rgba(222,64,42,0.2)] hover:brightness-110"
+                    : "cursor-not-allowed bg-white/[0.04] text-white/30"
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+                disabled={!active || amount <= 0 || demoBusy || demoFlow.state.status === "success"}
+                onClick={demoFlow.begin}
+                type="button"
+              >
+                {demoBusy
+                  ? "Submitting..."
+                  : demoFlow.state.status === "success"
+                    ? "Exited"
+                    : "Exit Position"}
+              </button>
+              <DemoActionStatusCard
+                amountLabel={`${amount} S1`}
+                confirmLabel="Confirm Exit Position"
+                description="Confirm this mock rage quit. The local S1 position decreases after submission."
+                onCancel={demoFlow.reset}
+                onConfirm={executeDemoExit}
+                onRetry={demoFlow.retry}
+                state={demoFlow.state}
+                successLabel="Exited"
+                title="Rage quit confirmation"
+              />
+            </>
+          ) : !signedIn ? (
             <div className="mt-4 space-y-2">
               <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
               <Link
@@ -413,6 +471,8 @@ function RageQuitPanel({
 function ClaimPanel({
   claimableUsdc,
   creatorWallet,
+  isDemoRoute,
+  onDemoClaim,
   onRefresh,
   positionBalance,
   sessionWallet,
@@ -420,18 +480,22 @@ function ClaimPanel({
 }: {
   claimableUsdc: string | null;
   creatorWallet: string;
+  isDemoRoute?: boolean;
+  onDemoClaim?: () => void;
   onRefresh: () => Promise<void>;
   positionBalance: string;
   sessionWallet: string | null;
   sponsorWallet: string | null;
 }) {
+  const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
 
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
   const signedIn = Boolean(sessionWallet && wallet.connected && !walletMismatch);
-  const canClaim = signedIn && sponsorWallet && hasClaimableUsdc(claimableUsdc) && Number(positionBalance || 0) > 0;
+  const hasClaimable = hasClaimableUsdc(claimableUsdc) && Number(positionBalance || 0) > 0;
+  const canClaim = isDemoRoute ? Boolean(sponsorWallet && hasClaimable) : Boolean(signedIn && sponsorWallet && hasClaimable);
 
   const execute = useCallback(async () => {
     if (!sponsorWallet) return;
@@ -441,7 +505,18 @@ function ClaimPanel({
     if (submitted) await onRefresh();
   }, [flow, creatorWallet, sponsorWallet, onRefresh]);
 
+  const executeDemoClaim = useCallback(
+    (options?: { fail?: boolean }) => {
+      demoFlow.submit({
+        fail: options?.fail,
+        onSuccess: onDemoClaim,
+      });
+    },
+    [demoFlow, onDemoClaim],
+  );
+
   const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+  const demoBusy = demoFlow.state.status === "submitted";
 
   return (
     <div className="rounded-[14px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 p-5">
@@ -463,7 +538,16 @@ function ClaimPanel({
           <p className="text-[10px] text-[#8ea0ba]">{canClaim ? "Ready to claim" : "Watch only"}</p>
           <p className="mt-0.5 font-mono text-[11px] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
         </div>
-        {signedIn ? (
+        {isDemoRoute ? (
+          <button
+            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[12px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canClaim || demoBusy || demoFlow.state.status === "success"}
+            onClick={demoFlow.begin}
+            type="button"
+          >
+            {demoBusy ? "Submitting..." : demoFlow.state.status === "success" ? "Claimed" : "Claim"}
+          </button>
+        ) : signedIn ? (
           <button
             className="rounded-full bg-[#65ecaf] px-5 py-2 text-[12px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canClaim || busy}
@@ -486,6 +570,20 @@ function ClaimPanel({
       </div>
 
       <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
+
+      {isDemoRoute ? (
+        <DemoActionStatusCard
+          amountLabel={formatUsdcAmount(claimableUsdc)}
+          confirmLabel="Confirm Claim"
+          description="Confirm this mock claim. The claimable USDC clears locally after submission."
+          onCancel={demoFlow.reset}
+          onConfirm={executeDemoClaim}
+          onRetry={demoFlow.retry}
+          state={demoFlow.state}
+          successLabel="Claimed"
+          title="Claim confirmation"
+        />
+      ) : null}
 
       <div className="mt-3">
         <S1TransactionDrawer
@@ -512,6 +610,7 @@ function BuyoutPage() {
   const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [demoSummary, setDemoSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -571,6 +670,50 @@ function BuyoutPage() {
     phase === "rage_quit" &&
     Boolean(profile?.buyout?.rageQuitDeadlineAt) &&
     Date.parse(profile?.buyout?.rageQuitDeadlineAt ?? "") > Date.now();
+
+  const handleDemoExit = useCallback(
+    (amount: number) => {
+      setPortfolio((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          positions: current.positions.map((item) => {
+            if (item.creatorWallet !== creatorWallet && item.creator?.creatorWallet !== creatorWallet) {
+              return item;
+            }
+            const currentBalance = Math.max(0, Number(item.internalTokenBalance || 0));
+            const nextBalance = Math.max(0, currentBalance - amount);
+            const currentCostBasis = Math.max(0, Number(item.spumpCostBasis || 0));
+            const retainedRatio = currentBalance > 0 ? nextBalance / currentBalance : 0;
+            return {
+              ...item,
+              internalTokenBalance: String(Math.round(nextBalance)),
+              spumpCostBasis: String(Math.round(currentCostBasis * retainedRatio)),
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        };
+      });
+      setDemoSummary(`Exited ${amount} S1 through the mock rage quit flow.`);
+    },
+    [creatorWallet],
+  );
+
+  const handleDemoClaim = useCallback(() => {
+    const claimedLabel = formatUsdcAmount(position?.estimatedClaimableUsdc ?? null);
+    setPortfolio((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        positions: current.positions.map((item) =>
+          item.creatorWallet === creatorWallet || item.creator?.creatorWallet === creatorWallet
+            ? { ...item, estimatedClaimableUsdc: "0", updatedAt: new Date().toISOString() }
+            : item,
+        ),
+      };
+    });
+    setDemoSummary(`Claimed ${claimedLabel} in the mock buyout flow.`);
+  }, [creatorWallet, position?.estimatedClaimableUsdc]);
 
   if (!creatorId || loading) {
     return (
@@ -686,21 +829,31 @@ function BuyoutPage() {
                   <RageQuitPanel
                     active={rageQuitActive}
                     creatorWallet={profile.creator.creatorWallet}
+                    isDemoRoute={isDemoRoute}
+                    onDemoExit={handleDemoExit}
                     onRefresh={refresh}
                     positionBalance={positionBalance}
                     sessionWallet={sessionWallet}
                   />
                 ) : null}
 
-                {phase === "graduated" ? (
+                {phase === "graduated" || isDemoRoute ? (
                   <ClaimPanel
                     claimableUsdc={position?.estimatedClaimableUsdc ?? null}
                     creatorWallet={profile.creator.creatorWallet}
+                    isDemoRoute={isDemoRoute}
+                    onDemoClaim={handleDemoClaim}
                     onRefresh={refresh}
                     positionBalance={positionBalance}
                     sessionWallet={sessionWallet}
                     sponsorWallet={profile.buyout?.winningSponsorWallet ?? null}
                   />
+                ) : null}
+
+                {demoSummary ? (
+                  <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[12px] font-medium text-[#8df0c4]">
+                    {demoSummary}
+                  </div>
                 ) : null}
 
                 {/* Position summary */}

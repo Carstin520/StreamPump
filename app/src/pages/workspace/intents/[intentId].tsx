@@ -13,9 +13,11 @@ import {
   SignatureIcon,
   WarningIcon,
 } from "@/components/shared/AppIcons";
+import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { StatusDot } from "@/components/workspace/StatusDot";
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
+import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { ProposalIntentStatus } from "@/lib/api/types";
 import {
   buildProposalLaunchBundle,
@@ -28,7 +30,7 @@ import {
   submitProposalBundle,
 } from "@/lib/api/workspace";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
-import { WORKSPACE_PATH } from "@/lib/routes";
+import { DEMO_S2_ENDORSE_PATH, WORKSPACE_PATH, WORKSPACE_SPONSORSHIPS_PATH } from "@/lib/routes";
 import { signVersionedTransactionBase64 } from "@/lib/solana/signVersionedTransaction";
 import {
   buildLoginHrefFromRouter,
@@ -58,6 +60,15 @@ const STATUS_LABELS: Record<ProposalIntentStatus, string> = {
 const canBuildFromStatus = (status: ProposalIntentStatus) =>
   ["TERMS_LOCKED", "BUNDLE_BUILT", "CREATOR_PARTIALLY_SIGNED", "SPONSOR_SIGNED", "SUBMITTED", "FAILED", "EXPIRED"].includes(status);
 
+const demoIntentSteps: StepItem[] = [
+  { label: "条款", status: "done" },
+  { label: "构建", status: "done" },
+  { label: "创作者签", status: "current" },
+  { label: "赞助商签", status: "pending" },
+  { label: "提交", status: "pending" },
+  { label: "确认", status: "pending" },
+];
+
 function deriveIntentSteps(status: ProposalIntentStatus): StepItem[] {
   const order: ProposalIntentStatus[] = ["DRAFT", "TERMS_LOCKED", "BUNDLE_BUILT", "CREATOR_PARTIALLY_SIGNED", "SPONSOR_SIGNED", "SUBMITTED", "CONFIRMED"];
   const labels = ["条款", "构建", "创作者签", "赞助商签", "提交", "确认"];
@@ -73,6 +84,99 @@ function deriveIntentSteps(status: ProposalIntentStatus): StepItem[] {
   });
 }
 
+function MockIntentSigningStep() {
+  const demoFlow = useDemoActionFlow();
+
+  return (
+    <>
+      <Head><title>StreamPump | Mock Signing Step</title></Head>
+      <WorkspaceShell>
+        <div className="space-y-5">
+          <div className="liquid-card card-radius p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
+                  Demo signing step
+                </p>
+                <h1 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                  Game trailer moodboard × Nova Screen
+                </h1>
+                <p className="mt-1 max-w-[620px] text-sm text-[#8ea0ba]">
+                  Local mock flow for the S2 creator signature. No wallet signature or transaction API is called.
+                </p>
+              </div>
+              <Link
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[11px] font-medium text-[#cbd6e7] transition hover:text-white"
+                href={WORKSPACE_SPONSORSHIPS_PATH}
+              >
+                Back to desk
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">合作进程</p>
+              <span className="text-xs text-white">等待创作者签名</span>
+            </div>
+            <StepProgress steps={demoIntentSteps} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <section className="liquid-glass-shell card-radius p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#de402a]/15">
+                  <SignatureIcon className="h-5 w-5 text-[#ff8a78]" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Mock creator signature</p>
+                  <p className="text-xs text-[#6b7d96]">Preview the signature confirmation state for the demo.</p>
+                </div>
+              </div>
+
+              <button
+                className="glass-button-primary mt-5 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={demoFlow.busy || demoFlow.state.status === "success"}
+                onClick={demoFlow.begin}
+                type="button"
+              >
+                {demoFlow.busy ? "Submitting..." : demoFlow.state.status === "success" ? "Signed" : "Confirm creator signature"}
+              </button>
+              <DemoActionStatusCard
+                amountLabel="intent-neo-pulsefit"
+                confirmLabel="Confirm Signature"
+                description="Confirm this local signature step. It only updates the page state for the demo."
+                onCancel={demoFlow.reset}
+                onConfirm={(options) => demoFlow.submit(options)}
+                onRetry={demoFlow.retry}
+                state={demoFlow.state}
+                successLabel="Signed"
+                title="Signature confirmation"
+              />
+            </section>
+
+            <aside className="space-y-3">
+              <div className="liquid-card card-radius p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Track budgets</p>
+                <div className="mt-3 space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-[#8ea0ba]">Track 1</span><span className="text-white">$1,800</span></div>
+                  <div className="flex justify-between"><span className="text-[#8ea0ba]">Track 2</span><span className="text-white">$3,600</span></div>
+                  <div className="flex justify-between"><span className="text-[#8ea0ba]">Track 3</span><span className="text-white">$5,200</span></div>
+                </div>
+              </div>
+              {demoFlow.state.status === "success" ? (
+                <Link className="glass-button-primary flex justify-center rounded-full px-4 py-3 text-sm font-semibold text-white" href={DEMO_S2_ENDORSE_PATH}>
+                  Continue to endorse
+                </Link>
+              ) : null}
+            </aside>
+          </div>
+        </div>
+      </WorkspaceShell>
+    </>
+  );
+}
+
 export default function IntentDetailPage() {
   const router = useRouter();
   const [state, setState] = useState<PageState>({ kind: "loading" });
@@ -85,6 +189,7 @@ export default function IntentDetailPage() {
   const wallet = useWallet();
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
   const intentId = String(router.query.intentId ?? "").trim();
+  const isDemoMode = router.isReady && router.query.demo === "1" && intentId === "intent-neo-pulsefit";
 
   const refreshIntent = async (token: string, id: string) => {
     const data = await getProposalIntentById(token, id);
@@ -98,6 +203,7 @@ export default function IntentDetailPage() {
 
   useEffect(() => {
     if (!router.isReady) return;
+    if (isDemoMode) return;
     let cancelled = false;
     const token = getAccessToken();
     const id = String(router.query.intentId ?? "").trim();
@@ -112,7 +218,7 @@ export default function IntentDetailPage() {
         setState({ kind: "error", message: error instanceof Error ? error.message : "加载失败" });
       });
     return () => { cancelled = true; };
-  }, [router.isReady, router.query.intentId]);
+  }, [isDemoMode, router.isReady, router.query.intentId]);
 
   const latestBundle = state.kind === "ready" ? state.data.bundles[0] ?? null : null;
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
@@ -216,6 +322,10 @@ export default function IntentDetailPage() {
     } catch (e) { handleApiError(e, "提交失败"); }
     finally { setBusyAction(null); }
   };
+
+  if (isDemoMode) {
+    return <MockIntentSigningStep />;
+  }
 
   if (state.kind !== "ready") {
     return (

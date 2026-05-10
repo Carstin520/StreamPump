@@ -1,5 +1,6 @@
 import { CampaignRecord, CreatorSeasonState, IntentRecord, ManifestRecord } from "@/lib/api/types";
 import type { ProposalDetailResponse } from "@/lib/api/workspace";
+import { WORKSPACE_SPONSORSHIPS_PATH } from "@/lib/routes";
 
 export const manifests: ManifestRecord[] = [
   {
@@ -396,14 +397,18 @@ export const workspacePersonas: Record<CreatorSeasonState, WorkspacePersona> = {
         subtitle: "Dune afterglow note · 等待签名",
         ctaLabel: "前往签名",
         tone: "urgent",
-        disabled: true,
+        href: "/workspace/intents/intent-neo-pulsefit?demo=1",
+        chainHint: "mock signing step",
+        workflowState: "ready",
       },
       {
         iconName: "sparkles",
         title: "创建赞助合作",
         subtitle: "F1 aesthetics gallery 已可发起",
         ctaLabel: "创建合作",
-        disabled: true,
+        href: `${WORKSPACE_SPONSORSHIPS_PATH}?demo=1`,
+        chainHint: "mock intent draft",
+        workflowState: "ready",
       },
     ],
     contentItems: manifests.map((manifest, index) => ({

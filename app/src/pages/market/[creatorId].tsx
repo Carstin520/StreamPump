@@ -13,8 +13,10 @@ import {
   S1TransactionDrawer,
   WalletSessionAlert,
 } from "@/components/s1/S1TransactionDrawer";
+import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
 import { StagePill } from "@/components/shared/StagePill";
+import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
 import {
   buildS1BuyTransaction,
@@ -212,14 +214,24 @@ function PositionCard({
 
 const AMOUNT_CHIPS = [1, 5, 10, 25] as const;
 
+type DemoTradeInput = {
+  amount: number;
+  estimatedCost: number;
+  side: "buy" | "sell";
+};
+
 function TradePanel({
   creatorWallet,
+  isDemoRoute,
+  onDemoTrade,
   onRefresh,
   portfolio,
   profile,
   sessionWallet,
 }: {
   creatorWallet: string;
+  isDemoRoute?: boolean;
+  onDemoTrade?: (input: DemoTradeInput) => void;
   onRefresh: () => Promise<void>;
   portfolio: S1PortfolioResponse | null;
   profile: S1MarketProfileResponse;
@@ -227,6 +239,7 @@ function TradePanel({
 }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(10);
+  const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
 
@@ -254,7 +267,18 @@ function TradePanel({
     if (submitted) await onRefresh();
   }, [side, amount, creatorWallet, flow, onRefresh]);
 
+  const executeDemoTrade = useCallback(
+    (options?: { fail?: boolean }) => {
+      demoFlow.submit({
+        fail: options?.fail,
+        onSuccess: () => onDemoTrade?.({ amount, estimatedCost, side }),
+      });
+    },
+    [amount, demoFlow, estimatedCost, onDemoTrade, side],
+  );
+
   const busy = flow.state.status === "building" || flow.state.status === "waiting_signature" || flow.state.status === "submitting" || flow.state.status === "syncing_projection";
+  const demoBusy = demoFlow.state.status === "submitted";
 
   const ctaLabel = (): string => {
     if (!wallet.connected) return "Connect wallet";
@@ -279,7 +303,7 @@ function TradePanel({
                 : "text-[#5a6d87] hover:text-white"
             }`}
             key={s}
-            onClick={() => { setSide(s); flow.reset(); }}
+            onClick={() => { setSide(s); flow.reset(); demoFlow.reset(); }}
             type="button"
           >
             {s === "buy" ? "Buy" : "Sell"}
@@ -354,7 +378,41 @@ function TradePanel({
       <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
 
       {/* CTA */}
-      {!wallet.connected ? (
+      {isDemoRoute ? (
+        <>
+          <button
+            className={`mt-4 w-full rounded-full py-3 text-[13px] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+              side === "buy"
+                ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] hover:brightness-110"
+                : "bg-white/10 text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] hover:bg-white/14"
+            }`}
+            disabled={demoBusy || demoFlow.state.status === "success" || (side === "sell" && (!hasPosition || sellOverLimit))}
+            onClick={demoFlow.begin}
+            type="button"
+          >
+            {demoBusy
+              ? "Submitting..."
+              : demoFlow.state.status === "success"
+                ? side === "buy" ? "Bought" : "Sold"
+                : side === "buy" ? "Buy S1" : "Sell S1"}
+          </button>
+          <DemoActionStatusCard
+            amountLabel={`${amount} S1 · ~${estimatedCost.toFixed(3)} SPUMP`}
+            confirmLabel={side === "buy" ? "Confirm Buy S1" : "Confirm Sell S1"}
+            description={
+              side === "buy"
+                ? "Confirm this mock buy. The page position updates locally after submission."
+                : "Confirm this mock sell. The page position updates locally after submission."
+            }
+            onCancel={demoFlow.reset}
+            onConfirm={executeDemoTrade}
+            onRetry={demoFlow.retry}
+            state={demoFlow.state}
+            successLabel={side === "buy" ? "Bought" : "Sold"}
+            title={side === "buy" ? "Buy confirmation" : "Sell confirmation"}
+          />
+        </>
+      ) : !wallet.connected ? (
         <div className="mt-4 space-y-2">
           <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
           <Link
@@ -479,6 +537,7 @@ function MarketPage() {
   const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [demoSummary, setDemoSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -534,6 +593,46 @@ function MarketPage() {
 
   const title = displayCreatorName(profile, fallbackCreator);
   const handle = displayCreatorHandle(profile, fallbackCreator);
+
+  const handleDemoTrade = useCallback(
+    ({ amount, estimatedCost, side }: DemoTradeInput) => {
+      setPortfolio((current) => {
+        if (!current) return current;
+        const costDeltaAtomic = Math.max(0, Math.round(estimatedCost * 1_000_000_000));
+        return {
+          ...current,
+          positions: current.positions.map((position) => {
+            if (position.creatorWallet !== creatorWallet && position.creator?.creatorWallet !== creatorWallet) {
+              return position;
+            }
+            const currentBalance = Math.max(0, Number(position.internalTokenBalance || 0));
+            const currentCostBasis = Math.max(0, Number(position.spumpCostBasis || 0));
+            const nextBalance =
+              side === "buy"
+                ? currentBalance + amount
+                : Math.max(0, currentBalance - amount);
+            const nextCostBasis =
+              side === "buy"
+                ? currentCostBasis + costDeltaAtomic
+                : Math.max(0, currentCostBasis - costDeltaAtomic);
+
+            return {
+              ...position,
+              internalTokenBalance: String(Math.round(nextBalance)),
+              spumpCostBasis: String(Math.round(nextCostBasis)),
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        };
+      });
+      setDemoSummary(
+        side === "buy"
+          ? `Bought ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`
+          : `Sold ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`,
+      );
+    },
+    [creatorWallet],
+  );
 
   if (!creatorId || loading) {
     return (
@@ -606,11 +705,18 @@ function MarketPage() {
             <div className="space-y-3">
               <TradePanel
                 creatorWallet={profile.creator.creatorWallet}
+                isDemoRoute={isDemoRoute}
+                onDemoTrade={handleDemoTrade}
                 onRefresh={refresh}
                 portfolio={portfolio}
                 profile={profile}
                 sessionWallet={sessionWallet}
               />
+              {demoSummary ? (
+                <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[12px] font-medium text-[#8df0c4]">
+                  {demoSummary}
+                </div>
+              ) : null}
               <PositionCard portfolio={portfolio} profile={profile} />
             </div>
           </div>

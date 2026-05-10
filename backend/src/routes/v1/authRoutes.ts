@@ -8,6 +8,8 @@ import {
   createAuthChallenge,
   exchangeProviderSession,
   getCurrentSession,
+  requestEmailLoginCode,
+  verifyEmailLoginCode,
   verifyAuthChallenge,
 } from "../../controllers/authController";
 import {
@@ -19,6 +21,8 @@ const router = Router();
 
 router.post("/challenge", createAuthChallenge);
 router.post("/verify", verifyAuthChallenge);
+router.post("/email/request-code", requestEmailLoginCode);
+router.post("/email/verify-code", verifyEmailLoginCode);
 router.post("/provider-exchange", exchangeProviderSession);
 router.get("/session", requireSessionAuth, getCurrentSession);
 router.post("/logout", requireSessionAuth, logoutWalletSession);
