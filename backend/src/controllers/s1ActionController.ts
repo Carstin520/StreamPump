@@ -16,6 +16,12 @@ import {
 } from "./http";
 import { getAnchorService, UserMissionTypeName } from "../services/AnchorService";
 import { ingestConfirmedProgramTransaction } from "../services/indexer";
+import {
+  buildMockS1SubmitResponse,
+  buildMockS1Transaction,
+  DEMO_S1_CREATOR_WALLET,
+  isS1MockWallet,
+} from "../services/s1MockContract";
 
 const USER_ROLE_FAN = 1 << 0;
 const ZERO_SIGNATURE = new Uint8Array(64);
@@ -229,6 +235,19 @@ export const buildBuyS1Transaction = withController(
   "BUILD_S1_BUY_TRANSACTION_FAILED",
   async (req, res) => {
     const userWallet = requireSessionWallet(req);
+    if (isS1MockWallet(userWallet)) {
+      ok(
+        res,
+        buildMockS1Transaction({
+          action: "BUY_S1_TOKEN",
+          userWallet,
+          creatorWallet: String(req.body.creatorWallet ?? DEMO_S1_CREATOR_WALLET),
+          amount: req.body.amount,
+        })
+      );
+      return;
+    }
+
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const amount = parsePositiveBigInt(req.body.amount, "amount");
 
@@ -253,6 +272,19 @@ export const buildSellS1Transaction = withController(
   "BUILD_S1_SELL_TRANSACTION_FAILED",
   async (req, res) => {
     const userWallet = requireSessionWallet(req);
+    if (isS1MockWallet(userWallet)) {
+      ok(
+        res,
+        buildMockS1Transaction({
+          action: "SELL_S1_TOKEN",
+          userWallet,
+          creatorWallet: String(req.body.creatorWallet ?? DEMO_S1_CREATOR_WALLET),
+          amount: req.body.amount,
+        })
+      );
+      return;
+    }
+
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const amount = parsePositiveBigInt(req.body.amount, "amount");
 
@@ -385,6 +417,19 @@ export const buildRageQuitS1Transaction = withController(
   "BUILD_S1_RAGE_QUIT_TRANSACTION_FAILED",
   async (req, res) => {
     const userWallet = requireSessionWallet(req);
+    if (isS1MockWallet(userWallet)) {
+      ok(
+        res,
+        buildMockS1Transaction({
+          action: "RAGE_QUIT_S1",
+          userWallet,
+          creatorWallet: String(req.body.creatorWallet ?? DEMO_S1_CREATOR_WALLET),
+          amount: req.body.amount,
+        })
+      );
+      return;
+    }
+
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const amount = parsePositiveBigInt(req.body.amount, "amount");
 
@@ -431,6 +476,19 @@ export const buildClaimS1BuyoutUsdcTransaction = withController(
   "BUILD_S1_CLAIM_BUYOUT_USDC_TRANSACTION_FAILED",
   async (req, res) => {
     const userWallet = requireSessionWallet(req);
+    if (isS1MockWallet(userWallet)) {
+      ok(
+        res,
+        buildMockS1Transaction({
+          action: "CLAIM_S1_BUYOUT_USDC",
+          userWallet,
+          creatorWallet: String(req.body.creatorWallet ?? DEMO_S1_CREATOR_WALLET),
+          sponsorWallet: String(req.body.sponsorWallet ?? ""),
+        })
+      );
+      return;
+    }
+
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const sponsorWallet = parseWallet(req.body.sponsorWallet, "sponsorWallet");
 
@@ -489,6 +547,12 @@ export const submitS1Transaction = withController("SUBMIT_S1_TRANSACTION_FAILED"
     req.body.signedTransactionBase64,
     "signedTransactionBase64"
   );
+
+  if (isS1MockWallet(wallet)) {
+    ok(res, buildMockS1SubmitResponse(signedTransactionBase64));
+    return;
+  }
+
   assertS1TransactionSignedByWallet(signedTransactionBase64, wallet);
 
   const signature = await getAnchorService().sendAndConfirmVersionedTransaction({

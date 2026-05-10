@@ -46,6 +46,12 @@ export const config = {
     backfillLimit: env.readNumber(process.env.INDEXER_BACKFILL_LIMIT, 100),
     consumerKey: env.readString(process.env.INDEXER_CONSUMER_KEY, "streampump_core_logs"),
   },
+  s1: {
+    mockApiEnabled: env.readBoolean(
+      process.env.S1_MOCK_API_ENABLED,
+      process.env.NODE_ENV !== "production"
+    ),
+  },
   oracle: {
     schedulerEnabled: env.readBoolean(process.env.ORACLE_SCHEDULER_ENABLED, false),
     runOnBoot: env.readBoolean(process.env.ORACLE_RUN_ON_BOOT, false),

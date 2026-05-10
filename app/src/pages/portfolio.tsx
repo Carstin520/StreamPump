@@ -19,14 +19,25 @@ import {
   DEMO_S1_CREATOR_WALLET,
   getS1MarketProfile,
   getS1Portfolio,
+  S1_MOCK_ACCESS_TOKEN,
+  S1_MOCK_USER_WALLET,
   S1PortfolioResponse,
 } from "@/lib/api/s1";
-import { clearStoredAuthSession, getStoredAuthSession } from "@/lib/auth-session";
+import { clearStoredAuthSession, getStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
 import {
+  DEMO_PATH,
+  DEMO_S1_BUYOUT_PATH,
+  DEMO_S1_CREATOR_PATH,
+  DEMO_S1_MARKET_PATH,
+} from "@/lib/routes";
+import {
+  buildDemoS1MarketProfile,
+  buildDemoS1Portfolio,
   formatS1Amount,
   formatSpump,
   formatUsdcAmount,
   hasClaimableUsdc,
+  resolveFallbackCreator,
   shortenWallet,
 } from "@/lib/s1-market-view";
 
@@ -420,6 +431,46 @@ function DemoHolderHints() {
   );
 }
 
+function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
+  return (
+    <div className="rounded-[14px] border border-[#67b8ff]/15 bg-[#0e1726]/50 p-4 text-left">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
+            Demo portfolio
+          </p>
+          <p className="mt-1 text-[12px] leading-5 text-[#8ea0ba]">
+            Load a local mock session to preview S1 positions and claim queue without a wallet.
+          </p>
+        </div>
+        <button
+          className="rounded-full bg-[#de402a] px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-[#ea523e]"
+          onClick={onLoadDemo}
+          type="button"
+        >
+          Load demo portfolio
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {[
+          { href: DEMO_PATH, label: "Demo hub" },
+          { href: DEMO_S1_MARKET_PATH, label: "S1 market" },
+          { href: DEMO_S1_BUYOUT_PATH, label: "Buyout watch" },
+          { href: DEMO_S1_CREATOR_PATH, label: "Creator profile" },
+        ].map((link) => (
+          <Link
+            className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-semibold text-[#8ad0ff] transition hover:border-white/[0.14] hover:text-white"
+            href={link.href}
+            key={link.href}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Fallback preview (no auth / API error)                             */
 /* ------------------------------------------------------------------ */
@@ -445,16 +496,19 @@ function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<LiveTab>("Portfolio");
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [isMockPortfolioSession, setIsMockPortfolioSession] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
 
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
-  const hasActiveWalletSession = Boolean(sessionWallet && connectedWallet && sessionWallet === connectedWallet);
+  const hasActiveWalletSession =
+    isMockPortfolioSession || Boolean(sessionWallet && connectedWallet && sessionWallet === connectedWallet);
   const sawConnectedWalletRef = useRef(false);
 
   const clearPortfolioSession = useCallback(() => {
     clearStoredAuthSession();
     setSessionWallet(null);
+    setIsMockPortfolioSession(false);
     setPortfolio(null);
     setFallbackReason(null);
     setActiveTab("Portfolio");
@@ -463,12 +517,35 @@ function PortfolioPage() {
   const refresh = useCallback(async () => {
     const session = getStoredAuthSession();
     setSessionWallet(session?.wallet ?? null);
+    setIsMockPortfolioSession(session?.accessToken === S1_MOCK_ACCESS_TOKEN);
     if (!session?.accessToken) {
       setPortfolio(null);
       return;
     }
+    if (session.accessToken === S1_MOCK_ACCESS_TOKEN) {
+      const demoProfile = buildDemoS1MarketProfile(resolveFallbackCreator("mika-zhou"));
+      setPortfolio(buildDemoS1Portfolio(DEMO_S1_CREATOR_WALLET, demoProfile));
+      return;
+    }
     setPortfolio(await getS1Portfolio(session.accessToken));
   }, []);
+
+  const loadDemoPortfolio = useCallback(() => {
+    storeAuthSession({
+      wallet: S1_MOCK_USER_WALLET,
+      accessToken: S1_MOCK_ACCESS_TOKEN,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tokenType: "Bearer",
+      identity: null,
+    });
+    setLoading(true);
+    refresh()
+      .catch((err) => {
+        setPortfolio(null);
+        setFallbackReason(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setLoading(false));
+  }, [refresh]);
 
   useEffect(() => {
     if (connectedWallet) {
@@ -476,10 +553,10 @@ function PortfolioPage() {
       return;
     }
 
-    if (sawConnectedWalletRef.current && sessionWallet) {
+    if (sawConnectedWalletRef.current && sessionWallet && !isMockPortfolioSession) {
       clearPortfolioSession();
     }
-  }, [clearPortfolioSession, connectedWallet, sessionWallet]);
+  }, [clearPortfolioSession, connectedWallet, isMockPortfolioSession, sessionWallet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -541,9 +618,17 @@ function PortfolioPage() {
               </Link>
             </div>
             <div className="mx-auto max-w-sm pt-4">
-              <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+              <DemoCreatorBanner
+                buyoutHref={DEMO_S1_BUYOUT_PATH}
+                creatorHref={DEMO_S1_CREATOR_PATH}
+                creatorWallet={DEMO_S1_CREATOR_WALLET}
+                marketHref={DEMO_S1_MARKET_PATH}
+              />
               <div className="mt-2">
                 <DemoHolderHints />
+              </div>
+              <div className="mt-2">
+                <PortfolioDemoLinks onLoadDemo={loadDemoPortfolio} />
               </div>
             </div>
           </div>
@@ -551,7 +636,12 @@ function PortfolioPage() {
           <FallbackPreview reason={fallbackReason} />
         ) : portfolio ? (
           <div className="mx-auto max-w-[1100px] space-y-4 py-4">
-            <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
+            <DemoCreatorBanner
+              buyoutHref={DEMO_S1_BUYOUT_PATH}
+              creatorHref={DEMO_S1_CREATOR_PATH}
+              creatorWallet={DEMO_S1_CREATOR_WALLET}
+              marketHref={DEMO_S1_MARKET_PATH}
+            />
 
             <WalletHeader
               connectedWallet={connectedWallet}

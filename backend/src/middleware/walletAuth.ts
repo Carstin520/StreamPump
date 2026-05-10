@@ -8,6 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 import { config } from "../../config/default";
 import { revokeWalletSession, verifyWalletSessionToken } from "../services/auth";
 import { fail } from "../controllers/http";
+import { isS1MockToken, S1_MOCK_USER_WALLET } from "../services/s1MockContract";
 
 const parseWalletHeader = (value: string | undefined): string | null => {
   const wallet = String(value ?? "").trim();
@@ -64,6 +65,16 @@ export const optionalWalletAuth = async (req: Request, res: Response, next: Next
       return;
     }
 
+    if (isS1MockToken(token)) {
+      req.auth = {
+        wallet: S1_MOCK_USER_WALLET,
+        sessionId: "mock-s1-demo",
+        source: "session",
+      };
+      next();
+      return;
+    }
+
     const session = await verifyWalletSessionToken(token);
     if (!session) {
       fail(res, 401, "AUTH_INVALID", "wallet session is invalid or expired");
@@ -86,6 +97,16 @@ export const optionalSessionAuth = async (req: Request, res: Response, next: Nex
   try {
     const token = getBearerToken(req);
     if (!token) {
+      next();
+      return;
+    }
+
+    if (isS1MockToken(token)) {
+      req.auth = {
+        wallet: S1_MOCK_USER_WALLET,
+        sessionId: "mock-s1-demo",
+        source: "session",
+      };
       next();
       return;
     }

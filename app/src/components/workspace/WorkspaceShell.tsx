@@ -97,7 +97,7 @@ export const WorkspaceShell = ({
                   disabled ? "pointer-events-none opacity-35" : ""
                 }`}
                 data-active={active}
-                href={disabled ? "#" : item.href}
+                href={disabled ? `${item.href}#` : item.href}
                 key={item.href}
               >
                 {Icon && (
@@ -174,7 +174,7 @@ export const WorkspaceShell = ({
                 return (
                   <Link
                     className={`flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition ${item.disabled ? "opacity-35" : "hover:bg-white/[0.05]"}`}
-                    href={item.disabled ? "#" : item.href}
+                    href={item.disabled ? `${item.href}#` : item.href}
                     key={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                   >

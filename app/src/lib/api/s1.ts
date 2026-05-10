@@ -4,6 +4,8 @@ import { CreatorSeasonState } from "@/lib/api/types";
 export const DEMO_S1_CREATOR_WALLET =
   process.env.NEXT_PUBLIC_DEMO_S1_CREATOR_WALLET?.trim() ||
   "EoMRsbLnHx21hMnY1KVzCL39WBTKLozLcRPt7SU2fVpg";
+export const S1_MOCK_ACCESS_TOKEN = "mock-s1-demo";
+export const S1_MOCK_USER_WALLET = "DemoWallet111111111111111111111111111111111";
 
 export type S1BuildTransactionResponse = {
   action: string;

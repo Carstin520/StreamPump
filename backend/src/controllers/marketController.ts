@@ -12,6 +12,12 @@ import {
   getPortfolioProjection,
   listTrendingCreatorProjections,
 } from "../services/marketProjectionService";
+import {
+  buildMockS1MarketProfile,
+  buildMockS1Portfolio,
+  isDemoS1CreatorWallet,
+  isS1MockWallet,
+} from "../services/s1MockContract";
 
 const DEFAULT_TRENDING_LIMIT = 24;
 
@@ -43,6 +49,11 @@ export const getMarketCreatorProfile = withController(
     const profile = await getCreatorMarketProjection(creatorWallet);
 
     if (!profile) {
+      if (isDemoS1CreatorWallet(creatorWallet)) {
+        ok(res, buildMockS1MarketProfile());
+        return;
+      }
+
       throw new HttpError(404, "CREATOR_MARKET_NOT_FOUND", "creator market projection not found");
     }
 
@@ -52,6 +63,11 @@ export const getMarketCreatorProfile = withController(
 
 export const getMarketPortfolio = withController("GET_MARKET_PORTFOLIO_FAILED", async (req, res) => {
   const userWallet = requireSessionWallet(req);
+
+  if (isS1MockWallet(userWallet)) {
+    ok(res, buildMockS1Portfolio(userWallet));
+    return;
+  }
 
   ok(res, await getPortfolioProjection(userWallet));
 });
