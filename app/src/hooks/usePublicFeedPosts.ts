@@ -70,7 +70,7 @@ export const usePublicFeedPosts = (options?: {
       };
     });
 
-    void listPublicFeedPosts()
+    void listPublicFeedPosts({ timeoutMs: 8000 })
       .then((posts) => {
         if (!active) {
           return;

@@ -192,8 +192,14 @@ export const WalletSessionAlert = ({
 
 export const DemoCreatorBanner = ({
   creatorWallet,
+  buyoutHref,
+  creatorHref,
+  marketHref,
 }: {
   creatorWallet: string;
+  buyoutHref?: string;
+  creatorHref?: string;
+  marketHref?: string;
 }) => {
   const isDemoEnv = process.env.NEXT_PUBLIC_SHOW_DEMO_HINTS === "1" || process.env.NODE_ENV === "development";
   if (!isDemoEnv) return null;
@@ -207,13 +213,21 @@ export const DemoCreatorBanner = ({
       </span>
       <a
         className="ml-auto text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
-        href={`/market/${creatorWallet}`}
+        href={marketHref ?? `/market/${creatorWallet}`}
       >
         Market ↗
       </a>
+      {creatorHref ? (
+        <a
+          className="text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
+          href={creatorHref}
+        >
+          Profile ↗
+        </a>
+      ) : null}
       <a
         className="text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
-        href={`/buyout/${creatorWallet}`}
+        href={buyoutHref ?? `/buyout/${creatorWallet}`}
       >
         Buyout ↗
       </a>

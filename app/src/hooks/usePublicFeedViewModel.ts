@@ -11,7 +11,10 @@ import {
   PostRecord,
   UserNoteRecord,
 } from "@/lib/api/types";
-import { creators as creatorProfileSeeds } from "@/lib/mocks/discover";
+import {
+  creators as creatorProfileSeeds,
+  posts as fallbackPublicFeedPosts,
+} from "@/lib/mocks/discover";
 import { usePublicFeedPosts } from "./usePublicFeedPosts";
 
 const creatorProfileById = new Map(
@@ -276,28 +279,47 @@ export const usePublicFeedViewModel = (options?: {
       postsByCreator.set(post.creatorId, group);
     });
 
-    const creators = Array.from(postsByCreator.entries())
-      .map(([, creatorPosts]) => createCreatorRecord(creatorPosts))
-      .sort((left, right) => right.momentumScore - left.momentumScore);
-    const creatorMap = new Map(creators.map((creator) => [creator.id, creator]));
+    creatorProfileSeeds.forEach((creator) => {
+      const currentPosts = postsByCreator.get(creator.id);
+      if (currentPosts?.length) {
+        return;
+      }
+
+      const fallbackPosts = fallbackPublicFeedPosts.filter((post) => post.creatorId === creator.id);
+      if (fallbackPosts.length > 0) {
+        postsByCreator.set(creator.id, fallbackPosts);
+      }
+    });
+
+    const derivedCreators = Array.from(postsByCreator.entries())
+      .filter(([, creatorPosts]) => creatorPosts.length > 0)
+      .map(([, creatorPosts]) => createCreatorRecord(creatorPosts));
+    const creatorMap = new Map(creatorProfileSeeds.map((creator) => [creator.id, creator]));
+    derivedCreators.forEach((creator) => {
+      creatorMap.set(creator.id, creator);
+    });
+    const creators = Array.from(creatorMap.values()).sort(
+      (left, right) => right.momentumScore - left.momentumScore
+    );
+    const visiblePosts = posts.length > 0 ? posts : fallbackPublicFeedPosts;
     const activityAuthors = creators.map((creator) =>
       createActivityAuthor(creator, postsByCreator.get(creator.id) ?? [])
     );
-    const activityFeedItems = posts.map(createActivityFeedItem);
-    const activityVideoItems = posts
+    const activityFeedItems = visiblePosts.map(createActivityFeedItem);
+    const activityVideoItems = visiblePosts
       .filter((post) => post.type === "VIDEO")
       .map(createActivityVideoItem);
     const activitySidebarHighlights = creators.slice(0, 4).map((creator) =>
       createSidebarHighlight(creator, postsByCreator.get(creator.id) ?? [])
     );
-    const currentUser = createCurrentUserRecord(posts);
-    const currentUserNotes = posts.map((post) =>
+    const currentUser = createCurrentUserRecord(visiblePosts);
+    const currentUserNotes = visiblePosts.map((post) =>
       createUserNote(post, "me-note", currentUser.name, currentUser.avatarSrc)
     );
-    const currentUserSavedPosts = posts.slice(0, 6).map((post) =>
+    const currentUserSavedPosts = visiblePosts.slice(0, 6).map((post) =>
       createUserNote(post, "saved", post.creatorName, post.creatorAvatarSrc)
     );
-    const currentUserLikedPosts = posts.slice(1, 7).map((post) =>
+    const currentUserLikedPosts = visiblePosts.slice(1, 7).map((post) =>
       createUserNote(post, "liked", post.creatorName, post.creatorAvatarSrc)
     );
 

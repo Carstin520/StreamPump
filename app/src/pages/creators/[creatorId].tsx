@@ -12,6 +12,7 @@ import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import { CreatorMarketRecord } from "@/lib/api/types";
 import {
   creators as fallbackCreators,
+  findCreatorStrict,
   posts as fallbackPosts,
 } from "@/lib/mocks/discover";
 import {
@@ -85,7 +86,7 @@ export default function CreatorDetailPage({
     initialPosts,
   });
   const creatorId = String(router.query.creatorId ?? "");
-  const creator = resolveCreator(creators, fallbackCreators, creatorId);
+  const creator = resolveCreator(creators, fallbackCreators, creatorId) ?? findCreatorStrict(creatorId);
   const creatorPosts = creator
     ? postsByCreator.get(creator.id) ??
       fallbackPosts.filter((post) => post.creatorId === creator.id)
@@ -143,7 +144,23 @@ export const getStaticPaths: GetStaticPaths = async () => ({
   paths: [],
 });
 
-export const getStaticProps: GetStaticProps<PublicFeedPageProps> = async () => ({
-  props: await loadPublicFeedPageProps(),
-  revalidate: PUBLIC_FEED_REVALIDATE_SECONDS,
-});
+export const getStaticProps: GetStaticProps<PublicFeedPageProps> = async (context) => {
+  const creatorId = String(context.params?.creatorId ?? "");
+  const demoCreator = findCreatorStrict(creatorId);
+
+  if (demoCreator) {
+    return {
+      props: {
+        initialError: null,
+        initialPosts: fallbackPosts.filter((post) => post.creatorId === demoCreator.id),
+        mediaOrigins: [],
+      },
+      revalidate: PUBLIC_FEED_REVALIDATE_SECONDS,
+    };
+  }
+
+  return {
+    props: await loadPublicFeedPageProps(),
+    revalidate: PUBLIC_FEED_REVALIDATE_SECONDS,
+  };
+};

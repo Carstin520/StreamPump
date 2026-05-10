@@ -639,8 +639,38 @@ export const posts: PostRecord[] = [
 
 export const discoverCategories = ["推荐", "赛车", "游戏", "电影", "科技", "城市", "氛围", "创作者观察"];
 
-const creatorIndex = new Map(creators.map((creator) => [creator.id, creator]));
 const postIndex = new Map(posts.map((post) => [post.id, post]));
 
-export const findCreator = (creatorId: string) => creatorIndex.get(creatorId) ?? creators[0];
+const safeDecodeURIComponent = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return value;
+  }
+};
+
+export const normalizeCreatorLookupKey = (value: string) =>
+  safeDecodeURIComponent(value)
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, "")
+    .replace(/\s+/g, "-");
+
+const creatorLookupIndex = new Map<string, (typeof creators)[number]>();
+
+creators.forEach((creator) => {
+  [creator.id, creator.name, creator.handle, creator.handle.replace(/^@/, "")].forEach((alias) => {
+    creatorLookupIndex.set(normalizeCreatorLookupKey(alias), creator);
+  });
+});
+
+export const findCreatorStrict = (creatorId: string | null | undefined) => {
+  if (!creatorId) {
+    return undefined;
+  }
+
+  return creatorLookupIndex.get(normalizeCreatorLookupKey(creatorId));
+};
+
+export const findCreator = (creatorId: string) => findCreatorStrict(creatorId) ?? creators[0];
 export const findPost = (postId: string) => postIndex.get(postId) ?? posts[0];

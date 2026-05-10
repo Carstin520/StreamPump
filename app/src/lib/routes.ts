@@ -15,6 +15,13 @@ export const WORKSPACE_SETTINGS_PATH = "/workspace/settings";
 export const WORKSPACE_BUYOUT_PATH = "/workspace/buyout";
 export const ONBOARDING_PATH = "/onboarding";
 export const REWARDS_PATH = "/rewards";
+export const DEMO_PATH = "/demo";
+export const DEMO_S1_MARKET_PATH = "/market/mika-zhou";
+export const DEMO_S1_CREATOR_PATH = "/creators/mika-zhou";
+export const DEMO_S1_BUYOUT_PATH = "/buyout/luna-cai";
+export const DEMO_S2_WORKSPACE_PATH = "/workspace?demo=1";
+export const DEMO_S2_ENDORSE_PATH = "/campaigns/prop-neo-park-2026q2/endorse";
+export const DEMO_S2_SETTLEMENT_PATH = "/campaigns/prop-neo-park-2026q2/settlement";
 
 export type RouteItem = {
   href: string;
@@ -120,6 +127,7 @@ export const primaryNavItems: RouteItem[] = [
   { href: TRENDING_PATH, label: "Trending", prefixes: [TRENDING_PATH] },
   { href: PORTFOLIO_PATH, label: "投资组合", prefixes: [PORTFOLIO_PATH] },
   { href: REWARDS_PATH, label: "Rewards", prefixes: [REWARDS_PATH] },
+  { href: DEMO_PATH, label: "Demo", prefixes: [DEMO_PATH] },
 ];
 
 export const workspacePageTabs: RouteItem[] = [

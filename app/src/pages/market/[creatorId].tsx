@@ -27,18 +27,28 @@ import {
 } from "@/lib/api/s1";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import {
+  buildDemoS1MarketProfile,
+  buildDemoS1Portfolio,
   displayCreatorHandle,
   displayCreatorName,
   findPortfolioPosition,
+  formatGraduationProgressPercent,
   formatS1Amount,
   formatSpump,
   formatUsdcAmount,
+  isDemoCreatorRoute,
   resolveCreatorWalletForRoute,
   resolveFallbackCreator,
   shortenWallet,
 } from "@/lib/s1-market-view";
 import { compactNumber } from "@/lib/public-data";
 import { createMockPriceHistory, parseAtomicSpumpToNumber } from "@/lib/price-history";
+import {
+  DEMO_PATH,
+  DEMO_S1_BUYOUT_PATH,
+  DEMO_S1_CREATOR_PATH,
+  DEMO_S1_MARKET_PATH,
+} from "@/lib/routes";
 
 /* ------------------------------------------------------------------ */
 /*  Price card                                                         */
@@ -86,7 +96,7 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
 /* ------------------------------------------------------------------ */
 
 function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
-  const grad = Math.round(profile.creator.graduationProgressBps / 100);
+  const grad = formatGraduationProgressPercent(profile.creator.graduationProgressBps);
   const stats = [
     { label: "Supply", value: formatS1Amount(profile.creator.s1Supply), color: "text-white" },
     { label: "Holders", value: compactNumber(profile.creator.holderCount), color: "text-[#67b8ff]" },
@@ -114,7 +124,15 @@ function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
 /*  Buyout summary                                                     */
 /* ------------------------------------------------------------------ */
 
-function BuyoutSummary({ buyout, creatorWallet }: { buyout: S1MarketProfileResponse["buyout"]; creatorWallet: string }) {
+function BuyoutSummary({
+  buyout,
+  creatorWallet,
+  href,
+}: {
+  buyout: S1MarketProfileResponse["buyout"];
+  creatorWallet: string;
+  href?: string;
+}) {
   const status = buyout?.status ?? "NONE";
   const statusLabel: Record<string, string> = {
     NONE: "No buyout",
@@ -140,7 +158,7 @@ function BuyoutSummary({ buyout, creatorWallet }: { buyout: S1MarketProfileRespo
       </div>
       <Link
         className="mt-2 inline-flex items-center text-[10px] font-medium text-[#67b8ff] transition hover:text-white"
-        href={`/buyout/${creatorWallet}`}
+        href={href ?? `/buyout/${creatorWallet}`}
       >
         Open buyout room →
       </Link>
@@ -425,6 +443,29 @@ function MarketHeader({
   );
 }
 
+function DemoRouteRail() {
+  const links = [
+    { href: DEMO_PATH, label: "Demo hub" },
+    { href: DEMO_S1_CREATOR_PATH, label: "Creator profile" },
+    { href: DEMO_S1_BUYOUT_PATH, label: "Buyout watch" },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 demo path</span>
+      {links.map((link) => (
+        <Link
+          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+          href={link.href}
+          key={link.href}
+        >
+          {link.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
@@ -434,6 +475,7 @@ function MarketPage() {
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
+  const isDemoRoute = useMemo(() => isDemoCreatorRoute(creatorId), [creatorId]);
   const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
@@ -445,6 +487,13 @@ function MarketPage() {
 
     const session = getStoredAuthSession();
     setSessionWallet(session?.wallet ?? null);
+    if (isDemoRoute) {
+      const demoProfile = buildDemoS1MarketProfile(fallbackCreator);
+      setProfile(demoProfile);
+      setPortfolio(buildDemoS1Portfolio(creatorWallet, demoProfile));
+      return;
+    }
+
     const marketProfile = await getS1MarketProfile(creatorWallet);
     setProfile(marketProfile);
 
@@ -457,7 +506,7 @@ function MarketPage() {
     } else {
       setPortfolio(null);
     }
-  }, [creatorWallet]);
+  }, [creatorWallet, fallbackCreator, isDemoRoute]);
 
   useEffect(() => {
     if (!creatorWallet) {
@@ -526,7 +575,13 @@ function MarketPage() {
       <Head><title>{`StreamPump | ${title} S1 Market`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-5xl space-y-4">
-          <DemoCreatorBanner creatorWallet={profile.creator.creatorWallet} />
+          <DemoCreatorBanner
+            buyoutHref={isDemoRoute ? DEMO_S1_BUYOUT_PATH : undefined}
+            creatorHref={isDemoRoute ? DEMO_S1_CREATOR_PATH : undefined}
+            creatorWallet={profile.creator.creatorWallet}
+            marketHref={isDemoRoute ? DEMO_S1_MARKET_PATH : undefined}
+          />
+          {isDemoRoute ? <DemoRouteRail /> : null}
 
           <MarketHeader
             fallbackAvatar={fallbackCreator.avatarSrc}
@@ -540,7 +595,11 @@ function MarketPage() {
             <div className="space-y-4">
               <PriceCard profile={profile} />
               <StatsGrid profile={profile} />
-              <BuyoutSummary buyout={profile.buyout} creatorWallet={profile.creator.creatorWallet} />
+              <BuyoutSummary
+                buyout={profile.buyout}
+                creatorWallet={profile.creator.creatorWallet}
+                href={isDemoRoute ? DEMO_S1_BUYOUT_PATH : undefined}
+              />
             </div>
 
             {/* Right column */}

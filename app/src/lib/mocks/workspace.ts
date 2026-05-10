@@ -1,4 +1,5 @@
 import { CampaignRecord, CreatorSeasonState, IntentRecord, ManifestRecord } from "@/lib/api/types";
+import type { ProposalDetailResponse } from "@/lib/api/workspace";
 
 export const manifests: ManifestRecord[] = [
   {
@@ -77,6 +78,20 @@ export const intents: IntentRecord[] = [
 
 export const campaigns: CampaignRecord[] = [
   {
+    id: "prop-neo-park-2026q2",
+    creatorName: "深夜不下线",
+    sponsorName: "Nova Screen",
+    status: "RESOLVED_SUCCESS",
+    contentHashShort: "f4e2...9a17",
+    contentAnchorShort: "5Yk3...R8wF",
+    track1BaseUsd: 100000,
+    track2PoolUsd: 1000000,
+    track3PoolUsd: 300000,
+    metric: "Views",
+    actualValue: "800 / 1,000",
+    chainTxShort: "8nQo...S2Q2",
+  },
+  {
     id: "proposal-radiantlab-luna",
     creatorName: "弯心入坑",
     sponsorName: "Apex Motion",
@@ -110,6 +125,46 @@ const manifestIndex = new Map(manifests.map((manifest) => [manifest.id, manifest
 const intentIndex = new Map(intents.map((intent) => [intent.id, intent]));
 const campaignIndex = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
 
+export const mockProposalDetails: Record<string, ProposalDetailResponse> = {
+  "prop-neo-park-2026q2": {
+    viewerRole: "PUBLIC_FAN",
+    proposal: {
+      id: "prop-neo-park-2026q2",
+      proposalPda: "DemoNeoParkProposalPda2026Q2",
+      creatorWallet: "3kRvDemoNeoParkWallet111111111111111111111",
+      sponsorWallet: "NovaScreenDemoSponsor1111111111111111111",
+      deadlineAt: "2026-05-15T00:00:00.000Z",
+      status: "RESOLVED_SUCCESS",
+      track1BaseUsdc: "100000000000",
+      track1Claimed: true,
+      track2MetricType: "VIEWS",
+      track2TargetValue: "1000",
+      track2MinAchievementBps: 5000,
+      track2UsdcDeposited: "1000000000000",
+      track2ActualValue: "800",
+      track2SettledAt: "2026-05-10T00:00:00.000Z",
+      track3UsdcDeposited: "300000000000",
+      track3CpsPayout: "250000000000",
+      track3DelayDays: 0,
+      track3SettledAt: "2026-05-10T00:00:00.000Z",
+      onChainTxSignature: "8nQoDemoNeoParkS2Q2SettlementTx",
+      oracleSyncStatus: "SYNCED",
+      contentHashHex: "f4e2c6d7310bb31f2dff84f4227d5522e0bd9a17",
+      contentAnchorPda: "5Yk3DemoNeoParkCampaignAnchorR8wF",
+      createdAt: "2026-04-28T08:00:00.000Z",
+      updatedAt: "2026-05-10T00:00:00.000Z",
+    },
+  },
+};
+
+export const findMockProposalDetail = (proposalId: string | null | undefined) => {
+  if (!proposalId) {
+    return undefined;
+  }
+
+  return mockProposalDetails[proposalId];
+};
+
 export const findIntent = (intentId: string) => intentIndex.get(intentId) ?? intents[0];
 export const findCampaign = (campaignId: string) => campaignIndex.get(campaignId) ?? campaigns[0];
 export const findManifest = (manifestId: string) => manifestIndex.get(manifestId) ?? manifests[0];
@@ -118,7 +173,6 @@ export type CreatorStageProfile = {
   stage: CreatorSeasonState;
   wallet: string;
   displayName: string;
-  /** Creator handle for workspace header, e.g. @wanxinrk */
   handle: string;
   avatarSrc: string;
   momentum: number;
@@ -146,10 +200,8 @@ export type WorkspaceActionItem = {
   iconName: "upload" | "signature" | "sparkles" | "chevron";
   href?: string;
   disabled?: boolean;
-  /** Operating console: Ready / Waiting / Blocked */
-  workflowState?: "ready" | "waiting" | "blocked";
-  /** Short chain / bundle status for the checklist row */
   chainHint?: string;
+  workflowState?: "ready" | "waiting" | "blocked";
 };
 
 export type WorkspaceContentItem = ManifestRecord & {
@@ -176,7 +228,6 @@ export type WorkspacePersona = CreatorStageProfile & {
   sponsorshipItems: WorkspaceSponsorshipItem[];
   previewItem: WorkspacePreviewItem;
   healthItems: WorkspaceHealthItem[];
-  /** True when overview content rows are mock fallback (empty API manifests). */
   pipelineDemoFallback?: boolean;
 };
 
@@ -333,50 +384,26 @@ export const workspacePersonas: Record<CreatorSeasonState, WorkspacePersona> = {
     actions: [
       {
         iconName: "upload",
-        title: "Upload missing assets",
-        subtitle: "City after dark reel · 3 files queued",
-        ctaLabel: "Resume upload",
-        tone: "urgent",
+        title: "上传素材",
+        subtitle: "City after dark reel · 3 个文件待上传",
+        ctaLabel: "上传素材",
+        tone: "info",
         href: "/workspace/content/new",
-        workflowState: "ready",
-        chainHint: "R2 multipart · 2/5 parts",
       },
       {
         iconName: "signature",
-        title: "Sign creator partial transaction",
-        subtitle: "intent-mika-grain · Dune afterglow note",
-        ctaLabel: "Preview Sign",
+        title: "创作者签名",
+        subtitle: "Dune afterglow note · 等待签名",
+        ctaLabel: "前往签名",
         tone: "urgent",
-        href: "/workspace/intents/intent-mika-grain",
-        workflowState: "ready",
-        chainHint: "bundle built · versioned tx ready",
-      },
-      {
-        iconName: "sparkles",
-        title: "Finalize manifest & lock terms",
-        subtitle: "Game trailer moodboard → Apex Motion draft",
-        ctaLabel: "Open manifest",
-        workflowState: "waiting",
-        chainHint: "manifest hash pending lock",
         disabled: true,
       },
       {
         iconName: "sparkles",
-        title: "Claim settled rewards",
-        subtitle: "Track 1 base · Nova Screen campaign",
-        ctaLabel: "Preview Claim",
-        workflowState: "blocked",
-        chainHint: "oracle verifying track 2",
+        title: "创建赞助合作",
+        subtitle: "F1 aesthetics gallery 已可发起",
+        ctaLabel: "创建合作",
         disabled: true,
-      },
-      {
-        iconName: "chevron",
-        title: "Review sponsor terms",
-        subtitle: "intent-luna-radiantlab · awaiting sponsor countersign",
-        ctaLabel: "Open desk",
-        href: "/workspace/sponsorships",
-        workflowState: "waiting",
-        chainHint: "creator signature recorded",
       },
     ],
     contentItems: manifests.map((manifest, index) => ({
@@ -408,6 +435,5 @@ export const stageProfiles: Record<CreatorSeasonState, CreatorStageProfile> = {
 
 export const MOCK_SYSTEM_HEALTH = workspacePersonas.S2_ACTIVE.healthItems;
 
-/** Fallback pipeline rows when API returns no manifests (demo shell). */
 export const DEMO_OVERVIEW_CONTENT_PIPELINE: WorkspaceContentItem[] =
   workspacePersonas.S2_ACTIVE.contentItems;

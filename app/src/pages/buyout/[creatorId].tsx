@@ -27,16 +27,27 @@ import {
 } from "@/lib/api/s1";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import {
+  buildDemoS1MarketProfile,
+  buildDemoS1Portfolio,
   displayCreatorHandle,
   displayCreatorName,
   findPortfolioPosition,
+  formatGraduationProgressPercent,
   formatS1Amount,
   formatUsdcAmount,
   hasClaimableUsdc,
+  isDemoCreatorRoute,
   resolveCreatorWalletForRoute,
   resolveFallbackCreator,
   shortenWallet,
 } from "@/lib/s1-market-view";
+import {
+  DEMO_PATH,
+  DEMO_S1_BUYOUT_PATH,
+  DEMO_S1_CREATOR_PATH,
+  DEMO_S1_MARKET_PATH,
+  PORTFOLIO_PATH,
+} from "@/lib/routes";
 
 /* ------------------------------------------------------------------ */
 /*  Phase helpers                                                      */
@@ -109,6 +120,29 @@ function PhaseStepper({ current }: { current: BuyoutPhase }) {
   );
 }
 
+function DemoRouteRail() {
+  const links = [
+    { href: DEMO_PATH, label: "Demo hub" },
+    { href: DEMO_S1_MARKET_PATH, label: "S1 market" },
+    { href: PORTFOLIO_PATH, label: "Portfolio" },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 buyout path</span>
+      {links.map((link) => (
+        <Link
+          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+          href={link.href}
+          key={link.href}
+        >
+          {link.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Summary metrics                                                    */
 /* ------------------------------------------------------------------ */
@@ -150,6 +184,24 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
           <p className={`mt-1 text-sm font-semibold tracking-[-0.02em] ${it.color ?? "text-white"}`}>{it.value}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function DiscoveryProgressCard({ profile }: { profile: S1MarketProfileResponse }) {
+  const progress = formatGraduationProgressPercent(profile.creator.graduationProgressBps);
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-left">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">
+          S1 discovery progress
+        </span>
+        <span className="text-sm font-semibold text-white">{progress}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-full rounded-full bg-[#f3b33e]" style={{ width: `${progress}%` }} />
+      </div>
     </div>
   );
 }
@@ -456,6 +508,7 @@ function BuyoutPage() {
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
+  const isDemoRoute = useMemo(() => isDemoCreatorRoute(creatorId), [creatorId]);
   const [profile, setProfile] = useState<S1MarketProfileResponse | null>(null);
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
@@ -466,6 +519,13 @@ function BuyoutPage() {
     if (!creatorWallet) return;
     const session = getStoredAuthSession();
     setSessionWallet(session?.wallet ?? null);
+    if (isDemoRoute) {
+      const demoProfile = buildDemoS1MarketProfile(fallbackCreator);
+      setProfile(demoProfile);
+      setPortfolio(buildDemoS1Portfolio(creatorWallet, demoProfile));
+      return;
+    }
+
     const marketProfile = await getS1MarketProfile(creatorWallet);
     setProfile(marketProfile);
 
@@ -478,7 +538,7 @@ function BuyoutPage() {
     } else {
       setPortfolio(null);
     }
-  }, [creatorWallet]);
+  }, [creatorWallet, fallbackCreator, isDemoRoute]);
 
   useEffect(() => {
     if (!creatorWallet) {
@@ -552,14 +612,20 @@ function BuyoutPage() {
       <Head><title>{`StreamPump | ${title} Buyout Room`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4">
-          <DemoCreatorBanner creatorWallet={profile.creator.creatorWallet} />
+          <DemoCreatorBanner
+            buyoutHref={isDemoRoute ? DEMO_S1_BUYOUT_PATH : undefined}
+            creatorHref={isDemoRoute ? DEMO_S1_CREATOR_PATH : undefined}
+            creatorWallet={profile.creator.creatorWallet}
+            marketHref={isDemoRoute ? DEMO_S1_MARKET_PATH : undefined}
+          />
+          {isDemoRoute ? <DemoRouteRail /> : null}
 
           {/* Header */}
           <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-[#7e90aa] transition hover:bg-white/[0.08]"
-                href={`/market/${creatorWallet}`}
+                href={isDemoRoute ? DEMO_S1_MARKET_PATH : `/market/${creatorWallet}`}
               >
                 <span aria-hidden className="text-sm">‹</span>
               </Link>
@@ -587,9 +653,10 @@ function BuyoutPage() {
               <p className="mt-1.5 text-xs text-[#8ea0ba]">
                 This creator is in S1 discovery. Buyout offers may appear when the market matures.
               </p>
+              <DiscoveryProgressCard profile={profile} />
               <Link
                 className="mt-4 inline-flex items-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
-                href={`/market/${creatorWallet}`}
+                href={isDemoRoute ? DEMO_S1_MARKET_PATH : `/market/${creatorWallet}`}
               >
                 ← Back to market
               </Link>

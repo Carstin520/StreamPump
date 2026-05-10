@@ -15,7 +15,9 @@ export {
   creators,
   discoverCategories,
   findCreator,
+  findCreatorStrict,
   findPost,
+  normalizeCreatorLookupKey,
   posts,
 } from "@/lib/mocks/discover";
 export {
@@ -36,8 +38,10 @@ export { compactNumber, formatUsd } from "@/lib/mocks/utils";
 export {
   campaigns,
   findCampaign,
+  findMockProposalDetail,
   findIntent,
   findManifest,
   intents,
   manifests,
+  mockProposalDetails,
 } from "@/lib/mocks/workspace";

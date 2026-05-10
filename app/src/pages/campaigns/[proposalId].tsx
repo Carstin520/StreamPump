@@ -8,6 +8,12 @@ import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
 import { Panel } from "@/components/shared/Panel";
 import { getProposalById, ProposalDetailResponse } from "@/lib/api/workspace";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
+import { findCreatorStrict } from "@/lib/mocks/discover";
+import { findMockProposalDetail } from "@/lib/mocks/workspace";
+import {
+  DEMO_S2_ENDORSE_PATH,
+  DEMO_S2_SETTLEMENT_PATH,
+} from "@/lib/routes";
 import { getAccessToken, loadWithPublicFallback } from "@/lib/session-flow";
 
 type PageState =
@@ -34,6 +40,12 @@ export default function CampaignDetailPage() {
     }
 
     setState({ kind: "loading" });
+    const mockProposal = findMockProposalDetail(proposalId);
+    if (mockProposal) {
+      setState({ kind: "ready", data: mockProposal });
+      return;
+    }
+
     const loadProposal = async () => {
       try {
         const data = await loadWithPublicFallback({
@@ -61,6 +73,21 @@ export default function CampaignDetailPage() {
 
   const pageTitle = state.kind === "ready" ? state.data.proposal.id : "Campaign detail";
   const isPublicView = state.kind === "ready" && state.data.viewerRole === "PUBLIC_FAN";
+  const isDemoProposal =
+    state.kind === "ready" && Boolean(findMockProposalDetail(state.data.proposal.id));
+  const demoCreator = isDemoProposal ? findCreatorStrict("neo-park") : undefined;
+  const campaignHeading = demoCreator
+    ? `${demoCreator.name} × Nova Screen`
+    : state.kind === "ready" && isPublicView
+      ? shortenWallet(state.data.proposal.creatorWallet)
+      : state.kind === "ready"
+        ? `${shortenWallet(state.data.proposal.creatorWallet)} × ${shortenWallet(state.data.proposal.sponsorWallet)}`
+        : "Campaign detail";
+  const settlementHref = isDemoProposal
+    ? DEMO_S2_SETTLEMENT_PATH
+    : state.kind === "ready"
+      ? `/campaigns/${state.data.proposal.id}/settlement`
+      : DEMO_S2_SETTLEMENT_PATH;
 
   return (
     <>
@@ -68,10 +95,10 @@ export default function CampaignDetailPage() {
         <title>{`StreamPump | ${pageTitle}`}</title>
       </Head>
       <PageShell
-        subtitle="Campaign detail is the shared surface after launch. It should speak both to sponsors and creators without forcing them into different portals."
+        subtitle="Campaign detail is the shared campaign overview after launch, whether the data comes from the live proposal endpoint or the local demo fallback."
         title="Campaign detail"
       >
-        {state.kind === "loading" ? <AsyncStateCard body="Loading proposal detail from the live v1 proposal endpoint." title="Loading campaign" /> : null}
+        {state.kind === "loading" ? <AsyncStateCard body="Loading proposal detail." title="Loading campaign" /> : null}
         {state.kind === "error" ? <AsyncStateCard body={state.message} title="Campaign request failed" /> : null}
         {state.kind === "ready" ? (
           <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
@@ -81,11 +108,13 @@ export default function CampaignDetailPage() {
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Proposal</p>
                     <h3 className="mt-2 text-2xl font-semibold text-white">
-                      {isPublicView
-                        ? shortenWallet(state.data.proposal.creatorWallet)
-                        : `${shortenWallet(state.data.proposal.creatorWallet)} × ${shortenWallet(state.data.proposal.sponsorWallet)}`}
+                      {campaignHeading}
                     </h3>
-                    <p className="mt-2 text-sm text-slate-300">Viewer mode: {state.data.viewerRole}</p>
+                    <p className="mt-2 text-sm text-slate-300">
+                      {isDemoProposal
+                        ? "S2 demo campaign · Track 2 views target"
+                        : `Viewer mode: ${state.data.viewerRole}`}
+                    </p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-100">{state.data.proposal.status}</span>
                 </div>
@@ -139,19 +168,29 @@ export default function CampaignDetailPage() {
             <Panel className="space-y-4">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Shared status language</p>
               <p className="text-sm leading-7 text-slate-300">
-                This page now reads directly from the backend proposal endpoint. Creator/sponsor sessions get the fuller projection; public viewers get the stripped-down campaign state that is safe to expose.
+                This campaign overview supports both demo fallback data and live proposal data. Creator/sponsor sessions can expose the fuller projection; public viewers get the campaign state that is safe to show.
               </p>
               <div className="surface-muted rounded-2xl p-4 text-sm text-slate-300">
                 <p>Oracle sync: {state.data.proposal.oracleSyncStatus ?? "Public view"}</p>
                 <p className="mt-2">Track 2 settled: {state.data.proposal.track2SettledAt ? formatIsoLabel(state.data.proposal.track2SettledAt) : "Not settled"}</p>
                 <p className="mt-2">Track 3 settled: {state.data.proposal.track3SettledAt ? formatIsoLabel(state.data.proposal.track3SettledAt) : "Not settled / private"}</p>
               </div>
-              <Link
-                className="block rounded-2xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.25)] transition hover:brightness-[1.05]"
-                href={`/campaigns/${state.data.proposal.id}/settlement`}
-              >
-                Open settlement dashboard
-              </Link>
+              <div className="grid gap-3">
+                {isDemoProposal ? (
+                  <Link
+                    className="block rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
+                    href={DEMO_S2_ENDORSE_PATH}
+                  >
+                    Endorse demo
+                  </Link>
+                ) : null}
+                <Link
+                  className="block rounded-2xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.25)] transition hover:brightness-[1.05]"
+                  href={settlementHref}
+                >
+                  Settlement dashboard
+                </Link>
+              </div>
             </Panel>
           </div>
         ) : null}
