@@ -2,7 +2,6 @@ import Head from "next/head";
 import { useState } from "react";
 
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
-import { useI18n } from "@/lib/i18n";
 
 type Offer = {
   sponsor: string;
@@ -170,7 +169,6 @@ function ConfirmModal({
 }
 
 export default function BuyoutPage() {
-  const { t } = useI18n();
   const [buyoutOpen, setBuyoutOpen] = useState(true);
   const [selectedOffer, setSelectedOffer] = useState<number | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -180,7 +178,7 @@ export default function BuyoutPage() {
   return (
     <>
       <Head>
-        <title>{t("page.workspace.buyoutTitle")}</title>
+        <title>Buyout Management — StreamPump</title>
       </Head>
 
       <WorkspaceShell stage="S1_BUYOUT" wallet={WALLET}>
@@ -188,7 +186,7 @@ export default function BuyoutPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
-                {t("shell.workspace")}
+                Workspace
               </p>
               <h1 className="mt-0.5 text-[18px] font-semibold tracking-[-0.03em] text-white md:text-[20px]">
                 Buyout Auction

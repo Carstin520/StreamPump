@@ -26,7 +26,6 @@ import {
   LoginPreviewMode,
 } from "@/lib/api/types";
 import { storeAuthSession } from "@/lib/auth-session";
-import { useI18n } from "@/lib/i18n";
 import { loginAccounts, loginMethods } from "@/lib/public-data";
 import { WORKSPACE_PATH } from "@/lib/routes";
 
@@ -125,47 +124,21 @@ const bytesToBase64 = (value: Uint8Array) => {
   return window.btoa(binary);
 };
 
-const getMethodLabelKey = (methodId: LoginMethodRecord["id"]) => {
-  if (methodId === "email") return "auth.emailLogin";
-  if (methodId === "google") return "auth.googleLogin";
-  if (methodId === "apple") return "auth.appleLogin";
-  return "auth.walletLogin";
-};
-
-const getMethodSubtitleKey = (methodId: LoginMethodRecord["id"]) => {
-  if (methodId === "email") return "auth.emailSubtitle";
-  if (methodId === "google") return "auth.googleSubtitle";
-  if (methodId === "apple") return "auth.appleSubtitle";
-  return "auth.walletSubtitle";
-};
-
-const getSessionLabelKey = (label: string) => {
-  if (label === "当前会话") return "auth.currentSession";
-  if (label === "最近登录") return "auth.recentLogin";
-  if (label === "钱包身份") return "auth.walletIdentity";
-  return null;
-};
-
 export const AuthOptionsPanel = ({
   mode,
   nextHref = WORKSPACE_PATH,
   onModeChange,
 }: AuthOptionsPanelProps) => {
   const router = useRouter();
-  const { t } = useI18n();
   const { connected, connecting, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState("alex@streampump.local");
   const [emailCode, setEmailCode] = useState("");
   const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<string>(t("auth.initialAction"));
+  const [lastAction, setLastAction] = useState<string>("选择邮箱、Google、Apple 或钱包继续。");
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
-
-  useEffect(() => {
-    setLastAction(t("auth.initialAction"));
-  }, [t]);
 
   const currentAccount = useMemo(
     () => loginAccounts.find((account) => account.isCurrent) ?? loginAccounts[0],
@@ -196,22 +169,22 @@ export const AuthOptionsPanel = ({
 
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
     if (!previewSocialAuthEnabled) {
-      setLastAction(t("auth.socialDisabled"));
+      setLastAction("社交登录预览被环境变量关闭，请使用钱包登录。");
       return;
     }
 
     setBusyKey(identity.providerSubject);
-    setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
+    setLastAction(`正在创建 ${successLabel} 会话...`);
 
     try {
       const session = await exchangeProviderSession(identity);
       storeAuthSession(session);
-      setLastAction(t("auth.providerSessionReady", { label: successLabel }));
+      setLastAction(`${successLabel} 会话已创建，正在进入产品。`);
       void router.push(nextHref);
     } catch (error) {
       const session = createLocalProviderSession(identity);
       storeAuthSession(session);
-      setLastAction(t("auth.providerLocalSession", { label: successLabel }));
+      setLastAction(`${successLabel} 本地预览会话已创建，后端不可用时也可继续浏览。`);
       void router.push(resolveLocalPreviewRedirectHref(nextHref));
     } finally {
       setBusyKey(null);
@@ -226,13 +199,13 @@ export const AuthOptionsPanel = ({
     const walletAddress = publicKey.toBase58();
     setBusyKey("wallet");
     setPendingWalletLogin(false);
-    setLastAction(t("auth.walletSessionCreating"));
+    setLastAction("正在创建钱包登录会话...");
 
     try {
       if (!signMessage) {
         const session = createLocalWalletSession(walletAddress);
         storeAuthSession(session);
-        setLastAction(t("auth.walletConnectedLocal"));
+        setLastAction("钱包已连接，本地预览会话已创建。");
         void router.push(resolveLocalPreviewRedirectHref(nextHref));
         return;
       }
@@ -246,22 +219,22 @@ export const AuthOptionsPanel = ({
       });
 
       storeAuthSession(session);
-      setLastAction(t("auth.walletSessionReady"));
+      setLastAction("钱包会话已创建，正在进入产品。");
       void router.push(nextHref);
     } catch (error) {
       if (isUserRejectedWalletRequest(error)) {
-        setLastAction(t("auth.walletRejected"));
+        setLastAction("钱包签名已取消，未创建会话。");
         return;
       }
 
       const session = createLocalWalletSession(walletAddress);
       storeAuthSession(session);
-      setLastAction(t("auth.walletConnectedLocal"));
+      setLastAction("钱包已连接，本地预览会话已创建。");
       void router.push(resolveLocalPreviewRedirectHref(nextHref));
     } finally {
       setBusyKey(null);
     }
-  }, [nextHref, publicKey, router, signMessage, t]);
+  }, [nextHref, publicKey, router, signMessage]);
 
   useEffect(() => {
     if (!pendingWalletLogin || !connected || !publicKey || busyKey) {
@@ -275,7 +248,7 @@ export const AuthOptionsPanel = ({
     if (!connected || !publicKey) {
       setPendingWalletLogin(true);
       setVisible(true);
-      setLastAction(t("auth.walletRequired"));
+      setLastAction("请选择并连接 Solana 钱包，连接成功后会自动继续登录。");
       return;
     }
 
@@ -285,20 +258,20 @@ export const AuthOptionsPanel = ({
   const handleEmailRequestCode = async () => {
     const email = emailValue.trim();
     if (!email) {
-      setLastAction(t("auth.emailRequired"));
+      setLastAction("请输入邮箱地址。");
       return;
     }
 
     setBusyKey("email");
-    setLastAction(t("auth.sendingEmailCode"));
+    setLastAction("正在发送邮箱验证码...");
 
     try {
       const challenge = await requestEmailLoginCode(email);
       setEmailCode("");
       setEmailCodeExpiresAt(challenge.expiresAt);
-      setLastAction(t("auth.codeSent"));
+      setLastAction("验证码已发送，请查看邮箱。");
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : t("auth.emailSendFailed"));
+      setLastAction(error instanceof Error ? error.message : "邮箱验证码发送失败。");
     } finally {
       setBusyKey(null);
     }
@@ -308,20 +281,20 @@ export const AuthOptionsPanel = ({
     const email = emailValue.trim();
     const code = emailCode.trim();
     if (!email || !code) {
-      setLastAction(t("auth.emailAndCodeRequired"));
+      setLastAction("请输入邮箱和验证码。");
       return;
     }
 
     setBusyKey("email-verify");
-    setLastAction(t("auth.verifyingEmailCode"));
+    setLastAction("正在验证邮箱验证码...");
 
     try {
       const session = await verifyEmailLoginCode({ email, code });
       storeAuthSession(session);
-      setLastAction(t("auth.emailSessionCreated"));
+      setLastAction("邮箱会话已创建，正在进入产品。");
       void router.push(nextHref);
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : t("auth.emailCodeFailed"));
+      setLastAction(error instanceof Error ? error.message : "邮箱验证码验证失败。");
     } finally {
       setBusyKey(null);
     }
@@ -338,13 +311,13 @@ export const AuthOptionsPanel = ({
       return;
     }
 
-    await createPreviewSession(resolveMethodIdentity(method.id), t(getMethodLabelKey(method.id)));
+    await createPreviewSession(resolveMethodIdentity(method.id), method.label);
   };
 
   const handleAccountSwitch = async (accountId: string, accountName: string) => {
     const identity = ACCOUNT_IDENTITIES[accountId];
     if (!identity) {
-      setLastAction(t("auth.walletSwitchFallback", { name: accountName }));
+      setLastAction(`${accountName} will use the connected wallet instead of the old preview path.`);
       await handleWalletLogin();
       return;
     }
@@ -369,7 +342,7 @@ export const AuthOptionsPanel = ({
               onClick={() => onModeChange(previewMode)}
               type="button"
             >
-              {previewMode === "welcome" ? t("auth.welcome") : t("auth.switchAccount")}
+              {previewMode === "welcome" ? "初次登录" : "切换账号"}
             </button>
           ))}
         </div>
@@ -377,13 +350,13 @@ export const AuthOptionsPanel = ({
         {mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-[40px] font-semibold tracking-[-0.05em] text-white">{t("auth.welcomeBack")}</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.signInOrCreate")}</p>
+              <h2 className="text-[40px] font-semibold tracking-[-0.05em] text-white">欢迎回来</h2>
+              <p className="mt-3 text-sm text-[#93a3bb]">登录或注册 StreamPump 账号</p>
             </div>
 
             <label className="block">
               <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
-                {t("common.email")}
+                Email
               </span>
               <input
                 className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
@@ -399,7 +372,7 @@ export const AuthOptionsPanel = ({
               <div className="space-y-3">
                 <label className="block">
                   <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
-                    {t("auth.verificationCode")}
+                    Verification code
                   </span>
                   <input
                     className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
@@ -417,7 +390,7 @@ export const AuthOptionsPanel = ({
                   onClick={() => void handleEmailVerifyCode()}
                   type="button"
                 >
-                  {t("auth.verifyEmailCode")}
+                  Verify email code
                 </button>
               </div>
             ) : null}
@@ -447,15 +420,15 @@ export const AuthOptionsPanel = ({
                         <LoginMethodIcon id={method.id} />
                       </span>
                       <div>
-                        <p className="text-sm font-medium">{t(getMethodLabelKey(method.id))}</p>
+                        <p className="text-sm font-medium">{method.label}</p>
                         <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
                           {method.id === "email"
                             ? emailCodeExpiresAt
-                              ? t("auth.resendEmailCode")
-                              : t("auth.sendEmailCode")
+                              ? "重新发送邮箱验证码"
+                              : "发送一次性邮箱验证码"
                             : socialDisabled
-                              ? t("auth.socialDisabledShort")
-                              : t(getMethodSubtitleKey(method.id))}
+                              ? "社交登录已被环境变量关闭"
+                              : method.subtitle}
                         </p>
                       </div>
                     </div>
@@ -466,15 +439,15 @@ export const AuthOptionsPanel = ({
                         </span>
                       ) : socialDisabled ? (
                         <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
-                          {t("auth.envOff")}
+                          Env off
                         </span>
                       ) : method.id === "wallet" ? (
                         <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
-                          {connecting ? t("auth.walletConnecting") : connected ? t("auth.walletReady") : "Web3"}
+                          {connecting ? "Connecting" : connected ? "Wallet ready" : "Web3"}
                         </span>
                       ) : (
                         <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
-                          {t("auth.ready")}
+                          Ready
                         </span>
                       )}
                       <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
@@ -485,14 +458,14 @@ export const AuthOptionsPanel = ({
             </div>
 
             <p className="text-center text-xs text-[#70819d]">
-              {t("auth.termsPrefix")} <span className="text-[#96a8c0]">{t("auth.termsService")}</span> {t("auth.termsAnd")} <span className="text-[#96a8c0]">{t("auth.termsPrivacy")}</span>
+              继续即表示你同意 <span className="text-[#96a8c0]">服务条款</span> 和 <span className="text-[#96a8c0]">隐私政策</span>
             </p>
           </div>
         ) : (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className="text-[32px] font-semibold tracking-[-0.05em] text-white">{t("auth.switchAccount")}</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.continueCurrent")}</p>
+              <h2 className="text-[32px] font-semibold tracking-[-0.05em] text-white">切换账号</h2>
+              <p className="mt-3 text-sm text-[#93a3bb]">继续当前身份，或切换到另一个 StreamPump 会话</p>
             </div>
 
             <div className="card-radius border border-white/[0.08] bg-[#111827]/90 p-5 shadow-[0_20px_52px_rgba(0,0,0,0.18)]">
@@ -504,7 +477,7 @@ export const AuthOptionsPanel = ({
                 </div>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/92">{getSessionLabelKey(currentAccount.sessionLabel) ? t(getSessionLabelKey(currentAccount.sessionLabel) as string) : currentAccount.sessionLabel}</span>
+                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/92">{currentAccount.sessionLabel}</span>
                 <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#93a3bb]">{currentAccount.methodLabel}</span>
               </div>
             </div>
@@ -514,7 +487,7 @@ export const AuthOptionsPanel = ({
               onClick={() => {
                 setShowAccounts((value) => {
                   const nextValue = !value;
-                  setLastAction(nextValue ? t("auth.expandedAccounts") : t("auth.compactAccounts"));
+                  setLastAction(nextValue ? "Expanded alternate accounts preview." : "Switched back to compact account view.");
                   return nextValue;
                 });
               }}
@@ -525,8 +498,8 @@ export const AuthOptionsPanel = ({
                   <SearchIcon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-[18px] font-semibold tracking-[-0.03em]">{t("auth.accountSwitcherTitle")}</p>
-                  <p className="mt-1 text-sm text-[#8ea0ba]">{t("auth.accountSwitcherBody")}</p>
+                  <p className="text-[18px] font-semibold tracking-[-0.03em]">切换账号</p>
+                  <p className="mt-1 text-sm text-[#8ea0ba]">查看其他登录身份与钱包会话</p>
                 </div>
               </div>
               <ChevronRightIcon className={`h-5 w-5 text-white/52 transition ${showAccounts ? "rotate-90" : ""}`} />

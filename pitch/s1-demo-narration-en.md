@@ -1,0 +1,17 @@
+# StreamPump S1 Demo Narration Script
+
+StreamPump S1 is a creator discovery market. Fans are not buying a transferable meme coin. Instead, they use SPUMP to support early creators and receive an internal S1 position recorded inside the product.
+
+We start from the demo hub and enter the S1 Market. On the left, the page shows the current price, price history, total supply, holder count, graduation progress, and supporter pool. On the right, fans can buy or sell S1 positions.
+
+First, I will demonstrate a buy. I choose 10 S1 and confirm the action. In this local demo state, the submission completes and the page updates the current position. In the live product, this maps to transaction building, wallet signing, on-chain submission, and read model synchronization.
+
+Next, I switch to sell. S1 is not a publicly transferable token, so selling means exiting through the protocol curve rather than trading on a secondary market. After confirming the sell, the position and cost basis update.
+
+When a creator approaches graduation, sponsors can initiate a buyout. We open Buyout Watch. This page shows the accepted offer, winning sponsor, USDC deposited, claimable USDC, and the rage quit deadline.
+
+During the rage quit window, early fans can choose to exit part of their S1 position. This window protects fans from repricing risk before the creator moves into the sponsored campaign market.
+
+Finally, I will demonstrate claim. After graduation, fans who still hold eligible S1 positions can claim pro-rata USDC. Once the claim is confirmed, the claimable balance clears, representing completion of the buyout payout.
+
+Back in Portfolio, we can see the S1 position, claim queue, and buyout entry points. The complete S1 loop is: discover a creator, build a position, adjust exposure through the curve, enter buyout, then either exit or claim USDC.

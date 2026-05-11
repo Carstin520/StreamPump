@@ -300,6 +300,7 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
 function RageQuitPanel({
   active,
   creatorWallet,
+  currentPriceSpump,
   isDemoRoute,
   onDemoExit,
   onRefresh,
@@ -308,6 +309,7 @@ function RageQuitPanel({
 }: {
   active: boolean;
   creatorWallet: string;
+  currentPriceSpump?: string | null;
   isDemoRoute?: boolean;
   onDemoExit?: (amount: number) => void;
   onRefresh: () => Promise<void>;
@@ -391,6 +393,15 @@ function RageQuitPanel({
             type="range"
             value={amount}
           />
+
+          {currentPriceSpump && Number(currentPriceSpump) > 0 ? (
+            <div className="mt-3 flex items-center justify-between rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8ea0ba]">Est. SPUMP return</span>
+              <span className="text-sm font-semibold tracking-[-0.02em] text-[#65ecaf]">
+                {new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount * Number(currentPriceSpump) / 1_000_000_000)} SPUMP
+              </span>
+            </div>
+          ) : null}
 
           <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
 
@@ -673,6 +684,14 @@ function BuyoutPage() {
 
   const handleDemoExit = useCallback(
     (amount: number) => {
+      const currentPrice = Number(profile?.creator.currentPriceSpump || 0);
+      const spumpReturned = currentPrice > 0 ? amount * (currentPrice / 1_000_000_000) : 0;
+      const spumpReturnedLabel = spumpReturned >= 1_000_000
+        ? `${(spumpReturned / 1_000_000).toFixed(1)}M`
+        : spumpReturned >= 1_000
+          ? `${(spumpReturned / 1_000).toFixed(1)}K`
+          : spumpReturned.toFixed(0);
+
       setPortfolio((current) => {
         if (!current) return current;
         return {
@@ -685,18 +704,42 @@ function BuyoutPage() {
             const nextBalance = Math.max(0, currentBalance - amount);
             const currentCostBasis = Math.max(0, Number(item.spumpCostBasis || 0));
             const retainedRatio = currentBalance > 0 ? nextBalance / currentBalance : 0;
+            const currentClaimable = Number(item.estimatedClaimableUsdc || 0);
+            const nextClaimable = Math.round(currentClaimable * retainedRatio);
             return {
               ...item,
               internalTokenBalance: String(Math.round(nextBalance)),
               spumpCostBasis: String(Math.round(currentCostBasis * retainedRatio)),
+              estimatedClaimableUsdc: String(nextClaimable),
               updatedAt: new Date().toISOString(),
             };
           }),
         };
       });
-      setDemoSummary(`Exited ${amount} S1 through the mock rage quit flow.`);
+
+      setProfile((current) => {
+        if (!current?.buyout) return current;
+        const totalSupply = Number(current.buyout.claimableS1SupplyRemaining || 0);
+        const nextSupply = Math.max(0, totalSupply - amount);
+        const supplyRatio = totalSupply > 0 ? nextSupply / totalSupply : 0;
+        const totalClaimable = Number(current.buyout.claimableUsdcRemaining || 0);
+        return {
+          ...current,
+          creator: {
+            ...current.creator,
+            s1Supply: String(Math.max(0, Number(current.creator.s1Supply || 0) - amount)),
+          },
+          buyout: {
+            ...current.buyout,
+            claimableS1SupplyRemaining: String(Math.round(nextSupply)),
+            claimableUsdcRemaining: String(Math.round(totalClaimable * supplyRatio)),
+          },
+        };
+      });
+
+      setDemoSummary(`Rage quit ${amount} S1 → received ~${spumpReturnedLabel} SPUMP (zero exit tax).`);
     },
-    [creatorWallet],
+    [creatorWallet, profile?.creator.currentPriceSpump],
   );
 
   const handleDemoClaim = useCallback(() => {
@@ -829,6 +872,7 @@ function BuyoutPage() {
                   <RageQuitPanel
                     active={rageQuitActive}
                     creatorWallet={profile.creator.creatorWallet}
+                    currentPriceSpump={profile.creator.currentPriceSpump}
                     isDemoRoute={isDemoRoute}
                     onDemoExit={handleDemoExit}
                     onRefresh={refresh}

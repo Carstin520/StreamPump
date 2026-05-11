@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
 
 export type TopbarMode = "sticky" | "scroll-reveal";
@@ -15,23 +14,20 @@ const SEARCH_AUTO_HIDE_MS = 10_000;
 
 export const UserTopbar = ({
   mode = "sticky",
-  searchPlaceholder,
+  searchPlaceholder = "搜索帖子、创作者、品牌合作",
   hideSearch = false,
 }: {
   mode?: TopbarMode;
   searchPlaceholder?: string;
   hideSearch?: boolean;
 }) => {
-  const { t } = useI18n();
-  const resolvedSearchPlaceholder = searchPlaceholder ?? t("shell.searchPlaceholder");
-
   if (mode === "scroll-reveal") {
-    return <ScrollRevealTopbar searchPlaceholder={resolvedSearchPlaceholder} />;
+    return <ScrollRevealTopbar searchPlaceholder={searchPlaceholder} />;
   }
 
   return (
     <header className="sticky top-0 z-30 pt-4">
-      <TopbarInner hideSearch={hideSearch} searchPlaceholder={resolvedSearchPlaceholder} />
+      <TopbarInner hideSearch={hideSearch} searchPlaceholder={searchPlaceholder} />
     </header>
   );
 };
@@ -264,11 +260,8 @@ const TopbarInner = ({
 }: {
   hideSearch?: boolean;
   searchPlaceholder: string;
-}) => {
-  const { t } = useI18n();
-
-  return (
-    <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
+}) => (
+  <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
     {hideSearch ? (
       <div className="flex-1" />
     ) : (
@@ -291,7 +284,7 @@ const TopbarInner = ({
         className="glass-button-primary px-5 py-2.5 text-sm font-semibold"
         href="/workspace"
       >
-        + {t("shell.workspaceCenter")}
+        + 创作中心
       </Link>
       <Link
         className="glass-button-ghost flex items-center gap-2 px-2.5 py-1.5 text-sm text-[#c4d0e3] transition duration-200 hover:text-white"
@@ -301,6 +294,5 @@ const TopbarInner = ({
         <span className="hidden max-w-[140px] truncate sm:inline">{currentUser.handle}</span>
       </Link>
     </div>
-    </div>
-  );
-};
+  </div>
+);

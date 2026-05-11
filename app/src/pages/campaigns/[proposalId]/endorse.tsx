@@ -8,10 +8,13 @@ import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 
 const creator = findCreator("neo-park");
 
+const CAMPAIGN_TITLE = "PulseFit × Nova Screen";
+const CAMPAIGN_BRIEF = "Nova Screen's sponsored review video reaches 10,000 likes within the campaign window.";
 const TRACK1_BASE = 100_000;
 const TRACK2_BUDGET = 1_000_000;
 const TRACK3_BUDGET = 300_000;
-const TRACK2_TARGET = 1_000;
+const TRACK2_TARGET = 10_000;
+const TRACK2_METRIC = "Likes";
 const TRACK2_CLIFF = 0.5;
 const TRACK2_CURRENT = 0;
 const FAN_POOL_SHARE = TRACK2_BUDGET * 0.2;
@@ -32,8 +35,8 @@ const DIAL_CIRCUMFERENCE = 2 * Math.PI * DIAL_RADIUS;
 
 const tracks = [
   { label: "Track 1 · Base", value: TRACK1_BASE, settled: true, color: "#65ecaf" },
-  { label: "Track 2 · Performance", value: TRACK2_BUDGET, settled: false, color: "#67b8ff" },
-  { label: "Track 3 · Bonus", value: TRACK3_BUDGET, settled: false, color: "#f3b33e" },
+  { label: `Track 2 · ${TRACK2_METRIC}`, value: TRACK2_BUDGET, settled: false, color: "#67b8ff" },
+  { label: "Track 3 · CPS", value: TRACK3_BUDGET, settled: false, color: "#f3b33e" },
 ];
 
 function clamp(v: number, min: number, max: number) {
@@ -117,6 +120,31 @@ export default function EndorsePage() {
         <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           {/* ── Left column ── */}
           <div className="space-y-5">
+            {/* ── Campaign target ── */}
+            <section className="liquid-card section-enter rounded-[28px] p-6">
+              <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">Campaign Target</p>
+              <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{CAMPAIGN_TITLE}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{CAMPAIGN_BRIEF}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="rounded-xl bg-white/[0.04] px-3 py-2">
+                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Metric</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(TRACK2_TARGET)} {TRACK2_METRIC}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.04] px-3 py-2">
+                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Cliff</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{TRACK2_CLIFF * 100}%</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.04] px-3 py-2">
+                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsd(FAN_POOL_SHARE)}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.04] px-3 py-2">
+                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{DEADLINE}</p>
+                </div>
+              </div>
+            </section>
+
             {/* ── Staking dial ── */}
             <section className="liquid-card section-enter flex flex-col items-center gap-6 rounded-[28px] p-8">
               <div className="flex items-center gap-3 self-start">
@@ -316,7 +344,7 @@ export default function EndorsePage() {
                         />
                       </div>
                       <p className="mt-1 text-[10px] text-[#8ea0ba]">
-                        {t.settled ? "Settled" : `${TRACK2_CURRENT} / ${compactNumber(TRACK2_TARGET)} views · ${pct.toFixed(0)}%`}
+                        {t.settled ? "Settled" : `${compactNumber(TRACK2_CURRENT)} / ${compactNumber(TRACK2_TARGET)} ${TRACK2_METRIC.toLowerCase()} · ${pct.toFixed(0)}%`}
                       </p>
                     </div>
                   );
@@ -382,7 +410,7 @@ export default function EndorsePage() {
               </p>
               <div className="mt-4 space-y-2.5">
                 {[
-                  ["Track 2 target", `${compactNumber(TRACK2_TARGET)} views`],
+                  ["Track 2 target", `${compactNumber(TRACK2_TARGET)} ${TRACK2_METRIC.toLowerCase()}`],
                   ["Cliff", `${TRACK2_CLIFF * 100}%`],
                   ["Fan pool (20%)", formatUsd(FAN_POOL_SHARE)],
                   ["Your balance", `${compactNumber(FAN_BALANCE)} SPUMP`],

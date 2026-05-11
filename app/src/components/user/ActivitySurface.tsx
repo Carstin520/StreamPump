@@ -12,7 +12,6 @@ import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { ActivityTab } from "@/lib/api/types";
 import { PostRecord } from "@/lib/api/types";
-import { useI18n } from "@/lib/i18n";
 import { compactNumber } from "@/lib/public-data";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
@@ -25,7 +24,6 @@ export const ActivitySurface = ({
   initialError?: string | null;
   initialPosts?: PostRecord[];
 }) => {
-  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<ActivityTab>("overview");
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(ALL_ACTIVITY);
   const {
@@ -50,7 +48,7 @@ export const ActivitySurface = ({
   );
 
   return (
-    <PageShell searchPlaceholder={t("feed.searchActivityPlaceholder")}>
+    <PageShell searchPlaceholder="搜索动态、创作者、视频">
       <div className="mx-auto max-w-[1400px] py-4">
         <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)_280px]">
           <aside className="hidden xl:block">
@@ -66,7 +64,7 @@ export const ActivitySurface = ({
                 }}
                 type="button"
               >
-                <span className="text-[13px] font-medium">{t("feed.allActivity")}</span>
+                <span className="text-[13px] font-medium">全部动态</span>
                 <span className="text-[11px] text-[#7f91ab]">{activityFeedItems.length}</span>
               </button>
 
@@ -111,9 +109,9 @@ export const ActivitySurface = ({
           <section className="min-w-0 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
               <div className="flex items-baseline gap-3">
-                <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-white">{t("nav.activity")}</h1>
+                <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-white">动态</h1>
                 <p className="hidden text-xs text-[#7f90ab] md:block">
-                  {t("feed.followFirst")}
+                  Follow-first updates from creators you already care about.
                 </p>
               </div>
 
@@ -131,13 +129,13 @@ export const ActivitySurface = ({
                     }}
                     type="button"
                   >
-                    {tab.id === "overview" ? t("nav.overview") : t("common.video")}
+                    {tab.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {loading ? <div className="text-sm text-[#8ea0ba]">{t("feed.loadingActivity")}</div> : null}
+            {loading ? <div className="text-sm text-[#8ea0ba]">Loading imported activity…</div> : null}
 
             {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
 
@@ -166,7 +164,7 @@ export const ActivitySurface = ({
                         </Link>
 
                         <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#7f90ab]">
-                          {item.kind === "post" ? t("common.post") : t("common.update")}
+                          {item.kind === "post" ? "POST" : "UPDATE"}
                         </span>
                       </div>
 
@@ -283,8 +281,8 @@ export const ActivitySurface = ({
               <div className="liquid-glass-shell card-radius px-3.5 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[13px] font-semibold text-white">{t("feed.activeCreators")}</p>
-                    <p className="mt-0.5 text-[11px] text-[#7d8faa]">{t("feed.activeCreatorsDesc")}</p>
+                    <p className="text-[13px] font-semibold text-white">关注中的活跃创作者</p>
+                    <p className="mt-0.5 text-[11px] text-[#7d8faa]">Creators already shaping your feed.</p>
                   </div>
                   <span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#8b9cb7]">
                     {activitySidebarHighlights.length}

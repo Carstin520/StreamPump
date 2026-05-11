@@ -6,7 +6,6 @@ import {
   usePublicFeedViewModel,
 } from "@/hooks/usePublicFeedViewModel";
 import { PostRecord } from "@/lib/api/types";
-import { useI18n } from "@/lib/i18n";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { discoverCategories } from "@/lib/public-data";
@@ -35,18 +34,6 @@ const preloadPostDetailExperience = () => {
   void loadPostDetailExperience();
 };
 
-const getCategoryLabelKey = (category: string) => {
-  if (category === "推荐") return "feed.categories.recommended";
-  if (category === "赛车") return "feed.categories.racing";
-  if (category === "游戏") return "feed.categories.game";
-  if (category === "电影") return "feed.categories.film";
-  if (category === "科技") return "feed.categories.tech";
-  if (category === "城市") return "feed.categories.city";
-  if (category === "氛围") return "feed.categories.mood";
-  if (category === "创作者观察") return "feed.categories.creatorWatch";
-  return category;
-};
-
 export const DiscoverSurface = ({
   initialError = null,
   initialPosts = [],
@@ -54,7 +41,6 @@ export const DiscoverSurface = ({
   initialError?: string | null;
   initialPosts?: PostRecord[];
 }) => {
-  const { t } = useI18n();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const viewModel = useExploreFeedViewModel({
     initialError,
@@ -67,7 +53,7 @@ export const DiscoverSurface = ({
       <ExploreView onOpenPost={setSelectedPostId} viewModel={viewModel} />
       {selectedPostId && posts.length > 0 ? (
         <DynamicPostDetailExperience
-          closeLabel={t("feed.backToExplore")}
+          closeLabel="Back to explore"
           currentPostId={selectedPostId}
           items={posts}
           mode="modal"
@@ -86,10 +72,7 @@ const ExploreView = ({
 }: {
   onOpenPost: (postId: string) => void;
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
-}) => {
-  const { t } = useI18n();
-
-  return (
+}) => (
   <div className="-mt-3 space-y-4">
     <section
       className="sticky z-30 pt-1"
@@ -108,7 +91,7 @@ const ExploreView = ({
             key={category}
             type="button"
           >
-            {t(getCategoryLabelKey(category))}
+            {category}
           </button>
         ))}
         <div className="ml-auto hidden shrink-0 items-center gap-1.5 lg:flex">
@@ -121,8 +104,7 @@ const ExploreView = ({
 
     <PostsSection onOpenPost={onOpenPost} viewModel={viewModel} />
   </div>
-  );
-};
+);
 
 const LiveStatChip = ({
   icon,
@@ -169,7 +151,6 @@ const PostsSection = ({
   onOpenPost: (postId: string) => void;
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
-  const { t } = useI18n();
   const { error, loading, posts } = viewModel;
 
   return (
@@ -187,15 +168,15 @@ const PostsSection = ({
 
       {!loading && error ? (
         <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
-          <p className="font-semibold text-white">{t("feed.importedUnavailable")}</p>
+          <p className="font-semibold text-white">Imported feed unavailable</p>
           <p className="mt-2 text-[#8ea0ba]">{error}</p>
         </div>
       ) : null}
 
       {!loading && !error && posts.length === 0 ? (
         <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
-          <p className="font-semibold text-white">{t("feed.emptyTitle")}</p>
-          <p className="mt-2 text-[#8ea0ba]">{t("feed.emptyBody")}</p>
+          <p className="font-semibold text-white">No imported posts yet</p>
+          <p className="mt-2 text-[#8ea0ba]">The public feed is live, but there are no published local post assets to show.</p>
         </div>
       ) : null}
 
@@ -235,7 +216,6 @@ const TrendingView = ({
   initialError?: string | null;
   initialPosts?: PostRecord[];
 }) => {
-  const { t } = useI18n();
   const { creators, error, loading } = usePublicFeedViewModel({
     initialError,
     initialPosts,
@@ -245,15 +225,15 @@ const TrendingView = ({
     <section className="mx-auto max-w-[1280px] space-y-5 py-4">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">{t("feed.trendingCreators")}</h1>
-          <p className="mt-1 text-xs text-[#97a7be]">{t("feed.trendingDesc")}</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">Trending Creators</h1>
+          <p className="mt-1 text-xs text-[#97a7be]">Discover investable creators with real imported media already attached.</p>
         </div>
         <div className="rounded-full border border-[#65ecaf]/20 bg-[#0e1f17] px-3 py-1.5 text-xs font-medium text-[#8df0c4]">
           Market Up +4.2%
         </div>
       </div>
 
-      {loading ? <div className="text-sm text-[#8ea0ba]">{t("feed.loadingCreators")}</div> : null}
+      {loading ? <div className="text-sm text-[#8ea0ba]">Loading imported creators…</div> : null}
       {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
 
       {!loading && !error ? (

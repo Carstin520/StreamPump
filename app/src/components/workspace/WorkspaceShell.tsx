@@ -17,11 +17,9 @@ import {
   SettingsIcon,
   SponsorIcon,
 } from "@/components/shared/AppIcons";
-import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
 import { StagePill } from "@/components/shared/StagePill";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { CreatorSeasonState } from "@/lib/api/types";
-import { useI18n } from "@/lib/i18n";
 import { EXPLORE_PATH, isRouteActive, workspaceSidebarNav } from "@/lib/routes";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -33,6 +31,12 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   analytics: AnalyticsIcon,
   earnings: EarningsIcon,
   settings: SettingsIcon,
+};
+
+const STAGE_LABELS: Record<CreatorSeasonState, string> = {
+  S1_DISCOVERY: "S1 Discovery",
+  S1_BUYOUT: "S1 Buyout Watch",
+  S2_ACTIVE: "S2 Sponsored Creator",
 };
 
 const MOBILE_NAV_LIMIT = 4;
@@ -49,7 +53,6 @@ export const WorkspaceShell = ({
   wallet?: string;
 }) => {
   const router = useRouter();
-  const { t } = useI18n();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAsideOpen, setMobileAsideOpen] = useState(false);
 
@@ -77,7 +80,7 @@ export const WorkspaceShell = ({
         <div className="border-b border-white/[0.06] px-5 py-3">
           <div className="flex items-center gap-2">
             <StagePill stage={stage} compact />
-            <span className="text-[11px] text-[#8ea0ba]">{t(`stage.${stage}`)}</span>
+            <span className="text-[11px] text-[#8ea0ba]">{STAGE_LABELS[stage]}</span>
           </div>
         </div>
 
@@ -101,11 +104,11 @@ export const WorkspaceShell = ({
                   <Icon className={`h-[18px] w-[18px] shrink-0 transition ${active ? "text-white" : "text-[#6b7d96] group-hover:text-white"}`} />
                 )}
                 <span className={`transition ${active ? "font-medium text-white" : "text-[#8f9eb7] group-hover:text-white"}`}>
-                  {t(item.labelKey)}
+                  {item.label}
                 </span>
                 {disabled && (
                   <span className="ml-auto rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#5a6b82]">
-                    {t("shell.soon")}
+                    Soon
                   </span>
                 )}
               </Link>
@@ -124,9 +127,6 @@ export const WorkspaceShell = ({
             </div>
           </div>
         )}
-        <div className="border-t border-white/[0.06] px-4 py-3">
-          <LanguageSwitch />
-        </div>
       </aside>
 
       {/* Mobile bottom nav */}
@@ -141,7 +141,7 @@ export const WorkspaceShell = ({
               key={item.href}
             >
               {Icon && <Icon className="h-5 w-5" />}
-              <span className="text-[10px]">{t(item.labelKey)}</span>
+              <span className="text-[10px]">{item.label}</span>
             </Link>
           );
         })}
@@ -152,7 +152,7 @@ export const WorkspaceShell = ({
             type="button"
           >
             <MoreIcon className="h-5 w-5" />
-            <span className="text-[10px]">{t("shell.mobileMore")}</span>
+            <span className="text-[10px]">更多</span>
           </button>
         )}
       </nav>
@@ -163,7 +163,7 @@ export const WorkspaceShell = ({
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
           <div className="absolute bottom-16 left-4 right-4 rounded-3xl border border-white/[0.08] bg-[#0d1420]/95 p-4 backdrop-blur-xl">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-white">{t("shell.moreFeatures")}</span>
+              <span className="text-sm font-medium text-white">更多功能</span>
               <button onClick={() => setMobileMenuOpen(false)} type="button">
                 <CloseIcon className="h-4 w-4 text-[#93a2bb]" />
               </button>
@@ -179,13 +179,10 @@ export const WorkspaceShell = ({
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {Icon && <Icon className="h-5 w-5 text-[#93a2bb]" />}
-                    <span className="text-[10px] text-[#93a2bb]">{t(item.labelKey)}</span>
+                    <span className="text-[10px] text-[#93a2bb]">{item.label}</span>
                   </Link>
                 );
               })}
-            </div>
-            <div className="mt-4">
-              <LanguageSwitch />
             </div>
           </div>
         </div>
@@ -208,7 +205,7 @@ export const WorkspaceShell = ({
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileAsideOpen(false)} />
           <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-3xl border-t border-white/[0.08] bg-[#0d1420]/95 p-4 pb-8 backdrop-blur-xl">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-white">{t("shell.previewPanel")}</span>
+              <span className="text-sm font-medium text-white">预览面板</span>
               <button onClick={() => setMobileAsideOpen(false)} type="button">
                 <CloseIcon className="h-4 w-4 text-[#93a2bb]" />
               </button>

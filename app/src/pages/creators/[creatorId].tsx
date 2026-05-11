@@ -10,7 +10,6 @@ import { PageShell } from "@/components/layout/PageShell";
 import { CreatorStageView } from "@/components/user/CreatorStageView";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import { CreatorMarketRecord } from "@/lib/api/types";
-import { useI18n } from "@/lib/i18n";
 import {
   creators as fallbackCreators,
   findCreatorStrict,
@@ -82,7 +81,6 @@ export default function CreatorDetailPage({
   initialPosts,
 }: PublicFeedPageProps) {
   const router = useRouter();
-  const { t } = useI18n();
   const { creators, loading, postsByCreator } = usePublicFeedViewModel({
     initialError,
     initialPosts,
@@ -98,10 +96,10 @@ export default function CreatorDetailPage({
     return (
       <>
         <Head>
-          <title>{`StreamPump | ${t("page.creator.fallback")}`}</title>
+          <title>StreamPump | Creator</title>
         </Head>
         <PageShell>
-          <div className="py-10 text-sm text-[#8ea0ba]">{t("common.loading")}</div>
+          <div className="py-10 text-sm text-[#8ea0ba]">Loading creator profile…</div>
         </PageShell>
       </>
     );
@@ -111,7 +109,7 @@ export default function CreatorDetailPage({
     return (
       <>
         <Head>
-          <title>{`StreamPump | ${t("page.creator.fallback")}`}</title>
+          <title>StreamPump | Creator</title>
         </Head>
         <PageShell>
           <div className="py-10 text-sm text-[#8ea0ba]">Imported creator not found.</div>
@@ -132,7 +130,7 @@ export default function CreatorDetailPage({
             href="/trending"
           >
             <span aria-hidden>←</span>
-            {t("feed.trendingCreators")}
+            Trending Creators
           </Link>
         </div>
         <CreatorStageView creator={creator} posts={creatorPosts} />
