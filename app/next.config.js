@@ -46,8 +46,10 @@ const parseRemoteImageHosts = () => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
+  outputFileTracingRoot: __dirname,
   reactStrictMode: true,
   images: {
+    maximumDiskCacheSize: 256 * 1024 * 1024,
     remotePatterns: parseRemoteImageHosts(),
   },
   async redirects() {

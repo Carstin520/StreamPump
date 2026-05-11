@@ -6,5 +6,7 @@
     "module": "commonjs",
     "target": "es2022",
     "esModuleInterop": true
-  }
+  },
+  "include": ["programs/tests/**/*.ts", "scripts/**/*.ts", "target/types/**/*.ts"],
+  "exclude": ["app", "backend", "node_modules", "target/deploy"]
 }

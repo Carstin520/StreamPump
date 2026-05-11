@@ -20,7 +20,7 @@
     "@web3auth/modal": "^9.7.0",
     "@web3auth/solana-provider": "^9.7.0",
     "hls.js": "^1.6.16",
-    "next": "14.2.35",
+    "next": "15.5.18",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -29,7 +29,7 @@
     "@types/react": "^18.3.18",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
-    "eslint-config-next": "14.2.25",
+    "eslint-config-next": "15.5.18",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"

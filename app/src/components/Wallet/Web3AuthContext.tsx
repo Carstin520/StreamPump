@@ -1,11 +1,15 @@
+import type { IProvider } from "@web3auth/base";
+import type { Web3Auth } from "@web3auth/modal";
 import {
-  CHAIN_NAMESPACES,
-  IProvider,
-  WEB3AUTH_NETWORK,
-} from "@web3auth/base";
-import { Web3Auth } from "@web3auth/modal";
-import { SolanaPrivateKeyProvider } from "@web3auth/solana-provider";
-import { FC, ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
+  FC,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 interface Web3AuthContextValue {
   provider: IProvider | null;
@@ -27,79 +31,87 @@ interface Web3AuthProviderProps {
   children: ReactNode;
 }
 
+const createWeb3AuthInstance = async (): Promise<Web3Auth> => {
+  const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID;
+  const rpcTarget = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
+
+  if (!clientId || !rpcTarget) {
+    throw new Error("Web3Auth requires NEXT_PUBLIC_WEB3AUTH_CLIENT_ID and NEXT_PUBLIC_RPC_ENDPOINT.");
+  }
+
+  const [{ CHAIN_NAMESPACES, WEB3AUTH_NETWORK }, { Web3Auth }, { SolanaPrivateKeyProvider }] =
+    await Promise.all([
+      import("@web3auth/base"),
+      import("@web3auth/modal"),
+      import("@web3auth/solana-provider"),
+    ]);
+
+  const chainConfig = {
+    chainNamespace: CHAIN_NAMESPACES.SOLANA,
+    chainId: "0x3",
+    rpcTarget,
+    displayName: "Solana Devnet",
+    ticker: "SOL",
+    tickerName: "Solana",
+  };
+
+  const privateKeyProvider = new SolanaPrivateKeyProvider({
+    config: {
+      chainConfig,
+    },
+  });
+
+  const instance = new Web3Auth({
+    clientId,
+    web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
+    privateKeyProvider,
+    chainConfig,
+  });
+
+  await instance.initModal();
+  return instance;
+};
+
 export const Web3AuthProvider: FC<Web3AuthProviderProps> = ({ children }) => {
-  const [web3auth, setWeb3Auth] = useState<Web3Auth | null>(null);
   const [provider, setProvider] = useState<IProvider | null>(null);
-  const [isReady, setIsReady] = useState(false);
+  const web3authRef = useRef<Web3Auth | null>(null);
+  const initPromiseRef = useRef<Promise<Web3Auth> | null>(null);
+  const isConfigured = Boolean(
+    process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID && process.env.NEXT_PUBLIC_RPC_ENDPOINT
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  const getWeb3Auth = useCallback(async () => {
+    if (web3authRef.current) {
+      return web3authRef.current;
+    }
 
-    const init = async () => {
-      const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID;
-      const rpcTarget = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
-
-      if (!clientId || !rpcTarget) {
-        setIsReady(false);
-        return;
-      }
-
-      const privateKeyProvider = new SolanaPrivateKeyProvider({
-        config: {
-          chainConfig: {
-            chainNamespace: CHAIN_NAMESPACES.SOLANA,
-            chainId: "0x3",
-            rpcTarget,
-            displayName: "Solana Devnet",
-            ticker: "SOL",
-            tickerName: "Solana",
-          },
-        },
+    if (!initPromiseRef.current) {
+      initPromiseRef.current = createWeb3AuthInstance().catch((error) => {
+        initPromiseRef.current = null;
+        throw error;
       });
+    }
 
-      const instance = new Web3Auth({
-        clientId,
-        web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
-        privateKeyProvider,
-        chainConfig: {
-          chainNamespace: CHAIN_NAMESPACES.SOLANA,
-          chainId: "0x3",
-          rpcTarget,
-          displayName: "Solana Devnet",
-          ticker: "SOL",
-          tickerName: "Solana",
-        },
-      });
-
-      await instance.initModal();
-      if (cancelled) {
-        return;
-      }
-
-      setProvider(instance.provider);
-      setWeb3Auth(instance);
-      setIsReady(true);
-    };
-
-    void init();
-
-    return () => {
-      cancelled = true;
-    };
+    const instance = await initPromiseRef.current;
+    web3authRef.current = instance;
+    setProvider(instance.provider);
+    return instance;
   }, []);
 
   const value = useMemo<Web3AuthContextValue>(
     () => ({
       provider,
-      isReady,
+      isReady: isConfigured,
       connect: async () => {
-        if (!web3auth) {
+        if (!isConfigured) {
           return;
         }
+        const web3auth = await getWeb3Auth();
         const nextProvider = await web3auth.connect();
         setProvider(nextProvider);
       },
       disconnect: async () => {
+        const web3auth = web3authRef.current;
         if (!web3auth) {
           return;
         }
@@ -107,7 +119,7 @@ export const Web3AuthProvider: FC<Web3AuthProviderProps> = ({ children }) => {
         setProvider(null);
       },
     }),
-    [isReady, provider, web3auth]
+    [getWeb3Auth, isConfigured, provider]
   );
 
   return <Web3AuthContext.Provider value={value}>{children}</Web3AuthContext.Provider>;

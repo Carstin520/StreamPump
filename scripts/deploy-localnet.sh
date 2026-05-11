@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-anchor build
+npm run build:anchor
 anchor deploy
