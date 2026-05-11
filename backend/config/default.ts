@@ -5,6 +5,8 @@
 import { env } from "./env";
 import "./loadEnv";
 
+const DEFAULT_AUTH_SESSION_SECRET = "dev-only-session-secret-change-me";
+
 export const config = {
   app: {
     apiBaseUrl: env.readString(process.env.API_BASE_URL, "http://localhost:4000/api/v1"),
@@ -14,10 +16,7 @@ export const config = {
     corsAllowedOrigins: env.readCsv(process.env.CORS_ALLOWED_ORIGINS),
   },
   auth: {
-    sessionSecret: env.readString(
-      process.env.AUTH_SESSION_SECRET,
-      "dev-only-session-secret-change-me"
-    ),
+    sessionSecret: env.readString(process.env.AUTH_SESSION_SECRET, DEFAULT_AUTH_SESSION_SECRET),
     challengeTtlSeconds: env.readNumber(process.env.AUTH_CHALLENGE_TTL_SECONDS, 600),
     sessionTtlSeconds: env.readNumber(process.env.AUTH_SESSION_TTL_SECONDS, 60 * 60 * 24 * 7),
     allowLegacyWalletHeader: env.readBoolean(process.env.AUTH_ALLOW_LEGACY_WALLET_HEADER, false),
@@ -108,3 +107,29 @@ export const config = {
     gatewayUrl: process.env.CHAINLINK_GATEWAY_URL,
   },
 };
+
+const validateProductionConfig = (runtimeConfig: typeof config): void => {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  const failures: string[] = [];
+
+  if (runtimeConfig.auth.sessionSecret === DEFAULT_AUTH_SESSION_SECRET) {
+    failures.push("AUTH_SESSION_SECRET must be set to a non-default value");
+  }
+
+  if (runtimeConfig.app.corsAllowedOrigins.length === 0) {
+    failures.push("CORS_ALLOWED_ORIGINS must include at least one frontend origin");
+  }
+
+  if (runtimeConfig.email.deliveryMode === "console") {
+    failures.push("EMAIL_DELIVERY_MODE=console is not allowed in production");
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`Invalid production configuration: ${failures.join("; ")}`);
+  }
+};
+
+validateProductionConfig(config);
