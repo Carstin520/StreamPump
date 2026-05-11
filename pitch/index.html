@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamPump — The Web2.5 Creator Sponsorship Market on Solana</title>
+<style>
+/* ── Design Tokens (from app globals.css) ── */
+:root {
+  --bg-start: #090d14;
+  --bg-end: #0a1018;
+  --surface-1: #111827;
+  --surface-2: #161f2c;
+  --surface-3: #1a2231;
+  --border-subtle: rgba(255,255,255,0.045);
+  --border-soft: rgba(255,255,255,0.09);
+  --text-main: #f5f7fb;
+  --text-muted: #93a2bb;
+  --primary: #de402a;
+  --primary-glow: rgba(222,64,42,0.25);
+  --ease-fluid: cubic-bezier(0.22,1,0.36,1);
+  --radius-card: 1.75rem;
+  --glass-line: rgba(255,255,255,0.08);
+  --glass-fill: rgba(255,255,255,0.05);
+  --solana-green: #14f195;
+  --solana-purple: #9945ff;
+}
+
+/* ── Reset & Base ── */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+body {
+  background: linear-gradient(180deg, var(--bg-start), var(--bg-end));
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-feature-settings: "cv11","ss01","ss03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  line-height: 1.6;
+}
+
+/* ── Sections / Slides ── */
+.slide {
+  min-height: 100vh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 80px;
+  overflow: hidden;
+}
+
+.slide-inner {
+  max-width: 1200px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Ambient backgrounds ── */
+.slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.slide:nth-child(odd)::before {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(64,90,150,0.12), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(222,64,42,0.06), transparent 35%);
+}
+
+.slide:nth-child(even)::before {
+  background:
+    radial-gradient(circle at 75% 25%, rgba(34,74,140,0.1), transparent 38%),
+    radial-gradient(circle at 25% 80%, rgba(222,64,42,0.05), transparent 30%);
+}
+
+/* ── Typography ── */
+h1 { font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.6rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+h3 { font-size: clamp(1.1rem, 1.8vw, 1.4rem); font-weight: 600; line-height: 1.3; }
+p, li { font-size: clamp(0.95rem, 1.2vw, 1.1rem); color: var(--text-muted); }
+.accent { color: var(--primary); }
+.solana-accent { color: var(--solana-green); }
+.text-white { color: var(--text-main); }
+.text-muted { color: var(--text-muted); }
+.text-sm { font-size: 0.9rem; }
+.text-xs { font-size: 0.78rem; }
+.font-mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; }
+
+/* ── Glass Panels ── */
+.glass-panel {
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, rgba(18,25,37,0.76) 0%, rgba(11,17,27,0.68) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 18px 46px rgba(0,0,0,0.2);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  padding: 32px;
+}
+
+.glass-panel-strong {
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, rgba(20,28,41,0.84) 0%, rgba(11,16,25,0.8) 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 26px 72px rgba(0,0,0,0.26);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  padding: 36px;
+}
+
+.glass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.85rem;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-pill-accent {
+  background: rgba(222,64,42,0.14);
+  border-color: rgba(222,64,42,0.3);
+  color: #ff9080;
+}
+
+.glass-pill-solana {
+  background: rgba(20,241,149,0.08);
+  border-color: rgba(20,241,149,0.22);
+  color: var(--solana-green);
+}
+
+/* ── Layout Helpers ── */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
+.gap-32 { gap: 32px; }
+.gap-40 { gap: 40px; }
+.gap-48 { gap: 48px; }
+.w-full { width: 100%; }
+.text-center { text-align: center; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+.mt-24 { margin-top: 24px; }
+.mt-32 { margin-top: 32px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+
+/* ── Grid ── */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
+
+/* ── Pain Point Cards ── */
+.pain-card {
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 28px 24px;
+  transition: transform 260ms var(--ease-fluid), border-color 260ms var(--ease-fluid);
+}
+.pain-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.12);
+}
+.pain-card .icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+.pain-card .icon.red { background: rgba(222,64,42,0.15); color: var(--primary); }
+.pain-card .icon.blue { background: rgba(59,130,246,0.12); color: #60a5fa; }
+.pain-card .icon.amber { background: rgba(245,158,11,0.12); color: #fbbf24; }
+.pain-card .icon.purple { background: rgba(139,92,246,0.12); color: #a78bfa; }
+.pain-card .icon.green { background: rgba(16,185,129,0.12); color: #34d399; }
+.pain-card .icon.gray { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+/* ── Stat Numbers ── */
+.stat-number {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--text-main) 40%, var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-number.accent-grad {
+  background: linear-gradient(135deg, #ff6b56 20%, var(--primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ── Flow / Timeline ── */
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-radius: 1rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  transition: background 200ms;
+}
+.flow-step:hover { background: rgba(255,255,255,0.06); }
+.flow-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.flow-arrow {
+  color: rgba(255,255,255,0.2);
+  font-size: 1.2rem;
+  text-align: center;
+  padding: 4px 0;
+}
+
+/* ── Track Lanes (S2) ── */
+.track-lane {
+  border-radius: 1.25rem;
+  padding: 24px 28px;
+  border: 1px solid rgba(255,255,255,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.track-lane::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+}
+.track-lane.t1 { background: rgba(16,185,129,0.04); }
+.track-lane.t1::before { background: #10b981; }
+.track-lane.t2 { background: rgba(59,130,246,0.04); }
+.track-lane.t2::before { background: #3b82f6; }
+.track-lane.t3 { background: rgba(245,158,11,0.04); }
+.track-lane.t3::before { background: #f59e0b; }
+
+/* ── Solana Feature Cards ── */
+.sol-card {
+  border-radius: 1.25rem;
+  padding: 24px;
+  background: linear-gradient(160deg, rgba(20,241,149,0.04) 0%, rgba(153,69,255,0.03) 100%);
+  border: 1px solid rgba(20,241,149,0.1);
+  transition: transform 200ms var(--ease-fluid), border-color 200ms;
+}
+.sol-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(20,241,149,0.2);
+}
+
+/* ── Architecture Diagram ── */
+.arch-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.arch-box.user { background: rgba(222,64,42,0.12); border: 1px solid rgba(222,64,42,0.25); color: #ff9080; }
+.arch-box.app { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.22); color: #60a5fa; }
+.arch-box.infra { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); }
+.arch-box.chain { background: rgba(20,241,149,0.08); border: 1px solid rgba(20,241,149,0.2); color: var(--solana-green); }
+.arch-box.oracle { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.22); color: #fbbf24; }
+
+.arch-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.18);
+  font-size: 1.4rem;
+  padding: 4px 0;
+}
+
+/* ── Status Table ── */
+.status-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+.status-table th {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.status-table td {
+  padding: 14px 16px;
+  font-size: 0.92rem;
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+}
+.status-table tr td:first-child { border-radius: 12px 0 0 12px; color: var(--text-main); font-weight: 500; }
+.status-table tr td:last-child { border-radius: 0 12px 12px 0; }
+
+.status-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.status-dot.green { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+.status-dot.yellow { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+.status-dot.blue { background: #3b82f6; box-shadow: 0 0 8px rgba(59,130,246,0.4); }
+
+/* ── Insight Cards ── */
+.insight-card {
+  border-radius: 1.25rem;
+  padding: 28px 24px;
+  background: linear-gradient(180deg, rgba(222,64,42,0.06) 0%, rgba(222,64,42,0.01) 100%);
+  border: 1px solid rgba(222,64,42,0.12);
+  position: relative;
+}
+.insight-card .num {
+  position: absolute;
+  top: 16px; right: 20px;
+  font-size: 3rem;
+  font-weight: 900;
+  color: rgba(222,64,42,0.1);
+  line-height: 1;
+}
+
+/* ── Role Cards ── */
+.role-card {
+  border-radius: var(--radius-card);
+  padding: 32px 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+  transition: transform 220ms var(--ease-fluid), border-color 220ms;
+}
+.role-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.12);
+}
+.role-icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 16px;
+}
+
+/* ── Bonding Curve SVG ── */
+.curve-container {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+}
+.curve-container svg {
+  width: 100%;
+  height: auto;
+}
+
+/* ── Navigation Dots ── */
+.nav-dots {
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 100;
+}
+.nav-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  transition: all 260ms var(--ease-fluid);
+}
+.nav-dot:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.3);
+}
+.nav-dot.active {
+  background: var(--primary);
+  border-color: rgba(222,64,42,0.5);
+  box-shadow: 0 0 12px var(--primary-glow);
+  transform: scale(1.3);
+}
+
+/* ── Slide Counter ── */
+.slide-counter {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 100;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: "SF Mono", "Fira Code", monospace;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Scroll Hint ── */
+.scroll-hint {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  animation: float-hint 2.4s ease-in-out infinite;
+}
+.scroll-hint-arrow {
+  width: 20px; height: 20px;
+  border-right: 2px solid rgba(255,255,255,0.3);
+  border-bottom: 2px solid rgba(255,255,255,0.3);
+  transform: rotate(45deg);
+}
+
+/* ── Reveal Animation ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity 700ms var(--ease-fluid), transform 700ms var(--ease-fluid);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal.d1 { transition-delay: 100ms; }
+.reveal.d2 { transition-delay: 200ms; }
+.reveal.d3 { transition-delay: 300ms; }
+.reveal.d4 { transition-delay: 400ms; }
+.reveal.d5 { transition-delay: 500ms; }
+.reveal.d6 { transition-delay: 600ms; }
+.reveal.d7 { transition-delay: 700ms; }
+.reveal.d8 { transition-delay: 800ms; }
+
+/* ── Logo ── */
+.logo-mark {
+  width: 64px; height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f05540, #de402a);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800; color: white;
+  box-shadow: 0 20px 52px rgba(222,64,42,0.3);
+  letter-spacing: -0.02em;
+}
+
+/* ── Collapse Data Bar ── */
+.collapse-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 80px;
+}
+.collapse-bar .bar {
+  width: 32px;
+  border-radius: 4px 4px 0 0;
+  transition: height 800ms var(--ease-fluid);
+}
+
+/* ── Keyframes ── */
+@keyframes float-hint {
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.6; }
+  50% { transform: translateX(-50%) translateY(8px); opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(222,64,42,0.15); }
+  50% { box-shadow: 0 0 40px rgba(222,64,42,0.3); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .slide { padding: 40px 32px; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-2-1 { grid-template-columns: 1fr; }
+  .nav-dots { display: none; }
+}
+
+@media (max-width: 640px) {
+  .slide { padding: 32px 20px; }
+  .glass-panel, .glass-panel-strong { padding: 20px; }
+  .grid-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Bonding Curve Animated Path ── */
+.curve-path {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  transition: stroke-dashoffset 1.2s var(--ease-fluid);
+}
+.visible .curve-path {
+  stroke-dashoffset: 0;
+}
+
+/* ── Timeline ── */
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+.timeline-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  position: relative;
+}
+.timeline-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  background: var(--bg-start);
+  position: relative;
+  z-index: 2;
+}
+.timeline-dot.filled {
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+.timeline-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), rgba(222,64,42,0.3));
+  min-width: 30px;
+}
+.timeline-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 100px;
+}
+
+/* ── CTA Button ── */
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 32px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #f05540, #de402a);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 18px 34px rgba(222,64,42,0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+  transition: transform 200ms var(--ease-fluid), box-shadow 200ms;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 44px rgba(222,64,42,0.36), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 32px;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 200ms var(--ease-fluid), background 200ms;
+}
+.cta-ghost:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.1);
+}
+
+/* ── Diagram container ── */
+.diagram-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* ── Separator ── */
+.sep {
+  width: 60px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--primary), rgba(222,64,42,0.2));
+}
+
+/* ── Solana gradient text ── */
+.solana-grad {
+  background: linear-gradient(135deg, var(--solana-green), var(--solana-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Positioning label ── */
+.pos-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+.pos-zone {
+  flex: 1;
+  text-align: center;
+  padding: 20px 12px;
+  position: relative;
+}
+.pos-zone.left { border-right: 1px dashed rgba(255,255,255,0.1); }
+.pos-zone.right { border-left: 1px dashed rgba(255,255,255,0.1); }
+.pos-zone.center {
+  flex: 1.4;
+  background: rgba(222,64,42,0.06);
+  border-radius: 1rem;
+  border: 1px solid rgba(222,64,42,0.15);
+}
+
+/* ── Vision quote ── */
+.vision-quote {
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+  color: var(--text-main);
+  position: relative;
+  padding: 0 24px;
+}
+.vision-quote::before, .vision-quote::after {
+  font-size: 3rem;
+  color: rgba(222,64,42,0.3);
+  font-weight: 800;
+  line-height: 1;
+  position: absolute;
+}
+.vision-quote::before { content: "\201C"; top: -16px; left: 0; }
+.vision-quote::after { content: "\201D"; bottom: -28px; right: 0; }
+
+/* ── Screenshot Frames ── */
+.screenshot-frame {
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: #0c121d;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.34);
+}
+.screenshot-frame img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+.screenshot-frame figcaption {
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding: 10px 16px;
+  font-size: 0.78rem;
+  color: #8ea0ba;
+  line-height: 1.5;
+}
+
+.screenshot-grid {
+  display: grid;
+  gap: 16px;
+}
+.screenshot-grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* ── Two-column slide layout ── */
+.slide-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(380px, 1.05fr);
+  gap: 40px;
+  align-items: center;
+}
+
+@media (max-width: 1024px) {
+  .slide-split { grid-template-columns: 1fr; }
+  .screenshot-grid.cols-2 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ NAV DOTS ═══════════ -->
+<nav class="nav-dots" id="navDots"></nav>
+<div class="slide-counter" id="slideCounter">01 / 12</div>
+
+<!-- ═══════════ SLIDE 1: TITLE ═══════════ -->
+<section class="slide" id="slide-1">
+  <div class="slide-inner">
+    <div class="slide-split">
+      <div class="flex flex-col gap-24">
+        <div class="reveal flex items-center gap-12">
+          <div class="logo-mark">SP</div>
+          <span style="font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;">StreamPump</span>
+        </div>
+        <div class="reveal d1">
+          <h1>Creator sponsorship markets settled on <span class="accent">Solana</span>.</h1>
+        </div>
+        <div class="reveal d2">
+          <p style="font-size: clamp(1.05rem, 1.4vw, 1.2rem); max-width: 560px;">
+            A Web2.5 content platform where early fans discover creators, sponsors buy measurable distribution, and Solana handles the financial truth.
+          </p>
+        </div>
+        <div class="reveal d3 flex gap-12 flex-wrap">
+          <span class="glass-pill-solana glass-pill">
+            <svg width="16" height="12" viewBox="0 0 398 312" fill="none"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 237.9z" fill="currentColor"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="currentColor"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="currentColor"/></svg>
+            Built on Solana
+          </span>
+          <span class="glass-pill-accent glass-pill">Hackathon 2026</span>
+        </div>
+        <!-- Hero stats -->
+        <div class="reveal d4 grid-3" style="gap: 12px;">
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">S1</p>
+            <p style="font-size: 1.4rem; font-weight: 700; margin-top: 6px;">Discovery</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Fans back creator momentum with internal positions.</p>
+          </div>
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">S2</p>
+            <p style="font-size: 1.4rem; font-weight: 700; margin-top: 6px;">Campaigns</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Sponsors fund fixed, performance, and CPS budgets.</p>
+          </div>
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">Rail</p>
+            <p style="font-size: 1.4rem; font-weight: 700; margin-top: 6px;">USDC</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Settlement is on-chain, content stays fast off-chain.</p>
+          </div>
+        </div>
+      </div>
+      <!-- Hero screenshot -->
+      <div class="reveal d3">
+        <figure class="screenshot-frame">
+          <img src="images/01-explore-feed-en.png" alt="StreamPump Explore feed">
+          <figcaption>Content-first discovery surface</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="scroll-hint">
+      <span>Scroll to explore</span>
+      <div class="scroll-hint-arrow"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 2: PRODUCT MARKET FIT ═══════════ -->
+<section class="slide" id="slide-2">
+  <div class="slide-inner">
+    <div class="slide-split">
+      <div class="flex flex-col gap-20">
+        <div class="reveal">
+          <span class="glass-pill mb-16">Product Market Fit</span>
+        </div>
+        <div class="reveal d1">
+          <h2 class="mb-8">Creator marketing is large, growing, and still operationally <span class="accent">messy</span>.</h2>
+          <p style="max-width: 540px;">Brands are moving from one-off influencer posts to measurable creator programs, but discovery, attribution, fraud prevention, and payout design remain fragmented.</p>
+        </div>
+        <div class="reveal d2">
+          <div class="pain-card" style="border-color: rgba(222,64,42,0.12); background: rgba(222,64,42,0.03);">
+            <h3 class="mb-8">Demand is already here</h3>
+            <p class="text-sm">Creator campaigns are now a core media channel, not an experimental growth hack.</p>
+          </div>
+        </div>
+        <div class="reveal d3">
+          <div class="pain-card" style="border-color: rgba(59,130,246,0.12); background: rgba(59,130,246,0.03);">
+            <h3 class="mb-8">The missing layer is trust</h3>
+            <p class="text-sm">Brands need campaign proof, creators need fair settlement, and fans need upside that is not just speculation.</p>
+          </div>
+        </div>
+        <div class="reveal d4">
+          <p class="text-xs" style="color: rgba(255,255,255,0.3);">Sources: Goldman Sachs Research, IAB Creator Economy Ad Spend Report, Later 2025 Influencer Marketing Report.</p>
+        </div>
+      </div>
+      <!-- PMF stats -->
+      <div class="flex flex-col gap-16 reveal d2">
+        <div class="glass-panel-strong" style="padding: 28px;">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">Creator Economy TAM</p>
+          <p class="stat-number accent-grad" style="margin-top: 12px;" data-count="480" data-prefix="$" data-suffix="B">$0B</p>
+          <p class="text-xs mt-8" style="color: var(--text-muted);">Goldman Sachs projection for 2027.</p>
+        </div>
+        <div class="glass-panel-strong" style="padding: 28px;">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">US Creator Ad Spend</p>
+          <p class="stat-number" style="margin-top: 12px;" data-count="37" data-prefix="$" data-suffix="B">$0B</p>
+          <p class="text-xs mt-8" style="color: var(--text-muted);">IAB 2025 projection.</p>
+        </div>
+        <div class="glass-panel-strong" style="padding: 28px;">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 600;">Brand Preference</p>
+          <p class="stat-number" style="margin-top: 12px;" data-count="73" data-suffix="%">0%</p>
+          <p class="text-xs mt-8" style="color: var(--text-muted);">Later: micro and mid-tier creators favored over mega-influencers.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 3: SOCIALFI FAILURES ═══════════ -->
+<section class="slide" id="slide-3">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">The Problem</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">Web3 Social Has <span class="accent">Failed</span></h2>
+      <p class="mb-24" style="max-width: 600px;">SocialFi platforms burned through hype cycles without solving real creator problems.</p>
+    </div>
+    <div class="grid-2 mt-16 reveal d2" style="align-items: start;">
+      <!-- Collapse data -->
+      <div class="glass-panel">
+        <h3 class="mb-16">The Collapse</h3>
+        <div class="flex flex-col gap-20">
+          <div>
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-white" style="font-weight: 600;">Friend.tech</span>
+              <span class="text-sm" style="color: #ef4444;">-87% DAU</span>
+            </div>
+            <div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden;">
+              <div style="width: 13%; height: 100%; background: linear-gradient(90deg, #ef4444, #f97316); border-radius: 3px; transition: width 1s var(--ease-fluid);" class="bar-fill"></div>
+            </div>
+            <p class="text-xs mt-8">80K → &lt;10K DAU. Revenue collapsed to $71. Devs abandoned contract.</p>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-white" style="font-weight: 600;">Farcaster</span>
+              <span class="text-sm" style="color: #f59e0b;">-40% DAU</span>
+            </div>
+            <div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden;">
+              <div style="width: 60%; height: 100%; background: linear-gradient(90deg, #f59e0b, #eab308); border-radius: 3px;" class="bar-fill"></div>
+            </div>
+            <p class="text-xs mt-8">$150M raised. New signups: 15K/mo → 545/mo.</p>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-white" style="font-weight: 600;">Lens Protocol</span>
+              <span class="text-sm" style="color: #ef4444;">-99.6%</span>
+            </div>
+            <div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden;">
+              <div style="width: 4%; height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 3px;" class="bar-fill"></div>
+            </div>
+            <p class="text-xs mt-8">New users: 37K/mo → 142/mo. DAUs dropped 80%.</p>
+          </div>
+        </div>
+      </div>
+      <!-- Structural failures -->
+      <div class="flex flex-col gap-16">
+        <div class="pain-card reveal d3">
+          <div class="icon gray">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="10"/><line x1="10" y1="14" x2="10" y2="14"/></svg>
+          </div>
+          <h3 class="mb-8">Token-First Mentality</h3>
+          <p class="text-sm">Teams launch coins, not products. No real intent to build sustainable content platforms.</p>
+        </div>
+        <div class="pain-card reveal d4">
+          <div class="icon gray">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17l5-5 4 4 5-5"/><polyline points="14 7 18 7 18 11"/><path d="M18 17h-15"/></svg>
+          </div>
+          <h3 class="mb-8">View-to-Earn Death Spiral</h3>
+          <p class="text-sm">Users earn platform tokens → dump on DEX → constant sell pressure → token crashes → users leave.</p>
+        </div>
+        <div class="pain-card reveal d5">
+          <div class="icon gray">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 3v14"/><path d="M3 7h14"/></svg>
+          </div>
+          <h3 class="mb-8">False Content Ownership</h3>
+          <p class="text-sm">Creators don't care about "data sovereignty" until content generates real revenue. Full video on-chain is too expensive and slow.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 4: OUR INSIGHT ═══════════ -->
+<section class="slide" id="slide-4">
+  <div class="slide-inner">
+    <div class="slide-split">
+      <div class="flex flex-col gap-20">
+        <div class="reveal">
+          <span class="glass-pill-accent glass-pill mb-16">Core Insight</span>
+        </div>
+        <div class="reveal d1">
+          <h2 class="mb-8">Content is the real digital asset. Sponsor budgets are the sustainable <span class="accent">yield source</span>.</h2>
+          <p style="max-width: 540px;">Videos and posts retain users. Sponsor dollars fund marketing outcomes. Fans help discover momentum early, then share in USDC when that momentum becomes commercial demand.</p>
+        </div>
+        <div class="flex flex-col gap-12 reveal d2">
+          <div class="insight-card">
+            <div class="num">01</div>
+            <h3 class="mb-8">No exchange-first token thesis</h3>
+            <p class="text-sm">SPUMP is a platform utility and participation asset, not the product's exit strategy.</p>
+          </div>
+          <div class="insight-card">
+            <div class="num">02</div>
+            <h3 class="mb-8">Marketing spend, not Ponzi liquidity</h3>
+            <p class="text-sm">Sponsors pay for distribution, content placement, and measurable outcomes.</p>
+          </div>
+          <div class="insight-card">
+            <div class="num">03</div>
+            <h3 class="mb-8">Low operating overhead</h3>
+            <p class="text-sm">Automation, protocol fees, and settlement fees keep the platform lean.</p>
+          </div>
+        </div>
+      </div>
+      <div class="reveal d3">
+        <figure class="screenshot-frame">
+          <img src="images/03-creator-profile-en.png" alt="StreamPump creator profile">
+          <figcaption>Creators are evaluated through content and momentum, not ticker hype.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 5: INTRODUCING STREAMPUMP ═══════════ -->
+<section class="slide" id="slide-5">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">The Product</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-24">Introducing <span class="accent">StreamPump</span></h2>
+    </div>
+    <!-- Positioning -->
+    <div class="reveal d2 mb-32">
+      <div class="pos-diagram">
+        <div class="pos-zone left">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600;">Web2</p>
+          <p class="text-sm mt-8" style="color: var(--text-muted);">YouTube, TikTok, Instagram</p>
+          <p class="text-xs mt-8" style="color: rgba(255,255,255,0.3);">Platform controls monetization</p>
+        </div>
+        <div class="pos-zone center">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--primary); font-weight: 700;">Web2.5</p>
+          <p style="font-weight: 700; font-size: 1.1rem; margin-top: 8px;">StreamPump</p>
+          <p class="text-xs mt-8" style="color: var(--text-muted);">Social-first UX + on-chain settlement</p>
+        </div>
+        <div class="pos-zone right">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600;">Web3 DeFi</p>
+          <p class="text-sm mt-8" style="color: var(--text-muted);">Friend.tech, Lens, Farcaster</p>
+          <p class="text-xs mt-8" style="color: rgba(255,255,255,0.3);">Token-first, poor UX</p>
+        </div>
+      </div>
+    </div>
+    <!-- 3 Roles -->
+    <div class="grid-3 reveal d3">
+      <div class="role-card">
+        <div class="role-icon" style="background: rgba(222,64,42,0.12); color: var(--primary);">
+          <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="18" height="18" rx="3"/><polygon points="10,8 18,13 10,18"/></svg>
+        </div>
+        <h3 class="mb-8">Creator</h3>
+        <p class="text-sm">Cold-start funding through fan backing. Graduate into structured sponsorship deals with guaranteed base pay + performance upside.</p>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background: rgba(59,130,246,0.12); color: #60a5fa;">
+          <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="13" cy="9" r="5"/><path d="M4 23c0-5 4-9 9-9s9 4 9 9"/></svg>
+        </div>
+        <h3 class="mb-8">Fan / Backer</h3>
+        <p class="text-sm">Back creators early using SPUMP. Earn USDC when sponsors buy out creators you believed in. Endorse campaigns for reward pools.</p>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background: rgba(16,185,129,0.12); color: #34d399;">
+          <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="20" height="14" rx="2"/><path d="M3 12h20"/><circle cx="13" cy="16" r="2"/></svg>
+        </div>
+        <h3 class="mb-8">Sponsor</h3>
+        <p class="text-sm">Direct creator access — no agency middlemen. Three flexible budget tracks: fixed, performance-based, and CPS. Pay in USDC.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 6: SEASON 1 ═══════════ -->
+<section class="slide" id="slide-6">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">Season 1</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">Creator <span class="accent">Discovery</span> Market</h2>
+      <p class="mb-32" style="max-width: 620px;">Fans back early creators through a rating-adjusted bonding curve. No tradable tokens — pure conviction plays settled on Solana.</p>
+    </div>
+    <div class="slide-split" style="align-items: start;">
+      <!-- Left: mechanism + stats -->
+      <div class="flex flex-col gap-20">
+        <div class="reveal d2 grid-3" style="gap: 12px;">
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); font-weight: 600;">Asset</p>
+            <p style="font-size: 1.2rem; font-weight: 700; margin-top: 6px;">SPUMP</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Token-2022 non-transferable platform utility.</p>
+          </div>
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); font-weight: 600;">Position</p>
+            <p style="font-size: 1.2rem; font-weight: 700; margin-top: 6px;">Virtual</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Recorded in S1UserPosition; no creator SPL token.</p>
+          </div>
+          <div class="glass-panel" style="padding: 16px 20px;">
+            <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); font-weight: 600;">Signal</p>
+            <p style="font-size: 1.2rem; font-weight: 700; margin-top: 6px;">Rating</p>
+            <p class="text-xs mt-8" style="color: var(--text-muted);">Oracle-updated momentum score with delayed effect.</p>
+          </div>
+        </div>
+        <div class="reveal d3 glass-panel">
+          <h3 class="mb-16">How It Works</h3>
+          <div class="flex flex-col gap-8">
+            <div class="flow-step">
+              <div class="flow-dot" style="background: var(--primary);"></div>
+              <span>Fan burns <strong class="text-white">SPUMP</strong> (non-transferable Token-2022)</span>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background: #3b82f6;"></div>
+              <span>Receives internal <strong class="text-white">creator position</strong> (on-chain PDA)</span>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background: #10b981;"></div>
+              <span>Price adjusts along <strong class="text-white">quadratic bonding curve</strong></span>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-dot" style="background: #f59e0b;"></div>
+              <span>Oracle rates creator by <strong class="text-white">followers, views, growth</strong></span>
+            </div>
+          </div>
+          <div class="mt-20" style="padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+            <p class="text-xs font-mono" style="color: var(--text-muted);">
+              effective_k = base_k × creator_rating / 10,000<br>
+              cost = k_eff / 2 × ((S + ΔS)² − S²)
+            </p>
+          </div>
+        </div>
+      </div>
+      <!-- Right: screenshot -->
+      <div class="reveal d4">
+        <figure class="screenshot-frame">
+          <img src="images/04-s1-market-en.png" alt="StreamPump S1 market">
+          <figcaption>S1 market UI: price, supply, graduation progress, and wallet actions.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 7: S1 BUYOUT ═══════════ -->
+<section class="slide" id="slide-7">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">Season 1 → Season 2</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">The <span class="accent">Buyout</span> Bridge</h2>
+      <p class="mb-32" style="max-width: 620px;">When a creator reaches critical mass, sponsors compete to buy them out. Backers get paid in USDC.</p>
+    </div>
+    <!-- Timeline -->
+    <div class="reveal d2 glass-panel-strong mb-32" style="padding: 40px;">
+      <div class="timeline">
+        <div class="timeline-node">
+          <div class="timeline-label">S1 Active</div>
+          <div class="timeline-dot filled"></div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-node">
+          <div class="timeline-label">Auction (Sponsors bid)</div>
+          <div class="timeline-dot filled"></div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-node">
+          <div class="timeline-label">48h Creator Decision</div>
+          <div class="timeline-dot filled"></div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-node">
+          <div class="timeline-label">Rage Quit Window</div>
+          <div class="timeline-dot"></div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-node">
+          <div class="timeline-label">Graduation → S2</div>
+          <div class="timeline-dot filled"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Details + Screenshot -->
+    <div class="slide-split reveal d3" style="align-items: start;">
+      <div class="flex flex-col gap-12">
+        <div class="pain-card">
+          <h3 class="mb-8">Sponsor offer</h3>
+          <p class="text-sm">USDC is escrowed into an offer vault with sponsor and creator PDAs.</p>
+        </div>
+        <div class="pain-card">
+          <h3 class="mb-8">Creator choice</h3>
+          <p class="text-sm">The creator chooses a sponsor before moving from S1 into S2 campaign execution.</p>
+        </div>
+        <div class="pain-card">
+          <h3 class="mb-8">Fan protection</h3>
+          <p class="text-sm">Disagree with the accepted deal? Rage quit back to SPUMP at full price, zero tax, before the deadline.</p>
+        </div>
+      </div>
+      <div>
+        <figure class="screenshot-frame">
+          <img src="images/05-s1-buyout-en.png" alt="StreamPump S1 buyout">
+          <figcaption>Buyout room: offer status, rage quit, and claimable USDC.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 8: SEASON 2 ═══════════ -->
+<section class="slide" id="slide-8">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">Season 2</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">Sponsored <span class="accent">Campaign</span> Market</h2>
+      <p class="mb-32" style="max-width: 640px;">Three budget tracks give sponsors granular control while guaranteeing creator income and fan participation.</p>
+    </div>
+    <!-- 3 Tracks -->
+    <div class="flex flex-col gap-16 reveal d2">
+      <div class="track-lane t1">
+        <div class="flex items-start gap-16">
+          <div>
+            <div class="flex items-center gap-12 mb-8">
+              <span style="font-weight: 700; color: #10b981; font-size: 0.85rem;">TRACK 1</span>
+              <h3>Fixed Base Pay</h3>
+            </div>
+            <p class="text-sm">Guaranteed creator compensation. Sponsor commits USDC upfront. Oracle settles to creator's payout ATA. One-time, unconditional.</p>
+          </div>
+        </div>
+      </div>
+      <div class="track-lane t2">
+        <div class="flex items-start gap-16">
+          <div>
+            <div class="flex items-center gap-12 mb-8">
+              <span style="font-weight: 700; color: #3b82f6; font-size: 0.85rem;">TRACK 2</span>
+              <h3>Performance + Fan Endorsement</h3>
+            </div>
+            <p class="text-sm">Budget tied to views, clicks, saves. Includes a cliff threshold — below it, full refund to sponsor. Above it, 80% to creator + 20% fan endorsement pool. Fans burn SPUMP to endorse and earn pro-rata USDC rewards.</p>
+          </div>
+        </div>
+      </div>
+      <div class="track-lane t3">
+        <div class="flex items-start gap-16">
+          <div>
+            <div class="flex items-center gap-12 mb-8">
+              <span style="font-weight: 700; color: #f59e0b; font-size: 0.85rem;">TRACK 3</span>
+              <h3>CPS with Delayed Settlement</h3>
+            </div>
+            <p class="text-sm">Cost-per-sale model. Sponsor pre-funds estimated budget. After the refund window closes, approved payout goes to creator. Unused balance returns to sponsor. Overflow generates an invoice for the difference.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Screenshots -->
+    <div class="reveal d3 mt-32 screenshot-grid cols-2">
+      <figure class="screenshot-frame">
+        <img src="images/09-campaign-detail-en.png" alt="StreamPump campaign detail">
+        <figcaption>Campaign proof: proposal PDA, manifest hash, content anchor, and track state.</figcaption>
+      </figure>
+      <figure class="screenshot-frame">
+        <img src="images/10-campaign-settlement-en.png" alt="StreamPump settlement dashboard">
+        <figcaption>Settlement dashboard for track outcomes and money flow.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 9: WHY SOLANA ═══════════ -->
+<section class="slide" id="slide-9">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill-solana glass-pill mb-16">
+        <svg width="16" height="12" viewBox="0 0 398 312" fill="none"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 237.9z" fill="currentColor"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="currentColor"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="currentColor"/></svg>
+        Why Solana
+      </span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">Purpose-Built on <span class="solana-grad">Solana</span></h2>
+      <p class="mb-32" style="max-width: 620px;">Solana isn't a marketing choice — it's a product requirement. Every core mechanism depends on its specific capabilities.</p>
+    </div>
+    <div class="grid-3 reveal d2">
+      <div class="sol-card">
+        <h3 class="mb-8" style="color: var(--solana-green);">Sub-Second Finality</h3>
+        <p class="text-sm">Real-time S1 market interactions. Buy, sell, and price updates confirm in ~400ms — critical for bonding curve UX.</p>
+      </div>
+      <div class="sol-card reveal d3">
+        <h3 class="mb-8" style="color: var(--solana-green);">&lt;$0.01 per Tx</h3>
+        <p class="text-sm">Makes Track 2 micro-settlements and Track 3 CPS payouts economically viable. Impossible on Ethereum L1.</p>
+      </div>
+      <div class="sol-card reveal d4">
+        <h3 class="mb-8" style="color: var(--solana-green);">Token-2022</h3>
+        <p class="text-sm">NonTransferable extension for SPUMP — enforced at the protocol level. Purpose-built for platform utility tokens, not speculative assets.</p>
+      </div>
+    </div>
+    <div class="grid-3 mt-20 reveal d5">
+      <div class="sol-card">
+        <h3 class="mb-8" style="color: var(--solana-purple);">PDA Architecture</h3>
+        <p class="text-sm">Protocol config, creator profiles, S1 positions, proposals, USDC vaults — all composable on-chain state derived from deterministic addresses.</p>
+      </div>
+      <div class="sol-card reveal d6">
+        <h3 class="mb-8" style="color: var(--solana-purple);">Anchor Framework</h3>
+        <p class="text-sm">Type-safe program with 20+ instructions covering S1 discovery, buyout, S2 campaigns, and settlement. Full lifecycle on one program.</p>
+      </div>
+      <div class="sol-card reveal d7">
+        <h3 class="mb-8" style="color: var(--solana-purple);">Ecosystem</h3>
+        <p class="text-sm">Wallet adapters, Web3Auth social login, RPC infrastructure, and devnet for rapid iteration. Production-ready tooling from day one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 10: ARCHITECTURE ═══════════ -->
+<section class="slide" id="slide-10">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">Architecture</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-8">Hybrid by <span class="accent">Design</span></h2>
+      <p class="mb-32" style="max-width: 640px;">DB-first for product workflow. Chain-first for financial truth. Each layer handles what it does best.</p>
+    </div>
+    <!-- Architecture Diagram -->
+    <div class="reveal d2 glass-panel-strong" style="padding: 48px 40px; overflow-x: auto;">
+      <div style="display: grid; grid-template-columns: auto 40px auto 40px auto; gap: 16px; align-items: start; min-width: 780px;">
+        <!-- Column 1: Users -->
+        <div class="flex flex-col gap-12 items-center">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Users</p>
+          <div class="arch-box user">Creator</div>
+          <div class="arch-box user">Sponsor</div>
+          <div class="arch-box user">Fan / Backer</div>
+        </div>
+        <!-- Arrow -->
+        <div class="flex items-center justify-center" style="height: 100%; padding-top: 32px;">
+          <span class="arch-arrow">→</span>
+        </div>
+        <!-- Column 2: Application Layer -->
+        <div class="flex flex-col gap-12 items-center">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Application</p>
+          <div class="arch-box app">Next.js Frontend</div>
+          <div class="arch-box app">Express v1 API</div>
+          <div class="flex gap-8 flex-wrap justify-center">
+            <div class="arch-box infra">Postgres</div>
+            <div class="arch-box infra">R2</div>
+            <div class="arch-box infra">Mux</div>
+          </div>
+          <div class="arch-box oracle">Oracle / Indexer</div>
+        </div>
+        <!-- Arrow -->
+        <div class="flex items-center justify-center" style="height: 100%; padding-top: 32px;">
+          <span class="arch-arrow">→</span>
+        </div>
+        <!-- Column 3: Solana -->
+        <div class="flex flex-col gap-12 items-center">
+          <p class="text-xs" style="text-transform: uppercase; letter-spacing: 0.1em; color: var(--solana-green); font-weight: 600; margin-bottom: 4px;">Solana</p>
+          <div class="arch-box chain">Anchor Program</div>
+          <div class="arch-box chain">SPUMP Mint (T22)</div>
+          <div class="arch-box chain">USDC Vaults</div>
+          <div class="arch-box chain">PDA State</div>
+        </div>
+      </div>
+      <!-- Legend -->
+      <div class="flex justify-center gap-24 mt-32 flex-wrap" style="font-size: 0.75rem; color: var(--text-muted);">
+        <div class="flex items-center gap-8"><div style="width: 10px; height: 10px; border-radius: 3px; background: rgba(222,64,42,0.3);"></div> Users</div>
+        <div class="flex items-center gap-8"><div style="width: 10px; height: 10px; border-radius: 3px; background: rgba(59,130,246,0.3);"></div> Application</div>
+        <div class="flex items-center gap-8"><div style="width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,0.15);"></div> Infrastructure</div>
+        <div class="flex items-center gap-8"><div style="width: 10px; height: 10px; border-radius: 3px; background: rgba(245,158,11,0.3);"></div> Oracle</div>
+        <div class="flex items-center gap-8"><div style="width: 10px; height: 10px; border-radius: 3px; background: rgba(20,241,149,0.3);"></div> Solana</div>
+      </div>
+    </div>
+    <!-- Design principle callout -->
+    <div class="reveal d3 mt-24 flex justify-center gap-24 flex-wrap">
+      <div class="glass-pill" style="border-color: rgba(59,130,246,0.2);">
+        <span style="color: #60a5fa; font-weight: 600;">DB-first</span>
+        <span class="text-muted text-sm">Drafts, media, intents, retries</span>
+      </div>
+      <div class="glass-pill" style="border-color: rgba(20,241,149,0.2);">
+        <span style="color: var(--solana-green); font-weight: 600;">Chain-first</span>
+        <span class="text-muted text-sm">Funding, settlement, token ops</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 11: STATUS + DEMO ═══════════ -->
+<section class="slide" id="slide-11">
+  <div class="slide-inner">
+    <div class="reveal">
+      <span class="glass-pill mb-16">Current Status</span>
+    </div>
+    <div class="reveal d1">
+      <h2 class="mb-24">What's <span class="accent">Built</span></h2>
+    </div>
+    <!-- Status Table -->
+    <div class="reveal d2 mb-32">
+      <table class="status-table">
+        <thead>
+          <tr><th>Layer</th><th>Status</th><th>What's Real</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="status-dot green"></span>Solana Program</td>
+            <td>Advanced Prototype</td>
+            <td>20+ Anchor instructions: S1 market, buyout, S2 proposals, 3-track settlement, content anchoring, protocol state</td>
+          </tr>
+          <tr>
+            <td><span class="status-dot yellow"></span>Backend</td>
+            <td>Integration Prototype</td>
+            <td>Express API, Prisma models, auth, content manifests, S1 tx builders, market projections, R2 + Mux</td>
+          </tr>
+          <tr>
+            <td><span class="status-dot blue"></span>Frontend</td>
+            <td>Demo-Ready Shell</td>
+            <td>Next.js: Explore, Trending, Creator, Portfolio, Market, Buyout, Workspace, Campaign, Settlement</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Demo Paths + Screenshots -->
+    <div class="slide-split reveal d3" style="align-items: start;">
+      <div class="flex flex-col gap-16">
+        <div class="glass-panel" style="padding: 24px;">
+          <div class="flex items-center gap-12 mb-12">
+            <span class="glass-pill-accent glass-pill" style="padding: 5px 12px; font-size: 0.72rem;">Frontend</span>
+          </div>
+          <p class="text-sm">Explore, Trending, Creator, Post, Portfolio, S1 market, S1 buyout, Workspace, Campaign, and Settlement surfaces exist.</p>
+        </div>
+        <div class="glass-panel" style="padding: 24px;">
+          <div class="flex items-center gap-12 mb-12">
+            <span class="glass-pill" style="padding: 5px 12px; font-size: 0.72rem;">Backend</span>
+          </div>
+          <p class="text-sm">Express v1 APIs support auth sessions, content manifests, proposal intents, S1 transaction builders, projections, R2, Mux, and oracle jobs.</p>
+        </div>
+        <div class="glass-panel" style="padding: 24px;">
+          <div class="flex items-center gap-12 mb-12">
+            <span class="glass-pill-solana glass-pill" style="padding: 5px 12px; font-size: 0.72rem;">On-chain</span>
+          </div>
+          <p class="text-sm">Anchor instructions cover S1 discovery, S1 buyout, S2 proposal funding, Track 1/2/3 settlement, endorsements, and content anchors.</p>
+        </div>
+      </div>
+      <div class="flex flex-col gap-16">
+        <figure class="screenshot-frame">
+          <img src="images/07-workspace-overview-en.png" alt="StreamPump workspace overview">
+          <figcaption>Workspace path: content manifest to proposal intent.</figcaption>
+        </figure>
+        <figure class="screenshot-frame">
+          <img src="images/08-proposal-intent-signing-en.png" alt="StreamPump proposal intent signing">
+          <figcaption>Creator and sponsor sign the launch bundle before Solana submission.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 12: VISION + CTA ═══════════ -->
+<section class="slide" id="slide-12">
+  <div class="slide-inner flex flex-col items-center text-center gap-40">
+    <div class="reveal">
+      <div class="logo-mark mx-auto mb-24" style="animation: pulse-glow 3s ease-in-out infinite;">SP</div>
+    </div>
+    <div class="reveal d1">
+      <div class="vision-quote">
+        StreamPump makes content the asset, fans the backers, and sponsors the revenue engine — all settled on Solana.
+      </div>
+    </div>
+    <div class="reveal d2 flex flex-col gap-24 items-center">
+      <div class="sep mx-auto"></div>
+      <div class="grid-3" style="max-width: 700px; gap: 16px;">
+        <div style="text-align: center;">
+          <p class="stat-number accent-grad" data-count="20" data-suffix="+">0+</p>
+          <p class="text-xs mt-8">On-chain Instructions</p>
+        </div>
+        <div style="text-align: center;">
+          <p class="stat-number" data-count="3">0</p>
+          <p class="text-xs mt-8">Budget Tracks</p>
+        </div>
+        <div style="text-align: center;">
+          <p class="stat-number accent-grad" data-count="1">0</p>
+          <p class="text-xs mt-8">Unified Product Loop</p>
+        </div>
+      </div>
+    </div>
+    <div class="reveal d3 flex flex-col gap-16 items-center">
+      <div class="flex gap-16 flex-wrap justify-center">
+        <span class="glass-pill-solana glass-pill">
+          <svg width="14" height="11" viewBox="0 0 398 312" fill="none"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 237.9z" fill="currentColor"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="currentColor"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="currentColor"/></svg>
+          Solana Hackathon 2026
+        </span>
+      </div>
+      <p class="text-sm text-muted" style="max-width: 500px;">
+        StreamPump is a serious prototype with a working on-chain program, integrated backend, and demo-ready frontend. We're building the infrastructure for the next generation of creator-sponsor relationships.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ JAVASCRIPT ═══════════ -->
+<script>
+(function() {
+  const TOTAL_SLIDES = 12;
+
+  // ── Build nav dots ──
+  const dotsContainer = document.getElementById('navDots');
+  for (let i = 1; i <= TOTAL_SLIDES; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'nav-dot' + (i === 1 ? ' active' : '');
+    dot.dataset.slide = i;
+    dot.addEventListener('click', () => {
+      document.getElementById('slide-' + i).scrollIntoView({ behavior: 'smooth' });
+    });
+    dotsContainer.appendChild(dot);
+  }
+
+  // ── Intersection Observer for reveals ──
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+  // ── Active slide tracking ──
+  const slideCounter = document.getElementById('slideCounter');
+  const dots = document.querySelectorAll('.nav-dot');
+
+  const slideObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.4) {
+        const slideNum = parseInt(entry.target.id.split('-')[1]);
+        slideCounter.textContent = String(slideNum).padStart(2, '0') + ' / ' + String(TOTAL_SLIDES).padStart(2, '0');
+        dots.forEach(d => d.classList.toggle('active', parseInt(d.dataset.slide) === slideNum));
+      }
+    });
+  }, { threshold: 0.4 });
+
+  document.querySelectorAll('.slide').forEach(s => slideObserver.observe(s));
+
+  // ── Keyboard navigation ──
+  let currentSlide = 1;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault();
+      if (currentSlide < TOTAL_SLIDES) {
+        currentSlide++;
+        document.getElementById('slide-' + currentSlide).scrollIntoView({ behavior: 'smooth' });
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      if (currentSlide > 1) {
+        currentSlide--;
+        document.getElementById('slide-' + currentSlide).scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  });
+
+  // Keep currentSlide in sync with scroll
+  const syncObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+        currentSlide = parseInt(entry.target.id.split('-')[1]);
+      }
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.slide').forEach(s => syncObserver.observe(s));
+
+  // ── Animated counters ──
+  const counterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const target = parseInt(el.dataset.count);
+        const suffix = el.dataset.suffix || '';
+        const prefix = el.dataset.prefix || '';
+        let current = 0;
+        const step = Math.max(1, Math.floor(target / 30));
+        const timer = setInterval(() => {
+          current += step;
+          if (current >= target) {
+            current = target;
+            clearInterval(timer);
+          }
+          el.textContent = prefix + current + suffix;
+        }, 40);
+        counterObserver.unobserve(el);
+      }
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('[data-count]').forEach(el => counterObserver.observe(el));
+})();
+</script>
+</body>
+</html>

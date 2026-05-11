@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BellIcon, PlusIcon } from "@/components/shared/AppIcons";
+import { useI18n } from "@/lib/i18n";
 import { WORKSPACE_CONTENT_NEW_PATH } from "@/lib/routes";
 
 export const WorkspaceHeader = ({
@@ -10,6 +11,7 @@ export const WorkspaceHeader = ({
   wallet?: string;
   className?: string;
 }) => {
+  const { t } = useI18n();
   const shortWallet = wallet
     ? `${wallet.slice(0, 4)}...${wallet.slice(-4)}`
     : null;
@@ -17,7 +19,7 @@ export const WorkspaceHeader = ({
   return (
     <header className={`flex h-14 items-center justify-between ${className}`}>
       <h1 className="text-sm font-medium tracking-[-0.02em] text-[#93a2bb]">
-        StreamPump <span className="text-white">创作中心</span>
+        StreamPump <span className="text-white">{t("shell.workspaceCenter")}</span>
       </h1>
 
       <div className="flex items-center gap-3">
@@ -40,7 +42,7 @@ export const WorkspaceHeader = ({
           href={WORKSPACE_CONTENT_NEW_PATH}
         >
           <PlusIcon className="h-3.5 w-3.5" />
-          新建内容
+          {t("shell.workspaceNewContent")}
         </Link>
       </div>
     </header>

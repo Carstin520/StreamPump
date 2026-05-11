@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { LoginPreviewMode } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import { loginPreviewDefaultMode } from "@/lib/public-data";
 import { WORKSPACE_PATH, buildLoginHref, normalizeInternalHref } from "@/lib/routes";
 
@@ -19,6 +20,7 @@ const getPreviewMode = (value: string | string[] | undefined): LoginPreviewMode 
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [previewMode, setPreviewMode] = useState<LoginPreviewMode>(loginPreviewDefaultMode);
   const nextHref = normalizeInternalHref(
     typeof router.query.next === "string" ? router.query.next : null,
@@ -46,7 +48,7 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>StreamPump | Login</title>
+        <title>{t("page.login.title")}</title>
       </Head>
       <main className="relative min-h-screen bg-[#090d14] text-white">
         <AnimatedFeedBackdrop className="opacity-[0.85]" />
@@ -62,7 +64,7 @@ export default function LoginPage() {
             </Link>
 
             <div className="hidden rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-[#8ea0ba] md:block">
-              Preview state syncs with <code className="text-white/80">?preview=</code>
+              {t("auth.previewSync")} <code className="text-white/80">?preview=</code>
             </div>
           </div>
 
@@ -70,12 +72,12 @@ export default function LoginPage() {
             <div className="w-full max-w-[1040px]">
               <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]">
                 <div className="hidden px-6 lg:block">
-                  <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">Access Layer</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">{t("auth.accessEyebrow")}</p>
                   <h1 className="mt-5 max-w-[520px] text-[56px] font-semibold leading-[0.94] tracking-[-0.06em] text-white">
-                    Accounts that feel native to the product, not bolted on later.
+                    {t("auth.accessTitle")}
                   </h1>
                   <p className="mt-6 max-w-[440px] text-base leading-8 text-[#95a6bf]">
-                    This preview keeps creator investing, social identity, and wallet power in one coherent entry flow. Start simple, then reveal control only when the user needs it.
+                    {t("auth.accessBody")}
                   </p>
                 </div>
 

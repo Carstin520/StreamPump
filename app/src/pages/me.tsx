@@ -4,6 +4,7 @@ import type { GetStaticProps } from "next";
 import { PageShell } from "@/components/layout/PageShell";
 import { MeSurface } from "@/components/me/MeSurface";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
+import { useI18n } from "@/lib/i18n";
 import {
   loadPublicFeedPageProps,
   PUBLIC_FEED_REVALIDATE_SECONDS,
@@ -14,6 +15,7 @@ export default function MePage({
   initialError,
   initialPosts,
 }: PublicFeedPageProps) {
+  const { t } = useI18n();
   const {
     currentUser,
     currentUserSavedPosts,
@@ -28,11 +30,11 @@ export default function MePage({
   return (
     <>
       <Head>
-        <title>StreamPump | Me</title>
+        <title>{t("page.me.title")}</title>
       </Head>
       <PageShell hideTopbar>
         {loading ? (
-          <div className="py-10 text-sm text-[#8ea0ba]">Loading portfolio…</div>
+          <div className="py-10 text-sm text-[#8ea0ba]">{t("common.loading")}</div>
         ) : null}
         {!loading && error ? (
           <div className="py-10 text-sm text-[#8ea0ba]">{error}</div>

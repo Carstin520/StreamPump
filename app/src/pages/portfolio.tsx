@@ -24,6 +24,7 @@ import {
   S1PortfolioResponse,
 } from "@/lib/api/s1";
 import { clearStoredAuthSession, getStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
+import { useI18n } from "@/lib/i18n";
 import {
   DEMO_PATH,
   DEMO_S1_BUYOUT_PATH,
@@ -492,6 +493,7 @@ function FallbackPreview({ reason }: { reason: string }) {
 /* ------------------------------------------------------------------ */
 
 function PortfolioPage() {
+  const { t } = useI18n();
   const wallet = useWallet();
   const [activeTab, setActiveTab] = useState<LiveTab>("Portfolio");
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
@@ -581,7 +583,7 @@ function PortfolioPage() {
 
   return (
     <>
-      <Head><title>StreamPump | Portfolio</title></Head>
+      <Head><title>{t("page.portfolio.title")}</title></Head>
       <PageShell>
         {loading ? (
           <div className="mx-auto max-w-4xl">
@@ -591,10 +593,10 @@ function PortfolioPage() {
           <div className="mx-auto max-w-[640px] space-y-5 py-16 text-center">
             <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
               {connectedWallet && sessionWallet && connectedWallet !== sessionWallet
-                ? "Sign in with connected wallet"
+                ? t("portfolio.signInConnected")
                 : connectedWallet
-                  ? "Sign in to load portfolio"
-                  : "Connect wallet to view portfolio"}
+                  ? t("portfolio.signInLoad")
+                  : t("portfolio.connectView")}
             </h1>
             <p className="text-xs leading-6 text-[#8ea0ba]">
               {connectedWallet && sessionWallet && connectedWallet !== sessionWallet
@@ -605,7 +607,7 @@ function PortfolioPage() {
             </p>
             {connectedWallet ? (
               <p className="mx-auto max-w-xs rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-[#8ea0ba]">
-                Connected: {shortenWallet(connectedWallet)}
+                {t("portfolio.connected")}: {shortenWallet(connectedWallet)}
               </p>
             ) : null}
             <div className="flex flex-wrap items-center justify-center gap-3">

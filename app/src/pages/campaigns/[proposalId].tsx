@@ -8,6 +8,7 @@ import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
 import { Panel } from "@/components/shared/Panel";
 import { getProposalById, ProposalDetailResponse } from "@/lib/api/workspace";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
+import { useI18n } from "@/lib/i18n";
 import { findCreatorStrict } from "@/lib/mocks/discover";
 import { findMockProposalDetail } from "@/lib/mocks/workspace";
 import {
@@ -23,6 +24,7 @@ type PageState =
 
 export default function CampaignDetailPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function CampaignDetailPage() {
     };
   }, [router.isReady, router.query.proposalId]);
 
-  const pageTitle = state.kind === "ready" ? state.data.proposal.id : "Campaign detail";
+  const pageTitle = state.kind === "ready" ? state.data.proposal.id : t("page.campaign.detailTitle");
   const isPublicView = state.kind === "ready" && state.data.viewerRole === "PUBLIC_FAN";
   const isDemoProposal =
     state.kind === "ready" && Boolean(findMockProposalDetail(state.data.proposal.id));
@@ -82,7 +84,7 @@ export default function CampaignDetailPage() {
       ? shortenWallet(state.data.proposal.creatorWallet)
       : state.kind === "ready"
         ? `${shortenWallet(state.data.proposal.creatorWallet)} × ${shortenWallet(state.data.proposal.sponsorWallet)}`
-        : "Campaign detail";
+        : t("page.campaign.detailTitle");
   const settlementHref = isDemoProposal
     ? DEMO_S2_SETTLEMENT_PATH
     : state.kind === "ready"
@@ -95,11 +97,11 @@ export default function CampaignDetailPage() {
         <title>{`StreamPump | ${pageTitle}`}</title>
       </Head>
       <PageShell
-        subtitle="Campaign detail is the shared campaign overview after launch, whether the data comes from the live proposal endpoint or the local demo fallback."
-        title="Campaign detail"
+        subtitle={t("page.campaign.detailBody")}
+        title={t("page.campaign.detailTitle")}
       >
-        {state.kind === "loading" ? <AsyncStateCard body="Loading proposal detail." title="Loading campaign" /> : null}
-        {state.kind === "error" ? <AsyncStateCard body={state.message} title="Campaign request failed" /> : null}
+        {state.kind === "loading" ? <AsyncStateCard body={t("page.campaign.loadingBody")} title={t("page.campaign.loadingTitle")} /> : null}
+        {state.kind === "error" ? <AsyncStateCard body={state.message} title={t("page.campaign.requestFailed")} /> : null}
         {state.kind === "ready" ? (
           <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
             <div className="space-y-5">

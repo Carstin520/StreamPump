@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { useI18n } from "@/lib/i18n";
 
 const MISSIONS = [
   { name: "Complete Profile", emoji: "👤", spump: 20_000, xp: 20, done: true },
@@ -24,6 +25,7 @@ function fmt(n: number) {
 }
 
 export default function RewardsPage() {
+  const { t } = useI18n();
   const [claimed, setClaimed] = useState(false);
 
   const completedXP = MISSIONS.filter((m) => m.done).reduce((a, m) => a + m.xp, 0);
@@ -33,7 +35,7 @@ export default function RewardsPage() {
   return (
     <>
       <Head>
-        <title>Daily Rewards — StreamPump</title>
+        <title>{t("page.rewards.title")}</title>
       </Head>
 
       <PageShell>

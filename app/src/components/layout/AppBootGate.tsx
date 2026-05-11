@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 
+import { useI18n } from "@/lib/i18n";
+
 const BOOT_SEEN_KEY = "streampump.boot.seen";
 const MIN_BOOT_MS = 1900;
 const MAX_BOOT_MS = 2600;
@@ -20,6 +22,7 @@ const waitForFonts = () => {
 };
 
 export const AppBootGate = ({ children }: { children: ReactNode }) => {
+  const { t } = useI18n();
   const [showBoot, setShowBoot] = useState(true);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export const AppBootGate = ({ children }: { children: ReactNode }) => {
     <>
       {children}
       {showBoot ? (
-        <div className="app-boot-overlay" aria-label="Loading StreamPump" role="status">
+        <div className="app-boot-overlay" aria-label={t("shell.loadingStreamPump")} role="status">
           <div className="app-boot-mark">SP</div>
           <div className="app-boot-name">StreamPump</div>
           <div className="app-boot-progress" />

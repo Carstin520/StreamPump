@@ -4,6 +4,8 @@ import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { SwitchAccountIcon } from "@/components/shared/AppIcons";
+import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
+import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
 import { PROFILE_PATH, buildLoginHref, isRouteActive, primaryNavItems } from "@/lib/routes";
 
@@ -15,6 +17,7 @@ export const UserShell = ({
   header?: ReactNode;
 }) => {
   const router = useRouter();
+  const { t } = useI18n();
   const switchAccountHref = buildLoginHref({
     nextPath: router.asPath,
     preview: "switch",
@@ -22,6 +25,7 @@ export const UserShell = ({
   const profileActive = isRouteActive(router.asPath, {
     href: PROFILE_PATH,
     label: "Me",
+    labelKey: "nav.me",
     prefixes: [PROFILE_PATH],
   });
 
@@ -51,7 +55,7 @@ export const UserShell = ({
               key={item.href}
             >
               <span className={`${isRouteActive(router.asPath, item) ? "text-white" : "text-[#8f9eb7]"} transition duration-200 group-hover:text-white`}>
-                {item.label}
+                {t(item.labelKey)}
               </span>
             </Link>
           ))}
@@ -83,14 +87,19 @@ export const UserShell = ({
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-[#9dadc6]">
                 <SwitchAccountIcon className="h-4 w-4" />
               </span>
-              <span className="ml-3 hidden text-sm font-medium text-white lg:block">切换账号</span>
+              <span className="ml-3 hidden text-sm font-medium text-white lg:block">{t("shell.switchAccount")}</span>
             </div>
           </Link>
+
+          <LanguageSwitch />
         </div>
       </aside>
 
       <div className="relative lg:ml-[280px]">
         <div className="page-enter mx-auto max-w-[1480px] space-y-6 px-4 py-4 lg:px-6 lg:py-0">
+          <div className="flex justify-end lg:hidden">
+            <LanguageSwitch compact />
+          </div>
           {header}
           {children}
         </div>

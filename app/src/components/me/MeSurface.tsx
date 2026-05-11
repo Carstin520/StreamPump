@@ -17,6 +17,7 @@ import {
   PostRecord,
   UserNoteRecord,
 } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import {
   compactNumber,
   creators as mockCreators,
@@ -36,6 +37,14 @@ import {
 
 const ME_TABS = ["Holdings", "Watchlist", "Rewards", "Activity", "Saved"] as const;
 type MeTab = (typeof ME_TABS)[number];
+
+const getMeTabLabelKey = (tab: MeTab) => {
+  if (tab === "Holdings") return "profile.tabs.holdings";
+  if (tab === "Watchlist") return "profile.tabs.watchlist";
+  if (tab === "Rewards") return "profile.tabs.rewards";
+  if (tab === "Activity") return "profile.tabs.activity";
+  return "profile.tabs.saved";
+};
 
 const SPUMP_BALANCE = 18420;
 const DAILY_SPUMP_REWARD = 320;
@@ -285,6 +294,7 @@ const IdentityHero = ({
   currentUser: CurrentUserRecord;
   portfolio: PortfolioModel;
 }) => {
+  const { t } = useI18n();
   const trend = portfolioExposureTrend.map((point) => point.value);
   const isUp = portfolio.change24hPct >= 0;
 
@@ -311,9 +321,9 @@ const IdentityHero = ({
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 text-[9px] uppercase tracking-[0.2em] text-[#7486a1]">
-              <RoleBadge tone="investor">Investor</RoleBadge>
-              <RoleBadge tone="backer">Creator Backer</RoleBadge>
-              <RoleBadge tone="sponsor">S2 Sponsor-ready</RoleBadge>
+              <RoleBadge tone="investor">{t("profile.badgeInvestor")}</RoleBadge>
+              <RoleBadge tone="backer">{t("profile.badgeBacker")}</RoleBadge>
+              <RoleBadge tone="sponsor">{t("profile.badgeSponsor")}</RoleBadge>
             </div>
             <h1 className="mt-1.5 truncate text-[22px] font-semibold tracking-[-0.04em] text-white md:text-[26px]">
               {currentUser.name}
@@ -323,7 +333,7 @@ const IdentityHero = ({
             </p>
 
             <button
-              aria-label="Copy wallet"
+              aria-label={t("shell.copyWallet")}
               className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] text-[#bcc8de] transition hover:border-white/[0.12] hover:text-white"
               type="button"
             >
@@ -342,7 +352,7 @@ const IdentityHero = ({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-                Total Portfolio Value
+                {t("portfolio.totalPortfolioValue")}
               </p>
               <p className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[32px]">
                 {formatUsd(portfolio.totalValueUsd)}
@@ -386,9 +396,9 @@ const IdentityHero = ({
 
           <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <HeroStat label="24h PnL" tone={isUp ? "positive" : "negative"} value={`${isUp ? "+" : ""}${portfolio.change24hPct.toFixed(2)}%`} />
-            <HeroStat label="Realized" value={formatUsd(portfolio.realizedRewardsUsd)} tone="positive" />
-            <HeroStat label="Positions" value={String(portfolio.activePositions)} />
-            <HeroStat label="Watchlist" value="6" />
+            <HeroStat label={t("portfolio.realizedRewards")} value={formatUsd(portfolio.realizedRewardsUsd)} tone="positive" />
+            <HeroStat label={t("portfolio.positions")} value={String(portfolio.activePositions)} />
+            <HeroStat label={t("portfolio.watchlist")} value="6" />
           </div>
         </div>
       </div>
@@ -450,42 +460,46 @@ const SnapshotStrip = ({
 }: {
   portfolio: PortfolioModel;
   watchlistCount: number;
-}) => (
+}) => {
+  const { t } = useI18n();
+
+  return (
   <section className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
     <SnapshotTile
       accent="#67b8ff"
       hint={`${portfolio.holdings.filter((h) => h.creator.state === "S1_DISCOVERY").length} discovery · ${portfolio.holdings.filter((h) => h.creator.state === "S1_BUYOUT").length} buyout`}
-      label="S1 Holdings"
+      label={t("portfolio.s1Holdings")}
       value={String(portfolio.s1HoldingsCount)}
     />
     <SnapshotTile
       accent="#65ecaf"
-      hint="Active campaigns"
-      label="S2 Exposure"
+      hint={t("workspace.activeCampaigns")}
+      label={t("portfolio.s2Exposure")}
       value={portfolio.s2ExposureUsd > 0 ? formatUsd(portfolio.s2ExposureUsd) : "—"}
     />
     <SnapshotTile
       accent="#ffb38a"
       hint={`${portfolioClaimWindows.length} ready · ${portfolioUpcomingClaims.length} pending`}
-      label="Claimable Rewards"
+      label={t("portfolio.claimableRewards")}
       tone="positive"
       value={formatUsd(portfolio.claimableRewardsUsd)}
     />
     <SnapshotTile
       accent="#de402a"
       hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"}
-      label="Buyout Claims"
+      label={t("portfolio.buyoutClaims")}
       tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"}
       value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"}
     />
     <SnapshotTile
       accent="#8ad0ff"
       hint={`+${portfolio.dailySpumpReward}/day streak`}
-      label="SPUMP Balance"
+      label="SPUMP"
       value={compactNumber(portfolio.spumpBalance)}
     />
   </section>
-);
+  );
+};
 
 const SnapshotTile = ({
   accent,
@@ -528,7 +542,10 @@ const TabBar = ({
 }: {
   activeTab: MeTab;
   onChange: (tab: MeTab) => void;
-}) => (
+}) => {
+  const { t } = useI18n();
+
+  return (
   <div className="flex items-center gap-0.5 overflow-x-auto border-b border-white/[0.06]">
     {ME_TABS.map((tab) => (
       <button
@@ -539,32 +556,35 @@ const TabBar = ({
         onClick={() => onChange(tab)}
         type="button"
       >
-        {tab}
+        {t(getMeTabLabelKey(tab))}
         {activeTab === tab ? (
           <span className="absolute inset-x-2.5 bottom-[-1px] h-[2px] rounded-full bg-[#de402a]" />
         ) : null}
       </button>
     ))}
   </div>
-);
+  );
+};
 
 /* ──────────────────────────────  Holdings  ────────────────────────────── */
 
 const HoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => {
+  const { t } = useI18n();
+
   if (rows.length === 0) {
-    return <EmptyState title="No holdings yet" cta="Browse Trending" href={TRENDING_PATH} />;
+    return <EmptyState title={t("portfolio.noHoldings")} cta={t("portfolio.browseTrending")} href={TRENDING_PATH} />;
   }
 
   return (
     <div className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
       <div className="hidden border-b border-white/[0.04] px-3.5 py-2 text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr_auto] lg:items-center lg:gap-3">
-        <span>Creator</span>
-        <span className="text-right">Price</span>
-        <span className="text-right">Holding</span>
-        <span className="text-right">Avg cost</span>
-        <span className="text-right">PnL</span>
-        <span>Graduation</span>
-        <span className="w-[160px]">Actions</span>
+        <span>{t("common.creator")}</span>
+        <span className="text-right">{t("portfolio.price")}</span>
+        <span className="text-right">{t("portfolio.holding")}</span>
+        <span className="text-right">{t("portfolio.avgCost")}</span>
+        <span className="text-right">{t("portfolio.pnL")}</span>
+        <span>{t("portfolio.graduation")}</span>
+        <span className="w-[160px]">{t("portfolio.actions")}</span>
       </div>
 
       <div className="divide-y divide-white/[0.04]">
@@ -577,6 +597,7 @@ const HoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => {
 };
 
 const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
+  const { t } = useI18n();
   const { creator, holding, marketValueUsd, pnlUsd, pnlPct } = row;
   const isUp = pnlUsd >= 0;
 
@@ -596,24 +617,24 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
       </Link>
 
       <div className="lg:text-right">
-        <MobileMetricLabel>Price</MobileMetricLabel>
+        <MobileMetricLabel>{t("portfolio.price")}</MobileMetricLabel>
         <p className="text-xs font-semibold text-white">{formatUsd(holding.currentPriceUsd ?? creator.tokenPrice)}</p>
         <p className="text-[9px] text-[#7e90aa]">SPUMP {Math.round((holding.currentPriceUsd ?? creator.tokenPrice) * 40)}</p>
       </div>
 
       <div className="lg:text-right">
-        <MobileMetricLabel>Holding</MobileMetricLabel>
+        <MobileMetricLabel>{t("portfolio.holding")}</MobileMetricLabel>
         <p className="text-xs font-semibold text-white">{holding.tokenCount} S1</p>
         <p className="text-[9px] text-[#7e90aa]">{formatUsd(marketValueUsd)}</p>
       </div>
 
       <div className="lg:text-right">
-        <MobileMetricLabel>Avg cost</MobileMetricLabel>
+        <MobileMetricLabel>{t("portfolio.avgCost")}</MobileMetricLabel>
         <p className="text-xs text-[#cbd6e7]">{formatUsd(holding.avgEntryUsd)}</p>
       </div>
 
       <div className="lg:text-right">
-        <MobileMetricLabel>PnL</MobileMetricLabel>
+        <MobileMetricLabel>{t("portfolio.pnL")}</MobileMetricLabel>
         <p className={`text-xs font-semibold ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
           {isUp ? "+" : ""}
           {formatUsd(pnlUsd)}
@@ -625,7 +646,7 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
       </div>
 
       <div>
-        <MobileMetricLabel>Graduation</MobileMetricLabel>
+        <MobileMetricLabel>{t("portfolio.graduation")}</MobileMetricLabel>
         <div className="flex items-center gap-1.5">
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
             <div
@@ -639,16 +660,16 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
 
       <div className="flex items-center justify-end gap-1">
         <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="primary">
-          {creator.state === "S1_BUYOUT" ? "Locked" : "Buy"}
+          {creator.state === "S1_BUYOUT" ? t("portfolio.locked") : t("portfolio.buy")}
         </RowAction>
         <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="ghost">
-          Sell
+          {t("portfolio.sell")}
         </RowAction>
         <Link
           className="flex h-7 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[10px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
           href={`/creators/${creator.id}`}
         >
-          View
+          {t("portfolio.view")}
         </Link>
       </div>
     </div>
@@ -702,18 +723,20 @@ const RowAction = ({
 /* ──────────────────────────────  Watchlist  ────────────────────────────── */
 
 const WatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
+  const { t } = useI18n();
+
   if (rows.length === 0) {
-    return <EmptyState title="Your watchlist is empty" cta="Discover creators" href={EXPLORE_PATH} />;
+    return <EmptyState title={t("portfolio.noWatchlist")} cta={t("portfolio.discoverCreators")} href={EXPLORE_PATH} />;
   }
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
       <div className="hidden border-b border-white/[0.04] px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.8fr_0.8fr_1.4fr_auto] lg:items-center lg:gap-4">
-        <span>Creator</span>
-        <span className="text-right">Price</span>
-        <span className="text-right">Momentum</span>
-        <span>Latest signal</span>
-        <span className="w-[180px]">Action</span>
+        <span>{t("common.creator")}</span>
+        <span className="text-right">{t("portfolio.price")}</span>
+        <span className="text-right">{t("portfolio.momentum")}</span>
+        <span>{t("portfolio.latestSignal")}</span>
+        <span className="w-[180px]">{t("portfolio.action")}</span>
       </div>
       <div className="divide-y divide-white/[0.04]">
         {rows.map((creator) => {
@@ -738,7 +761,7 @@ const WatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
               </Link>
 
               <div className="lg:text-right">
-                <MobileMetricLabel>Price</MobileMetricLabel>
+                <MobileMetricLabel>{t("portfolio.price")}</MobileMetricLabel>
                 <p className="text-sm font-semibold text-white">{formatUsd(creator.tokenPrice)}</p>
                 <p
                   className={`text-[10px] ${
@@ -751,7 +774,7 @@ const WatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
               </div>
 
               <div className="lg:text-right">
-                <MobileMetricLabel>Momentum</MobileMetricLabel>
+                <MobileMetricLabel>{t("portfolio.momentum")}</MobileMetricLabel>
                 <div className="flex items-center justify-end gap-2">
                   <div className="h-1 w-16 overflow-hidden rounded-full bg-white/[0.05]">
                     <div
@@ -764,19 +787,19 @@ const WatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
               </div>
 
               <div className="min-w-0">
-                <MobileMetricLabel>Latest signal</MobileMetricLabel>
+                <MobileMetricLabel>{t("portfolio.latestSignal")}</MobileMetricLabel>
                 <p className="line-clamp-1 text-[12px] text-[#cbd6e7]">{creator.teaser}</p>
               </div>
 
               <div className="flex items-center justify-end gap-1.5">
                 <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="primary">
-                  Add Position
+                  {t("portfolio.addPosition")}
                 </RowAction>
                 <Link
                   className="flex h-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 text-[11px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
                   href={`/market/${creator.id}`}
                 >
-                  Market
+                  {t("portfolio.market")}
                 </Link>
               </div>
             </div>
@@ -1044,11 +1067,14 @@ const SavedContent = ({
 
 /* ──────────────────────────────  Right rail  ────────────────────────────── */
 
-const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
+const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => {
+  const { t } = useI18n();
+
+  return (
   <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
     <header className="border-b border-white/[0.05] px-3.5 py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-        Claim Center
+        {t("portfolio.claimCenter")}
       </p>
       <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">
         {formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}
@@ -1057,9 +1083,9 @@ const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
     </header>
 
     <div className="space-y-0.5 px-1.5 py-1.5">
-      <RailRow accent="#65ecaf" label="Daily SPUMP" sub="Streak 12d" value={`+${portfolio.dailySpumpReward}`} />
-      <RailRow accent="#ffb38a" label="Buyout pool" sub="弯心入坑" value={formatUsd(portfolio.claimableBuyoutUsd)} />
-      <RailRow accent="#67b8ff" label="Campaign" sub="Pending" value={formatUsd(portfolio.pendingCampaignUsd)} />
+      <RailRow accent="#65ecaf" label={t("portfolio.dailySpump")} sub="Streak 12d" value={`+${portfolio.dailySpumpReward}`} />
+      <RailRow accent="#ffb38a" label={t("portfolio.buyoutPool")} sub="弯心入坑" value={formatUsd(portfolio.claimableBuyoutUsd)} />
+      <RailRow accent="#67b8ff" label={t("portfolio.campaign")} sub="Pending" value={formatUsd(portfolio.pendingCampaignUsd)} />
     </div>
 
     <div className="border-t border-white/[0.05] p-2.5">
@@ -1067,12 +1093,13 @@ const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
         className="w-full rounded-lg bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(222,64,42,0.28)] hover:brightness-[1.05]"
         type="button"
       >
-        Preview Claim All
+        {t("portfolio.claimAll")}
       </button>
-      <p className="mt-1.5 text-center text-[9px] text-[#5a6b82]">Demo · real claim coming soon</p>
+      <p className="mt-1.5 text-center text-[9px] text-[#5a6b82]">{t("portfolio.demoComingSoon")}</p>
     </div>
   </section>
-);
+  );
+};
 
 const RailRow = ({
   accent,
@@ -1097,21 +1124,25 @@ const RailRow = ({
   </div>
 );
 
-const QuickActionsCard = () => (
+const QuickActionsCard = () => {
+  const { t } = useI18n();
+
+  return (
   <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
     <header className="border-b border-white/[0.05] px-3.5 py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-        Quick Actions
+        {t("portfolio.quickActions")}
       </p>
     </header>
     <div className="grid grid-cols-2 gap-1.5 p-2.5">
-      <QuickAction href={EXPLORE_PATH} label="Explore" />
-      <QuickAction href={TRENDING_PATH} label="Trending" />
-      <QuickAction href={REWARDS_PATH} label="Rewards" />
-      <QuickAction href={WORKSPACE_PATH} label="Creator Studio" />
+      <QuickAction href={EXPLORE_PATH} label={t("nav.explore")} />
+      <QuickAction href={TRENDING_PATH} label={t("nav.trending")} />
+      <QuickAction href={REWARDS_PATH} label={t("nav.rewards")} />
+      <QuickAction href={WORKSPACE_PATH} label={t("nav.creatorStudio")} />
     </div>
   </section>
-);
+  );
+};
 
 const QuickAction = ({ href, label }: { href: string; label: string }) => (
   <Link
@@ -1132,10 +1163,13 @@ const EmptyState = ({
   cta: string;
   href: string;
   title: string;
-}) => (
+}) => {
+  const { t } = useI18n();
+
+  return (
   <div className="rounded-[20px] border border-white/[0.05] bg-white/[0.02] px-6 py-10 text-center">
     <p className="text-sm font-medium text-white">{title}</p>
-    <p className="mt-1 text-xs text-[#7486a1]">Demo data shown elsewhere — start here.</p>
+    <p className="mt-1 text-xs text-[#7486a1]">{t("portfolio.demoStartHere")}</p>
     <Link
       className="mt-4 inline-flex rounded-full bg-[#de402a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#ea523e]"
       href={href}
@@ -1143,4 +1177,5 @@ const EmptyState = ({
       {cta}
     </Link>
   </div>
-);
+  );
+};

@@ -12,6 +12,7 @@ import { OverviewConsoleV2 } from "@/components/workspace/OverviewConsoleV2";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { WorkspaceOverviewResponse, getWorkspaceOverview } from "@/lib/api/workspace";
 import { getStoredAuthSession } from "@/lib/auth-session";
+import { useI18n } from "@/lib/i18n";
 import { WorkspacePersona, workspacePersonas } from "@/lib/mocks/workspace";
 import { WORKSPACE_PATH, buildLoginHref } from "@/lib/routes";
 import { clearAuthAndBuildLoginHref, isAuthError } from "@/lib/session-flow";
@@ -33,6 +34,7 @@ const OVERVIEW_V2_PATH = "/workspace/overview-v2";
 
 export default function WorkspaceOverviewV2Page() {
   const router = useRouter();
+  const { t } = useI18n();
   const [state, setState] = useState<WorkspaceState>({ status: "loading" });
   const isDemoMode = router.isReady && router.query.demo === "1";
 
@@ -57,28 +59,28 @@ export default function WorkspaceOverviewV2Page() {
         if (isLocalPreviewToken(session.accessToken)) {
           setState({
             status: "preview",
-            message: "Preview session active. Showing the creator desk while the live workspace API is unavailable.",
+            message: t("workspace.previewSessionActive"),
           });
           return;
         }
         if (isAuthError(error)) {
           setState({
             status: "error",
-            message: "Session expired. Please sign in again.",
+          message: "Session expired. Please sign in again.",
             loginHref: clearAuthAndBuildLoginHref(WORKSPACE_PATH),
           });
           return;
         }
         setState({
           status: "preview",
-          message: `${getErrorMessage(error, "Workspace API unavailable")}. Showing the creator desk preview.`,
+          message: `${getErrorMessage(error, "Workspace API unavailable")}. ${t("workspace.previewShowingDesk")}`,
         });
       });
 
     return () => {
       isMounted = false;
     };
-  }, [isDemoMode, router.isReady]);
+  }, [isDemoMode, router.isReady, t]);
 
   const persona = useMemo<WorkspacePersona>(() => {
     if (isDemoMode) return workspacePersonas[WORKSPACE_DEMO_STAGE];
@@ -89,7 +91,7 @@ export default function WorkspaceOverviewV2Page() {
   return (
     <>
       <Head>
-        <title>StreamPump | Creator Desk V2</title>
+        <title>{t("page.workspace.creatorDeskV2")}</title>
       </Head>
       <WorkspaceShell aside={<OverviewAside persona={persona} />} stage={persona.stage} wallet={persona.wallet}>
         {!isDemoMode && state.status === "loading" ? <ConsoleLoading /> : null}
@@ -111,18 +113,22 @@ export default function WorkspaceOverviewV2Page() {
   );
 }
 
-const WorkspacePreviewNotice = ({ message }: { message: string }) => (
+const WorkspacePreviewNotice = ({ message }: { message: string }) => {
+  const { t } = useI18n();
+
+  return (
   <section className="rounded-2xl border border-[#f0b35f]/20 bg-[#1c1510]/72 px-5 py-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f0b35f]">
-          Preview desk
+          {t("workspace.previewDesk")}
         </p>
         <p className="mt-1 text-sm text-[#c6d1e2]">{message}</p>
       </div>
       <span className="rounded-full border border-[#f0b35f]/20 bg-[#f0b35f]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffd39b]">
-        Demo data
+        {t("workspace.previewData")}
       </span>
     </div>
   </section>
-);
+  );
+};

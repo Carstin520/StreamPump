@@ -20,6 +20,7 @@ import {
   WorkspacePersona,
   workspacePersonas,
 } from "@/lib/mocks/workspace";
+import { useI18n } from "@/lib/i18n";
 import { WORKSPACE_PATH, buildLoginHref } from "@/lib/routes";
 import { clearAuthAndBuildLoginHref, isAuthError } from "@/lib/session-flow";
 import {
@@ -45,6 +46,7 @@ type WorkspaceState =
 
 export default function WorkspacePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [state, setState] = useState<WorkspaceState>({ status: "loading" });
   const [activeStage, setActiveStage] = useState<CreatorSeasonState>(WORKSPACE_DEMO_STAGE);
   const isDemoMode = router.isReady && router.query.demo === "1";
@@ -71,7 +73,7 @@ export default function WorkspacePage() {
           setState({
             status: "preview",
             tone: "info",
-            message: "Preview session · showing demo data while the workspace API is offline.",
+            message: t("workspace.previewOffline"),
           });
           return;
         }
@@ -94,7 +96,7 @@ export default function WorkspacePage() {
     return () => {
       isMounted = false;
     };
-  }, [isDemoMode, router.isReady]);
+  }, [isDemoMode, router.isReady, t]);
 
   const persona = useMemo<WorkspacePersona>(() => {
     if (isDemoMode) return workspacePersonas[activeStage];
@@ -106,7 +108,7 @@ export default function WorkspacePage() {
   return (
     <>
       <Head>
-        <title>StreamPump | Operating Console</title>
+        <title>{t("page.workspace.operatingConsole")}</title>
       </Head>
       <WorkspaceShell aside={<OverviewAside persona={persona} />} stage={persona.stage} wallet={persona.wallet}>
         {isDemoMode ? <StageSwitcher activeStage={activeStage} onChange={setActiveStage} /> : null}

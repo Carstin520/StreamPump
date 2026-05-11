@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 
 import { UserShell } from "@/components/user/UserShell";
 import { UserTopbar, type TopbarMode } from "@/components/user/UserTopbar";
+import { useI18n } from "@/lib/i18n";
 import { RouteItem, isRouteActive } from "@/lib/routes";
 
 type PageShellProps = {
@@ -32,6 +33,7 @@ export const PageShell = ({
   topbarMode = "sticky",
 }: PageShellProps) => {
   const router = useRouter();
+  const { t } = useI18n();
   const showHeaderCard = Boolean(title || subtitle || action || tabs?.length);
 
   return (
@@ -72,7 +74,7 @@ export const PageShell = ({
                       href={tab.href}
                       key={tab.href}
                     >
-                      {tab.label}
+                      {t(tab.labelKey)}
                     </Link>
                   );
                 })}

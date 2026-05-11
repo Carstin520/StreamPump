@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { Fragment } from "react";
 
 import { AppBootGate } from "@/components/layout/AppBootGate";
+import { I18nProvider } from "@/lib/i18n";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "@/styles/globals.css";
@@ -25,13 +26,15 @@ export default function App({ Component, pageProps }: StreamPumpAppProps) {
 
   return (
     <Fragment>
-      <AppBootGate>
-        {Component.requiresWalletProviders ? (
-          <ClientProviders>{page}</ClientProviders>
-        ) : (
-          page
-        )}
-      </AppBootGate>
+      <I18nProvider>
+        <AppBootGate>
+          {Component.requiresWalletProviders ? (
+            <ClientProviders>{page}</ClientProviders>
+          ) : (
+            page
+          )}
+        </AppBootGate>
+      </I18nProvider>
     </Fragment>
   );
 }

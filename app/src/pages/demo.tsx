@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
 import { ChevronRightIcon } from "@/components/shared/AppIcons";
 import { StagePill } from "@/components/shared/StagePill";
+import { useI18n } from "@/lib/i18n";
 import { findCreator } from "@/lib/public-data";
 import {
   DEMO_S1_BUYOUT_PATH,
@@ -55,10 +56,12 @@ const demoCards = [
 ];
 
 export default function DemoHubPage() {
+  const { t } = useI18n();
+
   return (
     <>
       <Head>
-        <title>StreamPump | Demo Hub</title>
+        <title>{t("page.demo.title")}</title>
       </Head>
       <PageShell>
         <div className="mx-auto max-w-6xl space-y-5">

@@ -28,6 +28,7 @@ import {
 } from "@/lib/api/workspace";
 import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
+import { useI18n } from "@/lib/i18n";
 import { WORKSPACE_PATH } from "@/lib/routes";
 import {
   buildLoginHrefFromRouter,
@@ -128,7 +129,12 @@ const defaultDeadlineInput = () => {
   return d.toISOString().slice(0, 16);
 };
 
-function deriveManifestSteps(status: ContentManifestStatus, hasAssets: boolean, hasPublications: boolean): StepItem[] {
+function deriveManifestSteps(
+  status: ContentManifestStatus,
+  hasAssets: boolean,
+  hasPublications: boolean,
+  t: (key: string) => string,
+): StepItem[] {
   const s = (label: string, done: boolean, current: boolean): StepItem => ({
     label,
     status: done ? "done" : current ? "current" : "pending",
@@ -141,16 +147,17 @@ function deriveManifestSteps(status: ContentManifestStatus, hasAssets: boolean, 
   const isPublished = status === "PUBLISHED";
 
   return [
-    s("草稿", !isDraft, isDraft),
-    s("上传素材", hasAssets && !isUploading, isUploading || (isDraft && !hasAssets)),
-    s("完善内容", isReady || isLocked || isAnchored || isPublished, !isDraft && !isUploading && !isReady && !hasAssets),
-    s("发布", isPublished, isReady || isAnchored),
-    s("赞助合作", false, isLocked || isPublished),
+    s(t("workspace.details"), !isDraft, isDraft),
+    s(t("workspace.uploadAssets"), hasAssets && !isUploading, isUploading || (isDraft && !hasAssets)),
+    s(t("workspace.completeContent"), isReady || isLocked || isAnchored || isPublished, !isDraft && !isUploading && !isReady && !hasAssets),
+    s(t("workspace.publish"), isPublished, isReady || isAnchored),
+    s(t("nav.sponsorships"), false, isLocked || isPublished),
   ];
 }
 
 export default function ManifestDetailPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -308,7 +315,7 @@ export default function ManifestDetailPage() {
     finally { setBusyAction(null); }
   };
 
-  const title = state.kind === "ready" ? (state.data.title ?? "未命名内容") : "内容详情";
+  const title = state.kind === "ready" ? (state.data.title ?? t("workspace.unknownContent")) : t("workspace.contentDetail");
 
   if (state.kind !== "ready") {
     return (
@@ -318,13 +325,13 @@ export default function ManifestDetailPage() {
           {state.kind === "loading" && (
             <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
-              <p className="text-sm text-[#8ea0ba]">加载内容详情...</p>
+              <p className="text-sm text-[#8ea0ba]">{t("common.loading")}</p>
             </div>
           )}
           {state.kind === "auth" && (
             <div className="liquid-card card-radius px-6 py-8">
-              <p className="text-lg font-semibold text-white">登录后查看</p>
-              <a className="glass-button-primary mt-4 inline-flex px-5 py-2.5 text-sm font-semibold" href={loginHref}>登录</a>
+              <p className="text-lg font-semibold text-white">{t("workspace.loginRequired")}</p>
+              <a className="glass-button-primary mt-4 inline-flex px-5 py-2.5 text-sm font-semibold" href={loginHref}>{t("common.login")}</a>
             </div>
           )}
           {state.kind === "error" && (
@@ -338,7 +345,7 @@ export default function ManifestDetailPage() {
   }
 
   const d = state.data;
-  const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0);
+  const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0, t);
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -349,14 +356,14 @@ export default function ManifestDetailPage() {
           </span>
           <span className="text-[10px] text-[#5a6b82]">{formatIsoLabel(d.updatedAt)}</span>
         </div>
-        <p className="mt-3 text-sm font-medium text-white">{d.title ?? "未命名"}</p>
-        <p className="mt-1 text-[11px] text-[#6b7d96]">{d.contentType} · {d.assets.length} 素材 · v{d.version}</p>
-        <p className="mt-2 text-[11px] text-[#5a6b82]">创作者: {shortenWallet(d.creatorWallet)}</p>
+        <p className="mt-3 text-sm font-medium text-white">{d.title ?? t("workspace.unknownContent")}</p>
+        <p className="mt-1 text-[11px] text-[#6b7d96]">{d.contentType} · {d.assets.length} {t("workspace.media")} · v{d.version}</p>
+        <p className="mt-2 text-[11px] text-[#5a6b82]">{t("common.creator")}: {shortenWallet(d.creatorWallet)}</p>
       </div>
 
       {d.manifestHashHex && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">链上状态</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.chainStatus")}</p>
           <div className="mt-2 space-y-2">
             <HashRow label="Manifest Hash" value={d.manifestHashHex} />
             <HashRow label="Anchor PDA" value={d.currentAnchorPda} />
@@ -366,7 +373,7 @@ export default function ManifestDetailPage() {
 
       {d.publications.length > 0 && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">已发布</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
           {d.publications.map((pub) => (
             <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={pub.publicationId}>
               <p className="text-xs font-medium text-white">{pub.platform}</p>
@@ -379,9 +386,9 @@ export default function ManifestDetailPage() {
   );
 
   const sections: { id: "assets" | "publish" | "sponsor"; label: string }[] = [
-    { id: "assets", label: "素材管理" },
-    { id: "publish", label: "发布" },
-    { id: "sponsor", label: "赞助合作" },
+    { id: "assets", label: t("workspace.assetManagement") },
+    { id: "publish", label: t("workspace.publish") },
+    { id: "sponsor", label: t("nav.sponsorships") },
   ];
 
   return (
@@ -390,7 +397,7 @@ export default function ManifestDetailPage() {
       <WorkspaceShell aside={previewPanel}>
         {/* Header */}
         <div>
-          <h2 className="text-lg font-semibold text-white">{d.title ?? "未命名内容"}</h2>
+          <h2 className="text-lg font-semibold text-white">{d.title ?? t("workspace.unknownContent")}</h2>
           <div className="mt-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
             <StepProgress steps={steps} />
           </div>
@@ -434,7 +441,7 @@ export default function ManifestDetailPage() {
             <label className="block cursor-pointer">
               <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] p-6 transition hover:border-[#de402a]/30">
                 <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
-                <p className="text-xs text-[#8ea0ba]">拖拽或点击上传素材</p>
+                <p className="text-xs text-[#8ea0ba]">{t("workspace.uploadAssetDrop")}</p>
               </div>
               <input accept=".mp4,.mov,.jpg,.jpeg,.png,.webp,.heic" className="hidden" multiple onChange={handleFileSelection} type="file" />
             </label>
@@ -463,7 +470,7 @@ export default function ManifestDetailPage() {
               >
                 {busyAction === "upload" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
                 <UploadIcon className="h-3.5 w-3.5" />
-                上传素材
+                {t("workspace.uploadAssets")}
               </button>
               <button
                 className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
@@ -473,7 +480,7 @@ export default function ManifestDetailPage() {
               >
                 {busyAction === "finalize" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
                 <CheckCircleIcon className="h-3.5 w-3.5" />
-                完善内容
+                {t("workspace.completeContent")}
               </button>
             </div>
           </div>
@@ -484,15 +491,15 @@ export default function ManifestDetailPage() {
           <div className="section-enter space-y-4">
             <div className="space-y-3">
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">发布平台</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishPlatform")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPlatform(e.target.value.toUpperCase())} value={publicationPlatform} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">外部链接</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">外部帖子 ID（可选）</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
               </label>
             </div>
@@ -504,7 +511,7 @@ export default function ManifestDetailPage() {
             >
               {busyAction === "publication" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
               <LinkIcon className="h-3.5 w-3.5" />
-              发布到 Feed
+              {t("workspace.publishToFeed")}
             </button>
           </div>
         )}
@@ -514,45 +521,45 @@ export default function ManifestDetailPage() {
           <div className="section-enter space-y-4">
             {!["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && (
               <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#f3b33e]/[0.06] px-4 py-3 text-xs text-[#f3c66e]">
-                请先完善并发布内容后再创建赞助合作
+                {t("workspace.sponsorshipAfterDraft")}
               </div>
             )}
             <div className="space-y-3">
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">赞助商钱包</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setSponsorWallet(e.target.value)} placeholder="赞助商公钥" value={sponsorWallet} />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorWallet")}</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setSponsorWallet(e.target.value)} placeholder={t("workspace.sponsorPublicKey")} value={sponsorWallet} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">截止日期</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">基础报酬 (USDC)</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">绩效预算 (USDC)</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">延迟结算 (USDC)</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delaySettlement")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3BudgetUsdc(e.target.value)} value={track3BudgetUsdc} />
                 </label>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">指标类型</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
                   <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
-                    <option value="VIEWS">浏览量</option><option value="CLICKS">点击量</option><option value="SAVES">收藏量</option>
+                    <option value="VIEWS">{t("workspace.views")}</option><option value="CLICKS">{t("workspace.clicks")}</option><option value="SAVES">{t("workspace.saves")}</option>
                   </select>
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">目标值</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">延迟天数</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delayDays")}</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3DelayDays(e.target.value)} value={track3DelayDays} />
                 </label>
               </div>
@@ -565,7 +572,7 @@ export default function ManifestDetailPage() {
             >
               {busyAction === "intent" && <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />}
               <SignatureIcon className="h-3.5 w-3.5" />
-              创建赞助合作
+              {t("workspace.createSponsorship")}
             </button>
           </div>
         )}
@@ -581,6 +588,7 @@ export default function ManifestDetailPage() {
 }
 
 function AssetPreview({ asset }: { asset: ManifestAssetRecord }) {
+  const { t } = useI18n();
   const url = resolveRenderableAssetUrl(asset);
   if (isVideoAsset(asset) && isMuxAssetReady(asset) && asset.muxPlaybackUrl) {
     return <MediaVideoPlayer className="h-full w-full" controls muted playsInline preload="metadata" src={asset.muxPlaybackUrl} videoClassName="h-full w-full object-cover" fallbackSrc={asset.originUrl && isRenderableUrl(asset.originUrl) ? asset.originUrl : undefined} />;
@@ -594,7 +602,7 @@ function AssetPreview({ asset }: { asset: ManifestAssetRecord }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center">
       {isVideoAsset(asset) ? <VideoIcon className="h-5 w-5 text-[#4a5568]" /> : <ImageIcon className="h-5 w-5 text-[#4a5568]" />}
-      <span className="text-[10px] text-[#4a5568]">{asset.ingestStatus === "READY" ? "处理中" : "预览即将可用"}</span>
+      <span className="text-[10px] text-[#4a5568]">{asset.ingestStatus === "READY" ? t("workspace.transcoding") : t("workspace.previewUnavailable")}</span>
     </div>
   );
 }
