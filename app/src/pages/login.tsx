@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { LoginPreviewMode } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 import { loginPreviewDefaultMode } from "@/lib/public-data";
@@ -70,6 +71,14 @@ export default function LoginPage() {
 
           <div className="flex flex-1 items-center justify-center py-10">
             <div className="w-full max-w-[1040px]">
+              <div className="mx-auto mb-6 max-w-[760px]">
+                <ProductReadinessBanner
+                  description={t("auth.readinessDescription")}
+                  status="MOCK_PREVIEW"
+                  title={t("auth.readinessTitle")}
+                />
+              </div>
+
               <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]">
                 <div className="hidden px-6 lg:block">
                   <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">{t("auth.accessEyebrow")}</p>
