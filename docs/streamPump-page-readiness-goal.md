@@ -5,7 +5,7 @@ Use this prompt in Codex `/goal` for ongoing StreamPump page-level optimization.
 ```text
 Use GPT-5.5 with high reasoning.
 
-Goal: optimize StreamPump one page or API surface at a time until every product surface matches the current product reality documented in docs/streamPump-long-term-roadmap.md: truthful readiness, clear user behavior, and verified wiring status.
+Goal: optimize StreamPump one page or API surface at a time toward the long-term product target in docs/streamPump-long-term-roadmap.md, without re-planning baseline capabilities that are already implemented. Each surface should have truthful readiness, clear user behavior, and verified wiring status.
 
 Repository:
 /Users/jamesli/Desktop/Sol Projects/StreamPump
@@ -47,7 +47,7 @@ Work loop:
    - correct misleading copy;
    - improve loading/error/empty/auth/wallet mismatch states;
    - document a blocker when real external input is required.
-4. Do not invent fake integrations. Do not promote mocks into production claims. If a page has both live API wiring and local fallback, label the fallback clearly instead of downgrading the whole surface.
+4. Do not invent fake integrations. Do not promote mocks into production claims. If a page has both live API wiring and local fallback, keep the live wiring as baseline and label the fallback clearly.
 5. Update the Progress Ledger in docs/streamPump-long-term-roadmap.md.
 6. Run the smallest relevant verification:
    - frontend: npm run build --prefix app, plus browser smoke when practical;
