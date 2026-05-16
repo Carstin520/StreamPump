@@ -25,7 +25,7 @@ import {
   S1PortfolioResponse,
 } from "@/lib/api/s1";
 import { clearStoredAuthSession, getStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
-import { useI18n } from "@/lib/i18n";
+import { type Locale, useI18n } from "@/lib/i18n";
 import {
   DEMO_PATH,
   DEMO_S1_BUYOUT_PATH,
@@ -49,10 +49,22 @@ import {
 
 type LiveTab = "Portfolio" | "Claim queue";
 const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue"];
+type PortfolioPosition = S1PortfolioResponse["positions"][number];
 
 const isExpiredSessionError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return /session.*(invalid|expired)|AUTH_INVALID/i.test(message);
+};
+
+const isDemoPosition = (position: PortfolioPosition) =>
+  Boolean((position.creator?.metadata as { demo?: unknown } | null | undefined)?.demo);
+
+const displayPortfolioCreatorName = (position: PortfolioPosition, locale: Locale) => {
+  if (locale === "en" && isDemoPosition(position)) {
+    return "Seeded S1 Creator";
+  }
+
+  return position.creator?.displayName || position.creator?.handle || shortenWallet(position.creatorWallet);
 };
 
 function TabBar({ active, onChange }: { active: LiveTab; onChange: (t: LiveTab) => void }) {
@@ -81,10 +93,12 @@ function WalletHeader({
   connectedWallet,
   portfolio,
   sessionWallet,
+  sourceLabel,
 }: {
   connectedWallet: string | null;
   portfolio: S1PortfolioResponse;
   sessionWallet: string | null;
+  sourceLabel: string;
 }) {
   const mismatch = connectedWallet && sessionWallet && connectedWallet !== sessionWallet;
 
@@ -92,7 +106,7 @@ function WalletHeader({
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">Live Portfolio</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{sourceLabel}</p>
           <h1 className="mt-1 truncate font-mono text-lg font-bold tracking-[-0.02em] text-white sm:text-xl">
             {shortenWallet(portfolio.userWallet)}
           </h1>
@@ -145,13 +159,16 @@ function MetricsStrip({ portfolio }: { portfolio: S1PortfolioResponse }) {
 /* ------------------------------------------------------------------ */
 
 function PositionRow({
+  claimsEnabled,
   onRefresh,
   position,
 }: {
+  claimsEnabled: boolean;
   onRefresh: () => Promise<void>;
   position: S1PortfolioResponse["positions"][number];
 }) {
-  const name = position.creator?.displayName || position.creator?.handle || shortenWallet(position.creatorWallet);
+  const { locale } = useI18n();
+  const name = displayPortfolioCreatorName(position, locale);
   const claimable = hasClaimableUsdc(position.estimatedClaimableUsdc);
 
   return (
@@ -187,9 +204,10 @@ function PositionRow({
           >
             Buyout
           </Link>
-          {claimable ? (
+          {claimable && claimsEnabled ? (
             <ClaimButton creatorWallet={position.creatorWallet} onRefresh={onRefresh} />
           ) : null}
+          {claimable && !claimsEnabled ? <DisabledClaimPill /> : null}
         </div>
       </div>
 
@@ -228,12 +246,21 @@ function PositionRow({
           >
             Buyout
           </Link>
-          {claimable ? (
+          {claimable && claimsEnabled ? (
             <ClaimButton creatorWallet={position.creatorWallet} onRefresh={onRefresh} />
           ) : null}
+          {claimable && !claimsEnabled ? <DisabledClaimPill /> : null}
         </div>
       </div>
     </div>
+  );
+}
+
+function DisabledClaimPill() {
+  return (
+    <span className="rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-1.5 text-[10px] font-semibold text-[#f3c66e]">
+      Demo only
+    </span>
   );
 }
 
@@ -309,12 +336,15 @@ function ClaimButton({
 /* ------------------------------------------------------------------ */
 
 function ClaimQueue({
+  claimsEnabled,
   onRefresh,
   portfolio,
 }: {
+  claimsEnabled: boolean;
   onRefresh: () => Promise<void>;
   portfolio: S1PortfolioResponse;
 }) {
+  const { locale } = useI18n();
   const claimable = portfolio.positions.filter((p) => hasClaimableUsdc(p.estimatedClaimableUsdc));
   const totalUsdc = claimable.reduce((s, p) => s + Number(p.estimatedClaimableUsdc || 0), 0);
 
@@ -328,6 +358,12 @@ function ClaimQueue({
 
   return (
     <div className="space-y-3">
+      {!claimsEnabled ? (
+        <div className="rounded-[12px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-2 text-[11px] leading-5 text-[#f3c66e]">
+          Local demo sessions show claim eligibility only. A real claim requires a matching wallet session, backend builder, wallet signature, and synchronized S1 projection.
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] uppercase tracking-[0.14em] text-[#5a6d87]">
           {claimable.length} position{claimable.length > 1 ? "s" : ""} ready
@@ -346,7 +382,7 @@ function ClaimQueue({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-semibold text-white">
-                  {pos.creator?.displayName || pos.creator?.handle || shortenWallet(pos.creatorWallet)}
+                  {displayPortfolioCreatorName(pos, locale)}
                 </p>
                 <p className="mt-0.5 text-[10px] text-[#8ea0ba]">
                   {formatS1Amount(pos.internalTokenBalance)} S1
@@ -357,7 +393,11 @@ function ClaimQueue({
               </p>
             </div>
             <div className="mt-3">
-              <ClaimButton creatorWallet={pos.creatorWallet} onRefresh={onRefresh} />
+              {claimsEnabled ? (
+                <ClaimButton creatorWallet={pos.creatorWallet} onRefresh={onRefresh} />
+              ) : (
+                <DisabledClaimPill />
+              )}
             </div>
           </div>
         ))}
@@ -371,9 +411,11 @@ function ClaimQueue({
 /* ------------------------------------------------------------------ */
 
 function PositionsList({
+  claimsEnabled,
   onRefresh,
   portfolio,
 }: {
+  claimsEnabled: boolean;
   onRefresh: () => Promise<void>;
   portfolio: S1PortfolioResponse;
 }) {
@@ -388,7 +430,7 @@ function PositionsList({
   return (
     <div className="space-y-2">
       {portfolio.positions.map((pos) => (
-        <PositionRow key={pos.positionPda} onRefresh={onRefresh} position={pos} />
+        <PositionRow claimsEnabled={claimsEnabled} key={pos.positionPda} onRefresh={onRefresh} position={pos} />
       ))}
     </div>
   );
@@ -442,7 +484,7 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
             Demo portfolio
           </p>
           <p className="mt-1 text-[12px] leading-5 text-[#8ea0ba]">
-            Load a local mock session to preview S1 positions and claim queue without a wallet.
+            Load a local mock session to preview S1 positions and claim eligibility labels without a wallet.
           </p>
         </div>
         <button
@@ -450,7 +492,7 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
           onClick={onLoadDemo}
           type="button"
         >
-          Load demo portfolio
+          Load demo preview
         </button>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -480,12 +522,66 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
 function FallbackPreview({ reason }: { reason: string }) {
   return (
     <div className="mx-auto max-w-4xl space-y-4 py-6">
-      <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 p-4 text-[11px] text-[#f3c66e]">
-        Fallback preview — {reason}
+      <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Fallback preview</p>
+        <p className="mt-1 text-[12px] leading-5 text-[#f3c66e]">
+          No live portfolio projection is loaded from this state. Demo links below are informational until the API, session, RPC, and seeded S1 projection are available.
+        </p>
+        <p className="mt-2 font-mono text-[10px] text-[#c9a044]">{reason}</p>
       </div>
       <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
       <DemoHolderHints />
     </div>
+  );
+}
+
+function PortfolioSourceNotice({
+  mode,
+  reason,
+}: {
+  mode: "signed-out" | "live" | "mock" | "fallback";
+  reason?: string | null;
+}) {
+  const config = {
+    "signed-out": {
+      label: "AUTH_REQUIRED",
+      title: "Portfolio waits for wallet-backed session",
+      body: "No portfolio API request is treated as usable until a wallet is connected and the stored auth session matches it. Demo shortcuts remain preview-only.",
+      tone: "border-white/[0.08] bg-white/[0.03] text-[#9aabc4]",
+    },
+    live: {
+      label: "SEEDED_DEMO",
+      title: "Backend portfolio projection",
+      body: "Positions come from the portfolio API. USDC claim actions build a devnet transaction through the backend, require the matching wallet signature, and depend on the S1 projection being synchronized.",
+      tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+    },
+    mock: {
+      label: "MOCK_PREVIEW",
+      title: "Local demo portfolio session",
+      body: "This state is generated from a local mock token. It does not call the portfolio API, request a wallet signature, build a claim transaction, or update account balances.",
+      tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+    },
+    fallback: {
+      label: "API_FALLBACK",
+      title: "Live projection unavailable",
+      body: `The portfolio API did not provide a usable live projection${reason ? `: ${reason}` : "."} Demo links below do not represent a production claim path.`,
+      tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+    },
+  }[mode];
+
+  return (
+    <section className={`mt-3 rounded-[14px] border px-4 py-3 ${config.tone}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Portfolio data source</p>
+          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
+        </div>
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+          {config.label}
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -506,6 +602,14 @@ function PortfolioPage() {
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const hasActiveWalletSession =
     isMockPortfolioSession || Boolean(sessionWallet && connectedWallet && sessionWallet === connectedWallet);
+  const portfolioSourceMode = !hasActiveWalletSession
+    ? "signed-out"
+    : fallbackReason
+      ? "fallback"
+      : isMockPortfolioSession
+        ? "mock"
+        : "live";
+  const liveClaimsEnabled = hasActiveWalletSession && !fallbackReason && !isMockPortfolioSession;
   const sawConnectedWalletRef = useRef(false);
 
   const clearPortfolioSession = useCallback(() => {
@@ -588,10 +692,11 @@ function PortfolioPage() {
       <PageShell>
         <div className="mx-auto max-w-[1100px]">
           <ProductReadinessBanner
-            description="Live portfolio and USDC claim depend on a seeded devnet creator market, authenticated wallet session, and synchronized S1 projections."
+            description="Live portfolio and USDC claim depend on a seeded devnet creator market, authenticated wallet session, and synchronized S1 projections. Local demo sessions only preview position state and never submit a claim."
             status="SEEDED_DEMO"
             title="Portfolio claim is a seeded S1 demo path"
           />
+          {!loading ? <PortfolioSourceNotice mode={portfolioSourceMode} reason={fallbackReason} /> : null}
         </div>
 
         {loading ? (
@@ -658,6 +763,7 @@ function PortfolioPage() {
               connectedWallet={connectedWallet}
               portfolio={portfolio}
               sessionWallet={sessionWallet}
+              sourceLabel={isMockPortfolioSession ? "Demo Portfolio" : "Backend Portfolio"}
             />
 
             <MetricsStrip portfolio={portfolio} />
@@ -665,11 +771,11 @@ function PortfolioPage() {
             <TabBar active={activeTab} onChange={setActiveTab} />
 
             {activeTab === "Portfolio" ? (
-              <PositionsList onRefresh={refresh} portfolio={portfolio} />
+              <PositionsList claimsEnabled={liveClaimsEnabled} onRefresh={refresh} portfolio={portfolio} />
             ) : null}
 
             {activeTab === "Claim queue" ? (
-              <ClaimQueue onRefresh={refresh} portfolio={portfolio} />
+              <ClaimQueue claimsEnabled={liveClaimsEnabled} onRefresh={refresh} portfolio={portfolio} />
             ) : null}
 
             <DemoHolderHints />
