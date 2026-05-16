@@ -1,8 +1,10 @@
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import { useI18n } from "@/lib/i18n";
 import { findCreator, formatUsd } from "@/lib/public-data";
 
 /* ------------------------------------------------------------------ */
@@ -211,7 +213,7 @@ function RailPipeline({ data }: { data: SettlementData }) {
   return (
     <div className="w-full">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Settlement pipeline</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Simulated settlement pipeline</p>
         <p className="text-xs text-[#8ea0ba]">Total {formatUsd(total)}</p>
       </div>
 
@@ -320,7 +322,7 @@ function MoneyFlow({ data }: { data: SettlementData }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Money flow — USDC distribution</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Money flow preview - USDC distribution</p>
 
       {flows.map((flow) => (
         <div key={flow.label}>
@@ -439,13 +441,36 @@ function VoidOverlay({ total }: { total: number }) {
   );
 }
 
+function SettlementPreviewNotice({ proposalId }: { proposalId: string }) {
+  return (
+    <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">Operator preview</p>
+          <p className="mt-1 text-sm font-semibold text-white">No live settlement projection is loaded here</p>
+          <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
+            The route keeps the proposal id for context, but every track value on this page comes from a local mock. Production promotion needs proposal settlement read models, oracle permission checks, idempotent operator triggers, evidence digests, and Track 3 merchant reconciliation.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+          {proposalId || "proposal pending"}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function SettlementPage() {
+  const router = useRouter();
+  const { locale } = useI18n();
   const data = MOCK;
   const creator = useMemo(() => findCreator("neo-park"), []);
+  const creatorName = locale === "en" ? "Midnight Save" : creator.name;
+  const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
   const isVoided = data.status === "VOIDED";
   const totalBudget = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
   const totalCreatorPayout = data.track1.budgetUsd + data.track2.creatorPayoutUsd + data.track3.creatorPayoutUsd;
@@ -453,20 +478,21 @@ export default function SettlementPage() {
   return (
     <>
       <Head>
-        <title>{`StreamPump | Settlement — ${creator.name}`}</title>
+        <title>StreamPump | Settlement Preview</title>
       </Head>
 
       <PageShell
-        eyebrow="S2 Settlement"
-        subtitle={`Oracle-resolved tri-track settlement for ${creator.name} (${creator.handle})`}
-        title="Settlement Dashboard"
+        eyebrow="S2 Settlement Preview"
+        subtitle={`Local tri-track settlement model for ${creatorName} (${creator.handle}). This page does not trigger oracle workers or read live settlement projections.`}
+        title="Settlement Dashboard Preview"
       >
         <div className="relative space-y-6">
           <ProductReadinessBanner
-            description="This dashboard renders local settlement data. Track 1/2 settlement can be smoked with seeded data, while Track 3 CPS remains operator/mock until merchant reconciliation is integrated."
+            description="This dashboard renders local settlement data only. Track 1/2 settlement can be smoked with seeded data outside this page, while Track 3 CPS remains operator/mock until merchant reconciliation is integrated."
             status="MOCK_PREVIEW"
             title="Settlement dashboard is not fully live data yet"
           />
+          <SettlementPreviewNotice proposalId={routeProposalId} />
 
           {/* ---- Top stats ---- */}
           <div className="grid gap-4 sm:grid-cols-3">
