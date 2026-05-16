@@ -686,6 +686,13 @@ function BuyoutPage() {
     (amount: number) => {
       const currentPrice = Number(profile?.creator.currentPriceSpump || 0);
       const spumpReturned = currentPrice > 0 ? amount * (currentPrice / 1_000_000_000) : 0;
+      const currentPositionBalance = Math.max(0, Number(position?.internalTokenBalance || 0));
+      const nextPositionBalance = Math.max(0, currentPositionBalance - amount);
+      const retainedPositionRatio = currentPositionBalance > 0 ? nextPositionBalance / currentPositionBalance : 0;
+      const currentPositionClaimable = Number(
+        position?.estimatedClaimableUsdc ?? profile?.buyout?.claimableUsdcRemaining ?? 0,
+      );
+      const nextPositionClaimable = Math.round(currentPositionClaimable * retainedPositionRatio);
       const spumpReturnedLabel = spumpReturned >= 1_000_000
         ? `${(spumpReturned / 1_000_000).toFixed(1)}M`
         : spumpReturned >= 1_000
@@ -704,13 +711,11 @@ function BuyoutPage() {
             const nextBalance = Math.max(0, currentBalance - amount);
             const currentCostBasis = Math.max(0, Number(item.spumpCostBasis || 0));
             const retainedRatio = currentBalance > 0 ? nextBalance / currentBalance : 0;
-            const currentClaimable = Number(item.estimatedClaimableUsdc || 0);
-            const nextClaimable = Math.round(currentClaimable * retainedRatio);
             return {
               ...item,
               internalTokenBalance: String(Math.round(nextBalance)),
               spumpCostBasis: String(Math.round(currentCostBasis * retainedRatio)),
-              estimatedClaimableUsdc: String(nextClaimable),
+              estimatedClaimableUsdc: String(nextPositionClaimable),
               updatedAt: new Date().toISOString(),
             };
           }),
@@ -732,14 +737,22 @@ function BuyoutPage() {
           buyout: {
             ...current.buyout,
             claimableS1SupplyRemaining: String(Math.round(nextSupply)),
-            claimableUsdcRemaining: String(Math.round(totalClaimable * supplyRatio)),
+            claimableUsdcRemaining: String(
+              currentPositionBalance > 0 ? nextPositionClaimable : Math.round(totalClaimable * supplyRatio),
+            ),
           },
         };
       });
 
       setDemoSummary(`Rage quit ${amount} S1 → received ~${spumpReturnedLabel} SPUMP (zero exit tax).`);
     },
-    [creatorWallet, profile?.creator.currentPriceSpump],
+    [
+      creatorWallet,
+      position?.estimatedClaimableUsdc,
+      position?.internalTokenBalance,
+      profile?.buyout?.claimableUsdcRemaining,
+      profile?.creator.currentPriceSpump,
+    ],
   );
 
   const handleDemoClaim = useCallback(() => {

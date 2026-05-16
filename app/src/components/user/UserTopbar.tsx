@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
 
 export type TopbarMode = "sticky" | "scroll-reveal";
@@ -14,20 +15,23 @@ const SEARCH_AUTO_HIDE_MS = 10_000;
 
 export const UserTopbar = ({
   mode = "sticky",
-  searchPlaceholder = "搜索帖子、创作者、品牌合作",
+  searchPlaceholder,
   hideSearch = false,
 }: {
   mode?: TopbarMode;
   searchPlaceholder?: string;
   hideSearch?: boolean;
 }) => {
+  const { t } = useI18n();
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t("shell.searchPlaceholder");
+
   if (mode === "scroll-reveal") {
-    return <ScrollRevealTopbar searchPlaceholder={searchPlaceholder} />;
+    return <ScrollRevealTopbar searchPlaceholder={resolvedSearchPlaceholder} />;
   }
 
   return (
     <header className="sticky top-0 z-30 pt-4">
-      <TopbarInner hideSearch={hideSearch} searchPlaceholder={searchPlaceholder} />
+      <TopbarInner hideSearch={hideSearch} searchPlaceholder={resolvedSearchPlaceholder} />
     </header>
   );
 };
@@ -260,39 +264,43 @@ const TopbarInner = ({
 }: {
   hideSearch?: boolean;
   searchPlaceholder: string;
-}) => (
-  <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
-    {hideSearch ? (
-      <div className="flex-1" />
-    ) : (
-      <div className="flex-1 lg:max-w-xl">
-        <div className="input-glass group relative rounded-full">
-          <input
-            className="h-10 w-full rounded-full bg-transparent pl-5 pr-12 text-sm text-white outline-none placeholder:text-[#6f7d95]"
-            placeholder={searchPlaceholder}
-            type="text"
-          />
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#8ea0ba] transition group-focus-within:text-white">
-            ⌕
-          </span>
-        </div>
-      </div>
-    )}
+}) => {
+  const { t } = useI18n();
 
-    <div className="ml-4 flex items-center gap-3">
-      <Link
-        className="glass-button-primary px-5 py-2.5 text-sm font-semibold"
-        href="/workspace"
-      >
-        + 创作中心
-      </Link>
-      <Link
-        className="glass-button-ghost flex items-center gap-2 px-2.5 py-1.5 text-sm text-[#c4d0e3] transition duration-200 hover:text-white"
-        href="/me"
-      >
-        <img alt={currentUser.name} className="h-7 w-7 rounded-full object-cover" src={currentUser.avatarSrc} />
-        <span className="hidden max-w-[140px] truncate sm:inline">{currentUser.handle}</span>
-      </Link>
+  return (
+    <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
+      {hideSearch ? (
+        <div className="flex-1" />
+      ) : (
+        <div className="flex-1 lg:max-w-xl">
+          <div className="input-glass group relative rounded-full">
+            <input
+              className="h-10 w-full rounded-full bg-transparent pl-5 pr-12 text-sm text-white outline-none placeholder:text-[#6f7d95]"
+              placeholder={searchPlaceholder}
+              type="text"
+            />
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-[#8ea0ba] transition group-focus-within:text-white">
+              ⌕
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="ml-4 flex items-center gap-3">
+        <Link
+          className="glass-button-primary px-5 py-2.5 text-sm font-semibold"
+          href="/workspace"
+        >
+          + {t("shell.workspaceCenter")}
+        </Link>
+        <Link
+          className="glass-button-ghost flex items-center gap-2 px-2.5 py-1.5 text-sm text-[#c4d0e3] transition duration-200 hover:text-white"
+          href="/me"
+        >
+          <img alt={currentUser.name} className="h-7 w-7 rounded-full object-cover" src={currentUser.avatarSrc} />
+          <span className="hidden max-w-[140px] truncate sm:inline">{currentUser.handle}</span>
+        </Link>
+      </div>
     </div>
-  </div>
-);
+  );
+};

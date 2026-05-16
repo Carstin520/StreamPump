@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { useCallback } from "react";
 
 import { PostDetailExperience } from "@/components/post/PostDetailExperience";
+import { useI18n } from "@/lib/i18n";
 import { EXPLORE_PATH } from "@/lib/routes";
 import {
   loadPublicPostPageProps,
@@ -20,6 +21,7 @@ export default function PostDetailPage({
   post,
 }: PublicPostPageProps) {
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleClose = useCallback(() => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -33,7 +35,7 @@ export default function PostDetailPage({
   if (router.isFallback) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#090d14] text-sm text-[#c8d4e6]">
-        Loading imported post…
+        {t("feed.loadingPost")}
       </main>
     );
   }
@@ -41,7 +43,7 @@ export default function PostDetailPage({
   return (
     <>
       <Head>
-        <title>StreamPump | Post Detail</title>
+        <title>{t("page.postDetail.title")}</title>
         <link href="https://stream.mux.com" rel="preconnect" />
         {mediaOrigins.map((origin) => (
           <link crossOrigin="" href={origin} key={origin} rel="preconnect" />
@@ -54,12 +56,12 @@ export default function PostDetailPage({
       ) : null}
       {!initialError && !post ? (
         <main className="flex min-h-screen items-center justify-center bg-[#090d14] px-6 text-center text-sm text-[#c8d4e6]">
-          Imported post not found.
+          {t("feed.postNotFound")}
         </main>
       ) : null}
       {!initialError && post ? (
         <PostDetailExperience
-          closeLabel="Back"
+          closeLabel={t("common.back")}
           items={[post]}
           onClose={handleClose}
           syncRoute

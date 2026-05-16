@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useState } from "react";
 
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 type Offer = {
@@ -182,6 +183,12 @@ export default function BuyoutPage() {
       </Head>
 
       <WorkspaceShell stage="S1_BUYOUT" wallet={WALLET}>
+        <ProductReadinessBanner
+          description="Offer comparison and accept/decline controls use static local offers. Real S1 buyout offer creation, acceptance, rage quit, graduation, and reclaim remain backend-ready or operator-driven."
+          status="BACKEND_READY_UI_GAP"
+          title="Buyout workspace is not a productized live auction yet"
+        />
+
         <section className="section-enter rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.95)_0%,rgba(8,12,20,0.95)_100%)] px-4 py-3.5 md:px-5">
           <div className="flex items-center justify-between gap-3">
             <div>

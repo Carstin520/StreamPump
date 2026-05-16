@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FollowCheckIcon, FollowPlusIcon, HeartOutlineIcon, HeartSolidIcon, SendRoundedIcon } from "@/components/shared/AppIcons";
 import { StagePill } from "@/components/shared/StagePill";
 import { CommentRecord, PostRecord } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import { compactNumber, currentUser } from "@/lib/public-data";
 
 export const CommentPanel = ({
@@ -13,6 +14,7 @@ export const CommentPanel = ({
   post: PostRecord;
   variant?: "sidebar" | "sheet";
 }) => {
+  const { t } = useI18n();
   const [isFollowing, setIsFollowing] = useState(false);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -66,7 +68,7 @@ export const CommentPanel = ({
         avatarSrc: currentUser.avatarSrc,
         content,
         likes: 0,
-        timeLabel: "刚刚",
+        timeLabel: t("feed.justNow"),
       },
       ...value,
     ]);
@@ -111,7 +113,7 @@ export const CommentPanel = ({
         >
           <span className="inline-flex items-center gap-1.5">
             {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
-            {isFollowing ? "已关注" : "关注"}
+            {isFollowing ? t("feed.following") : t("feed.follow")}
           </span>
         </button>
       </div>
@@ -133,7 +135,9 @@ export const CommentPanel = ({
 
       <div className="my-6 h-px bg-white/[0.045]" />
 
-      <p className="mb-5 text-sm font-semibold text-white">共 {compactNumber(comments.length)} 条评论</p>
+      <p className="mb-5 text-sm font-semibold text-white">
+        {t("feed.commentCount", { count: compactNumber(comments.length) })}
+      </p>
       <div className="space-y-5">
         {comments.map((comment, index) => (
           <CommentRow comment={comment} emphasized={index === 0 && comment.author === currentUser.name} key={comment.id} />
@@ -171,7 +175,7 @@ export const CommentPanel = ({
           type="button"
         >
           <span className="text-base">↗</span>
-          <span>分享</span>
+          <span>{t("feed.share")}</span>
         </button>
       </div>
       <div className="flex items-center gap-2">
@@ -183,7 +187,7 @@ export const CommentPanel = ({
           <input
             className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-[#6f829d]"
             onChange={(event) => setComposerValue(event.target.value)}
-            placeholder="说点什么..."
+            placeholder={t("feed.commentPlaceholder")}
             type="text"
             value={composerValue}
           />
@@ -204,6 +208,7 @@ export const CommentPanel = ({
 };
 
 const CommentRow = ({ comment, emphasized = false }: { comment: CommentRecord; emphasized?: boolean }) => {
+  const { t } = useI18n();
   const [activeAction, setActiveAction] = useState<"reply" | "like" | null>(null);
 
   const triggerAction = (action: "reply" | "like") => {
@@ -224,7 +229,7 @@ const CommentRow = ({ comment, emphasized = false }: { comment: CommentRecord; e
         <p className="mt-1 text-sm leading-6 text-[#d1d9e7]">{comment.content}</p>
         <div className="mt-2 flex items-center gap-4 text-xs text-[#7c8ba1]">
           <button className={activeAction === "reply" ? "tap-soft-active" : ""} onClick={() => triggerAction("reply")} type="button">
-            回复
+            {t("feed.reply")}
           </button>
           <button className={activeAction === "like" ? "tap-soft-active" : ""} onClick={() => triggerAction("like")} type="button">
             ♡ {comment.likes}

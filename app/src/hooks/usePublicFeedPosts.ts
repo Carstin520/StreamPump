@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import { PostRecord } from "@/lib/api/types";
 import { listPublicFeedPosts } from "@/lib/api/feed";
-import { posts as fallbackPublicFeedPosts } from "@/lib/mocks/discover";
 
 type PublicFeedState = {
   error: string | null;
@@ -15,8 +14,6 @@ const emptyState: PublicFeedState = {
   loading: true,
   posts: [],
 };
-
-const getFallbackPosts = () => fallbackPublicFeedPosts.slice(0, 24);
 
 const buildInitialState = (
   initialPosts?: PostRecord[],
@@ -31,12 +28,10 @@ const buildInitialState = (
   }
 
   if (initialError) {
-    const fallbackPosts = getFallbackPosts();
-
     return {
-      error: fallbackPosts.length > 0 ? null : initialError,
+      error: initialError,
       loading: false,
-      posts: fallbackPosts,
+      posts: [],
     };
   }
 
@@ -87,25 +82,11 @@ export const usePublicFeedPosts = (options?: {
           return;
         }
 
-        setState((currentState) => {
-          const fallbackPosts =
-            currentState.posts.length > 0
-              ? currentState.posts
-              : nextInitialState.posts.length > 0
-                ? nextInitialState.posts
-                : getFallbackPosts();
-
-          return {
-            error:
-              fallbackPosts.length > 0
-                ? null
-                : error instanceof Error
-                  ? error.message
-                  : "Failed to load public posts",
-            loading: false,
-            posts: fallbackPosts,
-          };
-        });
+        setState((currentState) => ({
+          error: error instanceof Error ? error.message : "Failed to load public posts",
+          loading: false,
+          posts: currentState.posts.length > 0 ? currentState.posts : nextInitialState.posts,
+        }));
       });
 
     return () => {

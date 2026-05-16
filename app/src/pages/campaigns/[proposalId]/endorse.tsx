@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 
@@ -117,7 +118,14 @@ export default function EndorsePage() {
         <title>{`StreamPump | Endorse ${creator.name}`}</title>
       </Head>
       <PageShell eyebrow="S2 Endorsement" title={`Endorse ${creator.name}`}>
-        <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+        <div className="space-y-5">
+          <ProductReadinessBanner
+            description="Stake amount, endorser list, and success state update locally. There is no live fan endorsement position, burn, claim, or pool distribution wired on this page."
+            status="MOCK_PREVIEW"
+            title="S2 endorsement is a local interaction preview"
+          />
+
+          <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           {/* ── Left column ── */}
           <div className="space-y-5">
             {/* ── Campaign target ── */}
@@ -455,6 +463,7 @@ export default function EndorsePage() {
               </div>
             ) : null}
           </div>
+        </div>
         </div>
       </PageShell>
     </>

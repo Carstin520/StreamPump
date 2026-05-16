@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { findCreator, formatUsd } from "@/lib/public-data";
 
 /* ------------------------------------------------------------------ */
@@ -461,6 +462,12 @@ export default function SettlementPage() {
         title="Settlement Dashboard"
       >
         <div className="relative space-y-6">
+          <ProductReadinessBanner
+            description="This dashboard renders local settlement data. Track 1/2 settlement can be smoked with seeded data, while Track 3 CPS remains operator/mock until merchant reconciliation is integrated."
+            status="MOCK_PREVIEW"
+            title="Settlement dashboard is not fully live data yet"
+          />
+
           {/* ---- Top stats ---- */}
           <div className="grid gap-4 sm:grid-cols-3">
             {[

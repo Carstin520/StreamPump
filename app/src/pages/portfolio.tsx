@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import {
   DemoCreatorBanner,
   S1ErrorState,
@@ -585,6 +586,14 @@ function PortfolioPage() {
     <>
       <Head><title>{t("page.portfolio.title")}</title></Head>
       <PageShell>
+        <div className="mx-auto max-w-[1100px]">
+          <ProductReadinessBanner
+            description="Live portfolio and USDC claim depend on a seeded devnet creator market, authenticated wallet session, and synchronized S1 projections."
+            status="SEEDED_DEMO"
+            title="Portfolio claim is a seeded S1 demo path"
+          />
+        </div>
+
         {loading ? (
           <div className="mx-auto max-w-4xl">
             <S1LoadingSkeleton />

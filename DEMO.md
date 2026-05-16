@@ -205,6 +205,8 @@ npm run dev --prefix app
 
 ## Demo Boundaries
 
+See [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) for the frozen post-hackathon readiness matrix.
+
 - Do not claim S1 buyout formation is productized in this build; offers, acceptance, and graduation are seeded/operator-driven.
 - Do not enable Track3 automatic settlement. Track3 CPS still needs a real merchant/reconciliation source.
 - Do not present S2 endorsement or third-party Track3 reconciliation as live integrations.

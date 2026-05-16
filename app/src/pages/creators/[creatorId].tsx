@@ -15,6 +15,7 @@ import {
   findCreatorStrict,
   posts as fallbackPosts,
 } from "@/lib/mocks/discover";
+import { useI18n } from "@/lib/i18n";
 import {
   loadPublicFeedPageProps,
   PUBLIC_FEED_REVALIDATE_SECONDS,
@@ -81,6 +82,7 @@ export default function CreatorDetailPage({
   initialPosts,
 }: PublicFeedPageProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const { creators, loading, postsByCreator } = usePublicFeedViewModel({
     initialError,
     initialPosts,
@@ -96,10 +98,10 @@ export default function CreatorDetailPage({
     return (
       <>
         <Head>
-          <title>StreamPump | Creator</title>
+          <title>{`StreamPump | ${t("page.creator.fallback")}`}</title>
         </Head>
         <PageShell>
-          <div className="py-10 text-sm text-[#8ea0ba]">Loading creator profile…</div>
+          <div className="py-10 text-sm text-[#8ea0ba]">{t("feed.loadingCreator")}</div>
         </PageShell>
       </>
     );
@@ -109,10 +111,10 @@ export default function CreatorDetailPage({
     return (
       <>
         <Head>
-          <title>StreamPump | Creator</title>
+          <title>{`StreamPump | ${t("page.creator.fallback")}`}</title>
         </Head>
         <PageShell>
-          <div className="py-10 text-sm text-[#8ea0ba]">Imported creator not found.</div>
+          <div className="py-10 text-sm text-[#8ea0ba]">{t("feed.creatorNotFound")}</div>
         </PageShell>
       </>
     );
@@ -130,7 +132,7 @@ export default function CreatorDetailPage({
             href="/trending"
           >
             <span aria-hidden>←</span>
-            Trending Creators
+            {t("feed.trendingCreators")}
           </Link>
         </div>
         <CreatorStageView creator={creator} posts={creatorPosts} />

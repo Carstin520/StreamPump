@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { useI18n } from "@/lib/i18n";
 
 const MISSIONS = [
@@ -40,6 +41,12 @@ export default function RewardsPage() {
 
       <PageShell>
         <div className="mx-auto max-w-3xl space-y-5">
+          <ProductReadinessBanner
+            description="Missions, streaks, and daily claim are local preview data. No SPUMP mint, account balance, or reward ledger is changed from this page."
+            status="MOCK_PREVIEW"
+            title="Rewards are a mock engagement surface"
+          />
+
           {/* Row 1: XP bar (left) + New User Boost (right) — parallel */}
           <div className="grid gap-3 md:grid-cols-2">
             <section className="glass-card section-enter px-4 py-3">

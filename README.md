@@ -19,6 +19,8 @@ StreamPump is a serious prototype moving toward a usable product. The strongest 
 
 Snapshot as of **2026-05-10**:
 
+For the post-hackathon readiness boundary, see [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md).
+
 | Layer | Progress | What is real now | Main gaps |
 | --- | --- | --- | --- |
 | Solana program | Advanced prototype | Anchor instructions for S1 discovery, S1 buyout, S2 proposal creation, sponsor funding, campaign settlement, content hash anchoring, protocol/user/org state | Not audited; some Tier 2 surfaces are not ready for public frontend exposure |
