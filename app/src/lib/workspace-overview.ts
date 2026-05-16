@@ -2,7 +2,6 @@ import { CreatorSeasonState } from "@/lib/api/types";
 import { WorkspaceOverviewResponse } from "@/lib/api/workspace";
 import { shortenWallet } from "@/lib/formatting";
 import {
-  DEMO_OVERVIEW_CONTENT_PIPELINE,
   MOCK_COVERS,
   WorkspaceActionItem,
   WorkspaceContentItem,
@@ -23,13 +22,13 @@ export const getErrorMessage = (error: unknown, fallback: string) =>
 const formatUpdatedAt = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "recently";
-  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
 const buildContentItems = (data: WorkspaceOverviewResponse): WorkspaceContentItem[] =>
   data.manifests.map((manifest, index) => ({
     id: manifest.manifestId,
-    title: manifest.title ?? "未命名内容",
+    title: manifest.title ?? "Untitled content",
     status: manifest.status,
     contentType: manifest.contentType,
     assetCount: manifest.assetCount,
@@ -194,19 +193,18 @@ export const buildPersonaFromWorkspace = (data: WorkspaceOverviewResponse): Work
   const stage = resolveWorkspaceStage(data.wallet, data);
   const base = workspacePersonas[stage];
   const contentFromApi = buildContentItems(data);
-  const contentItems =
-    contentFromApi.length > 0 ? contentFromApi : DEMO_OVERVIEW_CONTENT_PIPELINE;
+  const contentItems = contentFromApi;
   const sponsorshipItems = buildSponsorshipItems(data);
   const previewContent = contentItems[0];
 
   return {
     ...base,
+    dataSource: "live",
     stage,
     wallet: data.wallet,
     displayName: "Current creator",
     momentum: Math.max(base.momentum, 55 + contentItems.length * 7 + sponsorshipItems.length * 4),
-    activeCampaigns:
-      stage === "S2_ACTIVE" ? Math.max(base.activeCampaigns ?? 0, data.proposals.length) : base.activeCampaigns,
+    activeCampaigns: data.proposals.length,
     actions: buildActions(stage, contentItems, sponsorshipItems),
     contentItems,
     sponsorshipItems,
@@ -219,8 +217,15 @@ export const buildPersonaFromWorkspace = (data: WorkspaceOverviewResponse): Work
           tags: ["Workspace", "Content"],
           href: previewContent.href,
         }
-      : base.previewItem,
+      : {
+          title: "No live manifest yet",
+          subtitle: "Create a manifest to populate this console",
+          coverSrc: MOCK_COVERS[0],
+          statusLabel: "EMPTY",
+          tags: ["Live API", "Empty"],
+          href: WORKSPACE_CONTENT_NEW_PATH,
+        },
     healthItems: base.healthItems,
-    pipelineDemoFallback: contentFromApi.length === 0,
+    pipelineDemoFallback: false,
   };
 };

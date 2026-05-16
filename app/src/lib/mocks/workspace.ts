@@ -224,6 +224,7 @@ export type WorkspacePreviewItem = {
 };
 
 export type WorkspacePersona = CreatorStageProfile & {
+  dataSource?: "demo" | "live";
   actions: WorkspaceActionItem[];
   contentItems: WorkspaceContentItem[];
   sponsorshipItems: WorkspaceSponsorshipItem[];

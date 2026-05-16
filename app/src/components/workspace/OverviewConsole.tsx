@@ -373,24 +373,19 @@ const KpiStrip = ({ persona }: { persona: WorkspacePersona }) => {
   const sponsorshipItems = persona.sponsorshipItems;
   const ready = persona.contentItems.filter((m) => ["READY", "ANCHORED", "PUBLISHED"].includes(m.status)).length;
   const pendingActions = persona.actions.filter((a) => !a.disabled && a.workflowState !== "blocked").length;
+  const isLiveWorkspace = persona.dataSource === "live";
   const activeCampaigns =
     persona.activeCampaigns ??
     sponsorshipItems.filter((s) =>
       ["TERMS_LOCKED", "BUNDLE_BUILT", "CREATOR_PARTIALLY_SIGNED", "SPONSOR_SIGNED", "SUBMITTED", "CONFIRMED"].includes(s.status),
     ).length;
 
-  const claimableValue =
-    persona.stage === "S2_ACTIVE"
-      ? "$1.2k"
-      : persona.stage === "S1_BUYOUT"
-        ? "—"
-        : "—";
-  const claimableHint =
-    persona.stage === "S2_ACTIVE"
+  const claimableValue = isLiveWorkspace ? "—" : persona.stage === "S2_ACTIVE" ? "$1.2k" : "—";
+  const claimableHint = isLiveWorkspace
+    ? "Open detail pages"
+    : persona.stage === "S2_ACTIVE"
       ? "USDC + SPUMP"
-      : persona.stage === "S1_BUYOUT"
-        ? "Available after S2"
-        : "Available after S2";
+      : "Available after S2";
 
   return (
     <section className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
@@ -794,30 +789,40 @@ const DeadlineReminderCard = ({ persona }: { persona: WorkspacePersona }) => {
 
 /* ────────────────────────────  Aside: Content preview  ──────────────────────────── */
 
-const ContentPreviewCompact = ({ item }: { item: WorkspacePersona["previewItem"] }) => (
-  <section className="overflow-hidden rounded-[14px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)]">
-    <header className="flex items-center justify-between border-b border-white/[0.05] px-3 py-2">
-      <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Latest manifest</p>
-      {item.href ? (
-        <Link className="text-[10px] text-[#cbd6e7] hover:text-white" href={item.href}>
-          Open
-        </Link>
-      ) : null}
-    </header>
-    <div className="flex gap-2 p-2">
-      <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-white/[0.05] bg-[#0d1420]">
-        <ProgressiveImage alt={item.title} className="h-full w-full object-cover" fill sizes="80px" src={item.coverSrc} />
+const ContentPreviewCompact = ({ item }: { item: WorkspacePersona["previewItem"] }) => {
+  const empty = item.statusLabel === "EMPTY";
+
+  return (
+    <section className="overflow-hidden rounded-[14px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)]">
+      <header className="flex items-center justify-between border-b border-white/[0.05] px-3 py-2">
+        <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Latest manifest</p>
+        {item.href ? (
+          <Link className="text-[10px] text-[#cbd6e7] hover:text-white" href={item.href}>
+            Open
+          </Link>
+        ) : null}
+      </header>
+      <div className="flex gap-2 p-2">
+        <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-white/[0.05] bg-[#0d1420]">
+          <ProgressiveImage alt={item.title} className="h-full w-full object-cover" fill sizes="80px" src={item.coverSrc} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-white">{item.title}</p>
+          <p className="mt-0.5 text-[9px] text-[#7486a1]">{item.subtitle}</p>
+          <span
+            className={`mt-1 inline-block rounded border px-1.5 py-px text-[8px] font-semibold uppercase ${
+              empty
+                ? "border-white/[0.08] bg-white/[0.04] text-[#9aabc4]"
+                : "border-[#65ecaf]/25 bg-[#0e1f17]/80 text-[#8df0c4]"
+            }`}
+          >
+            {item.statusLabel}
+          </span>
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-white">{item.title}</p>
-        <p className="mt-0.5 text-[9px] text-[#7486a1]">{item.subtitle}</p>
-        <span className="mt-1 inline-block rounded border border-[#65ecaf]/25 bg-[#0e1f17]/80 px-1.5 py-px text-[8px] font-semibold uppercase text-[#8df0c4]">
-          {item.statusLabel}
-        </span>
-      </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 /* ────────────────────────────  Workspace shell auxiliary states  ──────────────────────────── */
 
