@@ -1,15 +1,17 @@
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
+import { useI18n } from "@/lib/i18n";
 import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 
 const creator = findCreator("neo-park");
 
-const CAMPAIGN_TITLE = "PulseFit × Nova Screen";
+const SPONSOR_NAME = "Nova Screen";
 const CAMPAIGN_BRIEF = "Nova Screen's sponsored review video reaches 10,000 likes within the campaign window.";
 const TRACK1_BASE = 100_000;
 const TRACK2_BUDGET = 1_000_000;
@@ -45,6 +47,8 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export default function EndorsePage() {
+  const router = useRouter();
+  const { locale } = useI18n();
   const [stakeAmount, setStakeAmount] = useState(10_000);
   const [endorsers, setEndorsers] = useState(ENDORSERS);
   const [demoSummary, setDemoSummary] = useState<string | null>(null);
@@ -59,6 +63,9 @@ export default function EndorsePage() {
   const projectedEndorsed = totalEndorsed + stakeAmount;
   const successUsdc = (stakeAmount / projectedEndorsed) * FAN_POOL_SHARE;
   const failLoss = stakeAmount * 0.05;
+  const creatorName = locale === "en" ? "Midnight Save" : creator.name;
+  const campaignTitle = `${creatorName} × ${SPONSOR_NAME}`;
+  const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
 
   const handleDialInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const svg = dialRef.current;
@@ -105,7 +112,7 @@ export default function EndorsePage() {
             const withoutYou = items.filter((item) => item.name !== "You");
             return [{ name: "You", amount: stakeAmount }, ...withoutYou];
           });
-          setDemoSummary(`Endorsed with ${compactNumber(stakeAmount)} SPUMP.`);
+          setDemoSummary(`Preview endorsed with ${compactNumber(stakeAmount)} SPUMP.`);
         },
       });
     },
@@ -115,15 +122,16 @@ export default function EndorsePage() {
   return (
     <>
       <Head>
-        <title>{`StreamPump | Endorse ${creator.name}`}</title>
+        <title>{`StreamPump | Endorse ${creatorName}`}</title>
       </Head>
-      <PageShell eyebrow="S2 Endorsement" title={`Endorse ${creator.name}`}>
+      <PageShell eyebrow="S2 Endorsement Preview" title={`Endorse ${creatorName}`}>
         <div className="space-y-5">
           <ProductReadinessBanner
-            description="Stake amount, endorser list, and success state update locally. There is no live fan endorsement position, burn, claim, or pool distribution wired on this page."
+            description="Stake amount, endorser list, and success state update locally. There is no live fan endorsement position, SPUMP burn, endorsement PDA, claim state, or pool distribution wired on this page."
             status="MOCK_PREVIEW"
             title="S2 endorsement is a local interaction preview"
           />
+          <EndorsementPreviewNotice proposalId={routeProposalId} />
 
           <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           {/* ── Left column ── */}
@@ -131,7 +139,7 @@ export default function EndorsePage() {
             {/* ── Campaign target ── */}
             <section className="liquid-card section-enter rounded-[28px] p-6">
               <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">Campaign Target</p>
-              <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{CAMPAIGN_TITLE}</h2>
+              <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{campaignTitle}</h2>
               <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{CAMPAIGN_BRIEF}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
@@ -368,16 +376,16 @@ export default function EndorsePage() {
               {creator.avatarSrc ? (
                 <img
                   src={creator.avatarSrc}
-                  alt={creator.name}
+                  alt={creatorName}
                   className="h-11 w-11 rounded-full object-cover"
                 />
               ) : (
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
-                  {creator.name.charAt(0)}
+                  {creatorName.charAt(0)}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{creator.name}</p>
+                <p className="truncate text-sm font-semibold text-white">{creatorName}</p>
                 <p className="truncate text-xs text-[#8ea0ba]">{creator.handle}</p>
               </div>
               <span className="ml-auto shrink-0 rounded-full bg-[#65ecaf]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#65ecaf]">
@@ -441,21 +449,21 @@ export default function EndorsePage() {
               type="button"
             >
               {demoFlow.busy
-                ? "Submitting..."
+                ? "Simulating..."
                 : demoFlow.state.status === "success"
-                  ? "Endorsed"
-                  : `Endorse with ${compactNumber(stakeAmount)} SPUMP`}
+                  ? "Preview endorsed"
+                  : `Preview endorse ${compactNumber(stakeAmount)} SPUMP`}
             </button>
             <DemoActionStatusCard
               amountLabel={`${compactNumber(stakeAmount)} SPUMP`}
-              confirmLabel="Confirm Endorse"
-              description="Confirm this mock SPUMP endorsement. The endorser list and total update locally after submission."
+              confirmLabel="Confirm Preview"
+              description="Confirm this mock SPUMP endorsement. No wallet signature, token burn, endorsement PDA, or backend write will occur; the endorser list updates locally."
               onCancel={demoFlow.reset}
               onConfirm={handleConfirmEndorse}
               onRetry={demoFlow.retry}
               state={demoFlow.state}
-              successLabel="Endorsed"
-              title="Endorse confirmation"
+              successLabel="Preview endorsed"
+              title="Mock endorsement confirmation"
             />
             {demoSummary ? (
               <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
@@ -469,3 +477,20 @@ export default function EndorsePage() {
     </>
   );
 }
+
+const EndorsementPreviewNotice = ({ proposalId }: { proposalId: string }) => (
+  <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">Local simulator</p>
+        <p className="mt-1 text-sm font-semibold text-white">No campaign projection is loaded here</p>
+        <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
+          The route keeps the proposal id for context, but this surface currently uses local fixture values only. Real promotion requires SPUMP burn, endorsement PDA creation, reward pool projection, and claim state from the backend/indexer.
+        </p>
+      </div>
+      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+        {proposalId || "proposal pending"}
+      </span>
+    </div>
+  </section>
+);
