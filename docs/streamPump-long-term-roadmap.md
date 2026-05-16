@@ -1,6 +1,6 @@
 # StreamPump Product Roadmap
 
-Last updated: 2026-05-16  
+Last updated: 2026-05-17
 Post-deadline branch: `codex/post-deadline-phase-0`
 
 This is the compact execution roadmap for moving StreamPump from a hackathon controlled demo to the product promised in `pitch/script.md`: a Web2.5 creator sponsorship market where content, sponsor budgets, fan participation, and Solana settlement form one verifiable loop.
@@ -138,8 +138,8 @@ Page order:
 /campaigns/[proposalId] (audited)
 /campaigns/[proposalId]/endorse (audited)
 /campaigns/[proposalId]/settlement (audited)
-/rewards (next)
-/portfolio
+/rewards (audited)
+/portfolio (next)
 /market/[creatorId]
 /buyout/[creatorId]
 /creators/[creatorId]
@@ -184,3 +184,4 @@ Full acceptance requires two clean passes of app build, backend build, backend t
 | 2026-05-16 | `/campaigns/[proposalId]` | Added page-level readiness labeling and explicit data-source messaging for live proposal API reads versus the seeded Colosseum demo fallback. Settlement navigation now says preview, documents the remaining operator/oracle/reconciliation gap, and the English demo heading no longer leaks the Chinese mock creator name. | `npm run build --prefix app`; browser smoke on `/campaigns/prop-neo-park-2026q2` confirmed readiness copy, seeded data-source copy, settlement preview labeling, English heading, no Chinese heading leak in EN mode, no framework overlay, and clean console. | Full campaign proof still needs complete launch/funding/content-anchor/settlement read models and production settlement projections. Next page: `/campaigns/[proposalId]/endorse`. |
 | 2026-05-16 | `/campaigns/[proposalId]/endorse` | Clarified the endorsement page as a local simulator: route proposal id is shown only as context, core action labels now say preview/simulating, confirmation copy states no wallet signature, SPUMP burn, endorsement PDA, or backend write occurs, and the English creator name no longer leaks the Chinese fixture label. | `npm run build --prefix app`; browser smoke on `/campaigns/prop-neo-park-2026q2/endorse` confirmed readiness copy, local simulator copy, proposal-id context, preview action labels, English creator name, no Chinese creator leak in EN mode, no framework overlay, clean console, and local confirm/success state. | Real promotion requires SPUMP burn, endorsement PDA creation, reward pool projection, and claim state from backend/indexer. Next page: `/campaigns/[proposalId]/settlement`. |
 | 2026-05-17 | `/campaigns/[proposalId]/settlement` | Clarified the settlement page as an operator/mock preview: page title and subtitle no longer claim oracle-resolved live data, route proposal id is shown only as context, Track values are labeled as local mock data, and English mode no longer leaks the Chinese creator fixture name. | `npm run build --prefix app`; browser smoke on `/campaigns/prop-neo-park-2026q2/settlement` confirmed preview title, readiness copy, operator preview copy, proposal-id context, English creator name, no Chinese creator leak in EN mode, no framework overlay, and clean console. | Production promotion needs proposal settlement read models, oracle permission checks, idempotent operator triggers, evidence digests, and Track 3 merchant reconciliation. Next page: `/rewards`. |
+| 2026-05-17 | `/rewards` | Clarified the rewards page as a local preview: the daily claim button now uses preview language, fixture mission states are labeled, and a persistent page notice explains that no SPUMP mint, reward ledger, backend claim API, or account balance update occurs. | `npm run build --prefix app`; browser smoke on `/rewards` confirmed readiness copy, persistent mock ledger notice, preview claim interaction, final English title after locale hydration, no framework overlay, and clean console. | Real daily SPUMP claim still needs signed-in account state, anti-abuse controls, backend claim records, and verifiable balance/projection updates. Next page: `/portfolio`. |

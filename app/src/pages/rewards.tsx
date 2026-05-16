@@ -20,6 +20,12 @@ const LEVEL_XP = 200;
 const CURRENT_LEVEL = 3;
 const STREAK = 3;
 const BOOST_DAYS_LEFT = 5;
+const REWARD_BOUNDARIES = [
+  { label: "Daily claim", value: "local UI state only" },
+  { label: "SPUMP balance", value: "no mint or ledger write" },
+  { label: "Missions", value: "fixture progress" },
+  { label: "Production gate", value: "auth + anti-abuse + claim API" },
+] as const;
 
 function fmt(n: number) {
   return n.toLocaleString("en-US");
@@ -42,10 +48,34 @@ export default function RewardsPage() {
       <PageShell>
         <div className="mx-auto max-w-3xl space-y-5">
           <ProductReadinessBanner
-            description="Missions, streaks, and daily claim are local preview data. No SPUMP mint, account balance, or reward ledger is changed from this page."
+            description="Missions, streaks, and daily claim are local preview data. The button only changes browser UI state; no SPUMP mint, account balance, reward ledger, or backend claim API is touched."
             status="MOCK_PREVIEW"
             title="Rewards are a mock engagement surface"
           />
+
+          <section className="glass-card section-enter border-[#f3b33e]/20 px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Preview rewards ledger</p>
+                <p className="mt-1 text-sm font-semibold text-white">This page does not claim real daily SPUMP yet.</p>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-[#95a6bf]">
+                  Rewards are still a product preview. Production promotion requires a signed-in account, abuse controls, a backend claim record,
+                  and a verifiable balance/projection path before missions can affect user holdings.
+                </p>
+              </div>
+              <span className="w-fit rounded-full border border-[#f3b33e]/30 bg-[#f3b33e]/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+                MOCK_PREVIEW
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {REWARD_BOUNDARIES.map((item) => (
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2" key={item.label}>
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">{item.label}</p>
+                  <p className="mt-1 text-xs text-[#d7e3f4]">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           {/* Row 1: XP bar (left) + New User Boost (right) — parallel */}
           <div className="grid gap-3 md:grid-cols-2">
@@ -108,6 +138,7 @@ export default function RewardsPage() {
                 <span className="absolute inset-0 -m-3 rounded-full bg-[#65ecaf]/8" />
               )}
               <button
+                aria-label="Preview daily SPUMP claim"
                 className={`relative z-10 flex h-32 w-32 flex-col items-center justify-center rounded-full border-2 transition-all duration-500 md:h-36 md:w-36 ${
                   claimed
                     ? "border-[#65ecaf]/40 bg-[#65ecaf]/10 shadow-[0_0_50px_rgba(101,236,175,0.18)]"
@@ -120,14 +151,14 @@ export default function RewardsPage() {
                 {claimed ? (
                   <>
                     <span className="text-2xl">✓</span>
-                    <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">Claimed!</span>
+                    <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">Previewed</span>
                     <span className="text-xs font-medium text-[#65ecaf]/70">{fmt(DAILY_AMOUNT)}</span>
-                    <span className="text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">SPUMP</span>
+                    <span className="text-center text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">local state</span>
                   </>
                 ) : (
                   <>
                     <span className="text-3xl">🪙</span>
-                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Claim Daily</span>
+                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Preview Claim</span>
                     <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
                     <span className="text-[8px] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
@@ -198,12 +229,12 @@ export default function RewardsPage() {
                       </div>
                     </div>
                     {m.done ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#65ecaf]/15 text-[10px] text-[#65ecaf]">
-                        ✓
+                      <span className="rounded-full bg-[#65ecaf]/15 px-2 py-0.5 text-[9px] font-medium text-[#65ecaf]">
+                        Fixture
                       </span>
                     ) : (
                       <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[9px] font-medium text-[#8ea0ba]">
-                        TODO
+                        Preview
                       </span>
                     )}
                   </div>
