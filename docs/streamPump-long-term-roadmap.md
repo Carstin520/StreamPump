@@ -70,6 +70,42 @@ Status legend inherited from `docs/product-readiness-phase-0.md`:
 | Operator tooling | `OPERATOR_REQUIRED` | Needs dashboards/log views for oracle, indexer, Mux reconciliation, settlement retry, fraud review, and deployment health. |
 | Deployment | `BACKEND_READY_UI_GAP` | Vercel/Render/Neon/R2/Mux path is documented; needs continuously verified environments and smoke checks. |
 
+## Route And API Readiness Inventory
+
+This inventory is the working boundary for automation. It is not a promise that every listed surface is production-ready; it tells future runs where mock, seeded, or operator-driven behavior must be preserved until promoted by code and verification.
+
+### Frontend Routes
+
+| Surface | Current readiness | Promotion gate |
+| --- | --- | --- |
+| `/explore`, `/trending`, `/posts/[postId]`, `/creators/[creatorId]`, `/activity` | `LIVE` + `SEEDED_DEMO` | Keep R2/Mux-backed feed reliable, expose creator market truth where relevant, and avoid local media fallbacks in production claims. |
+| `/market/[creatorId]` | `SEEDED_DEMO` | Add non-seeded creator onboarding, rating provenance, cap usage, and projection-backed buy/sell state. |
+| `/buyout/[creatorId]` | `SEEDED_DEMO` + `OPERATOR_REQUIRED` | Replace prepared buyout state with productized sponsor offer, creator acceptance, rage quit, graduation, and reclaim flows. |
+| `/portfolio` | `SEEDED_DEMO` | Remove scenario assumptions once holdings, rage quit, buyout claim, and re-entry all read from projections. |
+| `/login` | `SEEDED_DEMO` + `MOCK_PREVIEW` | Replace preview provider exchange with production provider verification and managed wallet mapping. |
+| `/workspace`, `/workspace/content/new`, `/workspace/content/[manifestId]`, `/workspace/intents/[intentId]` | `SEEDED_DEMO` | Complete publication state, upload failure recovery, list/detail APIs, and role-specific intent actions. |
+| `/campaigns/[proposalId]` | `SEEDED_DEMO` | Require campaign proof projection for proposal PDA, vault, manifest hash, content anchor, and settlement signatures. |
+| `/campaigns/[proposalId]/endorse` | `MOCK_PREVIEW` | Connect to real SPUMP burn, endorsement PDA, reward pool projection, and claim state. |
+| `/campaigns/[proposalId]/settlement` | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` | Only remove readiness marking after Track1/2/3 data comes from projection and permitted operator/oracle flows. |
+| `/rewards` | `MOCK_PREVIEW` | Start with real daily SPUMP claim before expanding missions or engagement rewards. |
+| `/workspace/buyout` | `MOCK_PREVIEW` | Connect to real S1 buyout offer creation/review lifecycle before presenting as productized. |
+| `/demo`, `/pitch`, `/me`, `/onboarding` | `SEEDED_DEMO` | Keep as support or identity/profile surfaces; do not use them to imply missing financial flows are live. |
+
+### Backend API And Service Areas
+
+| Surface | Current readiness | Promotion gate |
+| --- | --- | --- |
+| `authRoutes` / session services | `SEEDED_DEMO` + `MOCK_PREVIEW` | Production provider verification, managed wallet mapping, and production-disabled preview fallbacks. |
+| `publicFeedRoutes` / R2/Mux feed services | `LIVE` + `BACKEND_READY_UI_GAP` | Publication eligibility, recovery states, and deployed R2/Mux smoke coverage. |
+| `contentManifestRoutes` | `SEEDED_DEMO` | Full manifest list/detail, upload retry, finalize, publish eligibility, and Mux reconciliation verification. |
+| `proposalIntentRoutes` / launch bundle service | `SEEDED_DEMO` | Idempotent state transitions, role-aware errors, and proposal proof reconciliation after Solana confirmation. |
+| `proposalRoutes`, `campaignRoutes`, campaign proof projection | `SEEDED_DEMO` | Complete campaign proof projection for launch, funding, content anchor, and all settlement signatures. |
+| `s1Routes`, `marketRoutes`, S1 action controllers | `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` | Self-serve S1 registration, market reads, buy/sell, buyout lifecycle, rage quit, graduation, and claim projections. |
+| `OracleScheduler`, settlement services | `OPERATOR_REQUIRED` | Operator-visible queue/status, idempotent manual triggers, evidence digests, and guarded schedulers. |
+| `indexer`, `chainProjectionService`, `marketProjectionService` | `SEEDED_DEMO` | Projection lag observability and event coverage for S1/S2 lifecycle states. |
+| `MuxReconciliationScheduler`, R2/Mux services | `BACKEND_READY_UI_GAP` | Deployed webhook/reconciliation smoke and operator-visible failed media recovery. |
+| prototype routes | `MOCK_PREVIEW` | Keep under prototype namespace; do not mount as v1 product capability. |
+
 ## Roadmap
 
 ### Phase 1: Roadmap Truth And Product Boundary Hardening
@@ -434,3 +470,4 @@ Completion rule:
 | Date | Run type | Completed | Verification | Blockers | Next safe task |
 | --- | --- | --- | --- | --- | --- |
 | 2026-05-16 | Manual setup | Created long-term roadmap source of truth and automation operating rules. | Documentation creation only; no product code behavior changed. | Existing local protected files remain dirty/untracked and must not be staged by automation. | Create recurring automation and start with Phase 1 boundary-hardening tasks. |
+| 2026-05-16 | Manual optimization | Added route/API readiness inventory and linked the long-term roadmap from README/DEMO so future work has a product boundary entry point. | Documentation-only change; run `git diff --check` before commit. | Protected local files remain dirty/untracked and are intentionally excluded. | Continue Phase 1 by auditing preview surfaces and README/DEMO claims against the new inventory. |

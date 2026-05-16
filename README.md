@@ -20,6 +20,7 @@ StreamPump is a serious prototype moving toward a usable product. The strongest 
 Snapshot as of **2026-05-10**:
 
 For the post-hackathon readiness boundary, see [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md).
+For the long-term product target, gap analysis, and automation roadmap, see [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md).
 
 | Layer | Progress | What is real now | Main gaps |
 | --- | --- | --- | --- |
