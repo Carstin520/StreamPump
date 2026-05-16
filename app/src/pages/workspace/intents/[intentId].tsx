@@ -14,6 +14,7 @@ import {
   WarningIcon,
 } from "@/components/shared/AppIcons";
 import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StatusDot } from "@/components/workspace/StatusDot";
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -92,6 +93,12 @@ function MockIntentSigningStep() {
       <Head><title>StreamPump | Mock Signing Step</title></Head>
       <WorkspaceShell>
         <div className="space-y-5">
+          <ProductReadinessBanner
+            description="This demo intent route only previews creator signature UI state. It does not call wallet signing, proposal intent APIs, transaction bundle builders, or Solana relay paths."
+            status="MOCK_PREVIEW"
+            title="Demo intent signing is local-only"
+          />
+
           <div className="liquid-card card-radius p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
