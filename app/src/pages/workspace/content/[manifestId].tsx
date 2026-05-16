@@ -12,6 +12,7 @@ import {
   VideoIcon,
 } from "@/components/shared/AppIcons";
 import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StatusDot } from "@/components/workspace/StatusDot";
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -49,6 +50,9 @@ type UploadQueueItem = { file: File; key: string; message: string; stage: Upload
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
 
+const CONTENT_DETAIL_READINESS_DESCRIPTION =
+  "This page reads live content manifests and can resume asset upload, finalize content, record publication URLs, and create proposal intents. It still depends on authenticated session state, R2/Mux/backend configuration, and seeded S2 creator readiness; failed asset cleanup and webhook reconciliation are not fully productized.";
+
 const STATUS_LABELS: Record<ContentManifestStatus, string> = {
   DRAFT: "草稿", UPLOADING: "上传中", READY: "可发布", LOCKED: "已锁定",
   ANCHORED: "已锚定", PUBLISHED: "已发布", ARCHIVED: "已归档",
@@ -78,6 +82,17 @@ const isRenderableUrl = (v: string | null | undefined) => {
 const isVideoAsset = (a: ManifestAssetRecord) => a.assetType === "VIDEO";
 const isMuxAssetReady = (a: ManifestAssetRecord) =>
   isVideoAsset(a) && a.preferredPlaybackSource === "MUX" && isRenderableUrl(a.muxPlaybackUrl);
+const hasAssetIssue = (a: ManifestAssetRecord) => {
+  const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
+    .map((status) => status?.toUpperCase?.() ?? "");
+  return Boolean(a.processingError) || statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"));
+};
+const isAssetWaiting = (a: ManifestAssetRecord) => {
+  if (hasAssetIssue(a)) return false;
+  const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
+    .map((status) => status?.toUpperCase?.() ?? "");
+  return statuses.some((status) => ["PENDING", "PROCESSING", "QUEUED", "UPLOADING"].includes(status));
+};
 const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
   if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
   if (isRenderableUrl(a.originUrl)) return a.originUrl;
@@ -252,6 +267,13 @@ export default function ManifestDetailPage() {
       setActionMessage("素材上传完成");
     } catch (error) {
       setUploadQueue((items) => items.map((i) => i.stage === "uploaded" ? i : { ...i, message: "上传失败", stage: "failed" }));
+      if (!isAuthError(error)) {
+        try {
+          await refreshManifest(token, manifestId);
+        } catch {
+          // Keep the original upload error visible; recovery details can be retried by refreshing the page.
+        }
+      }
       handleApiError(error, "上传失败");
     } finally { setBusyAction(null); }
   };
@@ -322,6 +344,11 @@ export default function ManifestDetailPage() {
       <>
         <Head><title>{`StreamPump | ${title}`}</title></Head>
         <WorkspaceShell>
+          <ProductReadinessBanner
+            description={CONTENT_DETAIL_READINESS_DESCRIPTION}
+            status="SEEDED_DEMO"
+            title="Content detail is live API/R2-wired with media recovery gaps"
+          />
           {state.kind === "loading" && (
             <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
@@ -346,6 +373,8 @@ export default function ManifestDetailPage() {
 
   const d = state.data;
   const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0, t);
+  const assetsWithIssues = d.assets.filter(hasAssetIssue);
+  const assetsWaiting = d.assets.filter(isAssetWaiting);
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -395,6 +424,12 @@ export default function ManifestDetailPage() {
     <>
       <Head><title>{`StreamPump | ${title}`}</title></Head>
       <WorkspaceShell aside={previewPanel}>
+        <ProductReadinessBanner
+          description={CONTENT_DETAIL_READINESS_DESCRIPTION}
+          status="SEEDED_DEMO"
+          title="Content detail is live API/R2-wired with media recovery gaps"
+        />
+
         {/* Header */}
         <div>
           <h2 className="text-lg font-semibold text-white">{d.title ?? t("workspace.unknownContent")}</h2>
@@ -438,6 +473,34 @@ export default function ManifestDetailPage() {
         {/* Assets section */}
         {activeSection === "assets" && (
           <div className="section-enter space-y-4">
+            {(assetsWithIssues.length > 0 || assetsWaiting.length > 0) && (
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Media recovery status</p>
+                    <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+                      {assetsWithIssues.length > 0
+                        ? `${assetsWithIssues.length} asset(s) need operator/user recovery. Upload replacement files here, then finalize again after storage is healthy.`
+                        : `${assetsWaiting.length} asset(s) are still waiting on upload, processing, ingest, or delivery updates.`}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f3c66e]">
+                    {assetsWithIssues.length > 0 ? "RECOVERY_NEEDED" : "PROCESSING"}
+                  </span>
+                </div>
+                {assetsWithIssues.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {assetsWithIssues.slice(0, 3).map((asset) => (
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[11px]" key={asset.assetId}>
+                        <span className="font-mono text-[#8ea0ba]">{asset.assetType} #{asset.orderIndex + 1}</span>
+                        <span className="truncate text-[#f67263]">{asset.processingError || `${asset.uploadStatus} / ${asset.processingStatus} / ${asset.deliveryStatus}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <label className="block cursor-pointer">
               <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] p-6 transition hover:border-[#de402a]/30">
                 <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
