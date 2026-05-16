@@ -61,6 +61,9 @@ const STATUS_LABELS: Record<ProposalIntentStatus, string> = {
 const canBuildFromStatus = (status: ProposalIntentStatus) =>
   ["TERMS_LOCKED", "BUNDLE_BUILT", "CREATOR_PARTIALLY_SIGNED", "SPONSOR_SIGNED", "SUBMITTED", "FAILED", "EXPIRED"].includes(status);
 
+const LIVE_INTENT_READINESS_DESCRIPTION =
+  "This route calls live proposal intent APIs, transaction bundle builders, wallet signing, and submit endpoints. It still depends on an authenticated session, an S2-ready seeded creator, the correct creator/sponsor wallet, configured backend relay/RPC, and post-confirmation projection sync.";
+
 const demoIntentSteps: StepItem[] = [
   { label: "条款", status: "done" },
   { label: "构建", status: "done" },
@@ -339,6 +342,11 @@ export default function IntentDetailPage() {
       <>
         <Head><title>StreamPump | 赞助合作详情</title></Head>
         <WorkspaceShell>
+          <ProductReadinessBanner
+            description={LIVE_INTENT_READINESS_DESCRIPTION}
+            status="SEEDED_DEMO"
+            title="Proposal intent launch is API/wallet-wired for seeded S2 creators"
+          />
           {state.kind === "loading" && (
             <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
@@ -429,6 +437,12 @@ export default function IntentDetailPage() {
     <>
       <Head><title>{`StreamPump | ${d.manifest?.title ?? "赞助合作"}`}</title></Head>
       <WorkspaceShell aside={previewPanel}>
+        <ProductReadinessBanner
+          description={LIVE_INTENT_READINESS_DESCRIPTION}
+          status="SEEDED_DEMO"
+          title="Proposal intent launch is API/wallet-wired for seeded S2 creators"
+        />
+
         {/* Header */}
         <div>
           <div className="flex items-center justify-between">
@@ -628,15 +642,21 @@ export default function IntentDetailPage() {
           )}
         </div>
 
-        {/* Advanced / Debug section -- collapsed by default */}
+        {/* Operator/debug fallback for controlled demos and API verification. */}
         <details className="rounded-2xl border border-white/[0.06]">
           <summary className="cursor-pointer px-4 py-3 text-[11px] font-medium text-[#5a6b82] hover:text-[#8ea0ba]">
-            Advanced / Developer Fallback
+            Operator / Debug Fallback
           </summary>
           <div className="space-y-4 border-t border-white/[0.06] p-4">
+            <div className="rounded-xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f3c66e]">Operator-only path</p>
+              <p className="mt-1 text-[11px] leading-5 text-[#9aabc4]">
+                Use these pasted-signature controls only for controlled demos, wallet adapter failures, or backend bundle verification. Normal creator/sponsor users should use the wallet signing buttons above.
+              </p>
+            </div>
             {isCreator && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[#5a6b82]">粘贴 partiallySignedTxBase64</p>
+                <p className="text-[11px] text-[#5a6b82]">Operator paste: partiallySignedTxBase64</p>
                 <textarea
                   className="input-glass min-h-[100px] w-full rounded-2xl px-3 py-2 text-xs text-white outline-none"
                   onChange={(e) => setCreatorSignedBase64(e.target.value)}
@@ -655,7 +675,7 @@ export default function IntentDetailPage() {
             )}
             {isSponsor && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[#5a6b82]">粘贴 fullySignedTxBase64</p>
+                <p className="text-[11px] text-[#5a6b82]">Operator paste: fullySignedTxBase64</p>
                 <textarea
                   className="input-glass min-h-[100px] w-full rounded-2xl px-3 py-2 text-xs text-white outline-none"
                   onChange={(e) => setFullySignedBase64(e.target.value)}
