@@ -72,7 +72,7 @@ Status legend inherited from `docs/product-readiness-phase-0.md`:
 
 ## Route And API Readiness Inventory
 
-This inventory is the working boundary for automation. It is not a promise that every listed surface is production-ready; it tells future runs where mock, seeded, or operator-driven behavior must be preserved until promoted by code and verification.
+This inventory is the working boundary for `/goal`-driven page optimization. It is not a promise that every listed surface is production-ready; it tells future runs where mock, seeded, or operator-driven behavior must be preserved until promoted by code and verification.
 
 ### Frontend Routes
 
@@ -110,7 +110,7 @@ This inventory is the working boundary for automation. It is not a promise that 
 
 ### Phase 1: Roadmap Truth And Product Boundary Hardening
 
-Goal: make the product boundary durable enough that future automation cannot confuse mock previews with production capability.
+Goal: make the product boundary durable enough that future page-by-page optimization cannot confuse mock previews with production capability.
 
 Key work:
 
@@ -118,13 +118,13 @@ Key work:
 - Keep `docs/product-readiness-phase-0.md` as the frozen hackathon readiness boundary.
 - Add or maintain demo/readiness labels on preview-only pages.
 - Ensure README/DEMO do not overclaim productized flows.
-- Add Progress Ledger entries after every automation run.
+- Add Progress Ledger entries after every `/goal` optimization pass.
 
 Acceptance criteria:
 
 - Every major route or API surface has a readiness status.
 - No mock flow is described as production-ready.
-- Automation can choose the next task from this document without product interpretation.
+- A `/goal` session can choose the next page or API surface from this document without product interpretation.
 
 ### Phase 2: Auth, Session, And Managed Wallet Production Path
 
@@ -401,26 +401,26 @@ Blocked until external decision/input:
 - Full fraud review vendor.
 - Production domain, production secrets, paid plan upgrades, or dashboard-only setup.
 
-## Automation Rules
+## Page-Level `/goal` Rules
 
-The recurring automation must operate under these rules:
+The previous recurring automation has been deleted. Future optimization should run through Codex `/goal` so each pass is scoped to a concrete page, route, or API surface with human review between meaningful increments.
 
-- Automation name: `StreamPump Long-Term Roadmap Optimizer`
-- Schedule: every 4 hours.
 - Model: `gpt-5.5`
 - Reasoning effort: `high`
 - Workspace: `/Users/jamesli/Desktop/Sol Projects/StreamPump`
 - Required branch: `codex/post-deadline-phase-0`
 - Remote branch: `origin/codex/post-deadline-phase-0`
+- Goal prompt source: `docs/streamPump-page-readiness-goal.md`
+- Core goal: audit one page at a time for functional completeness, live API/chain wiring, mock/operator dependencies, user-facing claims, and verification gaps.
 
-Preflight for every run:
+Preflight for every `/goal` session:
 
 ```bash
 git branch --show-current
 git status --short
 ```
 
-If the branch is not `codex/post-deadline-phase-0`, the automation must stop and report the branch mismatch.
+If the branch is not `codex/post-deadline-phase-0`, the session must stop and report the branch mismatch.
 
 Protected local files:
 
@@ -428,18 +428,19 @@ Protected local files:
 - `pitch/colosseum-submission.md`
 - `pitch/demo-youtube-description.md`
 
-The automation must not stage, commit, delete, or rewrite protected files unless a later explicit instruction changes this document.
+Do not stage, commit, delete, or rewrite protected files unless a later explicit instruction changes this document.
 
 Work loop:
 
 1. Read this document, `pitch/script.md`, `docs/product-readiness-phase-0.md`, `README.md`, and `DEMO.md`.
-2. Select the highest-priority incomplete roadmap item that is not blocked by missing secrets, paid third-party upgrades, dashboard actions, production DB access, or human business decisions.
-3. Implement exactly one coherent increment.
-4. Run the smallest relevant tests first, then broader checks when appropriate.
-5. Update the Progress Ledger in this document with the work done, tests run, blockers, and next safe task.
-6. Stage files explicitly. Do not use `git add .`.
-7. If checks pass, commit and push to `origin/codex/post-deadline-phase-0`.
-8. If blocked, do not fake integrations and do not convert mock previews into production claims. Report the exact blocker and choose the next safe unblocked task if one exists.
+2. Select exactly one page, route, or API surface from the readiness inventory.
+3. Inspect whether it is actually connected to backend/API/chain state, still mock/local-only, or blocked by operator/third-party requirements.
+4. Implement exactly one coherent page-level improvement: wiring to existing API, adding a readiness boundary, fixing misleading copy, improving error/loading states, or documenting a blocker.
+5. Run the smallest relevant tests first, then broader checks when appropriate.
+6. Update the Progress Ledger in this document with the page audited, work done, tests run, blockers, and next safe page.
+7. Stage files explicitly. Do not use `git add .`.
+8. If checks pass, commit and push to `origin/codex/post-deadline-phase-0`.
+9. If blocked, do not fake integrations and do not convert mock previews into production claims. Report the exact blocker and choose the next safe unblocked page if one exists.
 
 Completion rule:
 
@@ -449,7 +450,7 @@ Completion rule:
   - `npm run test:backend`
   - relevant Anchor tests
   - documented devnet smoke where credentials and funded accounts are available
-- Only after repeated verification can the automation mark the roadmap target ready for human acceptance.
+- Only after repeated verification can the roadmap target be marked ready for human acceptance.
 
 ## Verification Matrix
 
@@ -473,3 +474,4 @@ Completion rule:
 | 2026-05-16 | Manual optimization | Added route/API readiness inventory and linked the long-term roadmap from README/DEMO so future work has a product boundary entry point. | Documentation-only change; run `git diff --check` before commit. | Protected local files remain dirty/untracked and are intentionally excluded. | Continue Phase 1 by auditing preview surfaces and README/DEMO claims against the new inventory. |
 | 2026-05-16 | Automation | Hardened `/workspace/buyout` boundary copy so static offer data is labeled `MOCK_PREVIEW` and no longer reads like a live sponsor auction. | `npm run build --prefix app` passed. Local HTTP smoke on `http://127.0.0.1:3000/workspace/buyout` confirmed `MOCK_PREVIEW`, static offer, and preview action copy rendered; Browser plugin tools were not exposed, so no interactive browser screenshot was captured. | Protected local files remain dirty/untracked and are intentionally excluded. | Continue Phase 1 by auditing `/workspace/intents/[intentId]` and `/workspace/sponsorships` for any remaining preview copy that could be mistaken for live chain/API capability. |
 | 2026-05-16 | Manual optimization | Added shared readiness banners to `/workspace/sponsorships` and the `/workspace/intents/[intentId]?demo=1` mock signing route so local campaign desk and demo signature states cannot be mistaken for live proposal, funding, oracle, or Solana relay capability. | `npm run build --prefix app` passed. | Protected local files remain dirty/untracked and are intentionally excluded. | Continue Phase 1 by auditing `/login`, `/demo`, and support pages for preview-auth or demo copy that could be mistaken for production identity or financial capability. |
+| 2026-05-16 | Manual goal setup | Deleted the recurring automation and changed the roadmap operating model to page-level `/goal` optimization. Added a dedicated `/goal` prompt source for auditing each page's functional completeness and live wiring. | Documentation-only change; run `git diff --check` before commit. | The current toolset does not expose a direct `/goal` creation API, so the goal prompt must be pasted through the Codex `/goal` UI. Protected local files remain dirty/untracked and excluded. | Start the first `/goal` pass with `/login`, then `/demo`, then pages with mock financial capability. |
