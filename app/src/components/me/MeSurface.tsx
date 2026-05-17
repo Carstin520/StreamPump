@@ -191,22 +191,22 @@ const buildActivityLedger = (): LedgerEntry[] => [
   {
     id: "act-1",
     kind: "buy",
-    title: "Bought S1 · 弯心入坑",
+    title: "Preview bought S1 · 弯心入坑",
     detail: "12 S1 @ $3.18 avg",
     creatorId: "luna-cai",
     amountLabel: "−$38.16",
     amountTone: "negative",
-    status: "Confirmed",
+    status: "Preview",
     timeLabel: "Today · 14:22",
   },
   {
     id: "act-2",
     kind: "claim",
-    title: "Claimed Daily SPUMP",
+    title: "Preview claimed daily SPUMP",
     detail: "Streak day 12",
     amountLabel: "+320 SPUMP",
     amountTone: "positive",
-    status: "Confirmed",
+    status: "Preview",
     timeLabel: "Today · 09:01",
   },
   {
@@ -215,7 +215,7 @@ const buildActivityLedger = (): LedgerEntry[] => [
     title: "Joined Buyout Watch · 弯心入坑",
     detail: "Sponsor offer $850k · 36h window",
     creatorId: "luna-cai",
-    status: "Watching",
+    status: "Preview",
     timeLabel: "Yesterday",
   },
   {
@@ -224,7 +224,7 @@ const buildActivityLedger = (): LedgerEntry[] => [
     title: "Added to Watchlist · 深夜不下线",
     detail: "Cyberpunk · Visual signal",
     creatorId: "neo-park",
-    status: "Tracking",
+    status: "Preview",
     timeLabel: "Yesterday",
   },
   {
@@ -235,18 +235,18 @@ const buildActivityLedger = (): LedgerEntry[] => [
     creatorId: "luna-cai",
     amountLabel: "$498.96",
     amountTone: "positive",
-    status: "Pending",
+    status: "Pending preview",
     timeLabel: "2d ago",
   },
   {
     id: "act-6",
     kind: "buy",
-    title: "Bought S1 · 深夜不下线",
+    title: "Preview bought S1 · 深夜不下线",
     detail: "8 S1 @ $5.74 avg",
     creatorId: "neo-park",
     amountLabel: "−$45.92",
     amountTone: "negative",
-    status: "Confirmed",
+    status: "Preview",
     timeLabel: "3d ago",
   },
   {
@@ -255,18 +255,18 @@ const buildActivityLedger = (): LedgerEntry[] => [
     title: "Followed creator · 胶片落进沙里",
     detail: "Discovery momentum signal",
     creatorId: "mika-zhou",
-    status: "Confirmed",
+    status: "Preview",
     timeLabel: "5d ago",
   },
   {
     id: "act-8",
     kind: "sell",
-    title: "Sold S1 · 胶片落进沙里",
+    title: "Preview sold S1 · 胶片落进沙里",
     detail: "20 S1 @ $1.92 avg",
     creatorId: "mika-zhou",
     amountLabel: "+$38.40",
     amountTone: "positive",
-    status: "Confirmed",
+    status: "Preview",
     timeLabel: "1w ago",
   },
 ];
@@ -342,7 +342,7 @@ const IdentityHero = ({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-                Total Portfolio Value
+                Preview Portfolio Value
               </p>
               <p className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[32px]">
                 {formatUsd(portfolio.totalValueUsd)}
@@ -386,9 +386,9 @@ const IdentityHero = ({
 
           <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <HeroStat label="24h PnL" tone={isUp ? "positive" : "negative"} value={`${isUp ? "+" : ""}${portfolio.change24hPct.toFixed(2)}%`} />
-            <HeroStat label="Realized" value={formatUsd(portfolio.realizedRewardsUsd)} tone="positive" />
-            <HeroStat label="Positions" value={String(portfolio.activePositions)} />
-            <HeroStat label="Watchlist" value="6" />
+            <HeroStat label="Preview Realized" value={formatUsd(portfolio.realizedRewardsUsd)} tone="positive" />
+            <HeroStat label="Preview Positions" value={String(portfolio.activePositions)} />
+            <HeroStat label="Preview Watchlist" value="6" />
           </div>
         </div>
       </div>
@@ -455,33 +455,33 @@ const SnapshotStrip = ({
     <SnapshotTile
       accent="#67b8ff"
       hint={`${portfolio.holdings.filter((h) => h.creator.state === "S1_DISCOVERY").length} discovery · ${portfolio.holdings.filter((h) => h.creator.state === "S1_BUYOUT").length} buyout`}
-      label="S1 Holdings"
+      label="Preview S1 Holdings"
       value={String(portfolio.s1HoldingsCount)}
     />
     <SnapshotTile
       accent="#65ecaf"
       hint="Active campaigns"
-      label="S2 Exposure"
+      label="Preview S2 Exposure"
       value={portfolio.s2ExposureUsd > 0 ? formatUsd(portfolio.s2ExposureUsd) : "—"}
     />
     <SnapshotTile
       accent="#ffb38a"
       hint={`${portfolioClaimWindows.length} ready · ${portfolioUpcomingClaims.length} pending`}
-      label="Claimable Rewards"
+      label="Preview Claimable"
       tone="positive"
       value={formatUsd(portfolio.claimableRewardsUsd)}
     />
     <SnapshotTile
       accent="#de402a"
       hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"}
-      label="Buyout Claims"
+      label="Preview Buyout Claims"
       tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"}
       value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"}
     />
     <SnapshotTile
       accent="#8ad0ff"
       hint={`+${portfolio.dailySpumpReward}/day streak`}
-      label="SPUMP Balance"
+      label="Preview SPUMP"
       value={compactNumber(portfolio.spumpBalance)}
     />
   </section>
@@ -639,10 +639,10 @@ const HoldingRow = ({ row }: { row: HoldingViewModel }) => {
 
       <div className="flex items-center justify-end gap-1">
         <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="primary">
-          {creator.state === "S1_BUYOUT" ? "Locked" : "Buy"}
+          {creator.state === "S1_BUYOUT" ? "Locked" : "Preview Buy"}
         </RowAction>
         <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="ghost">
-          Sell
+          Preview Sell
         </RowAction>
         <Link
           className="flex h-7 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[10px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
@@ -770,7 +770,7 @@ const WatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
 
               <div className="flex items-center justify-end gap-1.5">
                 <RowAction disabled={creator.state !== "S1_DISCOVERY"} kind="primary">
-                  Add Position
+                  Preview Position
                 </RowAction>
                 <Link
                   className="flex h-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 text-[11px] text-[#9aabc4] transition hover:border-white/[0.12] hover:text-white"
@@ -797,32 +797,32 @@ const RewardsPanel = ({ portfolio }: { portfolio: PortfolioModel }) => (
         amount={`${compactNumber(portfolio.dailySpumpReward)} SPUMP`}
         cta="Preview Claim"
         ctaTone="primary"
-        label="Daily Engagement"
-        status="Ready"
+        label="Preview Daily Engagement"
+        status="Preview ready"
       />
       <RewardItem
         accent="#ffb38a"
         amount={formatUsd(portfolio.claimableBuyoutUsd)}
         cta="Preview Claim"
         ctaTone="primary"
-        label="Buyout Pool"
-        status="2d 0h window"
+        label="Preview Buyout Pool"
+        status="2d 0h preview"
       />
       <RewardItem
         accent="#67b8ff"
         amount={formatUsd(portfolio.pendingCampaignUsd)}
-        cta="View campaign"
+        cta="Preview campaign"
         ctaTone="ghost"
-        label="Pending Campaign"
-        status="Pending settlement"
+        label="Preview Campaign"
+        status="Preview pending"
       />
       <RewardItem
         accent="#de402a"
         amount={formatUsd(portfolio.realizedRewardsUsd)}
-        cta="Receipt"
+        cta="Preview Receipt"
         ctaTone="ghost"
-        label="Realized Rewards"
-        status="Lifetime"
+        label="Preview Realized Rewards"
+        status="Preview lifetime"
       />
     </div>
 
@@ -830,7 +830,7 @@ const RewardsPanel = ({ portfolio }: { portfolio: PortfolioModel }) => (
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
-            Total claimable
+            Preview claimable
           </p>
           <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">
             {formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}
@@ -847,7 +847,7 @@ const RewardsPanel = ({ portfolio }: { portfolio: PortfolioModel }) => (
         </button>
       </div>
       <p className="mt-1.5 text-[10px] text-[#5a6b82]">
-        Demo flow · on-chain claim lands in next release
+        Local preview only · real claims need the rewards ledger and wallet-signed flow
       </p>
     </div>
   </div>
@@ -1048,7 +1048,7 @@ const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
   <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
     <header className="border-b border-white/[0.05] px-3.5 py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-        Claim Center
+        Preview Claim Center
       </p>
       <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">
         {formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}
@@ -1057,9 +1057,9 @@ const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
     </header>
 
     <div className="space-y-0.5 px-1.5 py-1.5">
-      <RailRow accent="#65ecaf" label="Daily SPUMP" sub="Streak 12d" value={`+${portfolio.dailySpumpReward}`} />
-      <RailRow accent="#ffb38a" label="Buyout pool" sub="弯心入坑" value={formatUsd(portfolio.claimableBuyoutUsd)} />
-      <RailRow accent="#67b8ff" label="Campaign" sub="Pending" value={formatUsd(portfolio.pendingCampaignUsd)} />
+      <RailRow accent="#65ecaf" label="Preview Daily SPUMP" sub="Streak 12d" value={`+${portfolio.dailySpumpReward}`} />
+      <RailRow accent="#ffb38a" label="Preview buyout pool" sub="Fixture creator" value={formatUsd(portfolio.claimableBuyoutUsd)} />
+      <RailRow accent="#67b8ff" label="Preview campaign" sub="Pending preview" value={formatUsd(portfolio.pendingCampaignUsd)} />
     </div>
 
     <div className="border-t border-white/[0.05] p-2.5">
@@ -1069,7 +1069,7 @@ const RewardsSummaryCard = ({ portfolio }: { portfolio: PortfolioModel }) => (
       >
         Preview Claim All
       </button>
-      <p className="mt-1.5 text-center text-[9px] text-[#5a6b82]">Demo · real claim coming soon</p>
+      <p className="mt-1.5 text-center text-[9px] text-[#5a6b82]">Local preview only. Use Rewards for the labeled reward simulator.</p>
     </div>
   </section>
 );

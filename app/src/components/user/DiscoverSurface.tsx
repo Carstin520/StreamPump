@@ -9,6 +9,7 @@ import { PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { PostCard } from "./PostCard";
 import { TrendingCreatorCard } from "./TrendingCreatorCard";
 
@@ -89,6 +90,12 @@ const ExploreView = ({
 
   return (
     <div className="-mt-3 space-y-4">
+      <ProductReadinessBanner
+        description="Explore can render public feed media from the backend, including R2/Mux-origin assets when configured. Category filters, signal chips, and creator market signals are still seeded or derived UI projections until feed eligibility, media smoke checks, and creator market read models are productionized."
+        status="SEEDED_DEMO"
+        title="Explore mixes public feed media with seeded market signals"
+      />
+      <PublicFeedSourceNotice error={viewModel.error} surface="explore" />
       <section
         className="sticky z-30 pt-1"
         style={{
@@ -110,15 +117,59 @@ const ExploreView = ({
             </button>
           ))}
           <div className="ml-auto hidden shrink-0 items-center gap-1.5 lg:flex">
-            <LiveStatChip icon="pulse" label={t("feed.stat.buyouts")} value="12" tone="heat" />
-            <LiveStatChip icon="dot" label="S2" value="84" tone="success" />
-            <LiveStatChip icon="arrow" label={t("feed.stat.signal")} value="+4.2%" tone="info" />
+            <LiveStatChip icon="pulse" label="Buyout signals" value="12" tone="heat" />
+            <LiveStatChip icon="dot" label="S2 profiles" value="84" tone="success" />
+            <LiveStatChip icon="arrow" label={`${t("feed.stat.signal")} projection`} value="+4.2%" tone="info" />
           </div>
         </div>
       </section>
 
       <PostsSection onOpenPost={onOpenPost} viewModel={viewModel} />
     </div>
+  );
+};
+
+const PublicFeedSourceNotice = ({
+  error,
+  surface,
+}: {
+  error: string | null;
+  surface: "explore" | "trending";
+}) => {
+  const config = error
+    ? {
+        label: "SEEDED_DEMO",
+        title: "Public feed fallback active",
+        body: "The public feed API is unavailable for this render, so the surface is showing seeded media or derived creator records. Do not treat engagement, ranking, or market signals as production truth.",
+        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+      }
+    : surface === "explore"
+      ? {
+          label: "LIVE + SEEDED_DEMO",
+          title: "Public feed with projected signals",
+          body: "Post cards can come from the backend feed and configured media origins. Category filters, buyout counts, S2 counts, likes, saves, and market signals are derived display data until production feed eligibility and analytics are connected.",
+          tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+        }
+      : {
+          label: "LIVE + SEEDED_DEMO",
+          title: "Trending uses feed-derived creators",
+          body: "Trending creators are derived from public feed posts and seeded creator profiles. Market price, holders, pools, offers, and momentum are projections until creator market read models and analytics are wired.",
+          tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+        };
+
+  return (
+    <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Feed data source</p>
+          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
+        </div>
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+          {config.label}
+        </span>
+      </div>
+    </section>
   );
 };
 
@@ -241,13 +292,19 @@ const TrendingView = ({
 
   return (
     <section className="mx-auto max-w-[1280px] space-y-5 py-4">
+      <ProductReadinessBanner
+        description="Trending can use public feed media, but creator ranking, price, holder, pool, offer, and momentum signals still include seeded or derived projections. Production promotion needs analytics, media smoke checks, and creator market read models."
+        status="SEEDED_DEMO"
+        title="Trending is feed-derived with projected market signals"
+      />
+      <PublicFeedSourceNotice error={error} surface="trending" />
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">{t("feed.trendingCreators")}</h1>
           <p className="mt-1 text-xs text-[#97a7be]">{t("feed.trendingDesc")}</p>
         </div>
         <div className="rounded-full border border-[#65ecaf]/20 bg-[#0e1f17] px-3 py-1.5 text-xs font-medium text-[#8df0c4]">
-          {t("feed.marketUp")} +4.2%
+          Signal projection +4.2%
         </div>
       </div>
 

@@ -16,6 +16,7 @@ import {
   primeHlsJs,
 } from "@/components/shared/MediaVideoPlayer";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
 import { PostRecord } from "@/lib/api/types";
@@ -159,7 +160,8 @@ export const PostDetailExperience = ({
       className="detail-card-surface immersive-shell resize-detail-card overflow-hidden rounded-[34px] border border-white/[0.055]"
       style={{
         width: mode === "modal" ? "calc(100vw - 120px)" : "min(1500px, calc(100vw - 20px))",
-        height: mode === "modal" ? "calc(100vh - 90px)" : "min(900px, calc(100vh - 20px))",
+        height: mode === "modal" ? "calc(100vh - 90px)" : "min(780px, calc(100vh - 190px))",
+        minHeight: mode === "modal" ? undefined : "520px",
       }}
     >
       <div className={`grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_clamp(312px,26vw,392px)] ${transitionClass}`} key={`${currentPost.id}-${transitionKey}`}>
@@ -231,15 +233,40 @@ export const PostDetailExperience = ({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-[#090d14] text-white">
+    <main className="relative min-h-screen bg-[#090d14] text-white">
       <AnimatedFeedBackdrop className="opacity-[0.78]" />
       <div className="pointer-events-none fixed inset-[5%] z-0 rounded-[48px] border border-white/[0.025] bg-[linear-gradient(180deg,rgba(17,24,38,0.3)_0%,rgba(10,14,22,0.16)_100%)] shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur-[4px]" />
-      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1800px] items-center justify-center px-2 py-2 lg:px-5 lg:py-4">
-        {shell}
+      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1800px] flex-col items-center justify-center gap-3 px-2 py-3 lg:px-5 lg:py-4">
+        <div className="w-[min(1500px,calc(100vw-20px))] space-y-2">
+          <ProductReadinessBanner
+            description="Post detail can render public feed media from the backend, including R2/Mux-origin assets when configured. Comments, likes, saves, and adjacent post navigation are still feed/UI records rather than a production engagement ledger."
+            status="SEEDED_DEMO"
+            title="Post detail uses public feed media with projected engagement"
+          />
+          <PostDetailSourceNotice />
+        </div>
+        <div className="flex w-full items-center justify-center">{shell}</div>
       </div>
     </main>
   );
 };
+
+const PostDetailSourceNotice = () => (
+  <section className="rounded-[14px] border border-[#67b8ff]/20 bg-[#0d1b2a]/55 px-4 py-3 text-[#a8d8ff]">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Post data source</p>
+        <p className="mt-1 text-sm font-semibold text-white">Public post record with UI engagement projection</p>
+        <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+          Media URLs come from the public feed record when available. Comments, counts, stage labels, and neighboring post flow are not yet account-specific production state.
+        </p>
+      </div>
+      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+        LIVE + SEEDED_DEMO
+      </span>
+    </div>
+  </section>
+);
 
 const PostMediaStage = ({ post }: { post: PostRecord }) => {
   if (post.type === "VIDEO") {

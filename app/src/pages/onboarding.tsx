@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 
 type Role = "fan" | "creator";
 
@@ -143,6 +144,23 @@ function TokenRain({ active }: { active: boolean }) {
   );
 }
 
+const OnboardingReadinessNotice = () => (
+  <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/65 px-4 py-3 text-[#f8d48a]">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
+        <p className="mt-1 text-sm font-semibold text-white">Local onboarding preview</p>
+        <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+          This flow previews first-run UX only. It does not connect a wallet, create an auth session, register a profile, mint SPUMP, or update backend account state.
+        </p>
+      </div>
+      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+        MOCK_PREVIEW
+      </span>
+    </div>
+  </section>
+);
+
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [role, setRole] = useState<Role>("fan");
@@ -211,6 +229,15 @@ export default function OnboardingPage() {
             </div>
           </div>
 
+          <div className="mx-auto mt-4 w-full max-w-[720px] space-y-2">
+            <ProductReadinessBanner
+              description="Onboarding is currently a local preview flow. Production onboarding still needs provider verification, managed-wallet/session mapping, profile registration, and real reward accounting."
+              status="MOCK_PREVIEW"
+              title="Onboarding is not connected to auth or rewards yet"
+            />
+            <OnboardingReadinessNotice />
+          </div>
+
           {/* Card area */}
           <div className="flex flex-1 items-center justify-center py-10">
             <div key={stepKey} className="section-enter w-full max-w-[440px]">
@@ -223,7 +250,7 @@ export default function OnboardingPage() {
                     Welcome to StreamPump
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Connect your wallet to enter StreamPump
+                    Preview the first-run wallet setup
                   </p>
                   <button
                     className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold"
@@ -231,7 +258,7 @@ export default function OnboardingPage() {
                     type="button"
                   >
                     <WalletIcon />
-                    Connect Wallet
+                    Preview Wallet Setup
                   </button>
                 </div>
               )}
@@ -269,7 +296,7 @@ export default function OnboardingPage() {
                         </div>
                         <div>
                           <div className="text-[16px] font-semibold">Fan</div>
-                          <div className="mt-0.5 text-[13px] text-[#8ea0ba]">Invest in creators, earn SPUMP</div>
+                          <div className="mt-0.5 text-[13px] text-[#8ea0ba]">Back creators with utility SPUMP</div>
                         </div>
                       </div>
                       {role === "fan" && (
@@ -327,17 +354,17 @@ export default function OnboardingPage() {
                 <div className="liquid-glass-shell p-8 text-center">
                   <CheckCircle animated />
                   <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.05em]">
-                    Profile Registered
+                    Preview Profile Created
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Mission complete — you earned engagement XP
+                    Local onboarding step complete. No backend profile was written.
                   </p>
 
                   <div
                     className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.08] px-5 py-2.5"
                     style={{ animation: "count-pop 500ms ease-out" }}
                   >
-                    <span className="text-[13px] font-medium text-[#65ecaf]">XP Earned</span>
+                    <span className="text-[13px] font-medium text-[#65ecaf]">Preview XP</span>
                     <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
                   </div>
 
@@ -346,7 +373,7 @@ export default function OnboardingPage() {
                     onClick={goNext}
                     type="button"
                   >
-                    Claim Reward
+                    Preview Reward
                   </button>
                 </div>
               )}
@@ -366,10 +393,10 @@ export default function OnboardingPage() {
                   </div>
 
                   <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
-                    SPUMP Claimed
+                    Preview SPUMP Ready
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Your initial tokens are ready to use
+                    Local preview allocation. No SPUMP mint or wallet balance update occurred.
                   </p>
 
                   <div
@@ -379,7 +406,7 @@ export default function OnboardingPage() {
                     <div className="text-[48px] font-bold tabular-nums tracking-[-0.04em] text-white">
                       {spumpCount.toLocaleString()}
                     </div>
-                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">SPUMP tokens</div>
+                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">preview SPUMP</div>
                   </div>
 
                   <Link

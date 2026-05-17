@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { useCallback } from "react";
 
 import { PostDetailExperience } from "@/components/post/PostDetailExperience";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { useI18n } from "@/lib/i18n";
 import { EXPLORE_PATH } from "@/lib/routes";
 import {
@@ -50,14 +51,16 @@ export default function PostDetailPage({
         ))}
       </Head>
       {initialError ? (
-        <main className="flex min-h-screen items-center justify-center bg-[#090d14] px-6 text-center text-sm text-[#c8d4e6]">
-          {initialError}
-        </main>
+        <PostDetailUnavailableState
+          detail={initialError}
+          title="Post detail source unavailable"
+        />
       ) : null}
       {!initialError && !post ? (
-        <main className="flex min-h-screen items-center justify-center bg-[#090d14] px-6 text-center text-sm text-[#c8d4e6]">
-          {t("feed.postNotFound")}
-        </main>
+        <PostDetailUnavailableState
+          detail={t("feed.postNotFound")}
+          title="Post detail record not found"
+        />
       ) : null}
       {!initialError && post ? (
         <PostDetailExperience
@@ -70,6 +73,39 @@ export default function PostDetailPage({
     </>
   );
 }
+
+const PostDetailUnavailableState = ({
+  detail,
+  title,
+}: {
+  detail: string;
+  title: string;
+}) => (
+  <main className="relative min-h-screen bg-[#090d14] px-4 py-5 text-white">
+    <div className="mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-[980px] flex-col justify-center gap-3">
+      <ProductReadinessBanner
+        description="Post detail is wired to the public feed post API. If that API or backend media projection is unavailable, this page should fail transparently instead of silently presenting seeded content as a production post."
+        status="SEEDED_DEMO"
+        title="Post detail depends on public feed API data"
+      />
+      <section className="rounded-[18px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-5 py-4 text-[#f8d48a]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Post data source</p>
+            <p className="mt-1 text-base font-semibold text-white">{title}</p>
+            <p className="mt-2 text-sm leading-6 text-[#c8d4e6]">{detail}</p>
+            <p className="mt-2 text-xs leading-5 text-[#9aabc4]">
+              Production readiness still needs deployed feed/media smoke checks and account-specific engagement records.
+            </p>
+          </div>
+          <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+            SEEDED_DEMO
+          </span>
+        </div>
+      </section>
+    </div>
+  </main>
+);
 
 export const getStaticPaths: GetStaticPaths = async () => ({
   fallback: "blocking",

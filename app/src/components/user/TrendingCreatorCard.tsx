@@ -56,10 +56,10 @@ export const TrendingCreatorCard = ({
           <p className="mb-3 mt-2 truncate text-xs leading-5 text-[#d3dceb]">{creator.teaser}</p>
 
           <div className="grid grid-cols-2 gap-1.5">
-            <Metric accent label="Current price" value={formatUsd(creator.tokenPrice)} />
-            <Metric label="Holders" value={compactNumber(creator.holderCount)} />
-            <Metric label="Pool" value={formatUsd(resolveSupporterPool(creator))} />
-            <Metric label="Offer value" value={formatUsd(resolveOfferValue(creator))} />
+            <Metric accent label="Price proj." value={formatUsd(creator.tokenPrice)} />
+            <Metric label="Holder proj." value={compactNumber(creator.holderCount)} />
+            <Metric label="Pool proj." value={formatUsd(resolveSupporterPool(creator))} />
+            <Metric label="Offer proj." value={formatUsd(resolveOfferValue(creator))} />
           </div>
         </div>
       </div>
