@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import {
   DemoCreatorBanner,
   S1ErrorState,
@@ -24,10 +25,12 @@ import {
   DEMO_S1_CREATOR_WALLET,
   getS1MarketProfile,
   getS1Portfolio,
+  S1_MOCK_ACCESS_TOKEN,
   S1MarketProfileResponse,
   S1PortfolioResponse,
 } from "@/lib/api/s1";
 import { getStoredAuthSession } from "@/lib/auth-session";
+import { type Locale, useI18n } from "@/lib/i18n";
 import {
   buildDemoS1MarketProfile,
   buildDemoS1Portfolio,
@@ -248,9 +251,10 @@ function TradePanel({
   const hasPosition = maxSell > 0;
 
   const sessionToken = getStoredAuthSession()?.accessToken ?? null;
+  const isLocalDemoSession = sessionToken === S1_MOCK_ACCESS_TOKEN;
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
-  const canTrade = Boolean(sessionToken && wallet.connected && !walletMismatch);
+  const canTrade = Boolean(sessionToken && !isLocalDemoSession && wallet.connected && !walletMismatch);
   const sellOverLimit = side === "sell" && hasPosition && amount > maxSell;
 
   const estimatedCost = useMemo(() => {
@@ -282,7 +286,7 @@ function TradePanel({
 
   const ctaLabel = (): string => {
     if (!wallet.connected) return "Connect wallet";
-    if (!sessionToken) return "Sign in to trade";
+    if (!sessionToken || isLocalDemoSession) return "Sign in with wallet session";
     if (walletMismatch) return "Wallet mismatch";
     if (side === "sell" && !hasPosition) return "No position to sell";
     if (sellOverLimit) return "Amount exceeds position";
@@ -391,25 +395,25 @@ function TradePanel({
             type="button"
           >
             {demoBusy
-              ? "Submitting..."
+              ? "Previewing..."
               : demoFlow.state.status === "success"
-                ? side === "buy" ? "Bought" : "Sold"
-                : side === "buy" ? "Buy S1" : "Sell S1"}
+                ? side === "buy" ? "Preview bought" : "Preview sold"
+                : side === "buy" ? "Preview Buy S1" : "Preview Sell S1"}
           </button>
           <DemoActionStatusCard
             amountLabel={`${amount} S1 · ~${estimatedCost.toFixed(3)} SPUMP`}
-            confirmLabel={side === "buy" ? "Confirm Buy S1" : "Confirm Sell S1"}
+            confirmLabel={side === "buy" ? "Confirm preview buy" : "Confirm preview sell"}
             description={
               side === "buy"
-                ? "Confirm this mock buy. The page position updates locally after submission."
-                : "Confirm this mock sell. The page position updates locally after submission."
+                ? "Confirm this local preview buy. The page position updates locally; no backend builder, wallet signature, or Solana transaction is used."
+                : "Confirm this local preview sell. The page position updates locally; no backend builder, wallet signature, or Solana transaction is used."
             }
             onCancel={demoFlow.reset}
             onConfirm={executeDemoTrade}
             onRetry={demoFlow.retry}
             state={demoFlow.state}
-            successLabel={side === "buy" ? "Bought" : "Sold"}
-            title={side === "buy" ? "Buy confirmation" : "Sell confirmation"}
+            successLabel={side === "buy" ? "Preview bought" : "Preview sold"}
+            title={side === "buy" ? "Preview buy confirmation" : "Preview sell confirmation"}
           />
         </>
       ) : !wallet.connected ? (
@@ -422,12 +426,12 @@ function TradePanel({
             Sign in to trade
           </Link>
         </div>
-      ) : !sessionToken ? (
+      ) : !sessionToken || isLocalDemoSession ? (
         <Link
           className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[13px] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
           href={`/login?next=/market/${creatorWallet}`}
         >
-          Sign in to trade
+          {isLocalDemoSession ? "Sign in with wallet session" : "Sign in to trade"}
         </Link>
       ) : (
         <button
@@ -524,12 +528,57 @@ function DemoRouteRail() {
   );
 }
 
+function displayMarketTitle(
+  profile: S1MarketProfileResponse | null,
+  fallbackCreator: ReturnType<typeof resolveFallbackCreator>,
+  isDemoRoute: boolean,
+  locale: Locale,
+) {
+  if (isDemoRoute && locale === "en") {
+    return "Seeded S1 Creator";
+  }
+
+  return displayCreatorName(profile, fallbackCreator);
+}
+
+function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
+  const config = isDemoRoute
+    ? {
+        label: "MOCK_PREVIEW",
+        title: "Local S1 market preview",
+        body: "This demo slug uses fixture creator and portfolio state. Buy and sell controls update local UI only; they do not call S1 builders, request a wallet signature, burn SPUMP, or submit a Solana transaction.",
+        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+      }
+    : {
+        label: "SEEDED_DEMO",
+        title: "Backend S1 market projection",
+        body: "This route reads the creator market projection from the backend. Buy and sell can build devnet transactions only with a real wallet session; rating provenance, daily cap usage, open onboarding, and full projection coverage are still roadmap work.",
+        tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+      };
+
+  return (
+    <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Market data source</p>
+          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
+        </div>
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+          {config.label}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 function MarketPage() {
   const router = useRouter();
+  const { locale } = useI18n();
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
@@ -591,7 +640,7 @@ function MarketPage() {
     return () => { cancelled = true; };
   }, [creatorWallet, refresh]);
 
-  const title = displayCreatorName(profile, fallbackCreator);
+  const title = displayMarketTitle(profile, fallbackCreator, isDemoRoute, locale);
   const handle = displayCreatorHandle(profile, fallbackCreator);
 
   const handleDemoTrade = useCallback(
@@ -627,8 +676,8 @@ function MarketPage() {
       });
       setDemoSummary(
         side === "buy"
-          ? `Bought ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`
-          : `Sold ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`,
+          ? `Preview bought ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`
+          : `Preview sold ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`,
       );
     },
     [creatorWallet],
@@ -674,6 +723,13 @@ function MarketPage() {
       <Head><title>{`StreamPump | ${title} S1 Market`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-5xl space-y-4">
+          <ProductReadinessBanner
+            description="S1 market buy/sell builders are live for seeded devnet markets when a real wallet session is available. Demo slugs remain local previews, and rating provenance, cap usage, and open creator onboarding are not productized yet."
+            status="SEEDED_DEMO"
+            title="S1 market is a seeded demo path"
+          />
+          <MarketReadinessNotice isDemoRoute={isDemoRoute} />
+
           <DemoCreatorBanner
             buyoutHref={isDemoRoute ? DEMO_S1_BUYOUT_PATH : undefined}
             creatorHref={isDemoRoute ? DEMO_S1_CREATOR_PATH : undefined}
