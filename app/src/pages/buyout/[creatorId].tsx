@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import {
   DemoCreatorBanner,
   S1ErrorState,
@@ -23,11 +24,13 @@ import {
   DEMO_S1_CREATOR_WALLET,
   getS1MarketProfile,
   getS1Portfolio,
+  S1_MOCK_ACCESS_TOKEN,
   S1BuyoutStatus,
   S1MarketProfileResponse,
   S1PortfolioResponse,
 } from "@/lib/api/s1";
 import { getStoredAuthSession } from "@/lib/auth-session";
+import { type Locale, useI18n } from "@/lib/i18n";
 import {
   buildDemoS1MarketProfile,
   buildDemoS1Portfolio,
@@ -322,9 +325,11 @@ function RageQuitPanel({
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
 
+  const sessionToken = getStoredAuthSession()?.accessToken ?? null;
+  const isLocalDemoSession = sessionToken === S1_MOCK_ACCESS_TOKEN;
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
-  const signedIn = Boolean(sessionWallet && wallet.connected && !walletMismatch);
+  const signedIn = Boolean(sessionToken && !isLocalDemoSession && sessionWallet && wallet.connected && !walletMismatch);
 
   useEffect(() => {
     setAmount(maxTokens > 0 ? Math.min(1, maxTokens) : 0);
@@ -418,21 +423,21 @@ function RageQuitPanel({
                 type="button"
               >
                 {demoBusy
-                  ? "Submitting..."
+                  ? "Previewing..."
                   : demoFlow.state.status === "success"
-                    ? "Exited"
-                    : "Exit Position"}
+                    ? "Preview exited"
+                    : "Preview Exit Position"}
               </button>
               <DemoActionStatusCard
                 amountLabel={`${amount} S1`}
-                confirmLabel="Confirm Exit Position"
-                description="Confirm this mock rage quit. The local S1 position decreases after submission."
+                confirmLabel="Confirm preview exit"
+                description="Confirm this local preview. The local S1 position decreases, but no backend builder, wallet signature, or Solana transaction is used."
                 onCancel={demoFlow.reset}
                 onConfirm={executeDemoExit}
                 onRetry={demoFlow.retry}
                 state={demoFlow.state}
-                successLabel="Exited"
-                title="Rage quit confirmation"
+                successLabel="Preview exited"
+                title="Preview rage quit confirmation"
               />
             </>
           ) : !signedIn ? (
@@ -442,7 +447,7 @@ function RageQuitPanel({
                 className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
                 href={`/login?next=/buyout/${creatorWallet}`}
               >
-                {walletMismatch ? "Sign in again" : "Sign in to rage quit"}
+                {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
               </Link>
             </div>
           ) : (
@@ -502,9 +507,11 @@ function ClaimPanel({
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
 
+  const sessionToken = getStoredAuthSession()?.accessToken ?? null;
+  const isLocalDemoSession = sessionToken === S1_MOCK_ACCESS_TOKEN;
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
-  const signedIn = Boolean(sessionWallet && wallet.connected && !walletMismatch);
+  const signedIn = Boolean(sessionToken && !isLocalDemoSession && sessionWallet && wallet.connected && !walletMismatch);
   const hasClaimable = hasClaimableUsdc(claimableUsdc) && Number(positionBalance || 0) > 0;
   const canClaim = isDemoRoute ? Boolean(sponsorWallet && hasClaimable) : Boolean(signedIn && sponsorWallet && hasClaimable);
 
@@ -556,7 +563,7 @@ function ClaimPanel({
             onClick={demoFlow.begin}
             type="button"
           >
-            {demoBusy ? "Submitting..." : demoFlow.state.status === "success" ? "Claimed" : "Claim"}
+            {demoBusy ? "Previewing..." : demoFlow.state.status === "success" ? "Preview claimed" : "Preview Claim"}
           </button>
         ) : signedIn ? (
           <button
@@ -574,7 +581,7 @@ function ClaimPanel({
               className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
               href={`/login?next=/buyout/${creatorWallet}`}
             >
-              {walletMismatch ? "Sign in again" : "Sign in to claim"}
+              {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
             </Link>
           </div>
         )}
@@ -585,14 +592,14 @@ function ClaimPanel({
       {isDemoRoute ? (
         <DemoActionStatusCard
           amountLabel={formatUsdcAmount(claimableUsdc)}
-          confirmLabel="Confirm Claim"
-          description="Confirm this mock claim. The claimable USDC clears locally after submission."
+          confirmLabel="Confirm preview claim"
+          description="Confirm this local preview. The claimable balance clears locally, but no claim builder, wallet signature, USDC transfer, or Solana transaction is used."
           onCancel={demoFlow.reset}
           onConfirm={executeDemoClaim}
           onRetry={demoFlow.retry}
           state={demoFlow.state}
-          successLabel="Claimed"
-          title="Claim confirmation"
+          successLabel="Preview claimed"
+          title="Preview claim confirmation"
         />
       ) : null}
 
@@ -608,12 +615,57 @@ function ClaimPanel({
   );
 }
 
+function displayBuyoutTitle(
+  profile: S1MarketProfileResponse | null,
+  fallbackCreator: ReturnType<typeof resolveFallbackCreator>,
+  isDemoRoute: boolean,
+  locale: Locale,
+) {
+  if (isDemoRoute && locale === "en") {
+    return "Seeded Buyout Creator";
+  }
+
+  return displayCreatorName(profile, fallbackCreator);
+}
+
+function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
+  const config = isDemoRoute
+    ? {
+        label: "MOCK_PREVIEW",
+        title: "Local S1 buyout preview",
+        body: "This demo slug uses fixture buyout and portfolio state. Rage quit and claim controls update local UI only; they do not call S1 builders, request a wallet signature, move USDC, or submit a Solana transaction.",
+        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+      }
+    : {
+        label: "SEEDED_DEMO + OPERATOR_REQUIRED",
+        title: "Seeded buyout projection",
+        body: "This route reads backend S1 market and buyout projections. Rage quit and claim can build devnet transactions only with a real wallet session and prepared buyout state; offer creation, creator acceptance, graduation, reclaim, and full lifecycle projection remain operator/productization work.",
+        tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+      };
+
+  return (
+    <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Buyout data source</p>
+          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
+        </div>
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+          {config.label}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 function BuyoutPage() {
   const router = useRouter();
+  const { locale } = useI18n();
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
@@ -671,7 +723,7 @@ function BuyoutPage() {
     return () => { cancelled = true; };
   }, [creatorWallet, refresh]);
 
-  const title = displayCreatorName(profile, fallbackCreator);
+  const title = displayBuyoutTitle(profile, fallbackCreator, isDemoRoute, locale);
   const handle = displayCreatorHandle(profile, fallbackCreator);
   const phase = phaseFromStatus(profile?.buyout?.status);
   const position = findPortfolioPosition(portfolio, creatorWallet ?? "");
@@ -744,7 +796,7 @@ function BuyoutPage() {
         };
       });
 
-      setDemoSummary(`Rage quit ${amount} S1 → received ~${spumpReturnedLabel} SPUMP (zero exit tax).`);
+      setDemoSummary(`Preview rage quit ${amount} S1 -> received ~${spumpReturnedLabel} SPUMP (local state only).`);
     },
     [
       creatorWallet,
@@ -768,7 +820,7 @@ function BuyoutPage() {
         ),
       };
     });
-    setDemoSummary(`Claimed ${claimedLabel} in the mock buyout flow.`);
+    setDemoSummary(`Preview claimed ${claimedLabel}; local claimable balance cleared.`);
   }, [creatorWallet, position?.estimatedClaimableUsdc]);
 
   if (!creatorId || loading) {
@@ -787,7 +839,7 @@ function BuyoutPage() {
         <div className="mx-auto max-w-4xl space-y-4 py-6">
           <S1ErrorState
             error="This route is a local creator preview slug, not a live S1 wallet address."
-            title={`No live buyout for ${fallbackCreator.name}`}
+            title={`No live buyout for ${title}`}
           />
           <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
         </div>
@@ -799,7 +851,7 @@ function BuyoutPage() {
     return (
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4 py-6">
-          <S1ErrorState error={error} title={`Could not load buyout for ${fallbackCreator.name}`} />
+          <S1ErrorState error={error} title={`Could not load buyout for ${title}`} />
           <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
         </div>
       </PageShell>
@@ -811,6 +863,13 @@ function BuyoutPage() {
       <Head><title>{`StreamPump | ${title} Buyout Room`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4">
+          <ProductReadinessBanner
+            description="S1 buyout rage quit and claim builders are usable only for prepared seeded buyout state with a real wallet session. Demo slugs remain local previews; offer creation, creator acceptance, graduation execution, reclaim, and complete projection coverage are still roadmap work."
+            status="SEEDED_DEMO"
+            title="S1 buyout is seeded and operator-gated"
+          />
+          <BuyoutReadinessNotice isDemoRoute={isDemoRoute} />
+
           <DemoCreatorBanner
             buyoutHref={isDemoRoute ? DEMO_S1_BUYOUT_PATH : undefined}
             creatorHref={isDemoRoute ? DEMO_S1_CREATOR_PATH : undefined}
