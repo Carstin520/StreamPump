@@ -238,7 +238,7 @@ const StatusBadge = ({ market }: { market: MarketModel }) => {
     return (
       <span className="flex items-center gap-1.5 rounded-full border border-[#65ecaf]/30 bg-[#0e1f17]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8df0c4] backdrop-blur-md">
         <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
-        Graduated · S2 Live
+        S2 Profile
       </span>
     );
   }
@@ -256,7 +256,7 @@ const StatusBadge = ({ market }: { market: MarketModel }) => {
   return (
     <span className="flex items-center gap-1.5 rounded-full border border-[#67b8ff]/30 bg-[#0e1726]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff] backdrop-blur-md">
       <span className="h-1.5 w-1.5 rounded-full bg-[#67b8ff]" />
-      S1 Live · {market.graduationPct}%
+      S1 Profile · {market.graduationPct}%
     </span>
   );
 };
@@ -316,7 +316,7 @@ const MarketStatsBar = ({
 
 const PriceCell = ({ market }: { market: MarketModel }) => (
   <div className="min-w-0 px-3.5 py-2.5">
-    <p className="truncate text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Fans Token Price</p>
+    <p className="truncate text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">S1 Position Price</p>
     <p className="mt-1 whitespace-nowrap text-lg font-semibold tracking-[-0.04em] text-white">
       {market.priceSpump}
       <span className="ml-1 text-[10px] font-medium text-[#7486a1]">SPUMP</span>
@@ -372,10 +372,10 @@ const PriceHistoryPanel = ({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-            Price history
+            Price projection
           </p>
           <h2 className="mt-0.5 text-base font-semibold tracking-[-0.02em] text-white">
-            S1 market price
+            S1 market projection
           </h2>
         </div>
         <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-right">
@@ -428,10 +428,10 @@ const BuyPanel = ({
       <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
         <div>
           <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-            Trade Fans Token
+            S1 Position Access
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-white">
-            {liveCreatorWallet ? "Live S1 Market" : disabled ? "Preview Mode" : "Buy S1 Tokens"}
+            {liveCreatorWallet ? "Seeded S1 Market" : disabled ? "Preview Mode" : "Preview S1 Position"}
           </h3>
         </div>
         <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
@@ -513,13 +513,13 @@ const BuyPanel = ({
               className="block rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-3 py-2.5 text-center text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] transition hover:brightness-[1.05]"
               href={`/market/${liveCreatorWallet}`}
             >
-              Open live market
+              Open seeded market
             </Link>
             <Link
               className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
               href={`/buyout/${liveCreatorWallet}`}
             >
-              Open buyout room
+              Open seeded buyout
             </Link>
           </div>
         ) : (
@@ -551,7 +551,7 @@ const BuyPanel = ({
 
         {!liveCreatorWallet && !disabled ? (
           <p className="text-center text-[10px] text-[#5a6b82]">
-            Demo flow · on-chain trade lands in next release
+            Local preview only. Open a seeded market route for transaction builders.
           </p>
         ) : null}
       </div>
@@ -601,7 +601,7 @@ const LifecycleTimeline = ({
     <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-4 py-3.5 md:px-5">
       <header className="flex items-center justify-between">
         <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-          On-chain lifecycle
+          S1 lifecycle projection
         </p>
         <span className="text-[10px] text-[#7486a1]">{market.levelLabel}</span>
       </header>
@@ -674,10 +674,10 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#de402a]" />
           </span>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff8a78]">
-            Buyout Offer
+            Buyout Offer Projection
           </p>
         </div>
-        <span className="text-[9px] uppercase tracking-[0.18em] text-[#7486a1]">Live</span>
+        <span className="text-[9px] uppercase tracking-[0.18em] text-[#7486a1]">Seeded</span>
       </header>
       <div className="space-y-2.5 px-4 py-3">
         <div>
@@ -699,7 +699,7 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
             className="rounded-full bg-[#de402a] px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-[#ea523e]"
             href={`/buyout/${creator.id}`}
           >
-            View Buyout
+            Open buyout preview
           </Link>
         </div>
       </div>
