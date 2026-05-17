@@ -67,17 +67,523 @@ Status values come from `docs/product-readiness-phase-0.md`.
 | Rewards | `MOCK_PREVIEW` | Implement real daily SPUMP claim before missions; add anti-abuse gates. |
 | Operator/deployment | `OPERATOR_REQUIRED` + `BACKEND_READY_UI_GAP` | Add dashboards for indexer/oracle/media/settlement/retry/fraud plus Vercel/Render/Neon/R2/Mux smoke checks. |
 
+## Next Behavior
+
+The page-readiness audit is complete. The next product behavior should not be another mock cleanup pass. The next step is to make one narrow production corridor real and repeatedly verified:
+
+```text
+authenticated creator
+-> create/upload/finalize/publish content through R2/Mux/backend
+-> post appears in public feed and post detail from backend projection
+-> creator can open a real proposal intent from that content
+-> campaign detail shows verifiable proof state without local fallback claims
+```
+
+This corridor is the correct first landing target because it sits before every money-flow promise:
+
+- Sponsors cannot buy credible campaigns until content publication and campaign proof are reliable.
+- S1 creator markets should not open self-serve before identity, creator profile, content eligibility, and projection rules are stable.
+- S2 endorsement, settlement, and rewards should not become live until campaign proof and account-specific state exist.
+- Operator dashboards need real media/proposal/settlement events to observe.
+
+Immediate engineering behavior:
+
+1. Stop expanding preview surfaces unless they unblock this corridor.
+2. Stabilize production auth/session enough for one creator and one sponsor account.
+3. Turn media publication from "API exists" into an end-to-end smoke-tested workflow.
+4. Make public feed/post/detail consume only backend-projected records for this corridor.
+5. Make proposal intent and campaign detail reconcile DB state with Solana confirmation state.
+6. Keep readiness labels on every non-corridor mock until its own production gate is met.
+
+## Demo To Production Plan
+
+This is the execution plan for moving from the current controlled demo to a limited production pilot, then to the full StreamPump product. Each milestone must remove a real mock/seed/operator dependency and add verification. Do not promote a milestone by changing copy alone.
+
+### Stage 1: Production Identity And Session Spine
+
+Goal: one user identity model works across creator, fan/backer, and sponsor surfaces.
+
+Current state:
+
+- `/login` can attempt email OTP and wallet auth.
+- Preview social/local fallback is labeled but still useful for demos.
+- Current product surfaces can still rely on local session/persona assumptions.
+
+Required backend work:
+
+- Define `AuthIdentity`, `ManagedWallet`, and `WalletSession` as the canonical session subject.
+- Add provider verification for the chosen first provider path:
+  - Recommended first landing path: email OTP + wallet signature.
+  - Next providers: Google, Apple, passkey, Web3Auth/embedded wallet.
+- Add explicit role/profile records:
+  - creator profile;
+  - fan/backer profile;
+  - sponsor organization/member profile.
+- Disable preview provider exchange in production by environment guard.
+- Remove production dependence on legacy wallet headers.
+- Add audit events for sign-in, wallet binding, session refresh, role switch, and failed auth.
+
+Required frontend work:
+
+- `/login`: show production provider state, preview fallback only in dev/demo mode.
+- `/onboarding`: replace local preview with real profile creation and wallet/session binding.
+- `/me`: read current-session profile, wallets, saved posts, holdings summary, and rewards summary from APIs.
+- Add wallet mismatch states wherever a transaction builder requires a specific wallet.
+
+Third-party requirements:
+
+- Email delivery provider or console-only local mode for development.
+- OAuth/Web3Auth/passkey provider when expanding beyond email/wallet.
+- Production session secret and secure cookie/session settings.
+
+Verification gate:
+
+- A new user can sign in, bind or confirm a wallet, complete onboarding, reload the app, and keep the same identity.
+- Preview social auth is unavailable in production unless explicitly enabled for a demo environment.
+- Backend auth build and targeted auth tests pass.
+- Browser smoke covers `/login`, `/onboarding`, `/me`, and one wallet-required route.
+
+### Stage 2: Media Publication And Public Feed Reliability
+
+Goal: creator content becomes a reliable product asset instead of a seeded/local fixture.
+
+Current state:
+
+- Workspace content pages call manifest create, R2 presign, browser upload, asset complete, finalize, publication record, and proposal intent APIs.
+- Explore/trending/post detail can consume public feed records.
+- R2/Mux plumbing exists, but recovery, eligibility, and deployed smoke are incomplete.
+
+Required backend work:
+
+- Add manifest list/detail APIs with stable statuses:
+  - draft;
+  - uploading;
+  - processing;
+  - ready;
+  - published;
+  - failed;
+  - archived.
+- Add idempotent retry endpoints for failed upload completion, finalize, Mux ingest, and publication record creation.
+- Add publication eligibility rules:
+  - creator is verified enough;
+  - asset upload complete;
+  - Mux processing or image variant ready;
+  - required metadata present;
+  - content is not blocked by review.
+- Add media event projection:
+  - R2 object key;
+  - public/signed URL strategy;
+  - Mux asset/playback id;
+  - webhook status;
+  - last reconciliation attempt;
+  - failure reason.
+- Add public feed read model that never silently swaps in local seeded content for production claims.
+
+Required frontend work:
+
+- `/workspace/content/new`: make upload retry/resume first-class.
+- `/workspace/content/[manifestId]`: show per-asset status, failed asset recovery, finalize/publish eligibility, and proposal blockers.
+- `/explore`, `/trending`, `/posts/[postId]`: distinguish backend feed, empty feed, API failure, and demo fallback.
+- Creator profile pages should show whether media is live backend content or seeded/demo content.
+
+Third-party requirements:
+
+- Cloudflare R2 bucket, CORS, public base URL or signed URL strategy.
+- Mux token, webhook secret, and webhook endpoint.
+- Production backend URL reachable by Mux.
+
+Verification gate:
+
+- A real creator account uploads an image and/or short video.
+- R2 object is readable through the chosen delivery path.
+- Mux webhook or reconciliation moves video to a usable playback state.
+- The post appears in `/explore` and `/posts/[postId]` from backend feed APIs.
+- No local feed fallback is used in the production smoke.
+
+### Stage 3: Workspace And Proposal Intent Production Corridor
+
+Goal: creator and sponsor can move from real content to a proposal intent and verifiable campaign detail.
+
+Current state:
+
+- Proposal intent detail can lock terms, build bundles, collect signatures, and submit.
+- Campaign detail can load API data or seeded fallback.
+- Workspace overview has live API wiring but still has preview fallback paths.
+
+Required backend work:
+
+- Make proposal intent state machine explicit:
+  - draft;
+  - terms_locked;
+  - creator_signed;
+  - sponsor_signed;
+  - submitted;
+  - confirmed;
+  - failed;
+  - expired;
+  - cancelled.
+- Add role-aware errors:
+  - wrong wallet;
+  - wrong role;
+  - stale bundle;
+  - expired intent;
+  - missing creator readiness;
+  - missing content anchor;
+  - relay failure.
+- Store Solana transaction signatures, confirmation slot, proposal PDA, vault, manifest hash, and content anchor.
+- Add reconciliation job from submitted transaction to confirmed campaign projection.
+- Add campaign proof read model for public and authenticated views.
+
+Required frontend work:
+
+- `/workspace`: replace broad preview panels with live empty, blocked, ready, or operator-required panels.
+- `/workspace/intents/[intentId]`: remove pasted-signature fallback from normal UX; keep it as dev/operator debug only.
+- `/campaigns/[proposalId]`: show proposal PDA, vault, manifest, content anchor, funding, and confirmation state from projection.
+- `/workspace/sponsorships`: connect to real proposal/campaign list APIs or keep it explicitly preview-only.
+
+Third-party requirements:
+
+- Reliable Solana RPC provider.
+- Wallet adapters for creator/sponsor signature collection.
+- Backend relay configuration and key management where required.
+
+Verification gate:
+
+- With two real sessions, creator locks/signs and sponsor final-signs/submits one proposal.
+- Campaign detail updates from pending to confirmed through backend projection.
+- Wrong-wallet and expired-bundle states are visible and recoverable.
+- No mock campaign cards link into fake live intent ids.
+
+### Stage 4: S1 Self-Serve Market
+
+Goal: S1 moves from seeded demo to controlled self-serve creator market.
+
+Current state:
+
+- Market and portfolio pages can read creator/portfolio state and build buy/sell/claim transactions for seeded paths.
+- Creator onboarding, rating provenance, cap usage, and full lifecycle projection coverage remain incomplete.
+
+Required backend work:
+
+- Add creator registration/readiness API:
+  - creator profile;
+  - wallet;
+  - content eligibility;
+  - S1 status;
+  - rating source;
+  - cap configuration.
+- Add market read API:
+  - current price;
+  - supply;
+  - curve parameters;
+  - daily SPUMP cap used/remaining;
+  - pending rating and effective time;
+  - buyout status;
+  - user position state.
+- Add projection coverage for:
+  - buy;
+  - sell;
+  - rating update;
+  - paused/cancelled market;
+  - buyout started;
+  - rage quit;
+  - graduated;
+  - claimed;
+  - re-entry rules.
+- Add anti-abuse gates for daily utility SPUMP issuance and S1 buying.
+
+Required frontend work:
+
+- `/market/[creatorId]`: show rating provenance, pending rating, cap usage, transaction readiness, and wallet mismatch.
+- `/portfolio`: show live holdings, claim windows, rage quit history, claim status, and re-entry eligibility.
+- `/creators/[creatorId]`: show real market truth without projection-only labels when live.
+- `/rewards`: implement real daily SPUMP claim before mission expansion.
+
+Chain/indexer requirements:
+
+- Confirm S1 events fully cover projection states.
+- Add devnet smoke from user registration to S1 buy/sell/portfolio projection.
+- Add unhappy-path tests for caps, role guards, insufficient balances, paused markets, and stale ratings.
+
+Verification gate:
+
+- A non-seeded creator can become S1-ready through operator-approved or self-serve flow.
+- A user can claim daily SPUMP, buy S1, sell S1, and see portfolio projection update.
+- Projection balances match chain events after refresh.
+
+### Stage 5: S1 Buyout Lifecycle Productization
+
+Goal: sponsor buyout is created and completed through product UI, not prepared state.
+
+Current state:
+
+- Protocol/backend builder paths exist.
+- UI can show prepared buyout state and demo rage quit/claim flows.
+- Offer creation, creator acceptance, graduation, and reclaim are not productized.
+
+Required backend work:
+
+- Add buyout lifecycle APIs:
+  - sponsor init offer;
+  - sponsor submit/fund offer;
+  - creator list/review offers;
+  - creator accept offer;
+  - open rage quit window;
+  - execute graduation;
+  - reclaim rejected/expired offers;
+  - claim USDC.
+- Add operator guardrails:
+  - offer validation;
+  - minimum/maximum offer;
+  - creator eligibility;
+  - deadline enforcement;
+  - idempotency keys.
+- Complete projection for offer, rage quit, graduation, claim, and reclaim states.
+
+Required frontend work:
+
+- `/workspace/buyout`: replace static mock sponsor desk with live offer creation/review.
+- `/buyout/[creatorId]`: separate live buyout, local demo, and unavailable states.
+- `/portfolio`: make rage quit, claim, and re-entry state consistent after every action.
+
+Chain/indexer requirements:
+
+- Devnet smoke: sponsor offer -> creator accept -> fan rage quit -> graduation -> holder claim -> sponsor/creator final state.
+- Unhappy-path tests for expired offer, rejected offer, double claim, late rage quit, insufficient vault, and unauthorized actions.
+
+Verification gate:
+
+- No operator script is required for a happy-path S1 buyout on devnet except initial environment setup.
+- The two values that should match after rage quit/claim are derived from one backend projection formula and chain source.
+
+### Stage 6: S2 Endorsement And Fan Rewards
+
+Goal: fan endorsement becomes a real chain/backend flow, not a local simulator.
+
+Current state:
+
+- `/campaigns/[proposalId]/endorse` is `MOCK_PREVIEW`.
+- `/rewards` is a local preview.
+
+Required backend work:
+
+- Add endorsement builder:
+  - SPUMP burn or lock payload;
+  - endorsement PDA;
+  - campaign/fan relation;
+  - reward pool share.
+- Add endorsement projection:
+  - pending;
+  - confirmed;
+  - failed;
+  - claimable;
+  - claimed.
+- Add reward ledger:
+  - daily SPUMP issuance;
+  - campaign endorsement reward;
+  - anti-abuse risk;
+  - claim history.
+
+Required frontend work:
+
+- `/campaigns/[proposalId]/endorse`: replace local slider confirmation with wallet-signed transaction flow.
+- `/rewards`: show real daily claim, reward ledger, campaign claim state, and abuse/blocked states.
+- `/me`: replace preview reward cards with account-specific reward data.
+
+Verification gate:
+
+- Fan endorses a confirmed campaign with SPUMP.
+- Endorsement appears in campaign proof and reward ledger.
+- Rewards become claimable only after settlement/projection conditions are met.
+
+### Stage 7: Settlement, Oracle, And Reconciliation
+
+Goal: settlement moves from operator/mock dashboard to guarded production operations.
+
+Current state:
+
+- Track1/2 settlement can be smoked with controlled data.
+- Track3 remains mock/operator-required.
+- Oracle and Mux jobs exist but need observable control surfaces.
+
+Required backend work:
+
+- Track1:
+  - operator/manual trigger;
+  - publication evidence check;
+  - idempotent payout settlement.
+- Track2:
+  - metric ingestion API;
+  - fraud/review status;
+  - oracle-signed evidence digest;
+  - cliff calculation;
+  - creator/endorser split projection.
+- Track3:
+  - merchant/reconciliation provider abstraction;
+  - approved order import;
+  - refund/return window;
+  - settlement evidence;
+  - sponsor refund projection.
+- Add settlement job dashboard data:
+  - queued;
+  - running;
+  - succeeded;
+  - failed;
+  - retryable;
+  - blocked by review.
+
+Required frontend work:
+
+- `/campaigns/[proposalId]/settlement`: render only projection-backed track state in production.
+- Add operator-only settlement trigger/retry UI.
+- Add evidence digest display and fraud/review status.
+- Keep Track3 clearly disabled until a real merchant provider exists.
+
+Third-party requirements:
+
+- First metric source for Track2.
+- First merchant/reconciliation provider for Track3.
+- Optional oracle network integration after operator/manual payloads are stable.
+
+Verification gate:
+
+- Track1 and Track2 settle from projection/evidence without editing local mock data.
+- Failed settlement can be retried idempotently.
+- Track3 remains gated unless real provider evidence exists.
+
+### Stage 8: Operator, Observability, And Deployment Hardening
+
+Goal: production demos and pilot users are observable and recoverable.
+
+Required work:
+
+- Add operator dashboard or admin routes for:
+  - auth/session failures;
+  - media upload/Mux/R2 failures;
+  - feed publication status;
+  - proposal intent state;
+  - Solana relay/reconciliation state;
+  - S1/S2 projection lag;
+  - oracle/settlement jobs;
+  - fraud/review queues.
+- Add health checks:
+  - backend `/health`;
+  - DB connection;
+  - R2 presign smoke;
+  - Mux API/webhook smoke;
+  - Solana RPC health;
+  - Vercel frontend health;
+  - Render backend health.
+- Add runbooks:
+  - failed media upload;
+  - stale proposal intent;
+  - failed Solana relay;
+  - stuck settlement;
+  - incorrect projection;
+  - compromised/rotated key.
+
+Verification gate:
+
+- A fresh environment can be deployed and smoke-tested from README/DEMO instructions.
+- Operator can identify and resolve at least the top five expected pilot failures without database spelunking.
+
+### Stage 9: Security, Audit, And Pilot Launch
+
+Goal: freeze financial semantics, reduce abuse risk, and prepare controlled users.
+
+Required work:
+
+- Freeze Anchor instruction interface before audit.
+- Expand tests:
+  - S1 happy/unhappy;
+  - S1 buyout lifecycle;
+  - S2 proposal launch;
+  - S2 endorsement;
+  - settlement edge cases;
+  - role guards;
+  - expired bundles;
+  - double claim/refund/reclaim;
+  - cap/rate limits.
+- Add abuse controls:
+  - daily SPUMP claim limits;
+  - endorsement spam limits;
+  - content upload quotas;
+  - sponsor offer throttles;
+  - fraud review gates.
+- Run pilot acceptance:
+  - one creator;
+  - one sponsor;
+  - three fan/backer accounts;
+  - one complete content/proposal/campaign proof path;
+  - one S1 market path;
+  - one S1 buyout path;
+  - one Track1/Track2 settlement path.
+
+Verification gate:
+
+- Two consecutive clean full verification passes:
+  - app build;
+  - backend build;
+  - backend tests;
+  - relevant Anchor tests;
+  - media smoke;
+  - S1 devnet smoke;
+  - S2 devnet smoke;
+  - deployment health checks.
+
+## Mock Retirement Order
+
+Retire mocks in this order. Each row should end with code, verification, and documentation updates.
+
+| Order | Mock/seeded area | Replace with | Why this order |
+| --- | --- | --- | --- |
+| 1 | Preview auth/onboarding/profile | Production session spine and account profile APIs | Every production flow needs current-user truth. |
+| 2 | Media/feed fallback | R2/Mux-backed publication and public feed projection | Content is the product entry point and sponsor proof base. |
+| 3 | Workspace persona fallback | Live workspace overview/list/detail APIs | Creators and sponsors need honest work queues. |
+| 4 | Proposal/campaign fallback | Projection-backed proposal and campaign proof | S2 money flows depend on this state. |
+| 5 | Rewards mock | Real daily SPUMP and reward ledger | Fan utility must be accountable before endorsement. |
+| 6 | S1 seeded market assumptions | Self-serve creator readiness, rating, cap, projection reads | S1 must be fair and explainable before public use. |
+| 7 | Prepared buyout state | Live buyout offer/accept/rage quit/graduation/claim lifecycle | This is the highest-stakes S1 financial path. |
+| 8 | Endorsement simulator | SPUMP burn/lock, endorsement PDA, reward projection | Depends on campaign proof and reward ledger. |
+| 9 | Settlement mock/operator data | Evidence-backed Track1/2 and gated Track3 reconciliation | Final financial truth needs operator-grade auditability. |
+| 10 | Prototype/legacy routes | Remove, hide, or relabel as internal | Avoid accidental public claims. |
+
+## Blocker Policy
+
+Stop and report instead of inventing fake production behavior when a task requires:
+
+- OAuth/Web3Auth/passkey dashboard setup;
+- production secrets or key rotation;
+- Cloudflare R2 bucket/CORS changes;
+- Mux webhook configuration;
+- paid RPC provider setup;
+- Neon production migration approval;
+- Vercel/Render dashboard changes;
+- real metric provider contract;
+- real merchant/reconciliation provider;
+- legal/business rules for sponsor offers, creator eligibility, or fraud review.
+
+When blocked, continue only with adjacent safe work:
+
+- improve state visibility;
+- add idempotent backend transitions;
+- add tests;
+- add operator runbook text;
+- add dev-only smoke scripts;
+- remove misleading copy;
+- isolate prototype routes.
+
 ## Route Inventory
 
 | Surface | Status | Promotion gate |
 | --- | --- | --- |
 | `/login` | `SEEDED_DEMO` + `MOCK_PREVIEW` | Current page is labeled; promote only after production provider verification and managed-wallet mapping. |
-| `/demo`, `/pitch` | `SEEDED_DEMO` | Audit next so demo copy matches current route/API status and does not overclaim financial flows. |
+| `/demo`, `/pitch` | `SEEDED_DEMO` | `/demo` is audited as a boundary-first demo map. `/pitch` is a support/presentation route and must not be used to imply missing financial flows are live. |
 | `/workspace` | `SEEDED_DEMO` | Remove or narrow mock persona fallback and improve panel-level readiness. |
 | `/workspace/content/new` | `SEEDED_DEMO` | Add retry/resume, deployed R2/Mux smoke documentation, and production media error recovery. |
 | `/workspace/content/[manifestId]` | `SEEDED_DEMO` | Add failed asset recovery, clearer S2 readiness blockers, and remaining i18n cleanup. |
 | `/workspace/intents/[intentId]` | `SEEDED_DEMO` + `MOCK_PREVIEW` | Live route is already API/wallet-wired; next work is role-state polish, fallback labeling, and projection reconciliation. |
-| `/workspace/sponsorships`, `/workspace/buyout` | `MOCK_PREVIEW` | Both are labeled local previews; connect to live proposal/buyout lifecycle before product claims. |
+| `/workspace/sponsorships`, `/workspace/buyout`, `/workspace/overview-v2` | `MOCK_PREVIEW` | Sponsorships and buyout are labeled local previews. `overview-v2` is a legacy/experimental workspace entry; remove, hide, or relabel before public product claims. |
 | `/campaigns/[proposalId]` | `SEEDED_DEMO` | Can load proposal API or local fallback; add fallback readiness clarity and fuller campaign proof projection. |
 | `/campaigns/[proposalId]/endorse` | `MOCK_PREVIEW` | Real SPUMP burn, endorsement PDA, reward pool projection, and claim state. |
 | `/campaigns/[proposalId]/settlement` | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` | Track data must come from projection and permitted operator/oracle flows. |
@@ -129,11 +635,11 @@ Page order:
 
 ```text
 /login (audited)
-/demo (next)
-/workspace/sponsorships
-/workspace/intents/[intentId]
-/workspace/content/new
-/workspace/content/[manifestId]
+/demo (audited)
+/workspace/sponsorships (audited)
+/workspace/intents/[intentId] (audited)
+/workspace/content/new (audited)
+/workspace/content/[manifestId] (audited)
 /workspace (audited)
 /campaigns/[proposalId] (audited)
 /campaigns/[proposalId]/endorse (audited)
@@ -147,6 +653,8 @@ Page order:
 /posts/[postId] (audited)
 /activity (audited)
 /me and /onboarding (audited)
+/pitch (support route)
+/workspace/overview-v2 (legacy/experimental route: remove, hide, or relabel)
 ```
 
 ## Verification
@@ -190,3 +698,4 @@ Full acceptance requires two clean passes of app build, backend build, backend t
 | 2026-05-17 | `/buyout/[creatorId]` | Clarified S1 buyout data-source and action states for demo slugs versus backend wallet routes. Demo rage quit and claim labels now say preview and state that no S1 builder, claim builder, wallet signature, USDC transfer, or Solana transaction occurs; live routes no longer treat a local mock portfolio token as a valid rage quit/claim session, and English mode no longer leaks the Chinese fixture creator name. | `npm run build --prefix app`; browser smoke on `/buyout/luna-cai` confirmed readiness copy, local `MOCK_PREVIEW` source notice, preview rage quit confirmation copy, local-only position/claimable update, English demo creator label, no framework overlay, and clean console. | Production buyout readiness still needs self-serve offer creation, creator acceptance, graduation execution, reclaim, complete post-rage-quit projections, and devnet smoke beyond local preview interaction. Next page: `/creators/[creatorId]`. |
 | 2026-05-17 | `/creators/[creatorId]` | Clarified creator profile data-source states for seeded creator slugs, public-feed-derived profiles, and API fallback. Market-facing labels now use projection/seeded language instead of claiming live on-chain lifecycle, fan token trading, or live buyout offers; the page explains that posts/media can be live while price history, holders, sponsors, and lifecycle remain derived or seeded UI projections. | `npm run build --prefix app`; browser smoke on `/creators/mika-zhou` confirmed readiness copy, seeded creator source notice, seeded market/buyout labels, projection price/lifecycle labels, removal of old live/fan-token/on-chain copy, no framework overlay, and clean console. | Production creator profile readiness still needs creator market read models, rating provenance, daily cap usage, real holder data, R2/Mux media smoke, and projection-backed S1/S2 lifecycle state. Next page: `/explore` and `/trending`. |
 | 2026-05-17 | Remaining page audit: `/explore`, `/trending`, `/posts/[postId]`, `/activity`, `/me`, `/onboarding` | Completed the remaining page-level readiness pass. Explore/trending now show public-feed versus fallback source state and label market/ranking numbers as projected. Post detail now has readiness/source notices for both successful public post records and API unavailable/not-found states. Activity now labels feed-derived activity, unread, share, highlight, and video-count projections. Profile now keeps readiness visible even when feed API fails and labels portfolio/reward/watchlist data as local preview fixtures. Onboarding now states that wallet/auth/profile/reward steps are local preview only. | `npm run build --prefix app`; browser smoke covered `/explore`, `/trending`, `/posts/post-f1-aesthetics`, `/activity`, `/me`, and `/onboarding`; `/onboarding` `Preview Wallet Setup` advanced to role selection; no framework overlay. Console showed only Next dev HMR ISR-manifest warnings during local dev navigation. | Page-readiness audit inventory is complete. Remaining product work moves from labeling to real integrations: deployed feed/media smoke, account-specific activity/profile APIs, production onboarding/auth mapping, reward ledger, and S1/S2 projection hardening. |
+| 2026-05-17 | Demo-to-production roadmap | Added the next concrete product behavior and a staged landing plan from demo to production pilot. The plan prioritizes one real corridor first: authenticated creator -> R2/Mux/backend publication -> public feed/post detail -> proposal intent -> campaign proof. It also defines nine production stages, mock retirement order, third-party blocker policy, and clarifies `/workspace/overview-v2` as legacy/experimental. | `git diff --check` passed for the docs-only update. | Next execution should start with Stage 1 identity/session hardening, then Stage 2 media/feed smoke. Keep existing readiness labels until each mock retirement gate is actually verified. |
