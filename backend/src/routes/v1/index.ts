@@ -4,6 +4,7 @@
  */
 import { Router } from "express";
 
+import accountRoutes from "./accountRoutes";
 import authRoutes from "./authRoutes";
 import campaignRoutes from "./campaignRoutes";
 import contentManifestRoutes from "./contentManifestRoutes";
@@ -17,6 +18,7 @@ import workspaceRoutes from "./workspaceRoutes";
 
 const router = Router();
 
+router.use("/account", accountRoutes);
 router.use("/auth", authRoutes);
 router.use("/campaigns", campaignRoutes);
 router.use("/feed", publicFeedRoutes);

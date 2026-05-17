@@ -14,6 +14,8 @@ export type ProposalIntentStatus =
   | "EXPIRED";
 export type ProposalStatus = "OPEN" | "FUNDED" | "RESOLVED_SUCCESS" | "RESOLVED_FAIL" | "CANCELLED" | "VOIDED";
 export type IdentityProvider = "GOOGLE" | "APPLE" | "EMAIL" | "PASSKEY";
+export type AccountRole = "FAN" | "CREATOR" | "SPONSOR";
+export type AccountProfileStorageStatus = "LIVE" | "MIGRATION_REQUIRED";
 export type LoginPreviewMode = "welcome" | "switch";
 
 export type SessionIdentityRecord = {
@@ -51,6 +53,26 @@ export type CurrentSessionRecord = {
   sessionId: string;
   source: string;
   identity: SessionIdentityRecord | null;
+};
+
+export type AccountProfileRecord = {
+  id: string;
+  wallet: string;
+  role: AccountRole;
+  displayName: string | null;
+  handle: string | null;
+  onboardingCompletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccountMeRecord = {
+  wallet: string;
+  sessionId: string | null;
+  source: string;
+  storageStatus: AccountProfileStorageStatus;
+  identity: SessionIdentityRecord | null;
+  profile: AccountProfileRecord | null;
 };
 
 export type CommentRecord = {

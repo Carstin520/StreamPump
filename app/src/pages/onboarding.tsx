@@ -4,12 +4,54 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
-
-type Role = "fan" | "creator";
+import { getAccountMe, updateAccountMe } from "@/lib/api/account";
+import { AccountMeRecord, AccountRole } from "@/lib/api/types";
+import { getStoredAuthSession } from "@/lib/auth-session";
+import { buildLoginHref } from "@/lib/routes";
 
 const TOTAL_SPUMP = 1_250_000;
 const XP_REWARD = 20;
 const STEPS = 4;
+
+type AccountLoadState =
+  | { kind: "checking" }
+  | { kind: "signed-out" }
+  | { kind: "ready"; token: string; account: AccountMeRecord }
+  | { kind: "error"; message: string };
+
+const ROLE_OPTIONS: Array<{
+  role: AccountRole;
+  label: string;
+  description: string;
+  badge: string;
+}> = [
+  {
+    role: "FAN",
+    label: "Fan",
+    description: "Back creators with non-transferable utility SPUMP",
+    badge: "S1",
+  },
+  {
+    role: "CREATOR",
+    label: "Creator",
+    description: "Publish content and open sponsorship proposals",
+    badge: "CR",
+  },
+  {
+    role: "SPONSOR",
+    label: "Sponsor",
+    description: "Fund campaigns and verify performance proof",
+    badge: "USDC",
+  },
+];
+
+const roleDisplay = (role: AccountRole) =>
+  ROLE_OPTIONS.find((option) => option.role === role)?.label ?? "Fan";
+
+const defaultHandle = (account: AccountMeRecord | null) =>
+  account?.profile?.handle ??
+  account?.identity?.email?.split("@")[0]?.replace(/[^a-z0-9_.-]/gi, "-").toLowerCase() ??
+  "";
 
 function useCountUp(target: number, duration: number, active: boolean) {
   const [value, setValue] = useState(0);
@@ -144,30 +186,86 @@ function TokenRain({ active }: { active: boolean }) {
   );
 }
 
-const OnboardingReadinessNotice = () => (
+const OnboardingReadinessNotice = ({
+  accountState,
+}: {
+  accountState: AccountLoadState;
+}) => {
+  const signedIn = accountState.kind === "ready";
+  const storageStatus = signedIn ? accountState.account.storageStatus : null;
+
+  return (
   <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/65 px-4 py-3 text-[#f8d48a]">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
-        <p className="mt-1 text-sm font-semibold text-white">Local onboarding preview</p>
+        <p className="mt-1 text-sm font-semibold text-white">
+          {signedIn && storageStatus === "LIVE"
+            ? "Session-backed account profile"
+            : signedIn
+              ? "Account profile migration required"
+              : "Sign-in required before profile creation"}
+        </p>
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
-          This flow previews first-run UX only. It does not connect a wallet, create an auth session, register a profile, mint SPUMP, or update backend account state.
+          {signedIn && storageStatus === "LIVE"
+            ? "This flow reads and writes the current session's account profile. SPUMP rewards remain preview-only until the reward ledger is productized."
+            : signedIn
+              ? "The backend session is valid, but AccountProfile storage has not been migrated in this environment. Apply the Prisma migration before production onboarding writes are available."
+              : "Use email OTP or wallet signature login first. Local preview rewards are still shown only after a real session-backed profile can be saved."}
         </p>
       </div>
       <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
-        MOCK_PREVIEW
+        {signedIn && storageStatus === "LIVE" ? "SEEDED_DEMO" : signedIn ? "BACKEND_READY_UI_GAP" : "MOCK_PREVIEW"}
       </span>
     </div>
   </section>
-);
+  );
+};
 
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [role, setRole] = useState<Role>("fan");
+  const [role, setRole] = useState<AccountRole>("FAN");
+  const [displayName, setDisplayName] = useState("");
+  const [handle, setHandle] = useState("");
   const [stepKey, setStepKey] = useState(0);
+  const [accountState, setAccountState] = useState<AccountLoadState>({ kind: "checking" });
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const xpCount = useCountUp(XP_REWARD, 800, currentStep === 2);
   const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 3);
+  const account = accountState.kind === "ready" ? accountState.account : null;
+  const canWriteProfile = accountState.kind === "ready" && accountState.account.storageStatus === "LIVE";
+
+  useEffect(() => {
+    let cancelled = false;
+    const session = getStoredAuthSession();
+    if (!session?.accessToken) {
+      setAccountState({ kind: "signed-out" });
+      return;
+    }
+
+    setDisplayName(session.identity?.displayName ?? "");
+    void getAccountMe(session.accessToken)
+      .then((record) => {
+        if (cancelled) return;
+        setAccountState({ kind: "ready", token: session.accessToken, account: record });
+        setRole(record.profile?.role ?? "FAN");
+        setDisplayName(record.profile?.displayName ?? record.identity?.displayName ?? record.identity?.email?.split("@")[0] ?? "");
+        setHandle(defaultHandle(record));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAccountState({
+          kind: "error",
+          message: error instanceof Error ? error.message : "Unable to load account session",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const goNext = useCallback(() => {
     if (currentStep < STEPS - 1) {
@@ -182,6 +280,35 @@ export default function OnboardingPage() {
       setStepKey((k) => k + 1);
     }
   }, [currentStep]);
+
+  const completeProfile = useCallback(async () => {
+    if (accountState.kind !== "ready") {
+      setSaveMessage("Sign in before creating an account profile.");
+      return;
+    }
+    if (accountState.account.storageStatus !== "LIVE") {
+      setSaveMessage("AccountProfile migration is required before this environment can save onboarding.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const updated = await updateAccountMe(accountState.token, {
+        role,
+        displayName: displayName.trim() || null,
+        handle: handle.trim() || null,
+        completeOnboarding: true,
+      });
+      setAccountState({ kind: "ready", token: accountState.token, account: updated });
+      setCurrentStep(2);
+      setStepKey((k) => k + 1);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : "Profile save failed");
+    } finally {
+      setSaving(false);
+    }
+  }, [accountState, displayName, handle, role]);
 
   return (
     <>
@@ -231,11 +358,11 @@ export default function OnboardingPage() {
 
           <div className="mx-auto mt-4 w-full max-w-[720px] space-y-2">
             <ProductReadinessBanner
-              description="Onboarding is currently a local preview flow. Production onboarding still needs provider verification, managed-wallet/session mapping, profile registration, and real reward accounting."
-              status="MOCK_PREVIEW"
-              title="Onboarding is not connected to auth or rewards yet"
+              description="Onboarding now reads the stored auth session and writes AccountProfile when the migration is applied. Reward animation remains preview-only until real SPUMP issuance and anti-abuse gates are live."
+              status={canWriteProfile ? "SEEDED_DEMO" : "BACKEND_READY_UI_GAP"}
+              title="Onboarding is session-backed; rewards are still preview-only"
             />
-            <OnboardingReadinessNotice />
+            <OnboardingReadinessNotice accountState={accountState} />
           </div>
 
           {/* Card area */}
@@ -250,16 +377,38 @@ export default function OnboardingPage() {
                     Welcome to StreamPump
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Preview the first-run wallet setup
+                    Complete the account profile for your current session
                   </p>
-                  <button
-                    className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold"
-                    onClick={goNext}
-                    type="button"
-                  >
-                    <WalletIcon />
-                    Preview Wallet Setup
-                  </button>
+                  <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
+                    {accountState.kind === "checking"
+                      ? "Checking stored auth session..."
+                      : accountState.kind === "signed-out"
+                        ? "No auth session found. Sign in with email OTP or wallet signature before onboarding."
+                        : accountState.kind === "error"
+                          ? accountState.message
+                          : accountState.account.storageStatus === "LIVE"
+                            ? `Session wallet ${accountState.account.wallet.slice(0, 4)}...${accountState.account.wallet.slice(-4)} is ready for profile setup.`
+                            : "Session is valid, but AccountProfile storage needs the Prisma migration before writes are enabled."}
+                  </div>
+                  {accountState.kind === "signed-out" ? (
+                    <Link
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold"
+                      href={buildLoginHref({ nextPath: "/onboarding" })}
+                    >
+                      <WalletIcon />
+                      Sign in to continue
+                    </Link>
+                  ) : (
+                    <button
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                      disabled={!canWriteProfile}
+                      onClick={goNext}
+                      type="button"
+                    >
+                      <WalletIcon />
+                      Continue with session
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -280,72 +429,76 @@ export default function OnboardingPage() {
                     How will you use StreamPump?
                   </p>
 
-                  <div className="mt-8 grid gap-3">
-                    <button
-                      className={`relative cursor-pointer rounded-[20px] border p-5 text-left transition-all duration-200 ${
-                        role === "fan"
-                          ? "border-[#de402a]/40 bg-[#de402a]/[0.08] shadow-[0_0_24px_rgba(222,64,42,0.12)]"
-                          : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]"
-                      }`}
-                      onClick={() => setRole("fan")}
-                      type="button"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-lg">
-                          🎧
-                        </div>
-                        <div>
-                          <div className="text-[16px] font-semibold">Fan</div>
-                          <div className="mt-0.5 text-[13px] text-[#8ea0ba]">Back creators with utility SPUMP</div>
-                        </div>
-                      </div>
-                      {role === "fan" && (
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#de402a]">
-                            <svg className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                              <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                  <div className="mt-6 grid gap-3">
+                    {ROLE_OPTIONS.map((option) => (
+                      <button
+                        className={`relative cursor-pointer rounded-[20px] border p-5 text-left transition-all duration-200 ${
+                          role === option.role
+                            ? "border-[#de402a]/40 bg-[#de402a]/[0.08] shadow-[0_0_24px_rgba(222,64,42,0.12)]"
+                            : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]"
+                        }`}
+                        key={option.role}
+                        onClick={() => setRole(option.role)}
+                        type="button"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-[11px] font-bold text-[#ffb2a6]">
+                            {option.badge}
+                          </div>
+                          <div className="pr-8">
+                            <div className="text-[16px] font-semibold">{option.label}</div>
+                            <div className="mt-0.5 text-[13px] text-[#8ea0ba]">{option.description}</div>
                           </div>
                         </div>
-                      )}
-                    </button>
-
-                    <button
-                      className={`relative cursor-pointer rounded-[20px] border p-5 text-left transition-all duration-200 ${
-                        role === "creator"
-                          ? "border-[#de402a]/40 bg-[#de402a]/[0.08] shadow-[0_0_24px_rgba(222,64,42,0.12)]"
-                          : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]"
-                      }`}
-                      onClick={() => setRole("creator")}
-                      type="button"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#67b8ff]/10 text-lg">
-                          🎬
-                        </div>
-                        <div>
-                          <div className="text-[16px] font-semibold">Creator</div>
-                          <div className="mt-0.5 text-[13px] text-[#8ea0ba]">Publish content, get sponsored</div>
-                        </div>
-                      </div>
-                      {role === "creator" && (
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#de402a]">
-                            <svg className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                              <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                        {role === option.role && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#de402a]">
+                              <svg className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </button>
+                        )}
+                      </button>
+                    ))}
                   </div>
 
+                  <div className="mt-5 grid gap-3 text-left">
+                    <label className="block space-y-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Display name</span>
+                      <input
+                        className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                        maxLength={80}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                        placeholder="Alex Chen"
+                        value={displayName}
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Handle</span>
+                      <input
+                        className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                        maxLength={30}
+                        onChange={(event) => setHandle(event.target.value.replace(/^@+/, ""))}
+                        placeholder="alexchen"
+                        value={handle}
+                      />
+                    </label>
+                  </div>
+
+                  {saveMessage ? (
+                    <div className="mt-4 rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-4 py-3 text-left text-xs text-[#f8d48a]">
+                      {saveMessage}
+                    </div>
+                  ) : null}
+
                   <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold"
-                    onClick={goNext}
+                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                    disabled={!canWriteProfile || saving}
+                    onClick={() => void completeProfile()}
                     type="button"
                   >
-                    Continue as {role === "fan" ? "Fan" : "Creator"}
+                    {saving ? "Saving profile..." : `Continue as ${roleDisplay(role)}`}
                   </button>
                 </div>
               )}
@@ -354,10 +507,12 @@ export default function OnboardingPage() {
                 <div className="liquid-glass-shell p-8 text-center">
                   <CheckCircle animated />
                   <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.05em]">
-                    Preview Profile Created
+                    Profile Saved
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Local onboarding step complete. No backend profile was written.
+                    {account?.profile?.handle
+                      ? `@${account.profile.handle} is now stored for this session.`
+                      : "Your account profile is now stored for this session."}
                   </p>
 
                   <div
@@ -367,6 +522,9 @@ export default function OnboardingPage() {
                     <span className="text-[13px] font-medium text-[#65ecaf]">Preview XP</span>
                     <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-[#6f8099]">
+                    XP is still a preview animation. No SPUMP mint, reward ledger entry, or balance update happens here.
+                  </p>
 
                   <button
                     className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold"
@@ -396,7 +554,7 @@ export default function OnboardingPage() {
                     Preview SPUMP Ready
                   </h1>
                   <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Local preview allocation. No SPUMP mint or wallet balance update occurred.
+                    Reward issuance is not live yet. This allocation remains a local onboarding preview.
                   </p>
 
                   <div

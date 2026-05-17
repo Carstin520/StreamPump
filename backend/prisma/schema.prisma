@@ -118,6 +118,12 @@ enum IdentityProvider {
   PASSKEY
 }
 
+enum AccountRole {
+  FAN
+  CREATOR
+  SPONSOR
+}
+
 enum MarketCreatorStage {
   S1_DISCOVERY
   S1_BUYOUT
@@ -620,6 +626,19 @@ model AuthIdentity {
 
   @@unique([provider, providerSubject])
   @@index([managedWalletAddress])
+}
+
+model AccountProfile {
+  id                    String      @id @default(cuid())
+  wallet                String      @unique
+  role                  AccountRole @default(FAN)
+  displayName           String?
+  handle                String?     @unique
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([role, onboardingCompletedAt])
 }
 
 model Track2Event {
