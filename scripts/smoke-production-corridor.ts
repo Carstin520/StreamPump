@@ -190,6 +190,9 @@ const apiBaseUrl = normalizeBaseUrl(
 const defaultVideoPath = path.resolve(process.cwd(), "test_files/test_mux.mp4");
 const mediaPath = process.env.STREAM_PUMP_SMOKE_MEDIA_PATH?.trim() || defaultVideoPath;
 const waitForMuxReadySeconds = Number(process.env.STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS ?? 0);
+const proposalDeadlineSeconds = Number(
+  process.env.STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_SECONDS ?? 6 * 24 * 60 * 60
+);
 
 const isTruthyEnv = (name: string): boolean => {
   const value = process.env[name]?.trim().toLowerCase();
@@ -461,6 +464,15 @@ const pollMuxReadiness = async (
 
 const usdc = (value: number): string => String(Math.floor(value * 1_000_000));
 
+const proposalDeadlineUnix = (): string => {
+  const safeDeadlineSeconds =
+    Number.isFinite(proposalDeadlineSeconds) && proposalDeadlineSeconds > 0
+      ? Math.floor(proposalDeadlineSeconds)
+      : 6 * 24 * 60 * 60;
+
+  return String(Math.floor(Date.now() / 1000) + safeDeadlineSeconds);
+};
+
 const run = async () => {
   const creatorToken = requireEnv("STREAM_PUMP_SMOKE_CREATOR_TOKEN");
   const sponsorWallet = process.env.STREAM_PUMP_SMOKE_SPONSOR_WALLET?.trim() ?? "";
@@ -643,7 +655,7 @@ const run = async () => {
         manifestId: manifest.manifestId,
         creatorWallet: account.wallet,
         sponsorWallet,
-        deadlineUnix: String(Math.floor(Date.now() / 1000) + 14 * 24 * 60 * 60),
+        deadlineUnix: proposalDeadlineUnix(),
         track1BaseUsdc: usdc(25),
         track2MetricType: "VIEWS",
         track2TargetValue: "10000",
