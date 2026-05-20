@@ -204,6 +204,54 @@ export type ProposalDetailResponse = {
   proposal: ProposalDetailRecord;
 };
 
+export type PublicCampaignProofResponse = {
+  proposalId: string;
+  proposalPda: string;
+  viewerRole: "PUBLIC";
+  status: ProposalStatus;
+  proofStatus: "DRAFT" | "FUNDED" | "ANCHORED" | "SETTLING" | "SETTLED" | "CANCELLED" | "VOIDED";
+  creatorWallet: string;
+  sponsorWallet: string | null;
+  manifestId: string | null;
+  intentId: string | null;
+  deadlineAt: string;
+  budgetTracks: {
+    track1BaseUsdc: string;
+    track1Claimed: boolean;
+    track2MetricType: string;
+    track2TargetValue: string;
+    track2MinAchievementBps: number;
+    track2UsdcDeposited: string;
+    track2ActualValue: string | null;
+    track2SettledAt: string | null;
+    track3UsdcDeposited: string;
+    track3CpsPayout: string | null;
+    track3DelayDays: number;
+    track3SettledAt: string | null;
+  };
+  proof: {
+    contentHashHex: string | null;
+    contentAnchorPda: string | null;
+    contentAnchorTx: string | null;
+    latestChainTxSignature: string | null;
+    oracleSyncStatus: string | null;
+    contentPublishedVerifiedAt: string | null;
+  };
+  manifest: {
+    manifestId: string;
+    title: string | null;
+    contentType: ContentType;
+    status: ContentManifestStatus;
+    version: number;
+    manifestHashHex: string | null;
+    currentAnchorPda: string | null;
+    currentAnchorTx: string | null;
+    publishedAt: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CreatorMarketProfileResponse = {
   creator: {
     creatorWallet: string;
@@ -490,6 +538,9 @@ export const getProposalIntentById = (token: string, intentId: string) =>
 
 export const getProposalById = (proposalId: string, token?: string) =>
   apiClient.get<ProposalDetailResponse>(`/proposals/${proposalId}`, token ? { token } : undefined);
+
+export const getPublicCampaignProof = (proposalId: string) =>
+  apiClient.get<PublicCampaignProofResponse>(`/campaigns/${proposalId}/public`);
 
 export const getCreatorMarketProfile = (creatorWallet: string) =>
   apiClient.get<CreatorMarketProfileResponse>(`/market/creators/${creatorWallet}`);

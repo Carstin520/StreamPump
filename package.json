@@ -11,6 +11,7 @@
     "demo:s1:devnet": "ts-node --transpile-only scripts/devnet-s1-buyout-claim-seed.ts",
     "demo:s1:full-corridor": "ts-node --transpile-only scripts/devnet-s1-full-corridor.ts",
     "demo:s2:devnet": "ts-node --transpile-only scripts/devnet-s2-happy-path.ts",
+    "demo:s2:full-corridor": "ts-node --transpile-only scripts/devnet-s2-full-corridor.ts",
     "devnet:upgrade:fyph": "ts-node --transpile-only scripts/devnet-upgrade-program-buffered.ts",
     "smoke:production-corridor": "ts-node --transpile-only scripts/smoke-production-corridor.ts",
     "test:anchor": "anchor test",

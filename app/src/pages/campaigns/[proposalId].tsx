@@ -7,7 +7,12 @@ import { PageShell } from "@/components/layout/PageShell";
 import { AsyncStateCard } from "@/components/shared/AsyncStateCard";
 import { Panel } from "@/components/shared/Panel";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
-import { getProposalById, ProposalDetailResponse } from "@/lib/api/workspace";
+import {
+  getProposalById,
+  getPublicCampaignProof,
+  ProposalDetailResponse,
+  PublicCampaignProofResponse,
+} from "@/lib/api/workspace";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
 import { useI18n } from "@/lib/i18n";
 import { findCreatorStrict } from "@/lib/mocks/discover";
@@ -21,7 +26,58 @@ import { getAccessToken, loadWithPublicFallback } from "@/lib/session-flow";
 type PageState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; data: ProposalDetailResponse; source: "live-api" | "demo-fallback" };
+  | {
+      kind: "ready";
+      data: ProposalDetailResponse;
+      proofStatus?: PublicCampaignProofResponse["proofStatus"];
+      source: "live-campaign-proof" | "live-api" | "demo-fallback";
+    };
+
+const normalizeCampaignProof = (
+  campaign: PublicCampaignProofResponse
+): ProposalDetailResponse => ({
+  viewerRole: "PUBLIC_FAN",
+  proposal: {
+    id: campaign.proposalId,
+    proposalPda: campaign.proposalPda,
+    creatorWallet: campaign.creatorWallet,
+    sponsorWallet: campaign.sponsorWallet,
+    deadlineAt: campaign.deadlineAt,
+    status: campaign.status,
+    track1BaseUsdc: campaign.budgetTracks.track1BaseUsdc,
+    track1Claimed: campaign.budgetTracks.track1Claimed,
+    track2MetricType: campaign.budgetTracks.track2MetricType,
+    track2TargetValue: campaign.budgetTracks.track2TargetValue,
+    track2MinAchievementBps: campaign.budgetTracks.track2MinAchievementBps,
+    track2UsdcDeposited: campaign.budgetTracks.track2UsdcDeposited,
+    track2ActualValue: campaign.budgetTracks.track2ActualValue,
+    track2SettledAt: campaign.budgetTracks.track2SettledAt,
+    track3UsdcDeposited: campaign.budgetTracks.track3UsdcDeposited,
+    track3CpsPayout: campaign.budgetTracks.track3CpsPayout,
+    track3DelayDays: campaign.budgetTracks.track3DelayDays,
+    track3SettledAt: campaign.budgetTracks.track3SettledAt,
+    onChainTxSignature: campaign.proof.latestChainTxSignature,
+    oracleSyncStatus: campaign.proof.oracleSyncStatus ?? undefined,
+    contentHashHex: campaign.proof.contentHashHex,
+    contentAnchorPda: campaign.proof.contentAnchorPda,
+    createdAt: campaign.createdAt,
+    updatedAt: campaign.updatedAt,
+  },
+});
+
+const resolveProposalRouteId = (
+  queryValue: string | string[] | undefined,
+  asPath: string
+) => {
+  const queryId = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+  if (queryId?.trim()) {
+    return queryId.trim();
+  }
+
+  const pathname = asPath.split("?")[0]?.split("#")[0] ?? "";
+  const pathId = pathname.split("/").filter(Boolean).at(-1);
+  return pathId ? decodeURIComponent(pathId).trim() : "";
+};
 
 export default function CampaignDetailPage() {
   const router = useRouter();
@@ -29,15 +85,14 @@ export default function CampaignDetailPage() {
   const [state, setState] = useState<PageState>({ kind: "loading" });
 
   useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
-
     let cancelled = false;
-    const proposalId = String(router.query.proposalId ?? "").trim();
+    const proposalId = resolveProposalRouteId(router.query.proposalId, router.asPath);
     const token = getAccessToken();
 
     if (!proposalId) {
+      if (!router.isReady) {
+        return;
+      }
       setState({ kind: "error", message: "proposalId is required" });
       return;
     }
@@ -51,18 +106,36 @@ export default function CampaignDetailPage() {
 
     const loadProposal = async () => {
       try {
-        const data = await loadWithPublicFallback({
-          loadPublic: () => getProposalById(proposalId),
-          loadWithToken: (accessToken) => getProposalById(proposalId, accessToken),
-          token,
-        });
+        const campaignProof = await getPublicCampaignProof(proposalId);
+        const data = normalizeCampaignProof(campaignProof);
         if (!cancelled) {
-          setState({ kind: "ready", data, source: "live-api" });
+          setState({
+            kind: "ready",
+            data,
+            proofStatus: campaignProof.proofStatus,
+            source: "live-campaign-proof",
+          });
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to load proposal.";
-        if (!cancelled) {
-          setState({ kind: "error", message });
+      } catch (campaignError) {
+        try {
+          const data = await loadWithPublicFallback({
+            loadPublic: () => getProposalById(proposalId),
+            loadWithToken: (accessToken) => getProposalById(proposalId, accessToken),
+            token,
+          });
+          if (!cancelled) {
+            setState({ kind: "ready", data, source: "live-api" });
+          }
+        } catch (proposalError) {
+          const message =
+            proposalError instanceof Error
+              ? proposalError.message
+              : campaignError instanceof Error
+                ? campaignError.message
+                : "Failed to load proposal.";
+          if (!cancelled) {
+            setState({ kind: "error", message });
+          }
         }
       }
     };
@@ -72,11 +145,12 @@ export default function CampaignDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, router.query.proposalId]);
+  }, [router.asPath, router.isReady, router.query.proposalId]);
 
   const pageTitle = state.kind === "ready" ? state.data.proposal.id : "Campaign detail";
   const isPublicView = state.kind === "ready" && state.data.viewerRole === "PUBLIC_FAN";
   const isDemoProposal = state.kind === "ready" && state.source === "demo-fallback";
+  const isCampaignProof = state.kind === "ready" && state.source === "live-campaign-proof";
   const demoCreator = isDemoProposal ? findCreatorStrict("neo-park") : undefined;
   const demoCreatorName = locale === "en" ? "Midnight Save" : demoCreator?.name;
   const campaignHeading = demoCreator
@@ -89,7 +163,7 @@ export default function CampaignDetailPage() {
   const settlementHref = isDemoProposal
     ? DEMO_S2_SETTLEMENT_PATH
     : state.kind === "ready"
-      ? `/campaigns/${state.data.proposal.id}/settlement`
+      ? `/campaigns/${state.data.proposal.proposalPda || state.data.proposal.id}/settlement`
       : DEMO_S2_SETTLEMENT_PATH;
 
   return (
@@ -129,6 +203,11 @@ export default function CampaignDetailPage() {
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-100">{state.data.proposal.status}</span>
                 </div>
+                {state.proofStatus ? (
+                  <div className="rounded-2xl border border-[#67b8ff]/20 bg-[#0d1b2a]/55 px-4 py-3 text-sm text-slate-300">
+                    Campaign proof projection: <span className="font-semibold text-white">{state.proofStatus}</span>
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="surface-muted rounded-2xl p-4">
@@ -181,6 +260,8 @@ export default function CampaignDetailPage() {
               <p className="text-sm leading-7 text-slate-300">
                 {isDemoProposal
                   ? "This is the seeded S2 demo campaign used for controlled walkthroughs. It is not a live proposal projection from the backend."
+                  : isCampaignProof
+                    ? "This campaign overview comes from the public campaign proof projection, including proposal status, content anchor, and current proof readiness."
                   : "This campaign overview comes from the proposal API. Creator/sponsor sessions can expose the fuller projection; public viewers get the campaign state that is safe to show."}
               </p>
               <div className="surface-muted rounded-2xl p-4 text-sm text-slate-300">
@@ -233,7 +314,7 @@ const CampaignSourceNotice = ({
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Data source</p>
         <p className="mt-1 text-sm font-semibold text-white">
-          {isDemoProposal ? "Seeded local demo fallback" : "Live proposal API"}
+          {isDemoProposal ? "Seeded local demo fallback" : "Live campaign projection"}
         </p>
       </div>
       <span
@@ -249,7 +330,7 @@ const CampaignSourceNotice = ({
     <p className="mt-2 text-xs leading-5 text-slate-400">
       {isDemoProposal
         ? "Use this path for the controlled S2 walkthrough only. Do not treat the values as backend, indexer, or oracle projection output."
-        : "This page is reading backend proposal projection data. Settlement and endorsement actions still route to preview/operator surfaces."}
+        : "This page is reading backend campaign/proposal projection data. Settlement and endorsement actions still route to preview/operator surfaces."}
     </p>
   </section>
 );

@@ -76,10 +76,13 @@ const pickBestAssetUrl = (asset: PublicFeedAssetRecord | null | undefined) => {
     return null;
   }
 
+  if (asset.assetType === "VIDEO") {
+    return null;
+  }
+
   const candidates = [
-    asset.assetType !== "VIDEO" ? asset.preferredPlaybackUrl : null,
-    asset.assetType !== "VIDEO" ? asset.muxPlaybackUrl : null,
-    asset.preferredPlaybackSource === "ORIGIN" ? asset.preferredPlaybackUrl : null,
+    asset.preferredPlaybackUrl,
+    asset.muxPlaybackUrl,
     asset.originUrl,
   ];
 
