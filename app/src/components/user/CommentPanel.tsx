@@ -5,7 +5,12 @@ import { FollowCheckIcon, FollowPlusIcon, HeartOutlineIcon, HeartSolidIcon, Send
 import { StagePill } from "@/components/shared/StagePill";
 import { CommentRecord, PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
-import { compactNumber, currentUser } from "@/lib/public-data";
+import { compactNumber } from "@/lib/public-data";
+
+const ANONYMOUS_USER = {
+  name: "You",
+  avatarSrc: "/mock/user-surface/posts/cat-portrait.svg",
+};
 
 export const CommentPanel = ({
   post,
@@ -63,9 +68,9 @@ export const CommentPanel = ({
     setComments((value) => [
       {
         id: `new-${Date.now()}`,
-        author: currentUser.name,
+        author: ANONYMOUS_USER.name,
         avatarSeed: "A",
-        avatarSrc: currentUser.avatarSrc,
+        avatarSrc: ANONYMOUS_USER.avatarSrc,
         content,
         likes: 0,
         timeLabel: t("feed.justNow"),
@@ -140,7 +145,7 @@ export const CommentPanel = ({
       </p>
       <div className="space-y-5">
         {comments.map((comment, index) => (
-          <CommentRow comment={comment} emphasized={index === 0 && comment.author === currentUser.name} key={comment.id} />
+          <CommentRow comment={comment} emphasized={index === 0 && comment.author === ANONYMOUS_USER.name} key={comment.id} />
         ))}
       </div>
     </div>

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { CreatorMarketRecord } from "@/lib/api/types";
-import { compactNumber, formatUsd } from "@/lib/public-data";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
 
 export const TrendingCreatorCard = ({
@@ -56,27 +55,15 @@ export const TrendingCreatorCard = ({
           <p className="mb-3 mt-2 truncate text-xs leading-5 text-[#d3dceb]">{creator.teaser}</p>
 
           <div className="grid grid-cols-2 gap-1.5">
-            <Metric accent label="Price proj." value={formatUsd(creator.tokenPrice)} />
-            <Metric label="Holder proj." value={compactNumber(creator.holderCount)} />
-            <Metric label="Pool proj." value={formatUsd(resolveSupporterPool(creator))} />
-            <Metric label="Offer proj." value={formatUsd(resolveOfferValue(creator))} />
+            <Metric label="Posts" value={String(creator.contentPool.length)} />
+            <Metric label="Tags" value={creator.tags.slice(0, 2).join(", ") || "—"} />
+            <Metric label="Stage" value={creator.level} />
+            <Metric label="Momentum" value={`${creator.momentumScore}`} accent />
           </div>
         </div>
       </div>
     </Link>
   );
-};
-
-const resolveSupporterPool = (creator: CreatorMarketRecord) => {
-  if (creator.supporterDistributableUsd) return creator.supporterDistributableUsd;
-  if (creator.valuationUsd) return Math.round(creator.valuationUsd * 0.74);
-  return Math.round(creator.targetGraduationPrice * 14500);
-};
-
-const resolveOfferValue = (creator: CreatorMarketRecord) => {
-  if (creator.buyoutOfferUsd) return creator.buyoutOfferUsd;
-  if (creator.valuationUsd) return creator.valuationUsd;
-  return Math.round(creator.targetGraduationPrice * 64500);
 };
 
 const Metric = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (

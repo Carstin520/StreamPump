@@ -11,15 +11,7 @@ import {
   PostRecord,
   UserNoteRecord,
 } from "@/lib/api/types";
-import {
-  creators as creatorProfileSeeds,
-  posts as fallbackPublicFeedPosts,
-} from "@/lib/mocks/discover";
 import { usePublicFeedPosts } from "./usePublicFeedPosts";
-
-const creatorProfileById = new Map(
-  creatorProfileSeeds.map((seed) => [seed.id, seed]),
-);
 
 const activityFeedTabs: ActivityFeedTabRecord[] = [
   { id: "overview", label: "综合" },
@@ -105,25 +97,17 @@ const fallbackTeaser = (
 
 const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
   const primaryPost = posts[0];
-  const profileSeed = creatorProfileById.get(primaryPost.creatorId);
-  const state = profileSeed?.state ?? pickState(posts);
+  const state = pickState(posts);
   const totalLikesAndSavesCount = posts.reduce((total, post) => total + post.likes + post.saves, 0);
   const derivedTags = unique(posts.flatMap((post) => post.tags)).slice(0, 3);
-  const tags = profileSeed?.tags?.length ? profileSeed.tags : derivedTags;
-  const niche =
-    profileSeed?.niche ?? (derivedTags.join(" x ") || "Imported creator signal");
-  const city = profileSeed?.city ?? primaryPost.location;
-  const intro =
-    profileSeed?.intro ??
-    fallbackIntro(primaryPost.creatorName, derivedTags, niche);
-  const teaser =
-    profileSeed?.teaser ?? fallbackTeaser(posts.length, derivedTags, state);
-  const followerBase = 18000 + totalLikesAndSavesCount * 3;
+  const niche = derivedTags.join(" x ") || "Creator";
+  const city = primaryPost.location;
+  const intro = fallbackIntro(primaryPost.creatorName, derivedTags, niche);
+  const teaser = fallbackTeaser(posts.length, derivedTags, state);
+  const followerBase = totalLikesAndSavesCount * 3;
   const tokenPrice =
-    profileSeed?.tokenPrice ??
     Number((1.4 + (totalLikesAndSavesCount % 3200) / 1000).toFixed(2));
-  const targetGraduationPrice =
-    profileSeed?.targetGraduationPrice ?? Number((tokenPrice * 1.42).toFixed(2));
+  const targetGraduationPrice = Number((tokenPrice * 1.42).toFixed(2));
 
   return {
     id: primaryPost.creatorId,
@@ -131,49 +115,40 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
     handle: primaryPost.creatorHandle,
     avatarSrc: primaryPost.creatorAvatarSrc,
     heroSrc: primaryPost.coverSrc,
-    followingCount: profileSeed?.followingCount ?? 80 + posts.length * 14,
-    followersCount: profileSeed?.followersCount ?? followerBase,
+    followingCount: posts.length * 14,
+    followersCount: followerBase,
     totalLikesAndSavesCount,
     niche,
     city,
     intro,
-    level: profileSeed?.level ?? stageLevelLabel(state),
+    level: stageLevelLabel(state),
     momentumScore:
-      profileSeed?.momentumScore ??
       Math.min(96, 54 + posts.length * 8 + Math.round(totalLikesAndSavesCount / 2800)),
     tokenPrice,
-    supply: profileSeed?.supply ?? 9600 + posts.length * 1400,
+    supply: 9600 + posts.length * 1400,
     graduationProgress:
-      profileSeed?.graduationProgress ??
-      (state === "S2_ACTIVE" ? 100 : Math.min(92, 38 + posts.length * 18)),
-    buyoutStatus: profileSeed?.buyoutStatus ?? stageStatusLabel(state),
+      state === "S2_ACTIVE" ? 100 : Math.min(92, 38 + posts.length * 18),
+    buyoutStatus: stageStatusLabel(state),
     state,
     teaser,
-    tags,
-    holderCount: profileSeed?.holderCount ?? 820 + posts.length * 380,
-    topHolders: profileSeed?.topHolders ?? buildTopHolders(primaryPost.creatorId),
+    tags: derivedTags,
+    holderCount: 820 + posts.length * 380,
+    topHolders: buildTopHolders(primaryPost.creatorId),
     targetGraduationPrice,
-    potentialSponsors:
-      profileSeed?.potentialSponsors ?? buildPotentialSponsors(posts),
-    supporterDistributableUsd:
-      profileSeed?.supporterDistributableUsd ?? 38000 + posts.length * 21000,
-    buyoutOfferUsd: profileSeed?.buyoutOfferUsd ?? 160000 + posts.length * 98000,
+    potentialSponsors: buildPotentialSponsors(posts),
+    supporterDistributableUsd: 38000 + posts.length * 21000,
+    buyoutOfferUsd: 160000 + posts.length * 98000,
     buyoutTimeline:
-      profileSeed?.buyoutTimeline ??
-      (state === "S1_BUYOUT"
+      state === "S1_BUYOUT"
         ? ["Signal building", "Sponsor attention", "Window approaching"]
-        : undefined),
+        : undefined,
     activeCampaignCount:
-      profileSeed?.activeCampaignCount ??
-      (state === "S2_ACTIVE" ? Math.max(1, posts.length - 1) : undefined),
+      state === "S2_ACTIVE" ? Math.max(1, posts.length - 1) : undefined,
     activityScore:
-      profileSeed?.activityScore ??
-      (state === "S2_ACTIVE" ? 72 + posts.length * 4 : undefined),
+      state === "S2_ACTIVE" ? 72 + posts.length * 4 : undefined,
     valuationUsd:
-      profileSeed?.valuationUsd ??
-      (state === "S2_ACTIVE" ? 480000 + posts.length * 180000 : undefined),
+      state === "S2_ACTIVE" ? 480000 + posts.length * 180000 : undefined,
     contentPool:
-      profileSeed?.contentPool ??
       posts.slice(0, 3).map((post) => compactPreview(post.title, 28)),
   };
 };
@@ -279,47 +254,31 @@ export const usePublicFeedViewModel = (options?: {
       postsByCreator.set(post.creatorId, group);
     });
 
-    creatorProfileSeeds.forEach((creator) => {
-      const currentPosts = postsByCreator.get(creator.id);
-      if (currentPosts?.length) {
-        return;
-      }
-
-      const fallbackPosts = fallbackPublicFeedPosts.filter((post) => post.creatorId === creator.id);
-      if (fallbackPosts.length > 0) {
-        postsByCreator.set(creator.id, fallbackPosts);
-      }
-    });
-
-    const derivedCreators = Array.from(postsByCreator.entries())
+    const creators = Array.from(postsByCreator.entries())
       .filter(([, creatorPosts]) => creatorPosts.length > 0)
-      .map(([, creatorPosts]) => createCreatorRecord(creatorPosts));
-    const creatorMap = new Map(creatorProfileSeeds.map((creator) => [creator.id, creator]));
-    derivedCreators.forEach((creator) => {
-      creatorMap.set(creator.id, creator);
-    });
-    const creators = Array.from(creatorMap.values()).sort(
-      (left, right) => right.momentumScore - left.momentumScore
-    );
-    const visiblePosts = posts.length > 0 ? posts : fallbackPublicFeedPosts;
+      .map(([, creatorPosts]) => createCreatorRecord(creatorPosts))
+      .sort((left, right) => right.momentumScore - left.momentumScore);
+
+    const creatorMap = new Map(creators.map((creator) => [creator.id, creator]));
+
     const activityAuthors = creators.map((creator) =>
       createActivityAuthor(creator, postsByCreator.get(creator.id) ?? [])
     );
-    const activityFeedItems = visiblePosts.map(createActivityFeedItem);
-    const activityVideoItems = visiblePosts
+    const activityFeedItems = posts.map(createActivityFeedItem);
+    const activityVideoItems = posts
       .filter((post) => post.type === "VIDEO")
       .map(createActivityVideoItem);
     const activitySidebarHighlights = creators.slice(0, 4).map((creator) =>
       createSidebarHighlight(creator, postsByCreator.get(creator.id) ?? [])
     );
-    const currentUser = createCurrentUserRecord(visiblePosts);
-    const currentUserNotes = visiblePosts.map((post) =>
+    const currentUser = createCurrentUserRecord(posts);
+    const currentUserNotes = posts.map((post) =>
       createUserNote(post, "me-note", currentUser.name, currentUser.avatarSrc)
     );
-    const currentUserSavedPosts = visiblePosts.slice(0, 6).map((post) =>
+    const currentUserSavedPosts = posts.slice(0, 6).map((post) =>
       createUserNote(post, "saved", post.creatorName, post.creatorAvatarSrc)
     );
-    const currentUserLikedPosts = visiblePosts.slice(1, 7).map((post) =>
+    const currentUserLikedPosts = posts.slice(1, 7).map((post) =>
       createUserNote(post, "liked", post.creatorName, post.creatorAvatarSrc)
     );
 

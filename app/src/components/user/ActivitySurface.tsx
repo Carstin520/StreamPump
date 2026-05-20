@@ -9,7 +9,6 @@ import {
 } from "@/components/shared/AppIcons";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
-import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StagePill } from "@/components/shared/StagePill";
 import { ActivityTab } from "@/lib/api/types";
 import { PostRecord } from "@/lib/api/types";
@@ -53,11 +52,6 @@ export const ActivitySurface = ({
   return (
     <PageShell searchPlaceholder={t("feed.searchActivityPlaceholder")}>
       <div className="mx-auto max-w-[1400px] space-y-4 py-4">
-        <ProductReadinessBanner
-          description="Activity is derived from public feed posts plus seeded creator records. It is useful for demo browsing, but it is not yet a production notification graph, follow graph, or engagement ledger."
-          status="SEEDED_DEMO"
-          title="Activity is a feed-derived preview surface"
-        />
         <ActivitySourceNotice error={error ?? initialError} />
         <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)_280px]">
           <aside className="hidden xl:block">
@@ -147,6 +141,13 @@ export const ActivitySurface = ({
             {loading ? <div className="text-sm text-[#8ea0ba]">{t("feed.loadingActivity")}</div> : null}
 
             {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
+
+            {!loading && !error && activityFeedItems.length === 0 ? (
+              <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
+                <p className="font-semibold text-white">{t("feed.emptyTitle")}</p>
+                <p className="mt-2 text-[#8ea0ba]">{t("feed.emptyBody")}</p>
+              </div>
+            ) : null}
 
             {!loading && !error && activeTab === "overview" ? (
               <div className="space-y-2.5">
@@ -334,32 +335,14 @@ export const ActivitySurface = ({
 };
 
 const ActivitySourceNotice = ({ error }: { error: string | null }) => {
-  const config = error
-    ? {
-        label: "SEEDED_DEMO",
-        title: "Activity fallback active",
-        body: "The public feed API is unavailable for this render, so activity rows and sidebars are using available fallback records. Counts, unread dots, highlights, and creator filters are not production notifications.",
-        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
-      }
-    : {
-        label: "LIVE + SEEDED_DEMO",
-        title: "Public feed activity projection",
-        body: "Posts can come from the public feed API, while activity rows, unread indicators, creator filters, shares, highlights, and video counts are derived UI projections. Production readiness needs account-specific activity APIs and notification state.",
-        tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
-      };
+  if (!error) {
+    return null;
+  }
 
   return (
-    <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Activity data source</p>
-          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
-          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
-        </div>
-        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
-          {config.label}
-        </span>
-      </div>
+    <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/55 px-4 py-3 text-[#f8d48a]">
+      <p className="text-sm font-semibold text-white">Activity unavailable</p>
+      <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{error}</p>
     </section>
   );
 };
