@@ -247,12 +247,14 @@ const ScrollRevealTopbar = ({
 
       <header
         ref={barRef}
-        className="scroll-reveal-search-header fixed inset-x-0 top-0 px-4 pt-4 lg:left-[280px] lg:px-6 transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity]"
+        className="scroll-reveal-search-header fixed inset-x-0 top-0 pt-4 lg:left-[280px] transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity]"
         style={{
           opacity: "var(--scroll-reveal-search-opacity, 1)",
         }}
       >
-        <TopbarInner searchPlaceholder={searchPlaceholder} />
+        <div className="mx-auto max-w-[1480px] px-4 lg:px-6">
+          <TopbarInner searchPlaceholder={searchPlaceholder} />
+        </div>
       </header>
     </>
   );

@@ -188,23 +188,39 @@ export const ActivitySurface = ({
                         <p className="mt-1.5 text-[11px] text-[#de7a68]">{item.actionSummary}</p>
 
                         {item.coverSrc ? (
-                          <div className="card-radius mt-3 overflow-hidden border border-white/[0.06] bg-[#0b1019]">
-                            <div className="relative aspect-[16/9] max-h-[220px] w-full">
-                              <ProgressiveImage
-                                alt={item.title ?? creator.name}
-                                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
-                                fill
-                                priority={index === 0}
-                                sizes="(max-width: 1024px) 100vw, 720px"
-                                src={item.coverSrc}
-                              />
-                              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,17,28,0.05)_0%,transparent_30%,transparent_60%,rgba(8,17,28,0.4)_100%)]" />
-                              {item.mediaType === "VIDEO" && item.durationLabel ? (
-                                <div className="absolute bottom-2.5 right-2.5 rounded-full border border-white/10 bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                                  {item.durationLabel}
-                                </div>
-                              ) : null}
-                            </div>
+                          <div className="mt-3 overflow-hidden rounded-lg bg-[#0b1019]">
+                            {item.gallerySrcs && item.gallerySrcs.length >= 2 ? (
+                              <div className="grid grid-cols-2 gap-1">
+                                {item.gallerySrcs.slice(0, 2).map((src, imgIdx) => (
+                                  <div className="relative aspect-square overflow-hidden rounded-md" key={imgIdx}>
+                                    <ProgressiveImage
+                                      alt={`${item.title ?? creator.name} ${imgIdx + 1}`}
+                                      className="absolute inset-0 h-full w-full object-cover"
+                                      fill
+                                      priority={index === 0 && imgIdx === 0}
+                                      sizes="(max-width: 1024px) 50vw, 360px"
+                                      src={src}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg">
+                                <ProgressiveImage
+                                  alt={item.title ?? creator.name}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                  fill
+                                  priority={index === 0}
+                                  sizes="(max-width: 1024px) 100vw, 720px"
+                                  src={item.coverSrc}
+                                />
+                                {item.mediaType === "VIDEO" && item.durationLabel ? (
+                                  <div className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                    {item.durationLabel}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                         ) : null}
                       </Link>
@@ -230,7 +246,7 @@ export const ActivitySurface = ({
             ) : null}
 
             {!loading && !error && activeTab === "video" ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {visibleVideoItems.map((item, index) => {
                   const creator = creatorMap.get(item.creatorId);
                   if (!creator) {
@@ -239,46 +255,46 @@ export const ActivitySurface = ({
 
                   return (
                     <Link
-                      className="group block overflow-hidden"
+                      className="group block"
                       href={`/posts/${item.postId}`}
                       key={item.id}
                     >
-                      <article className="glass-card overflow-hidden border-white/[0.06] bg-[#101621]">
-                        <div className="relative aspect-[16/10] overflow-hidden">
-                          <ProgressiveImage
-                            alt={item.title}
-                            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                            fill
-                            priority={index < 2}
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
-                            src={item.coverSrc}
-                          />
-                          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_40%,rgba(7,13,21,0.36)_70%,rgba(7,13,21,0.78)_100%)]" />
-                          <div className="absolute left-2.5 top-2.5">
-                            <StagePill compact stage={creator.state} />
-                          </div>
-                          <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2.5 text-[11px] text-white">
-                            <span>▶ {compactNumber(item.viewsCount)}</span>
-                            <span>◌ {compactNumber(item.commentsCount)}</span>
-                          </div>
-                          {item.durationLabel ? (
-                            <div className="absolute bottom-2.5 right-2.5 rounded-full border border-white/10 bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                              {item.durationLabel}
-                            </div>
-                          ) : null}
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-lg">
+                        <ProgressiveImage
+                          alt={item.title}
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                          fill
+                          priority={index < 2}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
+                          src={item.coverSrc}
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute bottom-1.5 left-2 z-[2] flex items-center gap-2.5 text-[11px] text-white/80">
+                          <span className="flex items-center gap-0.5">
+                            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 16 16"><path d="M6.25 4.72a.75.75 0 0 1 1.06-.02l3.22 3.05a.75.75 0 0 1 0 1.08l-3.22 3.05a.75.75 0 0 1-1.03-1.09L8.87 8.2 6.27 5.78a.75.75 0 0 1-.02-1.06Z" /></svg>
+                            {compactNumber(item.viewsCount)}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <CommentBubbleIcon className="h-3 w-3" />
+                            {compactNumber(item.commentsCount)}
+                          </span>
                         </div>
+                        {item.durationLabel ? (
+                          <div className="absolute bottom-1.5 right-2 z-[2] rounded px-1 py-px text-[11px] font-medium leading-4 text-white/90 bg-black/50">
+                            {item.durationLabel}
+                          </div>
+                        ) : null}
+                      </div>
 
-                        <div className="space-y-2 px-3 py-3">
-                          <p className="line-clamp-2 text-[13px] font-medium leading-5 text-white">{item.title}</p>
-                          <div className="flex items-center justify-between gap-2 text-[11px] text-[#8fa1bb]">
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <img alt={creator.name} className="h-5 w-5 rounded-full object-cover" src={creator.avatarSrc} />
-                              <span className="truncate">{creator.name}</span>
-                            </div>
-                            <span className="shrink-0">{item.timeLabel}</span>
-                          </div>
+                      <div className="mt-2 px-0.5">
+                        <p className="line-clamp-2 text-[13px] font-normal leading-[1.4] text-[#d1d7e0] group-hover:text-[#67b8ff]">{item.title}</p>
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#9aa8bc]">
+                          <img alt={creator.name} className="h-5 w-5 rounded-full object-cover" src={creator.avatarSrc} />
+                          <span className="truncate">{creator.name}</span>
+                          <span className="text-[#4a5568]">·</span>
+                          <span className="shrink-0">{item.timeLabel}</span>
                         </div>
-                      </article>
+                      </div>
                     </Link>
                   );
                 })}

@@ -217,6 +217,7 @@ const createActivityFeedItem = (post: PostRecord): ActivityFeedItemRecord => ({
   likesCount: post.likes,
   sharesCount: Math.max(12, Math.round(post.saves / 6)),
   coverSrc: post.coverSrc,
+  gallerySrcs: post.gallerySrcs,
   mediaType: post.type,
   durationLabel: post.durationLabel,
   stage: post.stage,

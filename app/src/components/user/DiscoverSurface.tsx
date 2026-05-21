@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { PostCard } from "./PostCard";
-import { TrendingCreatorCard } from "./TrendingCreatorCard";
+import { TrendingTabsView } from "./TrendingTabs";
 
 let postDetailExperiencePromise:
   | Promise<typeof import("@/components/post/PostDetailExperience").PostDetailExperience>
@@ -249,7 +249,7 @@ const TrendingView = ({
   initialPosts?: PostRecord[];
 }) => {
   const { t } = useI18n();
-  const { creators, error, loading } = usePublicFeedViewModel({
+  const { creators, error, loading, posts, postsByCreator } = usePublicFeedViewModel({
     initialError,
     initialPosts,
   });
@@ -280,11 +280,7 @@ const TrendingView = ({
       ) : null}
 
       {!loading && !error && creators.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {creators.map((creator, index) => (
-            <TrendingCreatorCard creator={creator} key={creator.id} priority={index < 2} />
-          ))}
-        </div>
+        <TrendingTabsView creators={creators} posts={posts} postsByCreator={postsByCreator} />
       ) : null}
     </section>
   );

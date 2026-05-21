@@ -297,6 +297,7 @@ export type ActivityFeedItemRecord = {
   likesCount: number;
   sharesCount: number;
   coverSrc?: string;
+  gallerySrcs?: string[];
   mediaType?: PostType;
   durationLabel?: string;
   stage: CreatorSeasonState | "NONE";

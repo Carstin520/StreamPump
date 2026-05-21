@@ -5,7 +5,15 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
-import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import {
+  PreviewHoldingsTable,
+  PreviewPortfolioHero,
+  PreviewRewardsPanel,
+  PreviewSnapshotStrip,
+  PreviewWatchlistPanel,
+  usePreviewPortfolio,
+  usePreviewWatchlist,
+} from "@/components/portfolio/PortfolioPreviewPanels";
 import {
   DemoCreatorBanner,
   S1ErrorState,
@@ -47,8 +55,8 @@ import {
 /*  Tabs                                                               */
 /* ------------------------------------------------------------------ */
 
-type LiveTab = "Portfolio" | "Claim queue";
-const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue"];
+type LiveTab = "Portfolio" | "Claim queue" | "Preview Holdings" | "Watchlist" | "Rewards";
+const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue", "Preview Holdings", "Watchlist", "Rewards"];
 type PortfolioPosition = S1PortfolioResponse["positions"][number];
 
 const isExpiredSessionError = (error: unknown) => {
@@ -598,6 +606,8 @@ function PortfolioPage() {
   const [isMockPortfolioSession, setIsMockPortfolioSession] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const previewPortfolio = usePreviewPortfolio();
+  const previewWatchlist = usePreviewWatchlist();
 
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const hasActiveWalletSession =
@@ -690,12 +700,7 @@ function PortfolioPage() {
     <>
       <Head><title>{t("page.portfolio.title")}</title></Head>
       <PageShell>
-        <div className="mx-auto max-w-[1100px]">
-          <ProductReadinessBanner
-            description="Live portfolio and USDC claim depend on a seeded devnet creator market, authenticated wallet session, and synchronized S1 projections. Local demo sessions only preview position state and never submit a claim."
-            status="SEEDED_DEMO"
-            title="Portfolio claim is a seeded S1 demo path"
-          />
+        <div className="mx-auto max-w-[1100px] space-y-3">
           {!loading ? <PortfolioSourceNotice mode={portfolioSourceMode} reason={fallbackReason} /> : null}
         </div>
 
@@ -766,6 +771,9 @@ function PortfolioPage() {
               sourceLabel={isMockPortfolioSession ? "Demo Portfolio" : "Backend Portfolio"}
             />
 
+            <PreviewPortfolioHero portfolio={previewPortfolio} />
+            <PreviewSnapshotStrip portfolio={previewPortfolio} />
+
             <MetricsStrip portfolio={portfolio} />
 
             <TabBar active={activeTab} onChange={setActiveTab} />
@@ -776,6 +784,18 @@ function PortfolioPage() {
 
             {activeTab === "Claim queue" ? (
               <ClaimQueue claimsEnabled={liveClaimsEnabled} onRefresh={refresh} portfolio={portfolio} />
+            ) : null}
+
+            {activeTab === "Preview Holdings" ? (
+              <PreviewHoldingsTable rows={previewPortfolio.holdings} />
+            ) : null}
+
+            {activeTab === "Watchlist" ? (
+              <PreviewWatchlistPanel rows={previewWatchlist} />
+            ) : null}
+
+            {activeTab === "Rewards" ? (
+              <PreviewRewardsPanel portfolio={previewPortfolio} />
             ) : null}
 
             <DemoHolderHints />
