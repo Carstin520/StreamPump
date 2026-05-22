@@ -48,9 +48,13 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  Ed25519Program,
   SYSVAR_RENT_PUBKEY,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
+import { ed25519 } from "@noble/curves/ed25519";
 
 // Re-export BN type for convenience across test files
 // 重新导出 BN 类型，方便其他测试文件使用
@@ -182,6 +186,14 @@ export interface TestContext {
     fn: () => Promise<string>,
     expectedNeedle: string
   ) => Promise<void>;
+  /**
+   * Build the required Ed25519 oracle authorization instruction for register_creator.
+   */
+  creatorAuthPreInstruction: (
+    creator: PublicKey,
+    handle: string,
+    signerOverride?: Keypair
+  ) => TransactionInstruction;
 
   // --- PDA derivation helpers / PDA 推导辅助函数 ---
 
@@ -446,6 +458,46 @@ const buildContext = async (): Promise<TestContext> => {
         `Expected error containing "${expectedNeedle}", got:\n${text}`
       );
     }
+  };
+
+  const buildCreatorAuthMessage = (
+    creator: PublicKey,
+    handle: string,
+    timestampUnix: number,
+    nonce: Uint8Array
+  ): Buffer => {
+    const domain = Buffer.from("streampump:creator-register:v1");
+    const handleBytes = Buffer.from(handle, "utf8");
+    const handleLen = Buffer.alloc(2);
+    handleLen.writeUInt16LE(handleBytes.length, 0);
+    const timestamp = Buffer.alloc(8);
+    timestamp.writeBigInt64LE(BigInt(timestampUnix), 0);
+
+    return Buffer.concat([
+      domain,
+      creator.toBuffer(),
+      handleLen,
+      handleBytes,
+      Buffer.from(nonce),
+      timestamp,
+    ]);
+  };
+
+  const creatorAuthPreInstruction = (
+    creator: PublicKey,
+    handle: string,
+    signerOverride?: Keypair
+  ): TransactionInstruction => {
+    const signer = signerOverride ?? oracle;
+    const nonce = Keypair.generate().publicKey.toBytes();
+    const message = buildCreatorAuthMessage(creator, handle, nowTs(), nonce);
+    const signature = ed25519.sign(message, signer.secretKey.slice(0, 32));
+
+    return Ed25519Program.createInstructionWithPublicKey({
+      publicKey: signer.publicKey.toBytes(),
+      message,
+      signature,
+    });
   };
 
   // ===========================================================================
@@ -726,32 +778,38 @@ const buildContext = async (): Promise<TestContext> => {
   const creatorS1Profile = deriveCreatorProfile(creatorS1.publicKey);
 
   // Register S2 creator / 注册 S2 创作者
+  const creatorS2Handle = "creator_s2";
   await program.methods
     .registerCreator({
-      handle: "creator_s2",
+      handle: creatorS2Handle,
       payoutUsdcAta: creatorS2UsdcAta,
     })
     .accounts({
       authority: creatorS2.publicKey,
       protocolConfig,
       creatorProfile: creatorS2Profile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([creatorAuthPreInstruction(creatorS2.publicKey, creatorS2Handle)])
     .signers([creatorS2])
     .rpc();
 
   // Register S1 creator / 注册 S1 创作者
+  const creatorS1Handle = "creator_s1";
   await program.methods
     .registerCreator({
-      handle: "creator_s1",
+      handle: creatorS1Handle,
       payoutUsdcAta: creatorS1UsdcAta,
     })
     .accounts({
       authority: creatorS1.publicKey,
       protocolConfig,
       creatorProfile: creatorS1Profile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([creatorAuthPreInstruction(creatorS1.publicKey, creatorS1Handle)])
     .signers([creatorS1])
     .rpc();
 
@@ -896,6 +954,7 @@ const buildContext = async (): Promise<TestContext> => {
     tokenAmount,
     waitUntilDeadline,
     expectAnchorError,
+    creatorAuthPreInstruction,
 
     deriveCreatorProfile,
     deriveProposal,

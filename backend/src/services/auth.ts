@@ -5,7 +5,7 @@
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { ed25519 } from "@noble/curves/ed25519";
-import { IdentityProvider } from "@prisma/client";
+import { AccountRole, IdentityProvider } from "@prisma/client";
 import bs58 from "bs58";
 import { Keypair, PublicKey } from "@solana/web3.js";
 
@@ -157,6 +157,22 @@ const parseSessionToken = (
 const createPlatformManagedWalletAddress = (): string =>
   Keypair.generate().publicKey.toBase58();
 
+const ensureFanAccountProfile = async (
+  wallet: string,
+  displayName?: string | null
+) =>
+  prisma.accountProfile.upsert({
+    where: { wallet },
+    update: {
+      displayName: displayName ?? undefined,
+    },
+    create: {
+      wallet,
+      role: AccountRole.FAN,
+      displayName: displayName ?? undefined,
+    },
+  });
+
 const normalizeEmail = (email: string): string => {
   const normalized = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
@@ -270,7 +286,7 @@ export const createWalletAuthChallenge = async (wallet: string) => {
   };
 };
 
-export const verifyWalletAuthChallenge = async (params: {
+const verifyPendingWalletAuthChallenge = async (params: {
   wallet: string;
   nonce: string;
   signature: string;
@@ -302,6 +318,19 @@ export const verifyWalletAuthChallenge = async (params: {
     throw new Error("invalid wallet signature");
   }
 
+  return {
+    challenge,
+    normalizedWallet,
+  };
+};
+
+export const verifyWalletAuthChallenge = async (params: {
+  wallet: string;
+  nonce: string;
+  signature: string;
+}) => {
+  const { challenge, normalizedWallet } = await verifyPendingWalletAuthChallenge(params);
+
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   const accessToken = buildSessionToken({
@@ -326,6 +355,8 @@ export const verifyWalletAuthChallenge = async (params: {
       },
     }),
   ]);
+
+  await ensureFanAccountProfile(normalizedWallet);
 
   return {
     wallet: normalizedWallet,
@@ -462,6 +493,7 @@ export const exchangeProviderIdentitySession = async (params: {
       });
 
   const session = await createWalletSession(identity.managedWalletAddress);
+  await ensureFanAccountProfile(identity.managedWalletAddress, identity.displayName);
 
   return {
     ...session,
@@ -472,6 +504,75 @@ export const exchangeProviderIdentitySession = async (params: {
       email: identity.email,
       displayName: identity.displayName,
       managedWalletAddress: identity.managedWalletAddress,
+    },
+  };
+};
+
+export const bindExternalWalletToIdentitySession = async (params: {
+  currentAccessToken: string;
+  wallet: string;
+  nonce: string;
+  signature: string;
+}) => {
+  const currentSession = await verifyWalletSessionToken(params.currentAccessToken);
+  if (!currentSession) {
+    throw new Error("current identity session is invalid or expired");
+  }
+
+  const identity = await findAuthIdentityByWallet(currentSession.wallet);
+  if (!identity) {
+    throw new Error("current session is not linked to a provider identity");
+  }
+
+  const { challenge, normalizedWallet } = await verifyPendingWalletAuthChallenge({
+    wallet: params.wallet,
+    nonce: params.nonce,
+    signature: params.signature,
+  });
+  const sessionId = randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const accessToken = buildSessionToken({
+    sessionId,
+    wallet: normalizedWallet,
+    expiresAt,
+  });
+
+  await prisma.$transaction([
+    prisma.walletAuthChallenge.update({
+      where: { id: challenge.id },
+      data: {
+        consumedAt: new Date(),
+      },
+    }),
+    prisma.authIdentity.update({
+      where: { id: identity.id },
+      data: {
+        managedWalletAddress: normalizedWallet,
+      },
+    }),
+    prisma.walletSession.create({
+      data: {
+        id: sessionId,
+        wallet: normalizedWallet,
+        tokenHash: sha256Hex(accessToken),
+        expiresAt,
+      },
+    }),
+  ]);
+
+  await ensureFanAccountProfile(normalizedWallet, identity.displayName);
+
+  return {
+    wallet: normalizedWallet,
+    accessToken,
+    expiresAt,
+    identity: {
+      id: identity.id,
+      provider: identity.provider,
+      providerSubject: identity.providerSubject,
+      email: identity.email,
+      displayName: identity.displayName,
+      managedWalletAddress: normalizedWallet,
     },
   };
 };

@@ -24,6 +24,11 @@ export const config = {
       process.env.AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE,
       false
     ),
+    internalOperatorApiKey: process.env.INTERNAL_OPERATOR_API_KEY,
+    creatorAuthAllowPreviewTwitter: env.readBoolean(
+      process.env.CREATOR_AUTH_ALLOW_PREVIEW_TWITTER,
+      process.env.NODE_ENV !== "production"
+    ),
   },
   email: {
     deliveryMode: env.readString(process.env.EMAIL_DELIVERY_MODE, "console"),

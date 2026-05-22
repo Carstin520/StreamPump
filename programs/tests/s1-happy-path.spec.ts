@@ -10,6 +10,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   sendAndConfirmTransaction,
   SystemProgram,
@@ -131,17 +132,20 @@ describe("streampump-core S1 happy path", function () {
       );
 
       const creatorProfile = ctx.deriveCreatorProfile(creator.publicKey);
+      const creatorHandle = "s1_happy_creator";
       await ctx.program.methods
         .registerCreator({
-          handle: "s1_happy_creator",
+          handle: creatorHandle,
           payoutUsdcAta: creatorUsdcAta,
         })
         .accounts({
           authority: creator.publicKey,
           protocolConfig: ctx.protocolConfig,
           creatorProfile,
+          instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, creatorHandle)])
         .signers([creator])
         .rpc();
 

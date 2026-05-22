@@ -4,6 +4,9 @@ import {
   CurrentSessionRecord,
   EmailAuthChallengeRecord,
   IdentityProvider,
+  SponsorDocumentUploadRecord,
+  SponsorProfileRecord,
+  SponsorType,
   WalletAuthChallengeRecord,
 } from "./types";
 
@@ -38,12 +41,47 @@ export const verifyWalletAuthChallenge = (input: {
   wallet: string;
   nonce: string;
   signature: string;
-}) =>
+}, token?: string) =>
   apiClient.post<AuthSessionRecord>("/auth/verify", {
     body: input,
+    token,
   });
 
 export const getCurrentSession = (token: string) =>
   apiClient.get<CurrentSessionRecord>("/auth/session", {
     token,
+  });
+
+export const presignSponsorDocument = (
+  input: {
+    documentType: "BUSINESS_LICENSE" | "POWER_OF_ATTORNEY";
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+  },
+  token: string
+) =>
+  apiClient.post<SponsorDocumentUploadRecord>("/auth/sponsor/documents/presign", {
+    body: input,
+    token,
+    timeoutMs: 15_000,
+  });
+
+export const registerSponsorProfile = (
+  input: {
+    companyName: string;
+    sponsorType: SponsorType;
+    registrationNumber: string;
+    businessLicenseKey: string;
+    legalRepresentative: string;
+    contactPhone: string;
+    contactEmail: string;
+    powerOfAttorneyKey?: string | null;
+  },
+  token: string
+) =>
+  apiClient.post<SponsorProfileRecord>("/auth/sponsor/register", {
+    body: input,
+    token,
+    timeoutMs: 15_000,
   });

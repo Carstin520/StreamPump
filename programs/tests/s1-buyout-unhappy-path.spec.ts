@@ -10,6 +10,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
@@ -115,18 +116,21 @@ const registerCreator = async (
     )
   ).address;
   const creatorProfile = ctx.deriveCreatorProfile(creator.publicKey);
+  const handle = `${handlePrefix}_${creator.publicKey.toBase58().slice(0, 8)}`;
 
   await ctx.program.methods
     .registerCreator({
-      handle: `${handlePrefix}_${creator.publicKey.toBase58().slice(0, 8)}`,
+      handle,
       payoutUsdcAta: creatorUsdcAta,
     })
     .accounts({
       authority: creator.publicKey,
       protocolConfig: ctx.protocolConfig,
       creatorProfile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, handle)])
     .signers([creator])
     .rpc();
 

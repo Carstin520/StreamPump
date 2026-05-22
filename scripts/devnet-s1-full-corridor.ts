@@ -19,13 +19,16 @@ import {
 } from "@solana/spl-token";
 import {
   Connection,
+  Ed25519Program,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -197,6 +200,51 @@ const log = (message: string) => console.log(`[s1-full] ${message}`);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const short = (value: string) => `${value.slice(0, 4)}...${value.slice(-4)}`;
 const digestHex = (value: string) => createHash("sha256").update(value).digest("hex");
+
+const buildCreatorAuthMessage = (
+  creator: PublicKey,
+  handle: string,
+  timestampUnix: number,
+  nonce: Uint8Array
+): Buffer => {
+  const domain = Buffer.from("streampump:creator-register:v1", "utf8");
+  const handleBytes = Buffer.from(handle, "utf8");
+  const handleLength = Buffer.alloc(2);
+  const timestamp = Buffer.alloc(8);
+
+  handleLength.writeUInt16LE(handleBytes.length, 0);
+  timestamp.writeBigInt64LE(BigInt(timestampUnix), 0);
+
+  return Buffer.concat([
+    domain,
+    creator.toBuffer(),
+    handleLength,
+    handleBytes,
+    Buffer.from(nonce),
+    timestamp,
+  ]);
+};
+
+const creatorAuthPreInstruction = (
+  oracle: Keypair,
+  creator: PublicKey,
+  handle: string
+): TransactionInstruction => {
+  const nonce = Keypair.generate().publicKey.toBytes();
+  const message = buildCreatorAuthMessage(
+    creator,
+    handle,
+    Math.floor(Date.now() / 1000),
+    nonce
+  );
+  const signature = ed25519.sign(message, oracle.secretKey.slice(0, 32));
+
+  return Ed25519Program.createInstructionWithPublicKey({
+    publicKey: oracle.publicKey.toBytes(),
+    message,
+    signature,
+  });
+};
 
 const stringifyJson = (value: unknown) =>
   JSON.stringify(
@@ -998,17 +1046,22 @@ const main = async () => {
     });
     await ensureSponsorUsdcBalance({ connection, admin, sponsorUsdcAta, usdcMint });
 
+    const creatorHandle = `s1_full_${actors.creator.publicKey.toBase58().slice(0, 6)}`;
     const registerCreatorSignature = await program.methods
       .registerCreator({
-        handle: `s1_full_${actors.creator.publicKey.toBase58().slice(0, 6)}`,
+        handle: creatorHandle,
         payoutUsdcAta: getAssociatedTokenAddressSync(usdcMint, actors.creator.publicKey),
       })
       .accounts({
         authority: actors.creator.publicKey,
         protocolConfig: protocolConfigPda,
         creatorProfile,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
+      .preInstructions([
+        creatorAuthPreInstruction(oracle, actors.creator.publicKey, creatorHandle),
+      ])
       .signers([actors.creator])
       .rpc();
     signatures.registerCreator = registerCreatorSignature;

@@ -10,6 +10,7 @@ import {
   createContentPublication,
   finalizeContentManifest,
   getContentManifestById,
+  issueCreatorAuthSignature,
   listContentManifests,
   presignManifestAssets,
 } from "../../controllers/contentManifestController";
@@ -19,6 +20,7 @@ const router = Router();
 
 router.use(requireSessionAuth);
 
+router.post("/creator-auth-signature", issueCreatorAuthSignature);
 router.get("/manifests", listContentManifests);
 router.post("/manifests", createContentManifest);
 router.get("/manifests/:manifestId", getContentManifestById);

@@ -7,6 +7,7 @@ import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useI18n } from "@/lib/i18n";
+import { requireInteractiveSession } from "@/lib/interaction-auth";
 import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 
 const creator = findCreator("neo-park");
@@ -118,6 +119,14 @@ export default function EndorsePage() {
     },
     [demoFlow, stakeAmount],
   );
+
+  const handleBeginEndorse = useCallback(() => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+
+    demoFlow.begin();
+  }, [demoFlow, router]);
 
   return (
     <>
@@ -445,7 +454,7 @@ export default function EndorsePage() {
             <button
               className="glass-button-primary section-enter w-full rounded-full py-4 text-base font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
               disabled={demoFlow.busy || demoFlow.state.status === "success"}
-              onClick={demoFlow.begin}
+              onClick={handleBeginEndorse}
               type="button"
             >
               {demoFlow.busy

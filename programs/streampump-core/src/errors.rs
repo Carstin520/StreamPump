@@ -8,6 +8,8 @@ pub enum StreamPumpError {
     Unauthorized,
     #[msg("Invalid handle")]
     InvalidHandle,
+    #[msg("Invalid creator authorization signature")]
+    InvalidCreatorSignature,
     #[msg("String exceeds configured limit")]
     StringTooLong,
     #[msg("Invalid amount")]

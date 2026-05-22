@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import { ArrowDownIcon, ArrowUpIcon, FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
 import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
+import { requireInteractiveSession } from "@/lib/interaction-auth";
 import { createMockPriceHistory } from "@/lib/price-history";
 import { compactNumber } from "@/lib/public-data";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
@@ -22,6 +24,7 @@ export const CreatorStageView = ({
   creator: CreatorMarketRecord;
   posts?: PostRecord[];
 }) => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ProfileTab>("Posts");
   const [isFollowing, setIsFollowing] = useState(false);
   const [buyAmount, setBuyAmount] = useState(5);
@@ -43,7 +46,13 @@ export const CreatorStageView = ({
         creator={creator}
         isFollowing={isFollowing}
         market={market}
-        onToggleFollow={() => setIsFollowing((value) => !value)}
+        onToggleFollow={() => {
+          if (!requireInteractiveSession(router)) {
+            return;
+          }
+
+          setIsFollowing((value) => !value);
+        }}
       />
 
       <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -66,6 +75,7 @@ export const CreatorStageView = ({
             creator={creator}
             market={market}
             onBuyAmountChange={setBuyAmount}
+            onRequireAuth={() => requireInteractiveSession(router)}
           />
           {creator.state === "S1_BUYOUT" ? <BuyoutOfferCard creator={creator} /> : null}
           <TopHoldersCard creator={creator} />
@@ -404,12 +414,14 @@ const BuyPanel = ({
   creator,
   market,
   onBuyAmountChange,
+  onRequireAuth,
 }: {
   buyAmount: number;
   buyPreview: BuyPreview;
   creator: CreatorMarketRecord;
   market: MarketModel;
   onBuyAmountChange: (value: number) => void;
+  onRequireAuth: () => boolean;
 }) => {
   const [pulse, setPulse] = useState(false);
   const disabled = market.state !== "S1_DISCOVERY";
@@ -512,12 +524,22 @@ const BuyPanel = ({
             <Link
               className="block rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-3 py-2.5 text-center text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] transition hover:brightness-[1.05]"
               href={`/market/${liveCreatorWallet}`}
+              onClick={(event) => {
+                if (!onRequireAuth()) {
+                  event.preventDefault();
+                }
+              }}
             >
               Open seeded market
             </Link>
             <Link
               className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
               href={`/buyout/${liveCreatorWallet}`}
+              onClick={(event) => {
+                if (!onRequireAuth()) {
+                  event.preventDefault();
+                }
+              }}
             >
               Open seeded buyout
             </Link>
@@ -530,7 +552,13 @@ const BuyPanel = ({
                   ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
                   : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
               } ${pulse ? "tap-bounce-active" : ""}`}
-              onClick={() => setPulse(true)}
+              onClick={() => {
+                if (!onRequireAuth()) {
+                  return;
+                }
+
+                setPulse(true);
+              }}
               type="button"
             >
               {disabled
@@ -542,6 +570,13 @@ const BuyPanel = ({
 
             <button
               className="glass-button-ghost w-full px-3 py-2 text-xs font-medium"
+              onClick={() => {
+                if (!onRequireAuth()) {
+                  return;
+                }
+
+                setPulse(true);
+              }}
               type="button"
             >
               Add to Watchlist

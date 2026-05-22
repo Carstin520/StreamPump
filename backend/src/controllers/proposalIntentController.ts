@@ -7,6 +7,7 @@ import {
   BundleSubmitMode,
   ContentManifestStatus,
   ProposalIntentStatus,
+  SponsorVerificationStatus,
 } from "@prisma/client";
 import { Request } from "express";
 import { PublicKey } from "@solana/web3.js";
@@ -49,6 +50,7 @@ import {
 } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
 import { getAnchorService } from "../services/AnchorService";
+import { getSponsorProfileByWallet } from "../services/sponsorProfile";
 
 const getRequesterWallet = (req: Request): string => requireSessionWallet(req);
 
@@ -64,6 +66,18 @@ export const createProposalIntent = withController(
 
     if (requesterWallet !== creatorWallet && requesterWallet !== sponsorWallet) {
       throw new HttpError(403, "FORBIDDEN", "requester must be either creatorWallet or sponsorWallet");
+    }
+
+    const sponsorProfile = await getSponsorProfileByWallet(sponsorWallet);
+    if (
+      sponsorProfile &&
+      sponsorProfile.status !== SponsorVerificationStatus.APPROVED
+    ) {
+      throw new HttpError(
+        403,
+        "SPONSOR_KYB_NOT_APPROVED",
+        "sponsor KYB profile must be approved before creating production proposal intents"
+      );
     }
 
     const track2MinAchievementBps = parseNonNegativeInt(

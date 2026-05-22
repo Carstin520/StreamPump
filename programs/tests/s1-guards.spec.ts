@@ -8,6 +8,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   sendAndConfirmTransaction,
   SystemProgram,
@@ -96,8 +97,10 @@ const createS1Creator = async (ctx: TestContext, handle: string) => {
       authority: creator.publicKey,
       protocolConfig: ctx.protocolConfig,
       creatorProfile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, handle)])
     .signers([creator])
     .rpc();
 
@@ -313,8 +316,10 @@ describe("streampump-core S1 guards", function () {
         authority: creator.publicKey,
         protocolConfig: ctx.protocolConfig,
         creatorProfile,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
+      .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, "init_reentry_creator")])
       .signers([creator])
       .rpc();
 
@@ -329,8 +334,10 @@ describe("streampump-core S1 guards", function () {
         authority: creator.publicKey,
         protocolConfig: ctx.protocolConfig,
         creatorProfile,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
+      .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, "init_reentry_creator_v2")])
       .signers([creator])
       .rpc();
 

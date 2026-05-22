@@ -62,6 +62,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTestContext = void 0;
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const chai_1 = require("chai");
+const ed25519_1 = require("@noble/curves/ed25519");
 const spl_token_1 = require("@solana/spl-token");
 const web3_js_1 = require("@solana/web3.js");
 // ---------------------------------------------------------------------------
@@ -69,6 +70,33 @@ const web3_js_1 = require("@solana/web3.js");
 // 单例缓存 — 确保 `buildContext()` 在每个测试进程中只运行一次
 // ---------------------------------------------------------------------------
 let contextPromise = null;
+const buildCreatorAuthMessage = (creator, handle, timestampUnix, nonce) => {
+    const domain = Buffer.from("streampump:creator-register:v1", "utf8");
+    const handleBytes = Buffer.from(handle, "utf8");
+    const handleLength = Buffer.alloc(2);
+    const timestamp = Buffer.alloc(8);
+    handleLength.writeUInt16LE(handleBytes.length, 0);
+    timestamp.writeBigInt64LE(BigInt(timestampUnix), 0);
+    return Buffer.concat([
+        domain,
+        creator.toBuffer(),
+        handleLength,
+        handleBytes,
+        Buffer.from(nonce),
+        timestamp,
+    ]);
+};
+const creatorAuthPreInstructionFor = (oracle, creator, handle, signerOverride) => {
+    const signer = signerOverride ?? oracle;
+    const nonce = web3_js_1.Keypair.generate().publicKey.toBytes();
+    const message = buildCreatorAuthMessage(creator, handle, Math.floor(Date.now() / 1000), nonce);
+    const signature = ed25519_1.ed25519.sign(message, signer.secretKey.slice(0, 32));
+    return web3_js_1.Ed25519Program.createInstructionWithPublicKey({
+        publicKey: signer.publicKey.toBytes(),
+        message,
+        signature,
+    });
+};
 /**
  * Returns the shared TestContext, initializing it on first call.
  * All test suites should call this in their `before()` hook.
@@ -343,32 +371,39 @@ const buildContext = async () => {
     // ===========================================================================
     const creatorS2Profile = deriveCreatorProfile(creatorS2.publicKey);
     const creatorS1Profile = deriveCreatorProfile(creatorS1.publicKey);
+    const creatorAuthPreInstruction = (creator, handle, signerOverride) => creatorAuthPreInstructionFor(oracle, creator, handle, signerOverride);
     // Register S2 creator / 注册 S2 创作者
+    const creatorS2Handle = "creator_s2";
     await program.methods
         .registerCreator({
-        handle: "creator_s2",
+        handle: creatorS2Handle,
         payoutUsdcAta: creatorS2UsdcAta,
     })
         .accounts({
         authority: creatorS2.publicKey,
         protocolConfig,
         creatorProfile: creatorS2Profile,
+        instructions: web3_js_1.SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: web3_js_1.SystemProgram.programId,
     })
+        .preInstructions([creatorAuthPreInstruction(creatorS2.publicKey, creatorS2Handle)])
         .signers([creatorS2])
         .rpc();
     // Register S1 creator / 注册 S1 创作者
+    const creatorS1Handle = "creator_s1";
     await program.methods
         .registerCreator({
-        handle: "creator_s1",
+        handle: creatorS1Handle,
         payoutUsdcAta: creatorS1UsdcAta,
     })
         .accounts({
         authority: creatorS1.publicKey,
         protocolConfig,
         creatorProfile: creatorS1Profile,
+        instructions: web3_js_1.SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: web3_js_1.SystemProgram.programId,
     })
+        .preInstructions([creatorAuthPreInstruction(creatorS1.publicKey, creatorS1Handle)])
         .signers([creatorS1])
         .rpc();
     // Upgrade creatorS2 to level 2 via oracle report.
@@ -504,6 +539,7 @@ const buildContext = async () => {
         deriveBuyoutOffer,
         deriveOfferUsdcVault,
         deriveS1BuyoutState,
+        creatorAuthPreInstruction,
         createFundedProposal,
     };
 };

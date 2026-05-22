@@ -116,12 +116,26 @@ enum IdentityProvider {
   APPLE
   EMAIL
   PASSKEY
+  TWITTER
 }
 
 enum AccountRole {
   FAN
   CREATOR
   SPONSOR
+}
+
+enum SponsorVerificationStatus {
+  UNSUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum SponsorType {
+  BRAND
+  AGENCY
+  INDIVIDUAL
 }
 
 enum MarketCreatorStage {
@@ -639,6 +653,27 @@ model AccountProfile {
   updatedAt             DateTime    @updatedAt
 
   @@index([role, onboardingCompletedAt])
+}
+
+model SponsorProfile {
+  id                  String                    @id @default(cuid())
+  wallet              String                    @unique
+  companyName         String
+  sponsorType         SponsorType               @default(BRAND)
+  registrationNumber  String
+  businessLicenseKey  String
+  legalRepresentative String
+  contactPhone        String
+  contactEmail        String
+  powerOfAttorneyKey  String?
+  status              SponsorVerificationStatus @default(UNSUBMITTED)
+  rejectReason        String?
+  approvedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([sponsorType, status])
 }
 
 model Track2Event {

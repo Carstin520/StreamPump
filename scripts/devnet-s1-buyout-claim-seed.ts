@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 
 import * as anchor from "@coral-xyz/anchor";
+import { ed25519 } from "@noble/curves/ed25519";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -14,13 +15,16 @@ import {
 } from "@solana/spl-token";
 import {
   Connection,
+  Ed25519Program,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 
 import "../backend/config/loadEnv";
@@ -80,6 +84,51 @@ const log = (message: string) => {
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const buildCreatorAuthMessage = (
+  creator: PublicKey,
+  handle: string,
+  timestampUnix: number,
+  nonce: Uint8Array
+): Buffer => {
+  const domain = Buffer.from("streampump:creator-register:v1", "utf8");
+  const handleBytes = Buffer.from(handle, "utf8");
+  const handleLength = Buffer.alloc(2);
+  const timestamp = Buffer.alloc(8);
+
+  handleLength.writeUInt16LE(handleBytes.length, 0);
+  timestamp.writeBigInt64LE(BigInt(timestampUnix), 0);
+
+  return Buffer.concat([
+    domain,
+    creator.toBuffer(),
+    handleLength,
+    handleBytes,
+    Buffer.from(nonce),
+    timestamp,
+  ]);
+};
+
+const creatorAuthPreInstruction = (
+  oracle: Keypair,
+  creator: PublicKey,
+  handle: string
+): TransactionInstruction => {
+  const nonce = Keypair.generate().publicKey.toBytes();
+  const message = buildCreatorAuthMessage(
+    creator,
+    handle,
+    Math.floor(Date.now() / 1000),
+    nonce
+  );
+  const signature = ed25519.sign(message, oracle.secretKey.slice(0, 32));
+
+  return Ed25519Program.createInstructionWithPublicKey({
+    publicKey: oracle.publicKey.toBytes(),
+    message,
+    signature,
+  });
+};
 
 const withRetry = async <T>(label: string, operation: () => Promise<T>, attempts = 5): Promise<T> => {
   let lastError: unknown;
@@ -481,17 +530,22 @@ const main = async () => {
 
     const existingCreator = await anchorService.fetchCreatorProfileByWallet(creator.publicKey);
     if (!existingCreator) {
+      const creatorHandle = `s1_demo_${creator.publicKey.toBase58().slice(0, 6)}`;
       const signature = await program.methods
         .registerCreator({
-          handle: `s1_demo_${creator.publicKey.toBase58().slice(0, 6)}`,
+          handle: creatorHandle,
           payoutUsdcAta: creatorUsdcAta,
         })
         .accounts({
           authority: creator.publicKey,
           protocolConfig: protocolConfigPda,
           creatorProfile,
+          instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions([
+          creatorAuthPreInstruction(oracle, creator.publicKey, creatorHandle),
+        ])
         .signers([creator])
         .rpc();
       await syncTx("register creator", signature);

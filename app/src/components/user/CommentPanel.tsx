@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 
 import { FollowCheckIcon, FollowPlusIcon, HeartOutlineIcon, HeartSolidIcon, SendRoundedIcon } from "@/components/shared/AppIcons";
 import { StagePill } from "@/components/shared/StagePill";
 import { CommentRecord, PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
+import { requireInteractiveSession } from "@/lib/interaction-auth";
 import { compactNumber } from "@/lib/public-data";
 
 const ANONYMOUS_USER = {
@@ -20,6 +22,7 @@ export const CommentPanel = ({
   variant?: "sidebar" | "sheet";
 }) => {
   const { t } = useI18n();
+  const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(false);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -44,21 +47,37 @@ export const CommentPanel = ({
   };
 
   const toggleFollow = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+
     setIsFollowing((value) => !value);
     triggerHighlight("follow");
   };
 
   const toggleLike = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+
     setLiked((value) => !value);
     triggerHighlight("like");
   };
 
   const toggleSave = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+
     setSaved((value) => !value);
     triggerHighlight("save");
   };
 
   const publishComment = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+
     const content = composerValue.trim();
     if (!content) {
       triggerHighlight("composer");

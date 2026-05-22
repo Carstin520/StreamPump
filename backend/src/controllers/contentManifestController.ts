@@ -53,6 +53,7 @@ import {
   r2Service,
 } from "../services/R2Service";
 import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
+import { issueCreatorAuthSignature as issueCreatorAuthSignatureService } from "../services/creatorAuth";
 
 interface PresignAssetPlan {
   assetType: AssetType;
@@ -61,6 +62,22 @@ interface PresignAssetPlan {
   mimeType: string;
   fileSizeBytes: bigint;
 }
+
+export const issueCreatorAuthSignature = withController(
+  "ISSUE_CREATOR_AUTH_SIGNATURE_FAILED",
+  async (req, res) => {
+    const creatorWallet = requireSessionWallet(req);
+    const twitterHandle = parseNonEmptyString(req.body.twitterHandle, "twitterHandle");
+    const twitterAccessToken = parseOptionalString(req.body.twitterAccessToken);
+    const authorization = await issueCreatorAuthSignatureService({
+      creatorWallet,
+      twitterHandle,
+      twitterAccessToken,
+    });
+
+    ok(res, authorization, 201);
+  }
+);
 
 const readMaxAssetSizeBytes = (): bigint =>
   BigInt(Math.max(0, Math.floor(config.storage.origin.maxAssetSizeBytes)));
