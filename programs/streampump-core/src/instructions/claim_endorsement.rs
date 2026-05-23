@@ -190,16 +190,21 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
 
             usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
                 proposal.track2_usdc_deposited
-            } else if proposal.track2_unsettled_spump == 0 || proposal.track2_usdc_deposited == 0 {
+            } else if proposal.track2_initial_spump_staked == 0
+                || proposal.track2_initial_fan_pool == 0
+                || proposal.track2_usdc_deposited == 0
+            {
                 0
             } else {
                 let numerator = (staked_amount as u128)
-                    .checked_mul(proposal.track2_usdc_deposited as u128)
+                    .checked_mul(proposal.track2_initial_fan_pool as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
                 let quotient = numerator
-                    .checked_div(proposal.track2_unsettled_spump as u128)
+                    .checked_div(proposal.track2_initial_spump_staked as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
-                u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?
+                let reward =
+                    u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+                std::cmp::min(reward, proposal.track2_usdc_deposited)
             };
 
             if usdc_reward > 0 {

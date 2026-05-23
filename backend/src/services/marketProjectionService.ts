@@ -59,7 +59,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const unwrapEventPayload = (payload: Record<string, unknown>): Record<string, unknown> => {
   if (isRecord(payload.eventData)) {
-    return payload.eventData;
+    return {
+      ...(isRecord(payload.accounts) ? payload.accounts : {}),
+      ...(isRecord(payload.args) ? payload.args : {}),
+      ...payload.eventData,
+    };
   }
 
   if (isRecord(payload.args)) {
@@ -226,6 +230,55 @@ const calculateEstimatedClaimableUsdc = (
   } catch {
     return 0n;
   }
+};
+
+const calculateEstimatedS2Reward = (
+  stakedSpumpAmount: bigint,
+  initialFanPool: bigint | null | undefined,
+  initialSpumpStaked: bigint | null | undefined
+): bigint => {
+  try {
+    const fanPool = initialFanPool && initialFanPool > 0n ? initialFanPool : 0n;
+    const spumpStaked = initialSpumpStaked && initialSpumpStaked > 0n ? initialSpumpStaked : 0n;
+    if (stakedSpumpAmount <= 0n || fanPool <= 0n || spumpStaked <= 0n) {
+      return 0n;
+    }
+
+    return (stakedSpumpAmount * fanPool) / spumpStaked;
+  } catch {
+    return 0n;
+  }
+};
+
+const updateS2EndorsementEstimatesForProposal = async (
+  proposalPda: string,
+  initialFanPool: bigint,
+  initialSpumpStaked: bigint,
+  event: { signature?: string; observedAt?: Date } = {}
+) => {
+  const positions = await prisma.s2EndorsementPositionProjection.findMany({
+    where: {
+      proposalPda,
+      claimedStatus: false,
+    },
+  });
+
+  await Promise.all(
+    positions.map((position) =>
+      prisma.s2EndorsementPositionProjection.update({
+        where: { positionPda: position.positionPda },
+        data: {
+          estimatedUsdcReward: calculateEstimatedS2Reward(
+            position.stakedSpumpAmount,
+            initialFanPool,
+            initialSpumpStaked
+          ),
+          lastEventSignature: event.signature ?? position.lastEventSignature,
+          lastEventAt: event.observedAt ?? position.lastEventAt,
+        },
+      })
+    )
+  );
 };
 
 type S1GraduatedBuyoutProjectionPatch = {
@@ -1056,6 +1109,133 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     return;
   }
 
+  if (params.instructionName === "endorse_proposal") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    const userWallet = readString(eventData, "user");
+    const amount = readBigInt(eventData, "amount");
+    let positionPda = readString(eventData, "endorsementPosition");
+    if (!positionPda && userWallet && proposalPda) {
+      positionPda = getAnchorService()
+        .deriveEndorsementPositionPda(new PublicKey(userWallet), new PublicKey(proposalPda))
+        .toBase58();
+    }
+    if (!proposalPda || !userWallet || !positionPda || amount === null) return;
+
+    const existing = await prisma.s2EndorsementPositionProjection.findUnique({
+      where: { positionPda },
+    });
+    const nextStakedAmount =
+      existing?.lastEventSignature === params.signature
+        ? existing.stakedSpumpAmount
+        : (existing?.stakedSpumpAmount ?? 0n) + amount;
+    const proposal = await prisma.proposal.findUnique({
+      where: { proposalPda },
+      select: {
+        track2InitialFanPool: true,
+        track2InitialSpumpStaked: true,
+      },
+    });
+
+    await prisma.s2EndorsementPositionProjection.upsert({
+      where: { positionPda },
+      update: {
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: nextStakedAmount,
+        claimedStatus: false,
+        estimatedUsdcReward: calculateEstimatedS2Reward(
+          nextStakedAmount,
+          proposal?.track2InitialFanPool,
+          proposal?.track2InitialSpumpStaked
+        ),
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        positionPda,
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: amount,
+        claimedStatus: false,
+        estimatedUsdcReward: calculateEstimatedS2Reward(
+          amount,
+          proposal?.track2InitialFanPool,
+          proposal?.track2InitialSpumpStaked
+        ),
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+
+    return;
+  }
+
+  if (params.instructionName === "settle_track2") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    if (!proposalPda) return;
+    const initialFanPool = readBigIntAlias(
+      eventData,
+      "initialFanPool",
+      "track2InitialFanPool",
+      "fanPoolRemaining"
+    ) ?? 0n;
+    const initialSpumpStaked = readBigIntAlias(
+      eventData,
+      "initialSpumpStaked",
+      "track2InitialSpumpStaked"
+    ) ?? 0n;
+
+    await prisma.proposal.updateMany({
+      where: { proposalPda },
+      data: {
+        track2InitialFanPool: initialFanPool,
+        track2InitialSpumpStaked: initialSpumpStaked,
+      },
+    });
+    await updateS2EndorsementEstimatesForProposal(proposalPda, initialFanPool, initialSpumpStaked, event);
+    await syncCampaignProofProjectionFromProposalPda(proposalPda);
+    return;
+  }
+
+  if (params.instructionName === "claim_endorsement") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    const userWallet = readString(eventData, "user");
+    const stakedAmount = readBigInt(eventData, "stakedAmount");
+    const usdcReward = readBigInt(eventData, "usdcReward") ?? 0n;
+    let positionPda = readString(eventData, "endorsementPosition");
+    if (!positionPda && userWallet && proposalPda) {
+      positionPda = getAnchorService()
+        .deriveEndorsementPositionPda(new PublicKey(userWallet), new PublicKey(proposalPda))
+        .toBase58();
+    }
+    if (!proposalPda || !userWallet || !positionPda) return;
+
+    await prisma.s2EndorsementPositionProjection.upsert({
+      where: { positionPda },
+      update: {
+        userWallet,
+        proposalPda,
+        ...(stakedAmount === null ? {} : { stakedSpumpAmount: stakedAmount }),
+        claimedStatus: true,
+        estimatedUsdcReward: usdcReward,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        positionPda,
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: stakedAmount ?? 0n,
+        claimedStatus: true,
+        estimatedUsdcReward: usdcReward,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+    await syncCampaignProofProjectionFromProposalPda(proposalPda);
+    return;
+  }
+
   if (params.proposalPda) {
     await syncCampaignProofProjectionFromProposalPda(params.proposalPda);
   }
@@ -1274,14 +1454,24 @@ export const reconcileGraduatedS1BuyoutProjection = async (
 };
 
 export const getPortfolioProjection = async (userWallet: string) => {
-  const positions = await prisma.s1PositionProjection.findMany({
-    where: {
-      userWallet,
-    },
-    orderBy: {
-      updatedAt: "desc",
-    },
-  });
+  const [positions, s2Endorsements] = await Promise.all([
+    prisma.s1PositionProjection.findMany({
+      where: {
+        userWallet,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    }),
+    prisma.s2EndorsementPositionProjection.findMany({
+      where: {
+        userWallet,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    }),
+  ]);
   const creatorProfiles = await prisma.creatorMarketProjection.findMany({
     where: {
       creatorProfilePda: {
@@ -1296,8 +1486,16 @@ export const getPortfolioProjection = async (userWallet: string) => {
       },
     },
   });
+  const s2Proposals = await prisma.proposal.findMany({
+    where: {
+      proposalPda: {
+        in: s2Endorsements.map((position) => position.proposalPda),
+      },
+    },
+  });
   const creatorMap = new Map(creatorProfiles.map((creator) => [creator.creatorProfilePda, creator]));
   const buyoutMap = new Map(buyouts.map((buyout) => [buyout.creatorProfilePda, buyout]));
+  const proposalMap = new Map(s2Proposals.map((proposal) => [proposal.proposalPda, proposal]));
 
   return {
     userWallet,
@@ -1319,6 +1517,21 @@ export const getPortfolioProjection = async (userWallet: string) => {
         earlyCohortBalance: position.earlyCohortBalance.toString(),
         spumpCostBasis: position.spumpCostBasis.toString(),
         estimatedClaimableUsdc: serializeBigInt(estimatedClaimableUsdc),
+        updatedAt: position.updatedAt.toISOString(),
+      };
+    }),
+    s2Endorsements: s2Endorsements.map((position) => {
+      const proposal = proposalMap.get(position.proposalPda);
+      return {
+        positionPda: position.positionPda,
+        proposalPda: position.proposalPda,
+        proposalId: proposal?.id ?? null,
+        creatorWallet: proposal?.creatorWallet ?? null,
+        sponsorWallet: proposal?.sponsorWallet ?? null,
+        status: proposal?.status ?? null,
+        stakedSpumpAmount: position.stakedSpumpAmount.toString(),
+        claimedStatus: position.claimedStatus,
+        estimatedUsdcReward: position.estimatedUsdcReward.toString(),
         updatedAt: position.updatedAt.toISOString(),
       };
     }),
@@ -1393,6 +1606,8 @@ export const serializePublicCampaignProof = (
     track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
     track2ActualValue: serializeBigInt(proposal.track2ActualValue),
     track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+    track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+    track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
     track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
     track3CpsPayout: serializeBigInt(proposal.track3CpsPayout),
     track3DelayDays: proposal.track3DelayDays,
@@ -1450,6 +1665,23 @@ export const getPublicCampaignProof = async (id: string) => {
     return null;
   }
 
-  const proof = await syncCampaignProofProjectionFromProposal(proposal);
-  return serializePublicCampaignProof(proposal, proof);
+  const [proof, endorsementAggregate] = await Promise.all([
+    syncCampaignProofProjectionFromProposal(proposal),
+    prisma.s2EndorsementPositionProjection.aggregate({
+      where: { proposalPda: proposal.proposalPda },
+      _count: true,
+      _sum: {
+        stakedSpumpAmount: true,
+        estimatedUsdcReward: true,
+      },
+    }),
+  ]);
+  return {
+    ...serializePublicCampaignProof(proposal, proof),
+    endorsementSummary: {
+      endorserCount: endorsementAggregate._count,
+      totalStakedSpump: (endorsementAggregate._sum.stakedSpumpAmount ?? 0n).toString(),
+      estimatedUsdcReward: (endorsementAggregate._sum.estimatedUsdcReward ?? 0n).toString(),
+    },
+  };
 };

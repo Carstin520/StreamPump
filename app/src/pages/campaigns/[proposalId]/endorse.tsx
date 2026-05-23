@@ -1,10 +1,13 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
+import { buildEndorseProposalTransaction } from "@/lib/api/proposal";
+import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useI18n } from "@/lib/i18n";
 import { requireInteractiveSession } from "@/lib/interaction-auth";
@@ -37,15 +40,17 @@ const DIAL_STROKE = 10;
 const DIAL_RADIUS = (DIAL_SIZE - DIAL_STROKE) / 2;
 const DIAL_CIRCUMFERENCE = 2 * Math.PI * DIAL_RADIUS;
 
-const tracks = [
-  { label: "Track 1 · Base", value: TRACK1_BASE, settled: true, color: "#65ecaf" },
-  { label: `Track 2 · ${TRACK2_METRIC}`, value: TRACK2_BUDGET, settled: false, color: "#67b8ff" },
-  { label: "Track 3 · CPS", value: TRACK3_BUDGET, settled: false, color: "#f3b33e" },
-];
-
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
+
+const parseAmount = (value: string | null | undefined, fallback = 0) => {
+  const parsed = Number(value ?? "");
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const shortWallet = (wallet: string | null | undefined) =>
+  wallet ? `${wallet.slice(0, 4)}...${wallet.slice(-4)}` : "Unknown";
 
 export default function EndorsePage() {
   const router = useRouter();
@@ -53,20 +58,102 @@ export default function EndorsePage() {
   const [stakeAmount, setStakeAmount] = useState(10_000);
   const [endorsers, setEndorsers] = useState(ENDORSERS);
   const [demoSummary, setDemoSummary] = useState<string | null>(null);
+  const [campaign, setCampaign] = useState<PublicCampaignProofResponse | null>(null);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
   const demoFlow = useDemoActionFlow();
+  const proposalFlow = useProposalTransactionFlow();
   const dialRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
+  const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
+
+  useEffect(() => {
+    if (!router.isReady || !routeProposalId) {
+      return;
+    }
+
+    let cancelled = false;
+    setCampaignError(null);
+    getPublicCampaignProof(routeProposalId)
+      .then((record) => {
+        if (!cancelled) {
+          setCampaign(record);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCampaign(null);
+          setCampaignError(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, routeProposalId]);
 
   const fraction = stakeAmount / FAN_BALANCE;
   const dashOffset = DIAL_CIRCUMFERENCE * (1 - fraction);
 
-  const totalEndorsed = endorsers.reduce((s, e) => s + e.amount, 0);
+  const isLiveCampaign = Boolean(campaign);
+  const track2Budget = campaign
+    ? parseAmount(campaign.budgetTracks.track2UsdcDeposited, TRACK2_BUDGET)
+    : TRACK2_BUDGET;
+  const track2Target = campaign
+    ? parseAmount(campaign.budgetTracks.track2TargetValue, TRACK2_TARGET)
+    : TRACK2_TARGET;
+  const track2Metric = campaign?.budgetTracks.track2MetricType ?? TRACK2_METRIC;
+  const track2CliffFraction = campaign
+    ? campaign.budgetTracks.track2MinAchievementBps / 10_000
+    : TRACK2_CLIFF;
+  const fanPoolShare = campaign
+    ? parseAmount(campaign.budgetTracks.track2InitialFanPool, 0) || track2Budget * 0.2
+    : FAN_POOL_SHARE;
+  const track2Current = campaign
+    ? parseAmount(campaign.budgetTracks.track2ActualValue, TRACK2_CURRENT)
+    : TRACK2_CURRENT;
+  const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString() : DEADLINE;
+  const statusLabel = campaign?.status ?? STATUS;
+
+  const totalEndorsed = campaign
+    ? parseAmount(campaign.endorsementSummary?.totalStakedSpump, 0)
+    : endorsers.reduce((s, e) => s + e.amount, 0);
   const projectedEndorsed = totalEndorsed + stakeAmount;
-  const successUsdc = (stakeAmount / projectedEndorsed) * FAN_POOL_SHARE;
+  const successUsdc = projectedEndorsed > 0 ? (stakeAmount / projectedEndorsed) * fanPoolShare : 0;
   const failLoss = stakeAmount * 0.05;
-  const creatorName = locale === "en" ? "Midnight Save" : creator.name;
+  const creatorName = campaign
+    ? shortWallet(campaign.creatorWallet)
+    : locale === "en"
+      ? "Midnight Save"
+      : creator.name;
   const campaignTitle = `${creatorName} × ${SPONSOR_NAME}`;
-  const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
+  const visibleEndorsers = campaign
+    ? [
+        {
+          name: "Projection",
+          amount: totalEndorsed,
+        },
+      ].filter((item) => item.amount > 0)
+    : endorsers;
+  const visibleTracks = [
+    {
+      label: "Track 1 · Base",
+      value: campaign ? parseAmount(campaign.budgetTracks.track1BaseUsdc, TRACK1_BASE) : TRACK1_BASE,
+      settled: campaign?.budgetTracks.track1Claimed ?? true,
+      color: "#65ecaf",
+    },
+    {
+      label: `Track 2 · ${track2Metric}`,
+      value: track2Budget,
+      settled: Boolean(campaign?.budgetTracks.track2SettledAt),
+      color: "#67b8ff",
+    },
+    {
+      label: "Track 3 · CPS",
+      value: campaign ? parseAmount(campaign.budgetTracks.track3UsdcDeposited, TRACK3_BUDGET) : TRACK3_BUDGET,
+      settled: Boolean(campaign?.budgetTracks.track3SettledAt),
+      color: "#f3b33e",
+    },
+  ];
 
   const handleDialInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const svg = dialRef.current;
@@ -125,8 +212,21 @@ export default function EndorsePage() {
       return;
     }
 
+    if (campaign) {
+      void proposalFlow.execute((token) =>
+        buildEndorseProposalTransaction(token, campaign.proposalPda, {
+          amount: stakeAmount,
+        })
+      ).then((result) => {
+        if (result) {
+          setDemoSummary(`Endorse transaction submitted: ${result.signature.slice(0, 8)}...`);
+        }
+      });
+      return;
+    }
+
     demoFlow.begin();
-  }, [demoFlow, router]);
+  }, [campaign, demoFlow, proposalFlow, router, stakeAmount]);
 
   return (
     <>
@@ -136,11 +236,19 @@ export default function EndorsePage() {
       <PageShell eyebrow="S2 Endorsement Preview" title={`Endorse ${creatorName}`}>
         <div className="space-y-5">
           <ProductReadinessBanner
-            description="Stake amount, endorser list, and success state update locally. There is no live fan endorsement position, SPUMP burn, endorsement PDA, claim state, or pool distribution wired on this page."
-            status="MOCK_PREVIEW"
-            title="S2 endorsement is a local interaction preview"
+            description={
+              isLiveCampaign
+                ? "This page loads campaign projection data and builds wallet-signed endorse_proposal transactions. It still depends on seeded campaign state, SPUMP ATA readiness, and indexer confirmation for the projection update."
+                : "Stake amount, endorser list, and success state update locally because no live campaign projection was loaded for this route."
+            }
+            status={isLiveCampaign ? "SEEDED_DEMO" : "MOCK_PREVIEW"}
+            title={isLiveCampaign ? "S2 endorsement is API and wallet wired" : "S2 endorsement is a local interaction preview"}
           />
-          <EndorsementPreviewNotice proposalId={routeProposalId} />
+          <EndorsementPreviewNotice
+            error={campaignError}
+            isLiveCampaign={isLiveCampaign}
+            proposalId={campaign?.proposalPda ?? routeProposalId}
+          />
 
           <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           {/* ── Left column ── */}
@@ -153,19 +261,19 @@ export default function EndorsePage() {
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Metric</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(TRACK2_TARGET)} {TRACK2_METRIC}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {track2Metric}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Cliff</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">{TRACK2_CLIFF * 100}%</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{track2CliffFraction * 100}%</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
-                  <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsd(FAN_POOL_SHARE)}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsd(fanPoolShare)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">{DEADLINE}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{deadlineLabel}</p>
                 </div>
               </div>
             </section>
@@ -174,9 +282,9 @@ export default function EndorsePage() {
             <section className="liquid-card section-enter flex flex-col items-center gap-6 rounded-[28px] p-8">
               <div className="flex items-center gap-3 self-start">
                 <span className="liquid-pill rounded-full px-3 py-1 text-xs font-medium text-white">
-                  {STATUS}
+                  {statusLabel}
                 </span>
-                <span className="text-xs text-[#8ea0ba]">Deadline {DEADLINE}</span>
+                <span className="text-xs text-[#8ea0ba]">Deadline {deadlineLabel}</span>
               </div>
 
               <div
@@ -298,7 +406,7 @@ export default function EndorsePage() {
                 </div>
 
                 <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
-                  Track 2 metric ≥ {TRACK2_CLIFF * 100}% cliff
+                  Track 2 metric ≥ {track2CliffFraction * 100}% cliff
                 </p>
               </section>
 
@@ -338,7 +446,7 @@ export default function EndorsePage() {
                 </div>
 
                 <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
-                  Track 2 metric &lt; {TRACK2_CLIFF * 100}% cliff
+                  Track 2 metric &lt; {track2CliffFraction * 100}% cliff
                 </p>
               </section>
             </div>
@@ -349,8 +457,8 @@ export default function EndorsePage() {
                 Track Settlement
               </p>
               <div className="mt-5 space-y-4">
-                {tracks.map((t) => {
-                  const pct = t.settled ? 100 : (TRACK2_CURRENT / TRACK2_TARGET) * 100;
+                {visibleTracks.map((t) => {
+                  const pct = t.settled ? 100 : (track2Current / Math.max(track2Target, 1)) * 100;
                   return (
                     <div key={t.label}>
                       <div className="mb-1.5 flex items-center justify-between">
@@ -369,7 +477,7 @@ export default function EndorsePage() {
                         />
                       </div>
                       <p className="mt-1 text-[10px] text-[#8ea0ba]">
-                        {t.settled ? "Settled" : `${compactNumber(TRACK2_CURRENT)} / ${compactNumber(TRACK2_TARGET)} ${TRACK2_METRIC.toLowerCase()} · ${pct.toFixed(0)}%`}
+                        {t.settled ? "Settled" : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${track2Metric.toLowerCase()} · ${pct.toFixed(0)}%`}
                       </p>
                     </div>
                   );
@@ -408,7 +516,7 @@ export default function EndorsePage() {
                 Current Endorsers
               </p>
               <div className="mt-4 space-y-3">
-                {endorsers.map((e) => (
+                {visibleEndorsers.length > 0 ? visibleEndorsers.map((e) => (
                   <div
                     key={e.name}
                     className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3"
@@ -418,7 +526,11 @@ export default function EndorsePage() {
                       {compactNumber(e.amount)}
                     </span>
                   </div>
-                ))}
+                )) : (
+                  <div className="rounded-2xl bg-white/[0.04] px-4 py-3 text-xs text-[#8ea0ba]">
+                    No indexed endorsement positions yet.
+                  </div>
+                )}
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-4">
                 <span className="text-xs text-[#8ea0ba]">Total endorsed</span>
@@ -435,9 +547,9 @@ export default function EndorsePage() {
               </p>
               <div className="mt-4 space-y-2.5">
                 {[
-                  ["Track 2 target", `${compactNumber(TRACK2_TARGET)} ${TRACK2_METRIC.toLowerCase()}`],
-                  ["Cliff", `${TRACK2_CLIFF * 100}%`],
-                  ["Fan pool (20%)", formatUsd(FAN_POOL_SHARE)],
+                  ["Track 2 target", `${compactNumber(track2Target)} ${track2Metric.toLowerCase()}`],
+                  ["Cliff", `${track2CliffFraction * 100}%`],
+                  ["Fan pool (20%)", formatUsd(fanPoolShare)],
                   ["Your balance", `${compactNumber(FAN_BALANCE)} SPUMP`],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between">
@@ -453,27 +565,56 @@ export default function EndorsePage() {
             {/* ── Action button ── */}
             <button
               className="glass-button-primary section-enter w-full rounded-full py-4 text-base font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={demoFlow.busy || demoFlow.state.status === "success"}
+              disabled={
+                isLiveCampaign
+                  ? proposalFlow.state.status === "building" ||
+                    proposalFlow.state.status === "waiting_signature" ||
+                    proposalFlow.state.status === "submitting"
+                  : demoFlow.busy || demoFlow.state.status === "success"
+              }
               onClick={handleBeginEndorse}
               type="button"
             >
-              {demoFlow.busy
-                ? "Simulating..."
-                : demoFlow.state.status === "success"
-                  ? "Preview endorsed"
-                  : `Preview endorse ${compactNumber(stakeAmount)} SPUMP`}
+              {isLiveCampaign
+                ? proposalFlow.state.status === "success"
+                  ? "Endorse transaction submitted"
+                  : proposalFlow.state.status === "building"
+                    ? "Building transaction..."
+                    : proposalFlow.state.status === "waiting_signature"
+                      ? "Waiting for wallet..."
+                      : proposalFlow.state.status === "submitting"
+                        ? "Submitting..."
+                        : `Endorse ${compactNumber(stakeAmount)} SPUMP`
+                : demoFlow.busy
+                  ? "Simulating..."
+                  : demoFlow.state.status === "success"
+                    ? "Preview endorsed"
+                    : `Preview endorse ${compactNumber(stakeAmount)} SPUMP`}
             </button>
-            <DemoActionStatusCard
-              amountLabel={`${compactNumber(stakeAmount)} SPUMP`}
-              confirmLabel="Confirm Preview"
-              description="Confirm this mock SPUMP endorsement. No wallet signature, token burn, endorsement PDA, or backend write will occur; the endorser list updates locally."
-              onCancel={demoFlow.reset}
-              onConfirm={handleConfirmEndorse}
-              onRetry={demoFlow.retry}
-              state={demoFlow.state}
-              successLabel="Preview endorsed"
-              title="Mock endorsement confirmation"
-            />
+            {isLiveCampaign ? (
+              <section className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">Wallet transaction</p>
+                <p className="mt-1 text-xs leading-5 text-[#a7b2c4]">
+                  {proposalFlow.state.status === "failed"
+                    ? proposalFlow.state.error
+                    : proposalFlow.state.signature
+                      ? `Signature ${proposalFlow.state.signature}`
+                      : "The backend builds endorse_proposal; your wallet signs and the backend relays the signed transaction."}
+                </p>
+              </section>
+            ) : (
+              <DemoActionStatusCard
+                amountLabel={`${compactNumber(stakeAmount)} SPUMP`}
+                confirmLabel="Confirm Preview"
+                description="Confirm this mock SPUMP endorsement. No wallet signature, token burn, endorsement PDA, or backend write will occur; the endorser list updates locally."
+                onCancel={demoFlow.reset}
+                onConfirm={handleConfirmEndorse}
+                onRetry={demoFlow.retry}
+                state={demoFlow.state}
+                successLabel="Preview endorsed"
+                title="Mock endorsement confirmation"
+              />
+            )}
             {demoSummary ? (
               <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
                 {demoSummary}
@@ -487,14 +628,29 @@ export default function EndorsePage() {
   );
 }
 
-const EndorsementPreviewNotice = ({ proposalId }: { proposalId: string }) => (
+const EndorsementPreviewNotice = ({
+  error,
+  isLiveCampaign,
+  proposalId,
+}: {
+  error: string | null;
+  isLiveCampaign: boolean;
+  proposalId: string;
+}) => (
   <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">Local simulator</p>
-        <p className="mt-1 text-sm font-semibold text-white">No campaign projection is loaded here</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">
+          {isLiveCampaign ? "Seeded chain/API path" : "Local simulator"}
+        </p>
+        <p className="mt-1 text-sm font-semibold text-white">
+          {isLiveCampaign ? "Campaign projection loaded" : "No campaign projection is loaded here"}
+        </p>
         <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
-          The route keeps the proposal id for context, but this surface currently uses local fixture values only. Real promotion requires SPUMP burn, endorsement PDA creation, reward pool projection, and claim state from the backend/indexer.
+          {isLiveCampaign
+            ? "Endorsement now builds a real wallet-signed transaction and writes the endorsement projection after indexer sync. Keep this surfaced as SEEDED_DEMO until devnet SPUMP balances, ATAs, and seeded campaign state are verified."
+            : "The route keeps the proposal id for context, but this surface currently uses local fixture values only. Real promotion requires SPUMP burn, endorsement PDA creation, reward pool projection, and claim state from the backend/indexer."}
+          {error ? ` API fallback reason: ${error}` : ""}
         </p>
       </div>
       <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
@@ -503,3 +659,5 @@ const EndorsementPreviewNotice = ({ proposalId }: { proposalId: string }) => (
     </div>
   </section>
 );
+
+(EndorsePage as typeof EndorsePage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;

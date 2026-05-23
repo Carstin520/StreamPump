@@ -284,6 +284,10 @@ pub struct Proposal {
     pub track2_unsettled_endorser_count: u32,
     /// Remaining SPUMP stake basis used for exact batched payout distribution.
     pub track2_unsettled_spump: u64,
+    /// Immutable Track 2 fan pool snapshot fixed at settlement time.
+    pub track2_initial_fan_pool: u64,
+    /// Immutable SPUMP stake snapshot fixed at settlement time.
+    pub track2_initial_spump_staked: u64,
 
     // Track 3: CPS Sales (Creator Only)
     pub track3_usdc_deposited: u64,
@@ -315,6 +319,8 @@ impl Proposal {
         + 8
         + 4
         + 4
+        + 8
+        + 8
         + 8
         + 8
         + 9

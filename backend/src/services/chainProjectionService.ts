@@ -87,6 +87,8 @@ export const syncProposalProjectionFromChain = async (params: {
     track2UsdcDeposited: onChain.track2UsdcDeposited,
     track2ActualValue: onChain.track2ActualValue,
     track2SettledAt: toDateFromUnixSeconds(onChain.track2SettledAtUnix),
+    track2InitialFanPool: onChain.track2InitialFanPool,
+    track2InitialSpumpStaked: onChain.track2InitialSpumpStaked,
     track3UsdcDeposited: onChain.track3UsdcDeposited,
     track3CpsPayout: onChain.track3CpsPayout,
     track3DelayDays: onChain.track3DelayDays,

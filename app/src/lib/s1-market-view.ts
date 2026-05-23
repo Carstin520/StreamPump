@@ -166,6 +166,32 @@ export const buildDemoS1Portfolio = (
       updatedAt: profile.creator.updatedAt,
     },
   ],
+  s2Endorsements: [
+    {
+      positionPda: "demo-position-s2-1",
+      proposalPda: "demo-proposal-s2-pda-1",
+      proposalId: "demo-proposal-1",
+      creatorWallet: "CreatorWallet1111111111111111111111111111",
+      sponsorWallet: "SponsorWallet1111111111111111111111111111",
+      status: "RESOLVED_SUCCESS",
+      stakedSpumpAmount: "200000",
+      claimedStatus: false,
+      estimatedUsdcReward: "160000000000",
+      updatedAt: profile.creator.updatedAt,
+    },
+    {
+      positionPda: "demo-position-s2-2",
+      proposalPda: "demo-proposal-s2-pda-2",
+      proposalId: "demo-proposal-2",
+      creatorWallet: "CreatorWallet1111111111111111111111111111",
+      sponsorWallet: "SponsorWallet1111111111111111111111111111",
+      status: "FUNDED",
+      stakedSpumpAmount: "100000",
+      claimedStatus: false,
+      estimatedUsdcReward: "0",
+      updatedAt: profile.creator.updatedAt,
+    },
+  ],
 });
 
 const bigintFrom = (value: string | number | null | undefined) => {

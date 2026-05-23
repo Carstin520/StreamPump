@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -204,6 +204,8 @@ model Proposal {
   track2UsdcDeposited        BigInt
   track2ActualValue          BigInt?
   track2SettledAt            DateTime?
+  track2InitialFanPool       BigInt           @default(0)
+  track2InitialSpumpStaked   BigInt           @default(0)
   track3UsdcDeposited        BigInt
   track3CpsPayout            BigInt?
   track3DelayDays            Int
@@ -227,19 +229,37 @@ model Proposal {
   @@index([manifestId])
 }
 
+model S2EndorsementPositionProjection {
+  id                  String    @id @default(cuid())
+  positionPda         String    @unique
+  userWallet          String
+  proposalPda         String
+  stakedSpumpAmount   BigInt    @default(0)
+  claimedStatus       Boolean   @default(false)
+  estimatedUsdcReward BigInt    @default(0)
+  lastEventSignature  String?
+  lastEventAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([userWallet, proposalPda])
+  @@index([proposalPda, claimedStatus])
+  @@index([userWallet, updatedAt])
+}
+
 model ContentManifest {
-  id                    String                 @id @default(cuid())
+  id                    String                @id @default(cuid())
   creatorWallet         String
   contentType           ContentType
-  status                ContentManifestStatus  @default(DRAFT)
-  isPublicFeedEligible  Boolean                @default(false)
+  status                ContentManifestStatus @default(DRAFT)
+  isPublicFeedEligible  Boolean               @default(false)
   publishedAt           DateTime?
   publicSlug            String?
   creatorDisplayName    String?
   publicExcerpt         String?
   /// CN: 内容版本号。草稿变更通过新版本推进，而不是覆盖已绑定版本。
   /// EN: Content version number. Mutations should advance via new versions instead of mutating already-bound content.
-  version               Int                    @default(1)
+  version               Int                   @default(1)
   title                 String?
   captionText           String?
   captionTextHash       String?
@@ -250,22 +270,22 @@ model ContentManifest {
   canonicalManifestJson Json?
   /// CN: manifest 的 SHA-256 十六进制摘要，对应链上的 content_hash。
   /// EN: SHA-256 hex digest of the manifest, matching the on-chain content_hash.
-  manifestHashHex       String?                @unique
+  manifestHashHex       String?               @unique
   /// CN: 后端内部 canonical URL，不依赖外部平台发帖链接。
   /// EN: Backend-owned canonical URL that does not depend on an external platform post URL.
-  internalCanonicalUrl  String?                @unique
+  internalCanonicalUrl  String?               @unique
   /// CN: internalCanonicalUrl 的 Keccak 摘要，对应链上 url_digest。
   /// EN: Keccak digest of internalCanonicalUrl, matching the on-chain url_digest.
   internalUrlDigestHex  String?
   /// CN: 当前版本 manifest 对应的链上内容锚点 PDA。
   /// EN: On-chain content anchor PDA for the current manifest version.
-  currentAnchorPda      String?                @unique
+  currentAnchorPda      String?               @unique
   currentAnchorTx       String?
   /// CN: 封面资产 ID；未显式指定时通常回退到第一个素材。
   /// EN: Cover asset ID; usually falls back to the first asset when unspecified.
   coverAssetId          String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   assets                ContentAsset[]
   publications          ContentPublication[]
   proposalIntents       ProposalIntent[]
@@ -277,54 +297,54 @@ model ContentManifest {
 }
 
 model ContentAsset {
-  id               String                @id @default(cuid())
-  manifestId       String
-  manifest         ContentManifest       @relation(fields: [manifestId], references: [id], onDelete: Cascade)
-  assetType        AssetType
+  id                   String                 @id @default(cuid())
+  manifestId           String
+  manifest             ContentManifest        @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  assetType            AssetType
   /// CN: 素材在 manifest 内的稳定顺序，用于生成 canonical manifest hash。
   /// EN: Stable per-manifest ordering used when generating the canonical manifest hash.
-  orderIndex       Int
+  orderIndex           Int
   /// CN: 原始文件内容的 SHA-256 十六进制摘要。
   /// EN: SHA-256 hex digest of the raw uploaded file.
-  sha256Hex        String
-  mimeType         String
-  fileSizeBytes    BigInt
-  width            Int?
-  height           Int?
-  durationMs       Int?
+  sha256Hex            String
+  mimeType             String
+  fileSizeBytes        BigInt
+  width                Int?
+  height               Int?
+  durationMs           Int?
   /// CN: 对象存储中的稳定 key，作为 S3/R2 与 DB 的桥接主键。
   /// EN: Stable object-storage key that bridges S3/R2 objects with DB state.
-  storageKey       String                @unique
-  cdnUrl           String?
+  storageKey           String                 @unique
+  cdnUrl               String?
   /// CN: Mux 资产 ID，用于转码状态与播放地址回写。
   /// EN: Mux asset ID used to reconcile processing status and playback info.
-  muxAssetId       String?               @unique
+  muxAssetId           String?                @unique
   /// CN: Mux playback ID，对应最终可播放资源。
   /// EN: Mux playback ID for the final playable asset.
-  muxPlaybackId    String?               @unique
+  muxPlaybackId        String?                @unique
   /// CN: 最近一次从 Mux 观察到的原始状态，如 preparing / ready / errored。
   /// EN: Last raw status observed from Mux, such as preparing / ready / errored.
-  muxLastKnownStatus String?
+  muxLastKnownStatus   String?
   /// CN: 最近一次收到 Mux webhook 的时间。
   /// EN: Timestamp when the most recent Mux webhook was received.
   muxWebhookReceivedAt DateTime?
   /// CN: 最近一次主动向 Mux 查询资产状态的时间。
   /// EN: Timestamp of the most recent active reconciliation query against Mux.
-  muxLastCheckedAt DateTime?
+  muxLastCheckedAt     DateTime?
   /// CN: 主动 reconciliation 已尝试的次数。
   /// EN: Number of active reconciliation attempts executed so far.
-  muxReconcileAttempts Int               @default(0)
+  muxReconcileAttempts Int                    @default(0)
   /// CN: 视频被确认为 ready 的时间，无论来源是 webhook 还是补偿任务。
   /// EN: Timestamp when the video was confirmed ready, whether by webhook or reconciliation.
-  muxReadyAt       DateTime?
-  uploadStatus     AssetUploadStatus     @default(PENDING)
-  processingStatus AssetProcessingStatus @default(NONE)
+  muxReadyAt           DateTime?
+  uploadStatus         AssetUploadStatus      @default(PENDING)
+  processingStatus     AssetProcessingStatus  @default(NONE)
   /// CN: 当前 processing 状态是由哪条链路推进的。
   /// EN: Source that most recently advanced the processing state.
-  processingSource AssetProcessingSource?
-  processingError  String?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  processingSource     AssetProcessingSource?
+  processingError      String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@unique([manifestId, orderIndex])
   @@index([manifestId, assetType])
@@ -332,22 +352,22 @@ model ContentAsset {
 }
 
 model ContentPublication {
-  id                  String                        @id @default(cuid())
-  manifestId          String
-  manifest            ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
-  platform            String
+  id                   String                        @id @default(cuid())
+  manifestId           String
+  manifest             ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  platform             String
   /// CN: 外部平台帖子 ID 的摘要，避免在 DB 中直接依赖原始平台 ID。
   /// EN: Digest of the external platform post ID to avoid coupling directly to raw platform identifiers.
-  externalPostIdHash  String?
-  externalUrl         String
+  externalPostIdHash   String?
+  externalUrl          String
   /// CN: externalUrl 的摘要，可用于后续去重和链下证据比对。
   /// EN: Digest of externalUrl for later dedupe and off-chain evidence matching.
   externalUrlDigestHex String
-  verificationStatus  PublicationVerificationStatus @default(PENDING)
-  verificationSource  String?
-  verifiedAt          DateTime?
-  createdAt           DateTime                      @default(now())
-  updatedAt           DateTime                      @updatedAt
+  verificationStatus   PublicationVerificationStatus @default(PENDING)
+  verificationSource   String?
+  verifiedAt           DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
 
   @@unique([platform, externalUrl])
   @@index([manifestId, platform, verificationStatus])
@@ -432,25 +452,25 @@ model TxBundle {
 }
 
 model ChainEvent {
-  id              String   @id @default(cuid())
+  id               String   @id @default(cuid())
   /// CN: 对应链上交易签名；一笔交易内可能产生多条事件记录。
   /// EN: On-chain transaction signature; one transaction may yield multiple event rows.
-  signature       String
+  signature        String
   /// CN: 指令在交易消息内的顺序，用来和 signature 一起保证唯一性。
   /// EN: Instruction order inside the transaction message, used with the signature for uniqueness.
   instructionIndex Int
-  slot            BigInt
-  programId       String
+  slot             BigInt
+  programId        String
   /// CN: 通过 IDL 指令解码得到的指令名。
   /// EN: Instruction name decoded from the IDL.
-  instructionName String
-  proposalPda     String?
+  instructionName  String
+  proposalPda      String?
   /// CN: 事件主实体地址；没有 proposal 时可回落到 creator_profile/content_anchor 等地址。
   /// EN: Primary entity address for the event; falls back to creator_profile/content_anchor when no proposal exists.
-  entityPda       String?
-  payloadJson     Json?
-  observedAt      DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  entityPda        String?
+  payloadJson      Json?
+  observedAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([signature, instructionIndex])
   @@index([proposalPda, observedAt])
@@ -594,40 +614,40 @@ model IndexerCursor {
 }
 
 model WalletAuthChallenge {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   wallet     String
-  nonce      String   @unique
+  nonce      String    @unique
   message    String
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([wallet, expiresAt])
 }
 
 model EmailAuthChallenge {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   email      String
   codeHash   String
   expiresAt  DateTime
   consumedAt DateTime?
-  attempts   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([email, expiresAt])
 }
 
 model WalletSession {
-  id         String   @id
+  id         String    @id
   wallet     String
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
   lastSeenAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([wallet, expiresAt])
 }

@@ -109,6 +109,18 @@ export type S1PortfolioResponse = {
     estimatedClaimableUsdc: string | null;
     updatedAt: string;
   }>;
+  s2Endorsements?: Array<{
+    positionPda: string;
+    proposalPda: string;
+    proposalId: string | null;
+    creatorWallet: string | null;
+    sponsorWallet: string | null;
+    status: string | null;
+    stakedSpumpAmount: string;
+    claimedStatus: boolean;
+    estimatedUsdcReward: string;
+    updatedAt: string;
+  }>;
 };
 
 type S1BuildWithAmountInput = {

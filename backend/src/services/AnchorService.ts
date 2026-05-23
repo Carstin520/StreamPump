@@ -53,6 +53,8 @@ export interface OnChainProposalState {
   track2UsdcDeposited: bigint;
   track2ActualValue: bigint | null;
   track2SettledAtUnix: bigint;
+  track2InitialFanPool: bigint;
+  track2InitialSpumpStaked: bigint;
   track3UsdcDeposited: bigint;
   track3CpsPayout: bigint | null;
   track3DelayDays: number;
@@ -576,6 +578,15 @@ export class AnchorService {
     return vault;
   }
 
+  deriveEndorsementPositionPda(user: PublicKey, proposalPda: PublicKey): PublicKey {
+    const [position] = PublicKey.findProgramAddressSync(
+      [Buffer.from("endorsement"), user.toBuffer(), proposalPda.toBuffer()],
+      this.program.programId
+    );
+
+    return position;
+  }
+
   deriveContentAnchorPda(creatorProfilePda: PublicKey, urlDigest: Uint8Array): PublicKey {
     const [contentAnchor] = PublicKey.findProgramAddressSync(
       [Buffer.from("content_anchor"), creatorProfilePda.toBuffer(), Buffer.from(urlDigest)],
@@ -874,6 +885,8 @@ export class AnchorService {
             ? null
             : toBigInt(proposal.track2ActualValue),
         track2SettledAtUnix: toBigInt(proposal.track2SettledAt),
+        track2InitialFanPool: toBigInt(proposal.track2InitialFanPool),
+        track2InitialSpumpStaked: toBigInt(proposal.track2InitialSpumpStaked),
         track3UsdcDeposited: toBigInt(proposal.track3UsdcDeposited),
         track3CpsPayout:
           proposal.track3CpsPayout === null || proposal.track3CpsPayout === undefined
@@ -1158,6 +1171,70 @@ export class AnchorService {
         sponsorUsdcAta,
         proposalUsdcVault,
         tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildEndorseProposalInstruction(params: {
+    userWallet: string;
+    proposalPda: string;
+    amount: bigint;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const proposal = new PublicKey(params.proposalPda);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+
+    return (this.program.methods as any)
+      .endorseProposal({
+        amount: new BN(params.amount.toString()),
+      })
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        proposal,
+        endorsementPosition: this.deriveEndorsementPositionPda(user, proposal),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+  }
+
+  async buildClaimEndorsementInstruction(params: {
+    userWallet: string;
+    proposalPda: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const user = new PublicKey(params.userWallet);
+    const proposal = new PublicKey(params.proposalPda);
+    const spumpMint = protocolConfig.spumpMint as PublicKey;
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .claimEndorsement()
+      .accounts({
+        user,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        proposal,
+        endorsementPosition: this.deriveEndorsementPositionPda(user, proposal),
+        userSpumpAta: getAssociatedTokenAddressSync(
+          spumpMint,
+          user,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        userUsdcAta: getAssociatedTokenAddressSync(usdcMint, user),
+        proposalUsdcVault: this.deriveProposalUsdcVaultPda(proposal),
+        usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
       .instruction();
   }

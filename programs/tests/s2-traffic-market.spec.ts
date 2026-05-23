@@ -219,6 +219,8 @@ describe("streampump-core S2 traffic market", function () {
     // Assert: track2UsdcDeposited reflects the fan pool share (160,000)
     // 断言：track2UsdcDeposited 反映粉丝池份额（160,000）
     expect(proposalAfterSettle.track2UsdcDeposited.toString()).to.equal("160000");
+    expect(proposalAfterSettle.track2InitialFanPool.toString()).to.equal("160000");
+    expect(proposalAfterSettle.track2InitialSpumpStaked.toString()).to.equal(stakeAmount.toString());
 
     // ----- Fan claims endorsement reward: SPUMP principal + USDC share -----
     // ----- 粉丝领取背书奖励：SPUMP 本金 + USDC 份额 -----

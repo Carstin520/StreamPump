@@ -257,6 +257,8 @@ export const serializeProposal = (proposal: Proposal) => ({
   track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
   track2ActualValue: proposal.track2ActualValue?.toString() ?? null,
   track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+  track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+  track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
   track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
   track3CpsPayout: proposal.track3CpsPayout?.toString() ?? null,
   track3DelayDays: proposal.track3DelayDays,
@@ -505,4 +507,6 @@ export const serializePublicProposalView = (proposal: Proposal) => ({
   track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
   track2ActualValue: proposal.track2ActualValue?.toString() ?? null,
   track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+  track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+  track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
 });

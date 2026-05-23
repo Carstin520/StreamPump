@@ -216,6 +216,8 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     proposal.track2_endorser_count = 0;
     proposal.track2_unsettled_endorser_count = 0;
     proposal.track2_unsettled_spump = 0;
+    proposal.track2_initial_fan_pool = 0;
+    proposal.track2_initial_spump_staked = 0;
 
     // EN: Track 3 initialization — delayed CPS settlement.
     // ZH: Track3 初始化——延迟 CPS 结算。

@@ -219,6 +219,8 @@ pub struct Track2Settled {
     pub creator_payout: u64,
     pub sponsor_refund: u64,
     pub fan_pool_remaining: u64,
+    pub initial_fan_pool: u64,
+    pub initial_spump_staked: u64,
     pub status: u8,
     pub settled_at: i64,
 }

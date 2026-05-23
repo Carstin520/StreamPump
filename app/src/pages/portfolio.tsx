@@ -23,6 +23,8 @@ import {
 } from "@/components/s1/S1TransactionDrawer";
 import { StagePill } from "@/components/shared/StagePill";
 import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
+import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
+import { buildClaimEndorsementTransaction } from "@/lib/api/proposal";
 import {
   buildS1ClaimUsdcTransaction,
   DEMO_S1_CREATOR_WALLET,
@@ -55,8 +57,8 @@ import {
 /*  Tabs                                                               */
 /* ------------------------------------------------------------------ */
 
-type LiveTab = "Portfolio" | "Claim queue" | "Preview Holdings" | "Watchlist" | "Rewards";
-const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue", "Preview Holdings", "Watchlist", "Rewards"];
+type LiveTab = "Portfolio" | "Claim queue" | "S2 Endorsements" | "Preview Holdings" | "Watchlist" | "Rewards";
+const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue", "S2 Endorsements", "Preview Holdings", "Watchlist", "Rewards"];
 type PortfolioPosition = S1PortfolioResponse["positions"][number];
 
 const isExpiredSessionError = (error: unknown) => {
@@ -445,6 +447,247 @@ function PositionsList({
 }
 
 /* ------------------------------------------------------------------ */
+/*  S2 Endorsement Components                                          */
+/* ------------------------------------------------------------------ */
+
+function S2ClaimButton({
+  proposalPda,
+  onRefresh,
+}: {
+  proposalPda: string;
+  onRefresh: () => Promise<void>;
+}) {
+  const flow = useProposalTransactionFlow();
+  const [showDrawer, setShowDrawer] = useState(false);
+
+  const execute = useCallback(async () => {
+    setShowDrawer(true);
+    const submitted = await flow.execute(async (token) => {
+      return buildClaimEndorsementTransaction(token, proposalPda);
+    });
+    if (submitted) await onRefresh();
+  }, [flow, proposalPda, onRefresh]);
+
+  const busy =
+    flow.state.status === "building" ||
+    flow.state.status === "waiting_signature" ||
+    flow.state.status === "submitting" ||
+    flow.state.status === "syncing_projection";
+
+  return (
+    <div className="space-y-2">
+      <button
+        className="rounded-lg bg-[#65ecaf] px-3.5 py-1.5 text-[10px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={busy}
+        onClick={() => void execute()}
+        type="button"
+      >
+        {busy ? "..." : "Claim"}
+      </button>
+      {showDrawer ? (
+        <S1TransactionDrawer
+          actionLabel="Claim S2 Reward"
+          flow={flow.state as any}
+          onClose={() => {
+            flow.reset();
+            setShowDrawer(false);
+          }}
+          onRetry={() => void execute()}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function S2EndorsementRow({
+  claimsEnabled,
+  onRefresh,
+  endorsement,
+}: {
+  claimsEnabled: boolean;
+  onRefresh: () => Promise<void>;
+  endorsement: Required<S1PortfolioResponse>["s2Endorsements"][number];
+}) {
+  const isClaimed = endorsement.claimedStatus;
+  const isClaimable =
+    !isClaimed &&
+    ["RESOLVED_SUCCESS", "RESOLVED_FAIL", "CANCELLED", "VOIDED"].includes(
+      endorsement.status ?? ""
+    );
+  const status = endorsement.status ?? "UNKNOWN";
+
+  const stakedSpump = formatS1Amount(endorsement.stakedSpumpAmount);
+  const rewardUsdc = formatUsdcAmount(endorsement.estimatedUsdcReward);
+
+  let statusText = status.replace("_", " ");
+  let statusColor = "text-[#8ea0ba] bg-white/[0.04]";
+  if (status === "RESOLVED_SUCCESS") {
+    statusText = "Success";
+    statusColor = "text-[#65ecaf] bg-[#65ecaf]/10";
+  } else if (status === "RESOLVED_FAIL") {
+    statusText = "Failed";
+    statusColor = "text-[#de402a] bg-[#de402a]/10";
+  } else if (status === "CANCELLED" || status === "VOIDED") {
+    statusText = "Voided";
+    statusColor = "text-[#8ea0ba] bg-white/[0.06]";
+  } else if (status === "OPEN" || status === "FUNDED") {
+    statusText = "Active";
+    statusColor = "text-[#67b8ff] bg-[#67b8ff]/10";
+  }
+
+  return (
+    <div className="rounded-[14px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4">
+      {/* Desktop layout */}
+      <div className="hidden items-center gap-4 xl:flex">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#f3b33e]">
+          S2
+        </div>
+        <div className="min-w-[160px] flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[13px] font-semibold text-white">
+              Campaign {shortenWallet(endorsement.proposalPda)}
+            </span>
+            <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${statusColor}`}>
+              {statusText}
+            </span>
+          </div>
+          <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">
+            Creator: {endorsement.creatorWallet ? shortenWallet(endorsement.creatorWallet) : "—"}
+          </p>
+        </div>
+        <MetricCell label="Staked SPUMP" value={stakedSpump} />
+        <MetricCell
+          label={status === "RESOLVED_SUCCESS" ? "USDC Reward" : "USDC Est."}
+          value={rewardUsdc}
+          color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
+        />
+        <MetricCell
+          label="Status"
+          value={isClaimed ? "Claimed" : "Unclaimed"}
+          color={isClaimed ? "text-[#8ea0ba]" : "text-[#f3b33e]"}
+        />
+        <MetricCell label="Updated" value={new Date(endorsement.updatedAt).toLocaleDateString()} />
+        <div className="flex items-center gap-2">
+          {endorsement.proposalPda && (
+            <Link
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
+              href={`/campaigns/${endorsement.proposalPda}`}
+            >
+              Campaign
+            </Link>
+          )}
+          {isClaimable && claimsEnabled ? (
+            <S2ClaimButton proposalPda={endorsement.proposalPda} onRefresh={onRefresh} />
+          ) : null}
+          {isClaimable && !claimsEnabled ? <DisabledClaimPill /> : null}
+          {!isClaimable && !isClaimed && (
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+              Staking
+            </span>
+          )}
+          {isClaimed && (
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+              Claimed
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile card layout */}
+      <div className="space-y-3 xl:hidden">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#f3b33e]">
+            S2
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-[13px] font-semibold text-white">
+                Campaign {shortenWallet(endorsement.proposalPda)}
+              </span>
+              <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${statusColor}`}>
+                {statusText}
+              </span>
+            </div>
+            <p className="truncate font-mono text-[10px] text-[#6f8099]">
+              Creator: {endorsement.creatorWallet ? shortenWallet(endorsement.creatorWallet) : "—"}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <MobileMetric label="Staked SPUMP" value={stakedSpump} />
+          <MobileMetric
+            label={status === "RESOLVED_SUCCESS" ? "USDC Reward" : "USDC Est."}
+            value={rewardUsdc}
+            color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
+          />
+          <MobileMetric
+            label="Status"
+            value={isClaimed ? "Claimed" : "Unclaimed"}
+            color={isClaimed ? "text-[#8ea0ba]" : "text-[#f3b33e]"}
+          />
+          <MobileMetric label="Updated" value={new Date(endorsement.updatedAt).toLocaleDateString()} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {endorsement.proposalPda && (
+            <Link
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:text-white"
+              href={`/campaigns/${endorsement.proposalPda}`}
+            >
+              Campaign
+            </Link>
+          )}
+          {isClaimable && claimsEnabled ? (
+            <S2ClaimButton proposalPda={endorsement.proposalPda} onRefresh={onRefresh} />
+          ) : null}
+          {isClaimable && !claimsEnabled ? <DisabledClaimPill /> : null}
+          {!isClaimable && !isClaimed && (
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+              Staking
+            </span>
+          )}
+          {isClaimed && (
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+              Claimed
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function S2EndorsementsList({
+  claimsEnabled,
+  onRefresh,
+  endorsements = [],
+}: {
+  claimsEnabled: boolean;
+  onRefresh: () => Promise<void>;
+  endorsements?: S1PortfolioResponse["s2Endorsements"];
+}) {
+  if (!endorsements || endorsements.length === 0) {
+    return (
+      <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-6 text-center text-xs text-[#8ea0ba]">
+        No S2 campaign endorsement positions found for this wallet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {endorsements.map((end) => (
+        <S2EndorsementRow
+          claimsEnabled={claimsEnabled}
+          endorsement={end}
+          key={end.positionPda}
+          onRefresh={onRefresh}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Demo holder hints                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -784,6 +1027,10 @@ function PortfolioPage() {
 
             {activeTab === "Claim queue" ? (
               <ClaimQueue claimsEnabled={liveClaimsEnabled} onRefresh={refresh} portfolio={portfolio} />
+            ) : null}
+
+            {activeTab === "S2 Endorsements" ? (
+              <S2EndorsementsList claimsEnabled={liveClaimsEnabled} onRefresh={refresh} endorsements={portfolio.s2Endorsements} />
             ) : null}
 
             {activeTab === "Preview Holdings" ? (
