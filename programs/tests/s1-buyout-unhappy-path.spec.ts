@@ -703,4 +703,86 @@ describe("streampump-core S1 buyout unhappy paths", function () {
       await setS1RageQuitWindow(ctx, PRODUCTION_RAGE_QUIT_SECONDS);
     }
   });
+
+  it("aborts an accepted buyout when all S1 holders rage quit", async () => {
+    const { creator, creatorProfile } = await registerCreator(ctx, "buyout_abort");
+    const position = await buyS1(ctx, creatorProfile, 25);
+
+    await openAuction(ctx, creator, creatorProfile);
+    const loser = await submitOffer(ctx, creatorProfile, ctx.sponsorA, ctx.sponsorAUsdcAta, 500_000);
+    const winner = await submitOffer(ctx, creatorProfile, ctx.sponsorB, ctx.sponsorBUsdcAta, 1_000_000);
+    const s1BuyoutState = await acceptOffer(
+      ctx,
+      creator,
+      creatorProfile,
+      winner.buyoutOffer,
+      winner.offerUsdcVault
+    );
+
+    await ctx.program.methods
+      .rageQuitS1({ amount: ctx.bn(25) })
+      .accounts({
+        user: ctx.fanA.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        creatorProfile,
+        s1BuyoutState,
+        s1UserPosition: position,
+        userSpumpAta: ctx.fanASpumpAta,
+        spumpMint: ctx.spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .signers([ctx.fanA])
+      .rpc();
+
+    const creatorAfterExit = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfterExit.s1Supply.toString()).to.equal("0");
+
+    await ctx.expectAnchorError(
+      () =>
+        (ctx.program.methods as any)
+          .abortS1Buyout()
+          .accounts({
+            sponsor: ctx.sponsorA.publicKey,
+            protocolConfig: ctx.protocolConfig,
+            creatorProfile,
+            s1BuyoutState,
+            buyoutOffer: loser.buyoutOffer,
+            sponsorUsdcAta: ctx.sponsorAUsdcAta,
+            offerUsdcVault: loser.offerUsdcVault,
+            usdcMint: ctx.usdcMint,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([ctx.sponsorA])
+          .rpc(),
+      "Unauthorized"
+    );
+
+    const sponsorBeforeAbort = await ctx.tokenAmount(ctx.sponsorBUsdcAta, TOKEN_PROGRAM_ID);
+    await (ctx.program.methods as any)
+      .abortS1Buyout()
+      .accounts({
+        sponsor: ctx.sponsorB.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        creatorProfile,
+        s1BuyoutState,
+        buyoutOffer: winner.buyoutOffer,
+        sponsorUsdcAta: ctx.sponsorBUsdcAta,
+        offerUsdcVault: winner.offerUsdcVault,
+        usdcMint: ctx.usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([ctx.sponsorB])
+      .rpc();
+
+    const sponsorAfterAbort = await ctx.tokenAmount(ctx.sponsorBUsdcAta, TOKEN_PROGRAM_ID);
+    expect(sponsorAfterAbort - sponsorBeforeAbort).to.equal(1_000_000n);
+
+    const creatorAfterAbort = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(ctx.enumKey(creatorAfterAbort.status)).to.equal("s1Active");
+    expect(await ctx.connection.getAccountInfo(s1BuyoutState)).to.equal(null);
+    expect(await ctx.connection.getAccountInfo(winner.buyoutOffer)).to.equal(null);
+    expect(await ctx.connection.getAccountInfo(winner.offerUsdcVault)).to.equal(null);
+  });
 });

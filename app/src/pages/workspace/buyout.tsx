@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -9,12 +9,13 @@ type Offer = {
   avatar: string;
   amount: number;
   time: string;
+  lockHoursRemaining: number;
 };
 
 const OFFERS: Offer[] = [
-  { sponsor: "Apex Motion", avatar: "AM", amount: 850_000, time: "2h ago" },
-  { sponsor: "Gridline Lab", avatar: "GL", amount: 720_000, time: "5h ago" },
-  { sponsor: "Velocity House", avatar: "VH", amount: 680_000, time: "1d ago" },
+  { sponsor: "Apex Motion", avatar: "AM", amount: 850_000, time: "2h ago", lockHoursRemaining: 22 },
+  { sponsor: "Gridline Lab", avatar: "GL", amount: 720_000, time: "5h ago", lockHoursRemaining: 19 },
+  { sponsor: "Velocity House", avatar: "VH", amount: 680_000, time: "1d ago", lockHoursRemaining: 1 },
 ];
 
 const WALLET = "0x7A...2F";
@@ -28,6 +29,27 @@ const AVATAR_COLORS: Record<string, string> = {
   GL: "from-[#4a8dbf] to-[#3a7aaa]",
   VH: "from-[#c89630] to-[#b08228]",
 };
+
+function OfferLockCountdown({ initialHours }: { initialHours: number }) {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const deadline = Date.now() + Math.max(0, initialHours) * 3_600_000;
+    const update = () => setRemainingMs(Math.max(0, deadline - Date.now()));
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, [initialHours]);
+
+  if (remainingMs === null) {
+    return <span>锁定期剩余 -- 小时</span>;
+  }
+
+  const hours = Math.floor(remainingMs / 3_600_000);
+  const minutes = Math.floor((remainingMs % 3_600_000) / 60_000);
+
+  return <span>锁定期剩余 {hours} 小时 {minutes} 分钟</span>;
+}
 
 function OfferCard({
   offer,
@@ -65,6 +87,9 @@ function OfferCard({
             <div>
               <p className="text-[13px] font-semibold text-white">{offer.sponsor}</p>
               <p className="text-[11px] text-[#6f8099]">{offer.time}</p>
+              <p className="mt-1 text-[10px] font-medium text-[#f3c66e]">
+                <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
+              </p>
             </div>
           </div>
           <div className="text-right">
@@ -119,6 +144,9 @@ function ConfirmModal({
         <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-white">Preview buyout acceptance</h3>
         <p className="mt-0.5 text-[12px] text-[#9aabc4]">
           Accept ${fmt(offer.amount)} USDC from {offer.sponsor}
+        </p>
+        <p className="mt-2 rounded-lg border border-[#f3b33e]/15 bg-[#1f1708]/55 px-3 py-2 text-[11px] font-medium text-[#f3c66e]">
+          <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
         </p>
 
         <div className="mt-5 space-y-0">

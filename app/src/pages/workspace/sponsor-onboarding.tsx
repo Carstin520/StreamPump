@@ -42,6 +42,31 @@ const SPONSOR_TYPES: Array<{ value: SponsorType; label: string; body: string }> 
   { value: "INDIVIDUAL", label: "个人商家", body: "小型商家或个人经营主体" },
 ];
 
+function SponsorOfferLockNotice() {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const deadline = Date.now() + 24 * 3_600_000;
+    const update = () => setRemainingMs(Math.max(0, deadline - Date.now()));
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const hours = remainingMs === null ? "--" : String(Math.floor(remainingMs / 3_600_000));
+  const minutes =
+    remainingMs === null ? "--" : String(Math.floor((remainingMs % 3_600_000) / 60_000));
+
+  return (
+    <div className="rounded-[14px] border border-[#f3b33e]/18 bg-[#1f1708]/45 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+        S1 Buyout 报价锁定
+      </p>
+      <p className="mt-1 text-sm text-[#f5d391]">锁定期剩余 {hours} 小时 {minutes} 分钟</p>
+    </div>
+  );
+}
+
 const uploadFileWithProgress = (
   url: string,
   file: File,
@@ -197,6 +222,10 @@ export default function SponsorOnboardingPage() {
                 <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-[#9fb0ca]">
                   {session.wallet.slice(0, 4)}...{session.wallet.slice(-4)}
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <SponsorOfferLockNotice />
               </div>
 
               <div className="mt-5 grid gap-5 lg:grid-cols-[220px_1fr]">

@@ -83,6 +83,10 @@ pub mod streampump_core {
         instructions::accept_buyout_offer::handler(ctx)
     }
 
+    pub fn abort_s1_buyout(ctx: Context<AbortS1Buyout>) -> Result<()> {
+        instructions::abort_s1_buyout::handler(ctx)
+    }
+
     pub fn reclaim_expired_buyout_offer(ctx: Context<ReclaimExpiredBuyoutOffer>) -> Result<()> {
         instructions::reclaim_expired_buyout_offer::handler(ctx)
     }

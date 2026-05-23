@@ -75,6 +75,12 @@ export const buildDemoS1MarketProfile = (creator: CreatorMarketRecord): S1Market
   const currentPriceAtomic = String(Math.round(creator.tokenPrice * 1_000_000_000));
   const nextPriceAtomic = String(Math.round((creator.tokenPrice + 0.18) * 1_000_000_000));
   const latestOfferUsdc = isBuyoutDemo ? String((creator.buyoutOfferUsd ?? 850000) * 1_000_000) : null;
+  const demoClaimableUsdc = String(124000 * 1_000_000);
+  const demoClaimableSupply = String(Math.round(creator.supply * 0.34));
+  const demoEarlyClaimableSupply = String(Math.round(Number(demoClaimableSupply) * 0.66));
+  const demoRegularClaimableSupply = String(
+    Math.max(0, Number(demoClaimableSupply) - Number(demoEarlyClaimableSupply))
+  );
 
   return {
     creator: {
@@ -111,8 +117,12 @@ export const buildDemoS1MarketProfile = (creator: CreatorMarketRecord): S1Market
           latestOfferPda: "demo-offer-apex-motion",
           latestOfferUsdc,
           usdcDeposited: latestOfferUsdc,
-          claimableUsdcRemaining: String(124000 * 1_000_000),
-          claimableS1SupplyRemaining: String(Math.round(creator.supply * 0.34)),
+          claimableUsdcRemaining: demoClaimableUsdc,
+          claimableS1SupplyRemaining: demoClaimableSupply,
+          earlyClaimableUsdcRemaining: String(24000 * 1_000_000),
+          earlyClaimableS1SupplyRemaining: demoEarlyClaimableSupply,
+          regularClaimableUsdcRemaining: String(100000 * 1_000_000),
+          regularClaimableS1SupplyRemaining: demoRegularClaimableSupply,
           rageQuitDeadlineAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
         }
       : null,
@@ -150,6 +160,7 @@ export const buildDemoS1Portfolio = (
       creatorProfilePda: profile.creator.creatorProfilePda,
       creator: profile.creator,
       internalTokenBalance: "120",
+      earlyCohortBalance: "80",
       spumpCostBasis: "288000000000",
       estimatedClaimableUsdc: profile.buyout?.claimableUsdcRemaining ?? null,
       updatedAt: profile.creator.updatedAt,

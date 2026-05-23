@@ -85,6 +85,13 @@ pub struct S1BuyoutOfferCancelled {
 }
 
 #[event]
+pub struct S1BuyoutAborted {
+    pub creator_profile: Pubkey,
+    pub sponsor: Pubkey,
+    pub refund_amount: u64,
+}
+
+#[event]
 pub struct S1TokenBought {
     pub user: Pubkey,
     pub creator_profile: Pubkey,
@@ -144,6 +151,10 @@ pub struct S1Graduated {
     pub winning_sponsor: Pubkey,
     pub claimable_usdc_remaining: u64,
     pub claimable_s1_supply_remaining: u64,
+    pub early_claimable_usdc_remaining: u64,
+    pub early_claimable_s1_supply_remaining: u64,
+    pub regular_claimable_usdc_remaining: u64,
+    pub regular_claimable_s1_supply_remaining: u64,
     pub creator_spump_bonus: u64,
     pub status: u8,
 }
@@ -157,6 +168,10 @@ pub struct S1BuyoutUsdcClaimed {
     pub usdc_amount: u64,
     pub remaining_usdc: u64,
     pub remaining_supply: u64,
+    pub early_claimable_usdc_remaining: u64,
+    pub early_claimable_s1_supply_remaining: u64,
+    pub regular_claimable_usdc_remaining: u64,
+    pub regular_claimable_s1_supply_remaining: u64,
 }
 
 #[event]

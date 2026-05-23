@@ -56,6 +56,7 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
   S1BuyoutOfferAccepted: "accept_buyout_offer",
   S1BuyoutOfferReclaimed: "reclaim_expired_buyout_offer",
   S1BuyoutOfferCancelled: "cancel_buyout_offer",
+  S1BuyoutAborted: "abort_s1_buyout",
   S1TokenBought: "buy_s1_token",
   S1TokenSold: "sell_s1_token",
   S1RageQuit: "rage_quit_s1",

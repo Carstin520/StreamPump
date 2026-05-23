@@ -413,6 +413,28 @@ export const buildReclaimBuyoutOfferTransaction = withController(
   }
 );
 
+export const buildAbortS1BuyoutTransaction = withController(
+  "BUILD_S1_ABORT_BUYOUT_TRANSACTION_FAILED",
+  async (req, res) => {
+    const sponsorWallet = requireSessionWallet(req);
+    const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
+
+    ok(
+      res,
+      await buildResponse({
+        action: "ABORT_S1_BUYOUT",
+        payerWallet: sponsorWallet,
+        requiredSigners: [sponsorWallet],
+        instruction: getAnchorService().buildAbortS1BuyoutInstruction({
+          sponsorWallet,
+          creatorWallet,
+        }),
+        derived: deriveCommonPdas({ sponsorWallet, creatorWallet }),
+      })
+    );
+  }
+);
+
 export const buildRageQuitS1Transaction = withController(
   "BUILD_S1_RAGE_QUIT_TRANSACTION_FAILED",
   async (req, res) => {

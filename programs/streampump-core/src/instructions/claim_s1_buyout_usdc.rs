@@ -222,6 +222,10 @@ pub(crate) fn handler(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         usdc_amount: usdc_share,
         remaining_usdc,
         remaining_supply,
+        early_claimable_usdc_remaining: buyout_state.early_claimable_usdc_remaining,
+        early_claimable_s1_supply_remaining: buyout_state.early_claimable_s1_supply_remaining,
+        regular_claimable_usdc_remaining: buyout_state.regular_claimable_usdc_remaining,
+        regular_claimable_s1_supply_remaining: buyout_state.regular_claimable_s1_supply_remaining,
     });
 
     Ok(())

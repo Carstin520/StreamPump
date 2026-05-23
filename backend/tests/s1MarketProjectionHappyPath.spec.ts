@@ -52,6 +52,7 @@ describe("S1 market projection happy path", () => {
   let onChainCreator: any;
   let onChainPositions: Map<string, any>;
   let onChainBuyoutState: any;
+  let buyoutStateFetchCount = 0;
   let restorePrisma: (() => void) | null = null;
   let restoreAnchor: (() => void) | null = null;
 
@@ -61,6 +62,7 @@ describe("S1 market projection happy path", () => {
     s1BuyoutProjection = new Map();
     s1BuyoutOfferProjection = new Map();
     onChainPositions = new Map();
+    buyoutStateFetchCount = 0;
     onChainCreator = {
       authority: creator,
       handle: "s1_projection_creator",
@@ -100,7 +102,10 @@ describe("S1 market projection happy path", () => {
     (AnchorService as any).getInstance = () => ({
       fetchCreatorProfileByPda: async () => onChainCreator,
       fetchS1PositionByPda: async (pda: PublicKey) => onChainPositions.get(pda.toBase58()) ?? null,
-      fetchS1BuyoutStateByPda: async () => onChainBuyoutState,
+      fetchS1BuyoutStateByPda: async () => {
+        buyoutStateFetchCount += 1;
+        return onChainBuyoutState;
+      },
       fetchProtocolS1Config: async () => ({
         admin: Keypair.generate().publicKey,
         dailySpumpEmissionMultiplierBps: 50_000,
@@ -313,6 +318,10 @@ describe("S1 market projection happy path", () => {
         creator: creator.toBase58(),
         claimableUsdcRemaining: "1000000000",
         claimableS1SupplyRemaining: "525",
+        earlyClaimableUsdcRemaining: "200000000",
+        earlyClaimableS1SupplyRemaining: "500",
+        regularClaimableUsdcRemaining: "800000000",
+        regularClaimableS1SupplyRemaining: "25",
       },
     });
     expect(creatorMarketProjection.get(creatorProfilePda).stage).to.equal(
@@ -330,11 +339,21 @@ describe("S1 market projection happy path", () => {
     expect(s1BuyoutProjection.get(creatorProfilePda).acceptedOfferUsdc).to.equal(
       1_000_000_000n
     );
+    expect(s1BuyoutProjection.get(creatorProfilePda).earlyClaimableUsdcRemaining).to.equal(
+      200_000_000n
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).regularClaimableS1SupplyRemaining).to.equal(
+      25n
+    );
+    expect(buyoutStateFetchCount).to.equal(0);
 
     onChainBuyoutState.claimableUsdcRemaining = 990_000_000n;
     onChainBuyoutState.claimableS1SupplyRemaining = 500n;
     onChainBuyoutState.earlyClaimableUsdcRemaining = 190_000_000n;
     onChainBuyoutState.earlyClaimableS1SupplyRemaining = 475n;
+    onChainBuyoutState.regularClaimableUsdcRemaining = 800_000_000n;
+    onChainBuyoutState.regularClaimableS1SupplyRemaining = 25n;
+    buyoutStateFetchCount = 0;
     const claimedPosition = onChainPositions.get(positionPdas[0]);
     claimedPosition.internalTokenBalance = 0n;
     claimedPosition.earlyCohortBalance = 0n;
@@ -351,6 +370,10 @@ describe("S1 market projection happy path", () => {
         s1BuyoutState: buyoutStatePda,
         remainingUsdc: "990000000",
         remainingSupply: "500",
+        earlyClaimableUsdcRemaining: "190000000",
+        earlyClaimableS1SupplyRemaining: "475",
+        regularClaimableUsdcRemaining: "800000000",
+        regularClaimableS1SupplyRemaining: "25",
       },
     });
 
@@ -360,5 +383,9 @@ describe("S1 market projection happy path", () => {
     expect(s1BuyoutProjection.get(creatorProfilePda).claimableUsdcRemaining).to.equal(
       990_000_000n
     );
+    expect(s1BuyoutProjection.get(creatorProfilePda).earlyClaimableS1SupplyRemaining).to.equal(
+      475n
+    );
+    expect(buyoutStateFetchCount).to.equal(0);
   });
 });

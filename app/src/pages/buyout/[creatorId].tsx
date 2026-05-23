@@ -70,8 +70,8 @@ const PHASES: { key: BuyoutPhase; label: string }[] = [
 function phaseFromStatus(status: S1BuyoutStatus | undefined | null): BuyoutPhase {
   if (!status || status === "NONE") return "none";
   if (status === "GRADUATED") return "graduated";
-  if (status === "EXECUTION_PENDING") return "rage_quit";
-  if (status === "ACCEPTED") return "offer_accepted";
+  if (status === "EXECUTION_PENDING" || status === "RAGE_QUIT_OPEN") return "rage_quit";
+  if (status === "ACCEPTED" || status === "OFFER_ACCEPTED") return "offer_accepted";
   return "offers_open";
 }
 
@@ -304,6 +304,7 @@ function RageQuitPanel({
   active,
   creatorWallet,
   currentPriceSpump,
+  estimatedClaimableUsdc,
   isDemoRoute,
   onDemoExit,
   onRefresh,
@@ -313,6 +314,7 @@ function RageQuitPanel({
   active: boolean;
   creatorWallet: string;
   currentPriceSpump?: string | null;
+  estimatedClaimableUsdc?: string | null;
   isDemoRoute?: boolean;
   onDemoExit?: (amount: number) => void;
   onRefresh: () => Promise<void>;
@@ -330,6 +332,14 @@ function RageQuitPanel({
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
   const signedIn = Boolean(sessionToken && !isLocalDemoSession && sessionWallet && wallet.connected && !walletMismatch);
+  const estimatedSpumpReturn =
+    currentPriceSpump && Number(currentPriceSpump) > 0
+      ? amount * Number(currentPriceSpump) / 1_000_000_000
+      : null;
+  const estimatedSpumpReturnLabel =
+    estimatedSpumpReturn === null
+      ? "待链上报价"
+      : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(estimatedSpumpReturn)} SPUMP`;
 
   useEffect(() => {
     setAmount(maxTokens > 0 ? Math.min(1, maxTokens) : 0);
@@ -399,14 +409,27 @@ function RageQuitPanel({
             value={amount}
           />
 
-          {currentPriceSpump && Number(currentPriceSpump) > 0 ? (
-            <div className="mt-3 flex items-center justify-between rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8ea0ba]">Est. SPUMP return</span>
-              <span className="text-sm font-semibold tracking-[-0.02em] text-[#65ecaf]">
-                {new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount * Number(currentPriceSpump) / 1_000_000_000)} SPUMP
-              </span>
+          <div className="mt-3 grid gap-2">
+            <div className="rounded-[10px] border border-[#de402a]/20 bg-[#21100d]/45 px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#ff9a88]">
+                Rage Quit 退出
+              </p>
+              <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
+                可获得 {estimatedSpumpReturnLabel}
+              </p>
             </div>
-          ) : null}
+            <div className="rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8df0c4]">
+                留守毕业
+              </p>
+              <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
+                预计可获得 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 现金分红（估算）
+              </p>
+              <p className="mt-2 border-t border-white/[0.06] pt-2 text-[10px] leading-4 text-[#8ea0ba]">
+                注意：分红数额为基于当前池的实时 Pro-rata 估算值，由于其他持有人 Rage Quit 退出导致份额变化，或链上舍入精度影响，最终领取数额以实际链上结算为准。
+              </p>
+            </div>
+          </div>
 
           <WalletSessionAlert connectedWallet={connectedWallet} sessionWallet={sessionWallet} />
 
@@ -945,6 +968,7 @@ function BuyoutPage() {
                     active={rageQuitActive}
                     creatorWallet={profile.creator.creatorWallet}
                     currentPriceSpump={profile.creator.currentPriceSpump}
+                    estimatedClaimableUsdc={position?.estimatedClaimableUsdc ?? null}
                     isDemoRoute={isDemoRoute}
                     onDemoExit={handleDemoExit}
                     onRefresh={refresh}

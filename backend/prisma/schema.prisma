@@ -149,6 +149,7 @@ enum BuyoutOfferProjectionStatus {
   ACCEPTED
   CANCELLED
   RECLAIMED
+  ABORTED
 }
 
 enum BuyoutProjectionStatus {
@@ -491,6 +492,7 @@ model S1PositionProjection {
   creatorProfilePda      String
   positionPda            String    @unique
   internalTokenBalance   BigInt    @default(0)
+  earlyCohortBalance     BigInt    @default(0)
   spumpCostBasis         BigInt    @default(0)
   estimatedClaimableUsdc BigInt?
   lastEventSignature     String?
@@ -523,24 +525,28 @@ model S1BuyoutOfferProjection {
 }
 
 model S1BuyoutProjection {
-  id                         String                 @id @default(cuid())
-  creatorWallet              String?
-  creatorProfilePda          String                 @unique
-  buyoutStatePda             String?                @unique
-  status                     BuyoutProjectionStatus @default(NONE)
-  winningSponsorWallet       String?
-  acceptedOfferPda           String?
-  acceptedOfferUsdc          BigInt?
-  latestOfferPda             String?
-  latestOfferUsdc            BigInt?
-  usdcDeposited              BigInt                 @default(0)
-  claimableUsdcRemaining     BigInt                 @default(0)
-  claimableS1SupplyRemaining BigInt                 @default(0)
-  rageQuitDeadlineAt         DateTime?
-  lastEventSignature         String?
-  lastEventAt                DateTime?
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
+  id                                String                 @id @default(cuid())
+  creatorWallet                     String?
+  creatorProfilePda                 String                 @unique
+  buyoutStatePda                    String?                @unique
+  status                            BuyoutProjectionStatus @default(NONE)
+  winningSponsorWallet              String?
+  acceptedOfferPda                  String?
+  acceptedOfferUsdc                 BigInt?
+  latestOfferPda                    String?
+  latestOfferUsdc                   BigInt?
+  usdcDeposited                     BigInt                 @default(0)
+  claimableUsdcRemaining            BigInt                 @default(0)
+  claimableS1SupplyRemaining        BigInt                 @default(0)
+  earlyClaimableUsdcRemaining       BigInt                 @default(0)
+  earlyClaimableS1SupplyRemaining   BigInt                 @default(0)
+  regularClaimableUsdcRemaining     BigInt                 @default(0)
+  regularClaimableS1SupplyRemaining BigInt                 @default(0)
+  rageQuitDeadlineAt                DateTime?
+  lastEventSignature                String?
+  lastEventAt                       DateTime?
+  createdAt                         DateTime               @default(now())
+  updatedAt                         DateTime               @updatedAt
 
   @@index([status, updatedAt])
   @@index([creatorWallet])

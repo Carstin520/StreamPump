@@ -1430,6 +1430,34 @@ export class AnchorService {
       .instruction();
   }
 
+  async buildAbortS1BuyoutInstruction(params: {
+    sponsorWallet: string;
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sponsor = new PublicKey(params.sponsorWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+
+    return (this.program.methods as any)
+      .abortS1Buyout()
+      .accounts({
+        sponsor,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        buyoutOffer,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+  }
+
   async buildRageQuitS1Instruction(params: {
     userWallet: string;
     creatorWallet: string;

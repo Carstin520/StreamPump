@@ -80,6 +80,10 @@ export type S1MarketProfileResponse = {
     usdcDeposited: string | null;
     claimableUsdcRemaining: string | null;
     claimableS1SupplyRemaining: string | null;
+    earlyClaimableUsdcRemaining: string | null;
+    earlyClaimableS1SupplyRemaining: string | null;
+    regularClaimableUsdcRemaining: string | null;
+    regularClaimableS1SupplyRemaining: string | null;
     rageQuitDeadlineAt: string | null;
   } | null;
   offers: Array<{
@@ -100,6 +104,7 @@ export type S1PortfolioResponse = {
     creatorProfilePda: string;
     creator: S1MarketProfileResponse["creator"] | null;
     internalTokenBalance: string;
+    earlyCohortBalance: string;
     spumpCostBasis: string;
     estimatedClaimableUsdc: string | null;
     updatedAt: string;
@@ -145,6 +150,15 @@ export const buildS1ClaimUsdcTransaction = (
   input: { creatorWallet: string; sponsorWallet: string },
 ) =>
   apiClient.post<S1BuildTransactionResponse>("/s1/buyout/claim-usdc/build", {
+    token,
+    body: input,
+  });
+
+export const buildS1AbortBuyoutTransaction = (
+  token: string,
+  input: { creatorWallet: string },
+) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/buyout/abort/build", {
     token,
     body: input,
   });

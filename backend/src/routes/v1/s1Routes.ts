@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  buildAbortS1BuyoutTransaction,
   buildAcceptBuyoutOfferTransaction,
   buildBuyS1Transaction,
   buildCancelBuyoutOfferTransaction,
@@ -32,6 +33,7 @@ router.post("/buyout/offer/build", requireSessionAuth, buildSubmitBuyoutOfferTra
 router.post("/buyout/accept/build", requireSessionAuth, buildAcceptBuyoutOfferTransaction);
 router.post("/buyout/cancel/build", requireSessionAuth, buildCancelBuyoutOfferTransaction);
 router.post("/buyout/reclaim/build", requireSessionAuth, buildReclaimBuyoutOfferTransaction);
+router.post("/buyout/abort/build", requireSessionAuth, buildAbortS1BuyoutTransaction);
 router.post("/buyout/graduation/build", requireSessionAuth, buildExecuteS1GraduationTransaction);
 router.post("/buyout/claim-usdc/build", requireSessionAuth, buildClaimS1BuyoutUsdcTransaction);
 router.post("/transactions/submit", requireSessionAuth, submitS1Transaction);
