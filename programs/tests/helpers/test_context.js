@@ -88,8 +88,9 @@ const buildCreatorAuthMessage = (creator, handle, timestampUnix, nonce) => {
 };
 const creatorAuthPreInstructionFor = (oracle, creator, handle, signerOverride) => {
     const signer = signerOverride ?? oracle;
+    const normalizedHandle = handle.toLowerCase();
     const nonce = web3_js_1.Keypair.generate().publicKey.toBytes();
-    const message = buildCreatorAuthMessage(creator, handle, Math.floor(Date.now() / 1000), nonce);
+    const message = buildCreatorAuthMessage(creator, normalizedHandle, Math.floor(Date.now() / 1000), nonce);
     const signature = ed25519_1.ed25519.sign(message, signer.secretKey.slice(0, 32));
     return web3_js_1.Ed25519Program.createInstructionWithPublicKey({
         publicKey: signer.publicKey.toBytes(),

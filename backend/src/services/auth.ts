@@ -10,6 +10,7 @@ import bs58 from "bs58";
 import { Keypair, PublicKey } from "@solana/web3.js";
 
 import { config } from "../../config/default";
+import { HttpError } from "../controllers/http";
 import { prisma } from "./prisma";
 
 const CHALLENGE_TTL_MS = config.auth.challengeTtlSeconds * 1000;
@@ -524,7 +525,34 @@ export const bindExternalWalletToIdentitySession = async (params: {
     throw new Error("current session is not linked to a provider identity");
   }
 
-  const { challenge, normalizedWallet } = await verifyPendingWalletAuthChallenge({
+  const currentAccountProfile = await prisma.accountProfile.findUnique({
+    where: {
+      wallet: currentSession.wallet,
+    },
+  });
+  if (currentAccountProfile?.onboardingCompletedAt) {
+    throw new HttpError(
+      400,
+      "CANNOT_BIND_ONBOARDED",
+      "Cannot bind external wallet: onboarding has already been completed with the managed account."
+    );
+  }
+
+  const normalizedWallet = new PublicKey(params.wallet).toBase58();
+  const existingWalletIdentity = await prisma.authIdentity.findUnique({
+    where: {
+      managedWalletAddress: normalizedWallet,
+    },
+  });
+  if (existingWalletIdentity && existingWalletIdentity.id !== identity.id) {
+    throw new HttpError(
+      409,
+      "WALLET_ALREADY_BOUND",
+      "This external wallet is already bound to another social account."
+    );
+  }
+
+  const { challenge } = await verifyPendingWalletAuthChallenge({
     wallet: params.wallet,
     nonce: params.nonce,
     signature: params.signature,

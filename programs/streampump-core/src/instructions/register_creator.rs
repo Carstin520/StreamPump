@@ -51,11 +51,12 @@ const ED25519_OFFSETS_LEN: usize = 14;
 const ED25519_INSTRUCTION_INDEX_SELF: u16 = u16::MAX;
 
 pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) -> Result<()> {
+    let normalized_handle = args.handle.to_lowercase();
     require!(
-        !args.handle.is_empty() && args.handle.len() <= MAX_HANDLE_LEN,
+        !normalized_handle.is_empty() && normalized_handle.len() <= MAX_HANDLE_LEN,
         StreamPumpError::InvalidHandle
     );
-    verify_creator_authorization(&ctx, &args.handle)?;
+    verify_creator_authorization(&ctx, &normalized_handle)?;
 
     let profile = &mut ctx.accounts.creator_profile;
     if profile.authority == Pubkey::default() {
@@ -86,7 +87,7 @@ pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) 
         StreamPumpError::Unauthorized
     );
 
-    profile.handle = args.handle;
+    profile.handle = normalized_handle;
     profile.payout_usdc_ata = args.payout_usdc_ata;
     profile.updated_at = Clock::get()?.unix_timestamp;
 

@@ -85,13 +85,13 @@ describe("streampump-core creator registration authorization", function () {
   it("accepts register_creator with an oracle-signed Ed25519 authorization", async () => {
     const creator = Keypair.generate();
     await fundSigner(ctx, creator);
-    const handle = `ok_auth_${creator.publicKey.toBase58().slice(0, 8)}`;
+    const handle = `Ok_Auth_${creator.publicKey.toBase58().slice(0, 8)}`;
 
     await registerCreator(ctx, creator, handle);
 
     const creatorProfile = ctx.deriveCreatorProfile(creator.publicKey);
     const profile = await ctx.program.account.creatorProfile.fetch(creatorProfile);
     expect(profile.authority.toBase58()).to.equal(creator.publicKey.toBase58());
-    expect(profile.handle).to.equal(handle);
+    expect(profile.handle).to.equal(handle.toLowerCase());
   });
 });

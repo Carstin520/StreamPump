@@ -489,8 +489,9 @@ const buildContext = async (): Promise<TestContext> => {
     signerOverride?: Keypair
   ): TransactionInstruction => {
     const signer = signerOverride ?? oracle;
+    const normalizedHandle = handle.toLowerCase();
     const nonce = Keypair.generate().publicKey.toBytes();
-    const message = buildCreatorAuthMessage(creator, handle, nowTs(), nonce);
+    const message = buildCreatorAuthMessage(creator, normalizedHandle, nowTs(), nonce);
     const signature = ed25519.sign(message, signer.secretKey.slice(0, 32));
 
     return Ed25519Program.createInstructionWithPublicKey({

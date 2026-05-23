@@ -230,10 +230,11 @@ const creatorAuthPreInstruction = (
   creator: PublicKey,
   handle: string
 ): TransactionInstruction => {
+  const normalizedHandle = handle.toLowerCase();
   const nonce = Keypair.generate().publicKey.toBytes();
   const message = buildCreatorAuthMessage(
     creator,
-    handle,
+    normalizedHandle,
     Math.floor(Date.now() / 1000),
     nonce
   );

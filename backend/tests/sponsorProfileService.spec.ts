@@ -44,6 +44,7 @@ const installMockSponsorPrisma = () => {
       update: prisma.sponsorProfile.update,
     },
     accountProfile: {
+      findUnique: prisma.accountProfile.findUnique,
       upsert: prisma.accountProfile.upsert,
     },
   };
@@ -125,6 +126,24 @@ const installMockSponsorPrisma = () => {
     };
   };
 
+  prismaAny.accountProfile.findUnique = async ({ where }: { where: { wallet: string } }) => {
+    const role = accountRoles.get(where.wallet);
+    if (!role) {
+      return null;
+    }
+
+    return {
+      id: `account-${where.wallet}`,
+      wallet: where.wallet,
+      role,
+      displayName: null,
+      handle: null,
+      onboardingCompletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  };
+
   return {
     sponsors,
     accountRoles,
@@ -132,6 +151,7 @@ const installMockSponsorPrisma = () => {
       prismaAny.sponsorProfile.upsert = original.sponsorProfile.upsert;
       prismaAny.sponsorProfile.findMany = original.sponsorProfile.findMany;
       prismaAny.sponsorProfile.update = original.sponsorProfile.update;
+      prismaAny.accountProfile.findUnique = original.accountProfile.findUnique;
       prismaAny.accountProfile.upsert = original.accountProfile.upsert;
     },
   };
@@ -191,5 +211,29 @@ describe("sponsor profile service", () => {
     expect(approved.status).to.equal(SponsorVerificationStatus.APPROVED);
     expect(approved.approvedAt).to.be.instanceOf(Date);
     expect(approved.rejectReason).to.equal(null);
+  });
+
+  it("rejects sponsor onboarding for an existing creator wallet", async () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    mock?.accountRoles.set(wallet, AccountRole.CREATOR);
+
+    let thrown: any = null;
+    try {
+      await submitSponsorProfile({
+        wallet,
+        companyName: "Creator Brand Inc.",
+        sponsorType: "BRAND",
+        registrationNumber: "EIN-123456",
+        businessLicenseKey: "sponsor-kyb/license.png",
+        legalRepresentative: "Alex Chen",
+        contactPhone: "+1-555-0100",
+        contactEmail: "creator@example.com",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown?.status).to.equal(400);
+    expect(thrown?.code).to.equal("CANNOT_UPGRADE_CREATOR");
   });
 });

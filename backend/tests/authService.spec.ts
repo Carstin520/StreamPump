@@ -95,6 +95,7 @@ const installMockAuthPrisma = () => {
       findFirst: prisma.authIdentity.findFirst,
     },
     accountProfile: {
+      findUnique: prisma.accountProfile.findUnique,
       upsert: prisma.accountProfile.upsert,
     },
     $transaction: prismaAny.$transaction,
@@ -211,7 +212,26 @@ const installMockAuthPrisma = () => {
     return { count: removable.length };
   };
 
-  prismaAny.authIdentity.findUnique = async ({ where }: { where: { provider_providerSubject: { provider: IdentityProvider; providerSubject: string } } }) => {
+  prismaAny.authIdentity.findUnique = async ({
+    where,
+  }: {
+    where: {
+      provider_providerSubject?: { provider: IdentityProvider; providerSubject: string };
+      managedWalletAddress?: string;
+    };
+  }) => {
+    if (where.managedWalletAddress) {
+      return (
+        Array.from(identities.values()).find(
+          (identity) => identity.managedWalletAddress === where.managedWalletAddress,
+        ) ?? null
+      );
+    }
+
+    if (!where.provider_providerSubject) {
+      return null;
+    }
+
     const key = `${where.provider_providerSubject.provider}:${where.provider_providerSubject.providerSubject}`;
     return identities.get(key) ?? null;
   };
@@ -294,6 +314,9 @@ const installMockAuthPrisma = () => {
     return record;
   };
 
+  prismaAny.accountProfile.findUnique = async ({ where }: { where: { wallet: string } }) =>
+    accountProfiles.get(where.wallet) ?? null;
+
   prismaAny.$transaction = async (operations: Promise<unknown>[]) => Promise.all(operations);
 
   return {
@@ -311,6 +334,7 @@ const installMockAuthPrisma = () => {
       prismaAny.authIdentity.create = original.authIdentity.create;
       prismaAny.authIdentity.update = original.authIdentity.update;
       prismaAny.authIdentity.findFirst = original.authIdentity.findFirst;
+      prismaAny.accountProfile.findUnique = original.accountProfile.findUnique;
       prismaAny.accountProfile.upsert = original.accountProfile.upsert;
       prismaAny.$transaction = original.$transaction;
     },
@@ -321,16 +345,15 @@ const installMockAuthPrisma = () => {
 describe("wallet auth service", function () {
   this.timeout(20_000);
 
-  let restorePrisma: (() => void) | null = null;
+  let mockPrisma: ReturnType<typeof installMockAuthPrisma> | null = null;
 
   beforeEach(() => {
-    const mock = installMockAuthPrisma();
-    restorePrisma = mock.restore;
+    mockPrisma = installMockAuthPrisma();
   });
 
   afterEach(() => {
-    restorePrisma?.();
-    restorePrisma = null;
+    mockPrisma?.restore();
+    mockPrisma = null;
   });
 
   it("creates a challenge, verifies a wallet signature, and validates the resulting session", async () => {
@@ -438,5 +461,82 @@ describe("wallet auth service", function () {
 
     const mappedIdentity = await findAuthIdentityByWallet(walletAddress);
     expect(mappedIdentity?.providerSubject).to.equal("sam@example.com");
+  });
+
+  it("rejects external wallet binding after managed account onboarding is complete", async () => {
+    const identitySession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.EMAIL,
+      providerSubject: "onboarded@example.com",
+      email: "onboarded@example.com",
+      displayName: "Onboarded",
+    });
+    const currentProfile = mockPrisma?.accountProfiles.get(identitySession.wallet);
+    expect(currentProfile).to.not.equal(undefined);
+    if (currentProfile) {
+      mockPrisma?.accountProfiles.set(identitySession.wallet, {
+        ...currentProfile,
+        onboardingCompletedAt: new Date(),
+      });
+    }
+
+    const externalWallet = Keypair.generate();
+    const walletAddress = externalWallet.publicKey.toBase58();
+    const challenge = await createWalletAuthChallenge(walletAddress);
+    const signature = ed25519.sign(
+      Buffer.from(challenge.message, "utf8"),
+      externalWallet.secretKey.slice(0, 32),
+    );
+
+    let thrown: any = null;
+    try {
+      await bindExternalWalletToIdentitySession({
+        currentAccessToken: identitySession.accessToken,
+        wallet: walletAddress,
+        nonce: challenge.nonce,
+        signature: bs58.encode(signature),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown?.status).to.equal(400);
+    expect(thrown?.code).to.equal("CANNOT_BIND_ONBOARDED");
+  });
+
+  it("rejects external wallet binding when the wallet is already bound to another identity", async () => {
+    const firstSession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.EMAIL,
+      providerSubject: "first@example.com",
+      email: "first@example.com",
+      displayName: "First",
+    });
+    const secondSession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.GOOGLE,
+      providerSubject: "google-second",
+      email: "second@example.com",
+      displayName: "Second",
+    });
+    const walletAddress = firstSession.wallet;
+    const challenge = await createWalletAuthChallenge(walletAddress);
+    const wallet = Keypair.generate();
+    const signature = ed25519.sign(
+      Buffer.from(challenge.message, "utf8"),
+      wallet.secretKey.slice(0, 32),
+    );
+
+    let thrown: any = null;
+    try {
+      await bindExternalWalletToIdentitySession({
+        currentAccessToken: secondSession.accessToken,
+        wallet: walletAddress,
+        nonce: challenge.nonce,
+        signature: bs58.encode(signature),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown?.status).to.equal(409);
+    expect(thrown?.code).to.equal("WALLET_ALREADY_BOUND");
   });
 });

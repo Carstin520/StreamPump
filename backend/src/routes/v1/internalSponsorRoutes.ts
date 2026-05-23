@@ -16,6 +16,7 @@ import {
   listPendingSponsorProfiles,
   reviewSponsorProfile,
 } from "../../services/sponsorProfile";
+import { r2Service } from "../../services/R2Service";
 import { getAnchorService } from "../../services/AnchorService";
 import { config } from "../../../config/default";
 
@@ -52,8 +53,32 @@ router.use(requireInternalOperatorAuth);
 router.get(
   "/pending",
   withController("LIST_PENDING_SPONSORS_FAILED", async (_req, res) => {
+    const sponsors = await Promise.all(
+      (await listPendingSponsorProfiles()).map(async (profile) => {
+        return {
+          id: profile.id,
+          wallet: profile.wallet,
+          companyName: profile.companyName,
+          sponsorType: profile.sponsorType,
+          registrationNumber: profile.registrationNumber,
+          legalRepresentative: profile.legalRepresentative,
+          contactPhone: profile.contactPhone,
+          contactEmail: profile.contactEmail,
+          status: profile.status,
+          rejectReason: profile.rejectReason,
+          approvedAt: profile.approvedAt,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+          businessLicenseUrl: await r2Service.generateDownloadUrl(profile.businessLicenseKey),
+          powerOfAttorneyUrl: profile.powerOfAttorneyKey
+            ? await r2Service.generateDownloadUrl(profile.powerOfAttorneyKey)
+            : null,
+        };
+      })
+    );
+
     ok(res, {
-      sponsors: await listPendingSponsorProfiles(),
+      sponsors,
     });
   })
 );

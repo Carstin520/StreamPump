@@ -16,6 +16,7 @@ import {
   extensionForMimeType,
   r2Service,
 } from "./R2Service";
+import { HttpError } from "../controllers/http";
 import { prisma } from "./prisma";
 
 const MAX_SPONSOR_DOCUMENT_BYTES = 12 * 1024 * 1024;
@@ -95,6 +96,19 @@ export const submitSponsorProfile = async (params: {
   const wallet = normalizeWallet(params.wallet);
   const sponsorType = normalizeSponsorType(params.sponsorType);
   const contactEmail = normalizeEmail(params.contactEmail);
+  const accountProfile = await prisma.accountProfile.findUnique({
+    where: {
+      wallet,
+    },
+  });
+
+  if (accountProfile?.role === AccountRole.CREATOR) {
+    throw new HttpError(
+      400,
+      "CANNOT_UPGRADE_CREATOR",
+      "Cannot submit sponsor profile: this wallet is already registered as a creator."
+    );
+  }
 
   const sponsorProfile = await prisma.sponsorProfile.upsert({
     where: { wallet },
