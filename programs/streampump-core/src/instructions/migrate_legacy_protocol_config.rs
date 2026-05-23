@@ -246,6 +246,7 @@ pub(crate) fn handler(
         s1_rage_quit_window_seconds: DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
         s2_min_followers: legacy.s2_min_followers,
         s2_min_valid_views: legacy.s2_min_valid_views,
+        max_endorsement_per_user_bps: 2_000,
         bump: legacy.bump,
     };
 

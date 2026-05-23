@@ -34,7 +34,7 @@ pub struct EmergencyVoid<'info> {
     pub protocol_config: Account<'info, ProtocolConfig>,
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump
     )]
     pub proposal: Account<'info, Proposal>,
@@ -73,6 +73,7 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
 
     let proposal_creator = ctx.accounts.proposal.creator;
     let proposal_deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
+    let proposal_nonce_bytes = ctx.accounts.proposal.nonce.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
     let sponsor = ctx.accounts.proposal.sponsor;
     let mut sponsor_refund = 0u64;
@@ -90,10 +91,11 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
         // ZH: 退还金库全部余额（未领取 Track1 保底 + Track2 池 + Track3 剩余）。
         let refund_amount = ctx.accounts.proposal_usdc_vault.amount;
         if refund_amount > 0 {
-            let signer_seeds: [&[u8]; 4] = [
+            let signer_seeds: [&[u8]; 5] = [
                 b"proposal",
                 proposal_creator.as_ref(),
                 proposal_deadline_bytes.as_ref(),
+                proposal_nonce_bytes.as_ref(),
                 proposal_bump_bytes.as_ref(),
             ];
             let signer: &[&[&[u8]]] = &[&signer_seeds];

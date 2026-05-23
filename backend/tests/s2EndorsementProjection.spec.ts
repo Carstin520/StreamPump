@@ -28,12 +28,12 @@ describe("S2 endorsement projection events", () => {
     const original = {
       proposal: prismaAny.proposal,
       s2EndorsementPositionProjection: prismaAny.s2EndorsementPositionProjection,
-      campaignProofProjection: prismaAny.campaignProofProjection,
     };
 
     prismaAny.proposal = {
       findUnique: async () => null,
       updateMany: async () => ({ count: 1 }),
+      update: async () => null,
     };
     prismaAny.s2EndorsementPositionProjection = {
       findUnique: async (args: any) => positions.get(args.where.positionPda) ?? null,
@@ -43,6 +43,12 @@ describe("S2 endorsement projection events", () => {
             position.proposalPda === args.where.proposalPda &&
             position.claimedStatus === args.where.claimedStatus
         ),
+      count: async (args: any) =>
+        [...positions.values()].filter(
+          (position) =>
+            position.proposalPda === args.where.proposalPda &&
+            position.claimedStatus === (args.where.claimedStatus ?? true)
+        ).length,
       upsert: async (args: any) => {
         const existing = positions.get(args.where.positionPda);
         const next = existing
@@ -59,14 +65,9 @@ describe("S2 endorsement projection events", () => {
         return next;
       },
     };
-    prismaAny.campaignProofProjection = {
-      upsert: async () => null,
-    };
-
     restorePrisma = () => {
       prismaAny.proposal = original.proposal;
       prismaAny.s2EndorsementPositionProjection = original.s2EndorsementPositionProjection;
-      prismaAny.campaignProofProjection = original.campaignProofProjection;
     };
   });
 

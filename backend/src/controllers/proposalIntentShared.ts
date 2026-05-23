@@ -1,6 +1,7 @@
 import {
   BundleStatus,
   BundleSubmitMode,
+  CampaignProofStatus,
   ContentManifestStatus,
   OracleSyncStatus,
   Proposal,
@@ -14,7 +15,6 @@ import bs58 from "bs58";
 import { HttpError } from "./http";
 import { serializeAsset } from "./contentManifestShared";
 import { decodeVersionedTransaction, derivePlannedContentAnchorPda } from "../services/proposalLaunchService";
-import { syncCampaignProofProjectionFromProposalPda } from "../services/marketProjectionService";
 import { prisma } from "../services/prisma";
 
 type SerializedBundleInput = {
@@ -340,6 +340,10 @@ export const finalizeConfirmedLaunchBundle = async (params: {
       },
     });
 
+    const proofStatus = contentAnchorPda
+      ? CampaignProofStatus.ANCHORED
+      : CampaignProofStatus.FUNDED;
+
     await tx.proposal.upsert({
       where: {
         proposalPda: latestIntent.plannedProposalPda!,
@@ -364,6 +368,8 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3UsdcDeposited: latestIntent.track3UsdcDeposited,
         track3DelayDays: latestIntent.track3DelayDays,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        proofStatus,
+        fundingTxSignature: params.chainTxSignature,
       },
       create: {
         proposalPda: latestIntent.plannedProposalPda!,
@@ -387,15 +393,13 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3DelayDays: latestIntent.track3DelayDays,
         onChainTxSignature: params.chainTxSignature,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        proofStatus,
+        fundingTxSignature: params.chainTxSignature,
       },
     });
 
     return updatedBundle;
   });
-
-  if (latestIntent.plannedProposalPda) {
-    await syncCampaignProofProjectionFromProposalPda(latestIntent.plannedProposalPda);
-  }
 
   return updatedBundle;
 };

@@ -45,7 +45,7 @@ pub struct SponsorFund<'info> {
     /// ZH: 要注资的提案，只允许从 Open → Funded 转换一次。
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump,
         constraint = proposal.status == ProposalStatus::Open @ StreamPumpError::ProposalNotOpen
     )]

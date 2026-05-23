@@ -218,6 +218,24 @@ model Proposal {
   /// CN: 内容已发布且通过后端/人工核验的时间。
   /// EN: Timestamp when content publication has been verified by backend/manual review.
   contentPublishedVerifiedAt DateTime?
+  /// CN: 从 proposal 状态派生的公开证明状态（DRAFT/FUNDED/ANCHORED/SETTLING/SETTLED/CANCELLED/VOIDED）。
+  /// EN: Public proof status derived from proposal state (replaces CampaignProofProjection).
+  proofStatus                 CampaignProofStatus @default(DRAFT)
+  /// CN: 注资成功时的链上交易签名。
+  /// EN: On-chain transaction signature when funding was confirmed.
+  fundingTxSignature          String?
+  /// CN: 最近一次结算交易签名。
+  /// EN: Most recent settlement transaction signature.
+  latestSettlementTxSignature String?
+  /// CN: 当前 endorse 的总人数。
+  /// EN: Total number of unique endorsers for this proposal.
+  endorserCount               Int              @default(0)
+  /// CN: 所有 endorser 累计质押的 SPUMP 总量。
+  /// EN: Total SPUMP staked by all endorsers.
+  totalSpumpStaked             BigInt           @default(0)
+  /// CN: 已 claim 的 endorser 数量。
+  /// EN: Number of endorsers who have claimed their reward.
+  claimedEndorserCount         Int              @default(0)
   metadata                   Json?
   createdAt                  DateTime         @default(now())
   updatedAt                  DateTime         @updatedAt
@@ -230,17 +248,29 @@ model Proposal {
 }
 
 model S2EndorsementPositionProjection {
-  id                  String    @id @default(cuid())
-  positionPda         String    @unique
-  userWallet          String
-  proposalPda         String
-  stakedSpumpAmount   BigInt    @default(0)
-  claimedStatus       Boolean   @default(false)
-  estimatedUsdcReward BigInt    @default(0)
-  lastEventSignature  String?
-  lastEventAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  positionPda           String    @unique
+  userWallet            String
+  proposalPda           String
+  stakedSpumpAmount     BigInt    @default(0)
+  /// CN: 已提取（部分 unstake）的 SPUMP 数量。
+  /// EN: Total SPUMP amount withdrawn via partial unstake.
+  withdrawnSpumpAmount  BigInt    @default(0)
+  /// CN: 最近一次提取时间。
+  /// EN: Timestamp of the most recent withdrawal.
+  withdrawnAt           DateTime?
+  /// CN: 因提前退出而被扣除的罚金数量（SPUMP）。
+  /// EN: Penalty SPUMP amount deducted due to early withdrawal.
+  penaltySpumpAmount    BigInt    @default(0)
+  /// CN: 累计部分 unstake 次数。
+  /// EN: Cumulative number of partial unstake operations.
+  partialUnstakeCount   Int       @default(0)
+  claimedStatus         Boolean   @default(false)
+  estimatedUsdcReward   BigInt    @default(0)
+  lastEventSignature    String?
+  lastEventAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([userWallet, proposalPda])
   @@index([proposalPda, claimedStatus])
@@ -399,6 +429,12 @@ model ProposalIntent {
   track2UsdcDeposited     BigInt               @default(0)
   track3UsdcDeposited     BigInt
   track3DelayDays         Int
+  /// CN: 提案 PDA nonce，允许同一创作者、同一截止时间创建多个提案。
+  /// EN: Proposal PDA nonce allowing multiple proposals per creator per deadline.
+  nonce                   BigInt               @default(0)
+  /// CN: 该提案的最大 SPUMP 背书总量上限（0 = 不限制）。
+  /// EN: Maximum total SPUMP endorsement for this proposal (0 = uncapped).
+  maxEndorsementSpump     BigInt               @default(0)
   /// CN: 预推导的 Proposal PDA，供 bundle 组装和后续链上投影使用。
   /// EN: Pre-derived Proposal PDA used during bundle assembly and later on-chain projection.
   plannedProposalPda      String?
@@ -572,38 +608,6 @@ model S1BuyoutProjection {
   @@index([creatorWallet])
 }
 
-model CampaignProofProjection {
-  id                          String              @id @default(cuid())
-  proposalId                  String?             @unique
-  proposalPda                 String              @unique
-  creatorWallet               String
-  sponsorWallet               String?
-  manifestId                  String?
-  intentId                    String?
-  status                      ProposalStatus
-  proofStatus                 CampaignProofStatus @default(DRAFT)
-  contentHashHex              String?
-  contentAnchorPda            String?
-  contentAnchorTx             String?
-  fundingTxSignature          String?
-  latestSettlementTxSignature String?
-  track1BaseUsdc              BigInt              @default(0)
-  track2UsdcDeposited         BigInt              @default(0)
-  track3UsdcDeposited         BigInt              @default(0)
-  track2MetricType            Track2MetricType
-  track2TargetValue           BigInt              @default(0)
-  track2ActualValue           BigInt?
-  deadlineAt                  DateTime
-  settledAt                   DateTime?
-  metadataJson                Json?
-  createdAt                   DateTime            @default(now())
-  updatedAt                   DateTime            @updatedAt
-
-  @@index([proofStatus, updatedAt])
-  @@index([creatorWallet, updatedAt])
-  @@index([sponsorWallet, updatedAt])
-}
-
 model IndexerCursor {
   /// CN: cursor 的消费者键，例如 streampump_core_logs。
   /// EN: Consumer key for the cursor, for example streampump_core_logs.
@@ -669,16 +673,41 @@ model AuthIdentity {
 }
 
 model AccountProfile {
-  id                    String      @id @default(cuid())
-  wallet                String      @unique
-  role                  AccountRole @default(FAN)
+  id                    String          @id @default(cuid())
+  wallet                String          @unique
+  role                  AccountRole     @default(FAN)
   displayName           String?
-  handle                String?     @unique
+  handle                String?         @unique
   onboardingCompletedAt DateTime?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  /// CN: 关联的多钱包列表。
+  /// EN: Associated wallets for this account.
+  wallets               AccountWallet[]
 
   @@index([role, onboardingCompletedAt])
+}
+
+enum WalletType {
+  MANAGED
+  EXTERNAL
+}
+
+/// CN: 账户多钱包关联表，支持托管钱包和外部钱包绑定。
+/// EN: Multi-wallet join table for accounts, supporting both managed and external wallet bindings.
+model AccountWallet {
+  id                String         @id @default(cuid())
+  accountProfileId  String
+  accountProfile    AccountProfile @relation(fields: [accountProfileId], references: [id], onDelete: Cascade)
+  walletAddress     String         @unique
+  walletType        WalletType     @default(MANAGED)
+  isPrimary         Boolean        @default(false)
+  label             String?
+  boundAt           DateTime       @default(now())
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([accountProfileId])
 }
 
 model SponsorProfile {
@@ -697,9 +726,30 @@ model SponsorProfile {
   approvedAt          DateTime?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
+  /// CN: KYB 审核事件审计日志。
+  /// EN: KYB review event audit trail.
+  reviewEvents        SponsorReviewEvent[]
 
   @@index([status, updatedAt])
   @@index([sponsorType, status])
+}
+
+/// CN: Sponsor KYB 审核事件，记录每次状态变更的审计轨迹。
+/// EN: Sponsor KYB review event recording an immutable audit trail of each verification status change.
+model SponsorReviewEvent {
+  id                String                    @id @default(cuid())
+  sponsorProfileId  String
+  sponsorProfile    SponsorProfile            @relation(fields: [sponsorProfileId], references: [id], onDelete: Cascade)
+  reviewerWallet    String
+  previousStatus    SponsorVerificationStatus
+  newStatus         SponsorVerificationStatus
+  reason            String?
+  note              String?
+  documentSnapshot  Json?
+  createdAt         DateTime                  @default(now())
+
+  @@index([sponsorProfileId, createdAt])
+  @@index([reviewerWallet])
 }
 
 model Track2Event {
@@ -721,6 +771,18 @@ model Track2Event {
   /// CN: 原始 webhook/body 负载，供排障和风控回放使用。
   /// EN: Raw webhook/body payload used for debugging and fraud-review replay.
   rawPayload      Json?
+  /// CN: 人工审核者钱包或标识。
+  /// EN: Wallet address or identifier of the manual reviewer.
+  reviewedBy      String?
+  /// CN: 审核完成时间。
+  /// EN: Timestamp when the review was completed.
+  reviewedAt      DateTime?
+  /// CN: 审核备注。
+  /// EN: Free-text note left by the reviewer.
+  reviewNote      String?
+  /// CN: 审核来源（如 manual、auto-rule、oracle）。
+  /// EN: Source of the review decision (e.g. manual, auto-rule, oracle).
+  reviewSource    String?
   createdAt       DateTime         @default(now())
 
   @@index([proposalId, eventType, fraudStatus])

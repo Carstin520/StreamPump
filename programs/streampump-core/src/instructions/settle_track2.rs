@@ -45,7 +45,7 @@ pub struct SettleTrack2<'info> {
     /// ZH: 要结算的提案。必须为 Funded 且尚未完成 Track2 结算。
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump,
         constraint = proposal.status == ProposalStatus::Funded @ StreamPumpError::ProposalNotFunded
     )]
@@ -137,11 +137,13 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
     let mut fan_pool_remaining = 0u64;
 
     let deadline_bytes = proposal.deadline.to_le_bytes();
+    let nonce_bytes = proposal.nonce.to_le_bytes();
     let proposal_bump_bytes = [proposal.bump];
-    let signer_seeds: [&[u8]; 4] = [
+    let signer_seeds: [&[u8]; 5] = [
         b"proposal",
         proposal.creator.as_ref(),
         deadline_bytes.as_ref(),
+        nonce_bytes.as_ref(),
         proposal_bump_bytes.as_ref(),
     ];
     let signer: &[&[&[u8]]] = &[&signer_seeds];

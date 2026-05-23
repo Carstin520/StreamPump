@@ -134,4 +134,10 @@ pub enum StreamPumpError {
     LegacyProtocolConfigAlreadyMigrated,
     #[msg("Invalid legacy protocol config account")]
     InvalidLegacyProtocolConfig,
+    #[msg("Total endorsement cap exceeded for this proposal")]
+    EndorsementCapExceeded,
+    #[msg("Per-user endorsement cap exceeded for this proposal")]
+    EndorsementPerUserCapExceeded,
+    #[msg("Creator account is suspended")]
+    CreatorSuspended,
 }

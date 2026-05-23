@@ -60,6 +60,10 @@ export interface OnChainProposalState {
   track3DelayDays: number;
   track3SettledAtUnix: bigint;
   deadlineUnix: bigint;
+  nonce: bigint;
+  maxEndorsementSpump: bigint;
+  track2EndorserCount: number;
+  totalSpumpStaked: bigint;
 }
 
 export interface OnChainCreatorProfileState {
@@ -67,7 +71,7 @@ export interface OnChainCreatorProfileState {
   handle: string;
   payoutUsdcAta: PublicKey;
   level: number;
-  status: "S1_ACTIVE" | "S1_AUCTION_PENDING" | "S1_EXECUTION_PENDING" | "S2_ACTIVE";
+  status: "S1_ACTIVE" | "S1_AUCTION_PENDING" | "S1_EXECUTION_PENDING" | "S2_ACTIVE" | "SUSPENDED";
   s1Supply: bigint;
   s1EarlyCohortSupply: bigint;
   s1RatingBps: number;
@@ -344,6 +348,8 @@ const mapCreatorStatus = (
     case "s2_active":
     case "s2active":
       return "S2_ACTIVE";
+    case "suspended":
+      return "SUSPENDED";
     default:
       throw new Error(`Unsupported on-chain creator status: ${normalized}`);
   }
@@ -557,12 +563,14 @@ export class AnchorService {
     return creatorProfile;
   }
 
-  deriveProposalPda(creator: PublicKey, deadlineUnix: bigint): PublicKey {
+  deriveProposalPda(creator: PublicKey, deadlineUnix: bigint, nonce: bigint = 0n): PublicKey {
     const deadlineSeed = Buffer.alloc(8);
     deadlineSeed.writeBigInt64LE(deadlineUnix);
+    const nonceSeed = Buffer.alloc(8);
+    nonceSeed.writeBigUInt64LE(nonce);
 
     const [proposal] = PublicKey.findProgramAddressSync(
-      [Buffer.from("proposal"), creator.toBuffer(), deadlineSeed],
+      [Buffer.from("proposal"), creator.toBuffer(), deadlineSeed, nonceSeed],
       this.program.programId
     );
 
@@ -895,6 +903,10 @@ export class AnchorService {
         track3DelayDays: Number(proposal.track3DelayDays ?? 0),
         track3SettledAtUnix: toBigInt(proposal.track3SettledAt),
         deadlineUnix: toBigInt(proposal.deadline),
+        nonce: toBigInt(proposal.nonce),
+        maxEndorsementSpump: toBigInt(proposal.maxEndorsementSpump),
+        track2EndorserCount: Number(proposal.track2EndorserCount ?? 0),
+        totalSpumpStaked: toBigInt(proposal.totalSpumpStaked),
       };
     } catch (error) {
       const message = String(error);
@@ -1098,6 +1110,8 @@ export class AnchorService {
     track2MinAchievementBps: number;
     track3DelayDays: number;
     deadlineUnix: bigint;
+    nonce: bigint;
+    maxEndorsementSpump: bigint;
   }): Promise<TransactionInstruction> {
     const protocolConfigPda = this.deriveProtocolConfigPda();
     const protocolConfig = await this.fetchProtocolConfigAccount();
@@ -1119,6 +1133,8 @@ export class AnchorService {
         track2MinAchievementBps: params.track2MinAchievementBps,
         track3DelayDays: params.track3DelayDays,
         deadline: new BN(params.deadlineUnix.toString()),
+        nonce: new BN(params.nonce.toString()),
+        maxEndorsementSpump: new BN(params.maxEndorsementSpump.toString()),
       })
       .accounts({
         creator,

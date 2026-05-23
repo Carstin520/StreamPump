@@ -2,11 +2,10 @@
  * CN: 链上投影服务，根据链上 Proposal 账户状态回写数据库投影。
  * EN: Chain projection service that writes DB projections from on-chain Proposal account state.
  */
-import { OracleSyncStatus, ProposalStatus } from "@prisma/client";
+import { CampaignProofStatus, OracleSyncStatus, ProposalStatus } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 
 import { OnChainProposalState, getAnchorService } from "./AnchorService";
-import { syncCampaignProofProjectionFromProposal } from "./marketProjectionService";
 import { prisma } from "./prisma";
 
 const toDateFromUnixSeconds = (unixSeconds: bigint): Date | null => {
@@ -46,6 +45,26 @@ const normalizeProposalStatus = (status: OnChainProposalState["status"]): Propos
   }
 };
 
+type ProofStatusInput = {
+  status: ProposalStatus;
+  track1Claimed: boolean;
+  track2SettledAt: Date | null;
+  track3SettledAt: Date | null;
+  contentAnchorPda: string | null;
+};
+
+const deriveProofStatus = (input: ProofStatusInput): CampaignProofStatus => {
+  if (input.status === ProposalStatus.CANCELLED) return CampaignProofStatus.CANCELLED;
+  if (input.status === ProposalStatus.VOIDED) return CampaignProofStatus.VOIDED;
+  if (input.track2SettledAt && input.track3SettledAt) return CampaignProofStatus.SETTLED;
+  if (input.track2SettledAt || input.track3SettledAt || input.track1Claimed) {
+    return CampaignProofStatus.SETTLING;
+  }
+  if (input.contentAnchorPda) return CampaignProofStatus.ANCHORED;
+  if (input.status === ProposalStatus.FUNDED) return CampaignProofStatus.FUNDED;
+  return CampaignProofStatus.DRAFT;
+};
+
 export const syncProposalProjectionFromChain = async (params: {
   proposalPda: string;
   signature: string;
@@ -68,6 +87,21 @@ export const syncProposalProjectionFromChain = async (params: {
     },
   });
 
+  const normalizedStatus = normalizeProposalStatus(onChain.status);
+  const track2SettledAt = toDateFromUnixSeconds(onChain.track2SettledAtUnix);
+  const track3SettledAt = toDateFromUnixSeconds(onChain.track3SettledAtUnix);
+
+  const proofStatus = deriveProofStatus({
+    status: normalizedStatus,
+    track1Claimed: onChain.track1Claimed,
+    track2SettledAt,
+    track3SettledAt,
+    contentAnchorPda: onChain.contentAnchorPda,
+  });
+
+  const isSettlingOrSettled =
+    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED;
+
   const payload = {
     creatorWallet: onChain.creator.toBase58(),
     sponsorWallet: onChain.sponsor?.toBase58() ?? null,
@@ -78,7 +112,7 @@ export const syncProposalProjectionFromChain = async (params: {
     contentHashHex: onChain.contentHashHex,
     contentAnchorPda: onChain.contentAnchorPda,
     deadlineAt: toDateFromUnixSeconds(onChain.deadlineUnix) ?? new Date(0),
-    status: normalizeProposalStatus(onChain.status),
+    status: normalizedStatus,
     track1BaseUsdc: onChain.track1BaseUsdc,
     track1Claimed: onChain.track1Claimed,
     track2MetricType: onChain.track2MetricType,
@@ -86,13 +120,13 @@ export const syncProposalProjectionFromChain = async (params: {
     track2MinAchievementBps: onChain.track2MinAchievementBps,
     track2UsdcDeposited: onChain.track2UsdcDeposited,
     track2ActualValue: onChain.track2ActualValue,
-    track2SettledAt: toDateFromUnixSeconds(onChain.track2SettledAtUnix),
+    track2SettledAt,
     track2InitialFanPool: onChain.track2InitialFanPool,
     track2InitialSpumpStaked: onChain.track2InitialSpumpStaked,
     track3UsdcDeposited: onChain.track3UsdcDeposited,
     track3CpsPayout: onChain.track3CpsPayout,
     track3DelayDays: onChain.track3DelayDays,
-    track3SettledAt: toDateFromUnixSeconds(onChain.track3SettledAtUnix),
+    track3SettledAt,
     onChainTxSignature: params.signature,
     oracleSyncStatus: shouldMarkOracleSynced(params.instructionName)
       ? OracleSyncStatus.SYNCED
@@ -100,9 +134,15 @@ export const syncProposalProjectionFromChain = async (params: {
     oracleLastError: shouldMarkOracleSynced(params.instructionName)
       ? null
       : existing?.oracleLastError ?? null,
+    proofStatus,
+    fundingTxSignature:
+      normalizedStatus === ProposalStatus.FUNDED
+        ? params.signature
+        : existing?.fundingTxSignature ?? null,
+    latestSettlementTxSignature: isSettlingOrSettled ? params.signature : null,
   };
 
-  const proposal = await prisma.proposal.upsert({
+  return prisma.proposal.upsert({
     where: {
       proposalPda: params.proposalPda,
     },
@@ -112,7 +152,4 @@ export const syncProposalProjectionFromChain = async (params: {
       ...payload,
     },
   });
-
-  await syncCampaignProofProjectionFromProposal(proposal);
-  return proposal;
 };

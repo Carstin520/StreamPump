@@ -30,7 +30,7 @@ pub struct AnchorContentHash<'info> {
     )]
     pub creator_profile: Account<'info, CreatorProfile>,
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         seeds = [
             b"content_anchor",
@@ -58,13 +58,30 @@ pub(crate) fn handler(ctx: Context<AnchorContentHash>, args: AnchorContentHashAr
 
     let now = Clock::get()?.unix_timestamp;
     let content_anchor = &mut ctx.accounts.content_anchor;
-    content_anchor.creator_profile = ctx.accounts.creator_profile.key();
-    content_anchor.authority = ctx.accounts.creator_authority.key();
-    content_anchor.canonical_url = args.canonical_url;
-    content_anchor.url_digest = args.url_digest;
-    content_anchor.content_digest = args.content_digest;
-    content_anchor.anchored_at = now;
-    content_anchor.bump = ctx.bumps.content_anchor;
+    let is_update = content_anchor.creator_profile != Pubkey::default();
+
+    if is_update {
+        require_keys_eq!(
+            content_anchor.creator_profile,
+            ctx.accounts.creator_profile.key(),
+            StreamPumpError::Unauthorized
+        );
+        content_anchor.content_digest = args.content_digest;
+        content_anchor.anchored_at = now;
+        content_anchor.version = content_anchor
+            .version
+            .checked_add(1)
+            .ok_or(StreamPumpError::MathOverflow)?;
+    } else {
+        content_anchor.creator_profile = ctx.accounts.creator_profile.key();
+        content_anchor.authority = ctx.accounts.creator_authority.key();
+        content_anchor.canonical_url = args.canonical_url;
+        content_anchor.url_digest = args.url_digest;
+        content_anchor.content_digest = args.content_digest;
+        content_anchor.anchored_at = now;
+        content_anchor.version = 1;
+        content_anchor.bump = ctx.bumps.content_anchor;
+    }
 
     emit!(ContentAnchored {
         content_anchor: content_anchor.key(),
@@ -74,6 +91,7 @@ pub(crate) fn handler(ctx: Context<AnchorContentHash>, args: AnchorContentHashAr
         url_digest: content_anchor.url_digest,
         content_digest: content_anchor.content_digest,
         anchored_at: content_anchor.anchored_at,
+        version: content_anchor.version,
     });
 
     Ok(())

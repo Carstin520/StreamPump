@@ -47,6 +47,9 @@ pub struct InitializeProtocolArgs {
     pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
+    /// EN: Maximum endorsement per user as bps of proposal's max_endorsement_spump (e.g. 2000 = 20%).
+    /// ZH: 每用户背书上限，为提案 max_endorsement_spump 的基点比例（例如 2000 = 20%）。
+    pub max_endorsement_per_user_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -116,6 +119,11 @@ pub(crate) fn handler(
             && args.s1_rage_quit_window_seconds <= DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
         StreamPumpError::InvalidS1GuardConfig
     );
+    require!(
+        args.max_endorsement_per_user_bps > 0
+            && args.max_endorsement_per_user_bps <= 10_000,
+        StreamPumpError::InvalidEmissionConfig
+    );
 
     require_keys_eq!(
         *ctx.accounts.spump_mint.owner,
@@ -170,6 +178,7 @@ pub(crate) fn handler(
     config.s1_rage_quit_window_seconds = args.s1_rage_quit_window_seconds;
     config.s2_min_followers = args.s2_min_followers;
     config.s2_min_valid_views = args.s2_min_valid_views;
+    config.max_endorsement_per_user_bps = args.max_endorsement_per_user_bps;
     config.bump = ctx.bumps.protocol_config;
 
     Ok(())

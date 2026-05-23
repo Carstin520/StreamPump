@@ -47,6 +47,7 @@ pub enum CreatorStatus {
     S1_Auction_Pending = 1,
     S1_Execution_Pending = 2,
     S2_Active = 3,
+    Suspended = 4,
 }
 
 #[allow(non_camel_case_types)]
@@ -136,6 +137,8 @@ pub struct ProtocolConfig {
     pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
+    /// Maximum endorsement per user as basis points of proposal's max_endorsement_spump (e.g. 2000 = 20%).
+    pub max_endorsement_per_user_bps: u16,
     pub bump: u8,
 }
 
@@ -164,6 +167,7 @@ impl ProtocolConfig {
         + 8
         + 8
         + 8
+        + 2
         + 1;
 }
 
@@ -249,10 +253,12 @@ pub struct ContentHashAnchor {
     pub content_digest: [u8; 32],
     pub anchored_at: i64,
     pub bump: u8,
+    /// Monotonically increasing version counter; starts at 1 for new anchors.
+    pub version: u32,
 }
 
 impl ContentHashAnchor {
-    pub const INIT_SPACE: usize = 32 + 32 + 4 + MAX_CANONICAL_URL_LEN + 32 + 32 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 4 + MAX_CANONICAL_URL_LEN + 32 + 32 + 8 + 1 + 4;
 }
 
 #[account]
@@ -301,6 +307,10 @@ pub struct Proposal {
     pub usdc_vault_bump: u8,
     pub total_spump_staked: u64,
     pub bump: u8,
+    /// Nonce to allow multiple proposals with the same creator and deadline.
+    pub nonce: u64,
+    /// Maximum total SPUMP endorsement for this proposal (0 = uncapped).
+    pub max_endorsement_spump: u64,
 }
 
 impl Proposal {
@@ -330,7 +340,9 @@ impl Proposal {
         + 1
         + 1
         + 8
-        + 1;
+        + 1
+        + 8
+        + 8;
 }
 
 #[account]

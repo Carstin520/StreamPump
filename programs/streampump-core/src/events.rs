@@ -6,6 +6,7 @@ pub struct ProposalCreated {
     pub creator: Pubkey,
     pub payer: Pubkey,
     pub deadline: i64,
+    pub nonce: u64,
     pub content_kind: u8,
     pub content_hash: [u8; 32],
     pub content_anchor: Option<Pubkey>,
@@ -26,6 +27,7 @@ pub struct ContentAnchored {
     pub url_digest: [u8; 32],
     pub content_digest: [u8; 32],
     pub anchored_at: i64,
+    pub version: u32,
 }
 
 #[event]

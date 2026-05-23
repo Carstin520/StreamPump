@@ -594,77 +594,23 @@ export const refreshAllCreatorMarketProjections = async (
   );
 };
 
-export const syncCampaignProofProjectionFromProposal = async (proposal: Proposal) => {
+const refreshProposalProofStatus = async (proposalPda: string, signature?: string) => {
+  const proposal = await prisma.proposal.findUnique({ where: { proposalPda } });
+  if (!proposal) return;
+
   const proofStatus = mapProofStatus(proposal);
-  const settledAt =
-    proposal.track3SettledAt ?? proposal.track2SettledAt ?? (proposal.track1Claimed ? proposal.updatedAt : null);
-  const latestSettlementTxSignature =
-    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED
-      ? proposal.onChainTxSignature
-      : null;
+  const isSettlingOrSettled =
+    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED;
 
-  return prisma.campaignProofProjection.upsert({
-    where: {
-      proposalPda: proposal.proposalPda,
-    },
-    update: {
-      proposalId: proposal.id,
-      creatorWallet: proposal.creatorWallet,
-      sponsorWallet: proposal.sponsorWallet,
-      manifestId: proposal.manifestId,
-      intentId: proposal.intentId,
-      status: proposal.status,
+  await prisma.proposal.update({
+    where: { proposalPda },
+    data: {
       proofStatus,
-      contentHashHex: proposal.contentHashHex,
-      contentAnchorPda: proposal.contentAnchorPda,
-      contentAnchorTx: proposal.contentAnchorTx,
-      fundingTxSignature:
-        proposal.status === ProposalStatus.FUNDED ? proposal.onChainTxSignature : undefined,
-      latestSettlementTxSignature,
-      track1BaseUsdc: proposal.track1BaseUsdc,
-      track2UsdcDeposited: proposal.track2UsdcDeposited,
-      track3UsdcDeposited: proposal.track3UsdcDeposited,
-      track2MetricType: proposal.track2MetricType,
-      track2TargetValue: proposal.track2TargetValue,
-      track2ActualValue: proposal.track2ActualValue,
-      deadlineAt: proposal.deadlineAt,
-      settledAt,
-    },
-    create: {
-      proposalId: proposal.id,
-      proposalPda: proposal.proposalPda,
-      creatorWallet: proposal.creatorWallet,
-      sponsorWallet: proposal.sponsorWallet,
-      manifestId: proposal.manifestId,
-      intentId: proposal.intentId,
-      status: proposal.status,
-      proofStatus,
-      contentHashHex: proposal.contentHashHex,
-      contentAnchorPda: proposal.contentAnchorPda,
-      contentAnchorTx: proposal.contentAnchorTx,
-      fundingTxSignature:
-        proposal.status === ProposalStatus.FUNDED ? proposal.onChainTxSignature : null,
-      latestSettlementTxSignature,
-      track1BaseUsdc: proposal.track1BaseUsdc,
-      track2UsdcDeposited: proposal.track2UsdcDeposited,
-      track3UsdcDeposited: proposal.track3UsdcDeposited,
-      track2MetricType: proposal.track2MetricType,
-      track2TargetValue: proposal.track2TargetValue,
-      track2ActualValue: proposal.track2ActualValue,
-      deadlineAt: proposal.deadlineAt,
-      settledAt,
+      latestSettlementTxSignature: isSettlingOrSettled
+        ? (signature ?? proposal.onChainTxSignature)
+        : proposal.latestSettlementTxSignature,
     },
   });
-};
-
-export const syncCampaignProofProjectionFromProposalPda = async (proposalPda: string) => {
-  const proposal = await prisma.proposal.findUnique({
-    where: {
-      proposalPda,
-    },
-  });
-
-  return proposal ? syncCampaignProofProjectionFromProposal(proposal) : null;
 };
 
 export const syncMarketProjectionFromChainInstruction = async (params: ChainProjectionEvent) => {
@@ -1167,6 +1113,17 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       },
     });
 
+    if (existing?.lastEventSignature !== params.signature) {
+      const endorserIncrement = existing ? 0 : 1;
+      await prisma.proposal.updateMany({
+        where: { proposalPda },
+        data: {
+          endorserCount: { increment: endorserIncrement },
+          totalSpumpStaked: { increment: amount },
+        },
+      });
+    }
+
     return;
   }
 
@@ -1193,7 +1150,7 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       },
     });
     await updateS2EndorsementEstimatesForProposal(proposalPda, initialFanPool, initialSpumpStaked, event);
-    await syncCampaignProofProjectionFromProposalPda(proposalPda);
+    await refreshProposalProofStatus(proposalPda, params.signature);
     return;
   }
 
@@ -1232,12 +1189,21 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         lastEventAt: observedAt,
       },
     });
-    await syncCampaignProofProjectionFromProposalPda(proposalPda);
+
+    const claimedCount = await prisma.s2EndorsementPositionProjection.count({
+      where: { proposalPda, claimedStatus: true },
+    });
+    await prisma.proposal.updateMany({
+      where: { proposalPda },
+      data: { claimedEndorserCount: claimedCount },
+    });
+
+    await refreshProposalProofStatus(proposalPda, params.signature);
     return;
   }
 
   if (params.proposalPda) {
-    await syncCampaignProofProjectionFromProposalPda(params.proposalPda);
+    await refreshProposalProofStatus(params.proposalPda, params.signature);
   }
 };
 
@@ -1351,7 +1317,7 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
       },
       take: 5,
     }),
-    prisma.campaignProofProjection.findMany({
+    prisma.proposal.findMany({
       where: {
         creatorWallet: creator.creatorWallet,
       },
@@ -1391,7 +1357,7 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
       sponsorCancelAfterAt: offer.sponsorCancelAfterAt?.toISOString() ?? null,
     })),
     campaigns: campaigns.map((campaign) => ({
-      proposalId: campaign.proposalId,
+      proposalId: campaign.id,
       proposalPda: campaign.proposalPda,
       status: campaign.status,
       proofStatus: campaign.proofStatus,
@@ -1585,13 +1551,12 @@ const serializeManifestProof = (manifest: MarketProofManifest | null) => {
 
 export const serializePublicCampaignProof = (
   proposal: PublicCampaignProposal,
-  proof?: Awaited<ReturnType<typeof syncCampaignProofProjectionFromProposal>> | null
 ) => ({
   proposalId: proposal.id,
   proposalPda: proposal.proposalPda,
   viewerRole: "PUBLIC",
   status: proposal.status,
-  proofStatus: proof?.proofStatus ?? mapProofStatus(proposal),
+  proofStatus: proposal.proofStatus ?? mapProofStatus(proposal),
   creatorWallet: proposal.creatorWallet,
   sponsorWallet: proposal.sponsorWallet,
   manifestId: proposal.manifestId,
@@ -1665,23 +1630,12 @@ export const getPublicCampaignProof = async (id: string) => {
     return null;
   }
 
-  const [proof, endorsementAggregate] = await Promise.all([
-    syncCampaignProofProjectionFromProposal(proposal),
-    prisma.s2EndorsementPositionProjection.aggregate({
-      where: { proposalPda: proposal.proposalPda },
-      _count: true,
-      _sum: {
-        stakedSpumpAmount: true,
-        estimatedUsdcReward: true,
-      },
-    }),
-  ]);
   return {
-    ...serializePublicCampaignProof(proposal, proof),
+    ...serializePublicCampaignProof(proposal),
     endorsementSummary: {
-      endorserCount: endorsementAggregate._count,
-      totalStakedSpump: (endorsementAggregate._sum.stakedSpumpAmount ?? 0n).toString(),
-      estimatedUsdcReward: (endorsementAggregate._sum.estimatedUsdcReward ?? 0n).toString(),
+      endorserCount: proposal.endorserCount,
+      totalStakedSpump: proposal.totalSpumpStaked.toString(),
+      claimedEndorserCount: proposal.claimedEndorserCount,
     },
   };
 };
