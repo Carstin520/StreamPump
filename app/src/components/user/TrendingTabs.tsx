@@ -201,6 +201,7 @@ const GraduationWatchRow = ({
   const liveWallet = resolveCreatorWalletForRoute(creator.id);
   const creatorPosts = postsByCreator.get(creator.id) ?? [];
   const trend = creatorPosts.map((p) => p.likes + p.saves);
+  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
 
   return (
     <Link
@@ -218,7 +219,7 @@ const GraduationWatchRow = ({
       <div className="hidden items-center gap-3 sm:flex">
         <div className="text-right">
           <p className="text-[9px] uppercase tracking-[0.12em] text-[#5a6d87]">Price</p>
-          <p className="text-xs font-semibold text-white">{formatUsd(creator.tokenPrice)}</p>
+          <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
         </div>
         <div className="w-20">
           <div className="flex items-center gap-1.5">
@@ -228,7 +229,7 @@ const GraduationWatchRow = ({
                 style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
               />
             </div>
-            <span className="text-[10px] font-semibold text-[#ff8a78]">{creator.graduationProgress}%</span>
+            <span className="text-[10px] font-semibold text-[#ff8a78]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
           </div>
         </div>
         {trend.length > 1 ? (
@@ -284,10 +285,13 @@ const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
 
 const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
   const liveWallet = resolveCreatorWalletForRoute(creator.id);
-  const change24h = Number(((creator.momentumScore - 70) * 0.18).toFixed(2));
+  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
+  const change24h = hasMarketProjection ? Number(((creator.momentumScore - 70) * 0.18).toFixed(2)) : 0;
   const isUp = change24h >= 0;
-  const volume24h = Math.round(creator.supply * creator.tokenPrice * 0.04);
-  const trend = creator.contentPool.map((_, i) => creator.tokenPrice * (0.88 + i * 0.06 + Math.random() * 0.04));
+  const volume24h = hasMarketProjection ? Math.round(creator.supply * creator.tokenPrice * 0.04) : 0;
+  const trend = hasMarketProjection
+    ? creator.contentPool.map((_, i) => creator.tokenPrice * (0.88 + i * 0.06 + Math.random() * 0.04))
+    : [];
 
   return (
     <Link
@@ -306,18 +310,18 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
       </div>
 
       <div className="lg:text-right">
-        <p className="text-xs font-semibold text-white">{formatUsd(creator.tokenPrice)}</p>
+        <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
         <p className={`text-[10px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
-          {isUp ? "+" : ""}{change24h.toFixed(2)}%
+          {hasMarketProjection ? `${isUp ? "+" : ""}${change24h.toFixed(2)}%` : "content only"}
         </p>
       </div>
 
       <div className="hidden lg:block lg:text-right">
-        <p className="text-xs text-[#cbd6e7]">{formatUsd(volume24h)}</p>
+        <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? formatUsd(volume24h) : "—"}</p>
       </div>
 
       <div className="hidden lg:block lg:text-right">
-        <p className="text-xs text-[#cbd6e7]">{compactNumber(creator.holderCount)}</p>
+        <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? compactNumber(creator.holderCount) : "—"}</p>
       </div>
 
       <div className="hidden lg:block">
@@ -328,7 +332,7 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
               style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
             />
           </div>
-          <span className="shrink-0 text-[10px] font-medium text-[#cbd6e7]">{creator.graduationProgress}%</span>
+          <span className="shrink-0 text-[10px] font-medium text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
         </div>
       </div>
 

@@ -49,6 +49,8 @@ type UploadStage = "selected" | "hashing" | "presigning" | "uploading" | "comple
 type UploadQueueItem = { file: File; key: string; message: string; stage: UploadStage };
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
+const TRACK3_OPERATOR_GATED_USDC = "0";
+const TRACK3_OPERATOR_GATED_DELAY_DAYS = 0;
 
 const CONTENT_DETAIL_READINESS_DESCRIPTION =
   "This page reads live content manifests and can resume asset upload, finalize content, record publication URLs, and create proposal intents. It still depends on authenticated session state, R2/Mux/backend configuration, and seeded S2 creator readiness; failed asset cleanup and webhook reconciliation are not fully productized.";
@@ -188,8 +190,6 @@ export default function ManifestDetailPage() {
   const [track2TargetValue, setTrack2TargetValue] = useState("10000");
   const [track2MinAchievementBps, setTrack2MinAchievementBps] = useState("7000");
   const [track2BudgetUsdc, setTrack2BudgetUsdc] = useState("1000");
-  const [track3BudgetUsdc, setTrack3BudgetUsdc] = useState("300");
-  const [track3DelayDays, setTrack3DelayDays] = useState("14");
   const [activeSection, setActiveSection] = useState<"assets" | "publish" | "sponsor">("assets");
 
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
@@ -304,7 +304,7 @@ export default function ManifestDetailPage() {
       await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId: publicationPostId.trim() || null });
       await refreshManifest(token, manifestId);
       setPublicationUrl(""); setPublicationPostId("");
-      setActionMessage("发布记录已创建");
+      setActionMessage("发布记录已创建，等待验证和媒体交付就绪后进入 public feed");
     } catch (error) { handleApiError(error, "发布失败"); }
     finally { setBusyAction(null); }
   };
@@ -329,7 +329,9 @@ export default function ManifestDetailPage() {
         manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
         deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),
         track2MetricType, track2TargetValue: track2TargetValue.trim(), track2MinAchievementBps: Number(track2MinAchievementBps),
-        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc), track3UsdcDeposited: toUsdcAtomicString(track3BudgetUsdc), track3DelayDays: Number(track3DelayDays),
+        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc),
+        track3UsdcDeposited: toUsdcAtomicString(TRACK3_OPERATOR_GATED_USDC),
+        track3DelayDays: TRACK3_OPERATOR_GATED_DELAY_DAYS,
       });
       setActionMessage("合作意向已创建");
       void router.push(`/workspace/intents/${intent.intentId}`);
@@ -596,7 +598,7 @@ export default function ManifestDetailPage() {
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
@@ -605,12 +607,8 @@ export default function ManifestDetailPage() {
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
                 </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delaySettlement")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3BudgetUsdc(e.target.value)} value={track3BudgetUsdc} />
-                </label>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
                   <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
@@ -621,10 +619,12 @@ export default function ManifestDetailPage() {
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
                 </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delayDays")}</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3DelayDays(e.target.value)} value={track3DelayDays} />
-                </label>
+              </div>
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Track 3 CPS operator-gated</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+                  Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
+                </p>
               </div>
             </div>
             <button

@@ -119,6 +119,7 @@ export type IntentSummaryResponse = {
   lockedManifestHashHex: string | null;
   lockedAnchorPda: string | null;
   deadlineUnix: string;
+  nonce: string;
   track1BaseUsdc: string;
   track2MetricType: string;
   track2TargetValue: string;
@@ -126,6 +127,7 @@ export type IntentSummaryResponse = {
   track2UsdcDeposited: string;
   track3UsdcDeposited: string;
   track3DelayDays: number;
+  maxEndorsementSpump: string;
   plannedProposalPda: string | null;
   plannedUsdcVaultPda: string | null;
   creatorApprovedAt: string | null;
@@ -313,6 +315,7 @@ type CreateProposalIntentInput = {
   track2UsdcDeposited: string;
   track3UsdcDeposited: string;
   track3DelayDays: number;
+  maxEndorsementSpump?: string;
 };
 
 export type PresignManifestAssetsResponse = {

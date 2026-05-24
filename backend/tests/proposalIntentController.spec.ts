@@ -19,6 +19,7 @@ import {
   buildProposalIntentSemantics,
   extractTransactionSignature,
   isBundleReusable,
+  serializeIntent,
 } from "../src/controllers/proposalIntentShared";
 
 describe("proposalIntentController helpers", () => {
@@ -88,6 +89,7 @@ describe("proposalIntentController helpers", () => {
         lockedManifestHashHex: "a".repeat(64),
         lockedAnchorPda: "anchor-pda",
         deadlineUnix: 1_800_000_000n,
+        nonce: 9n,
         track1BaseUsdc: 1n,
         track2MetricType: Track2MetricType.VIEWS,
         track2TargetValue: 1n,
@@ -95,6 +97,7 @@ describe("proposalIntentController helpers", () => {
         track2UsdcDeposited: 1n,
         track3UsdcDeposited: 1n,
         track3DelayDays: 7,
+        maxEndorsementSpump: 10_000n,
         plannedProposalPda: "proposal-pda",
         plannedUsdcVaultPda: "vault-pda",
         creatorApprovedAt: now,
@@ -115,5 +118,44 @@ describe("proposalIntentController helpers", () => {
     expect(semantics.nextAction).to.equal("SPONSOR_SIGN_AND_SUBMIT");
     expect(semantics.requiredSigner).to.equal("SPONSOR");
     expect(semantics.disabledReason).to.equal("SPONSOR_REQUIRED");
+  });
+
+  it("serializes proposal nonce and endorsement cap explicitly", () => {
+    const now = new Date("2026-05-24T00:00:00.000Z");
+    const serialized = serializeIntent({
+      id: "intent-id",
+      status: ProposalIntentStatus.DRAFT,
+      version: 1,
+      creatorWallet: "creator-wallet",
+      sponsorWallet: "sponsor-wallet",
+      sponsorOrgId: null,
+      creatorOrgId: null,
+      manifestId: "manifest-id",
+      lockedManifestHashHex: null,
+      lockedAnchorPda: null,
+      deadlineUnix: 1_800_000_000n,
+      nonce: 123n,
+      track1BaseUsdc: 100n,
+      track2MetricType: Track2MetricType.VIEWS,
+      track2TargetValue: 1_000n,
+      track2MinAchievementBps: 7_000,
+      track2UsdcDeposited: 200n,
+      track3UsdcDeposited: 0n,
+      track3DelayDays: 0,
+      maxEndorsementSpump: 50_000n,
+      plannedProposalPda: null,
+      plannedUsdcVaultPda: null,
+      creatorApprovedAt: null,
+      sponsorApprovedAt: null,
+      chainTxSignature: null,
+      chainSubmittedAt: null,
+      chainConfirmedAt: null,
+      failureReason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    expect(serialized.nonce).to.equal("123");
+    expect(serialized.maxEndorsementSpump).to.equal("50000");
   });
 });

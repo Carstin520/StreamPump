@@ -57,13 +57,6 @@ const pickState = (posts: PostRecord[]): CreatorMarketRecord["state"] => {
 
 const unique = <T,>(items: T[]) => [...new Set(items)];
 
-const buildTopHolders = (creatorId: string) =>
-  [1, 2, 3].map((rank) => ({
-    rank,
-    label: `0x${(creatorId + rank).replace(/[^a-z0-9]/gi, "").slice(0, 4)}...${String(rank * 17).padStart(2, "0")}`,
-    share: `${(8.9 - rank * 1.3).toFixed(1)}%`,
-  }));
-
 const buildPotentialSponsors = (posts: PostRecord[]) => {
   const tagPool = unique(posts.flatMap((post) => post.tags)).slice(0, 3);
   if (tagPool.length === 0) {
@@ -104,10 +97,8 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
   const city = primaryPost.location;
   const intro = fallbackIntro(primaryPost.creatorName, derivedTags, niche);
   const teaser = fallbackTeaser(posts.length, derivedTags, state);
-  const followerBase = totalLikesAndSavesCount * 3;
-  const tokenPrice =
-    Number((1.4 + (totalLikesAndSavesCount % 3200) / 1000).toFixed(2));
-  const targetGraduationPrice = Number((tokenPrice * 1.42).toFixed(2));
+  const contentMomentumScore =
+    Math.min(72, 24 + posts.length * 12 + derivedTags.length * 4);
 
   return {
     id: primaryPost.creatorId,
@@ -115,39 +106,31 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
     handle: primaryPost.creatorHandle,
     avatarSrc: primaryPost.creatorAvatarSrc,
     heroSrc: primaryPost.coverSrc,
-    followingCount: posts.length * 14,
-    followersCount: followerBase,
+    followingCount: 0,
+    followersCount: 0,
     totalLikesAndSavesCount,
     niche,
     city,
     intro,
     level: stageLevelLabel(state),
-    momentumScore:
-      Math.min(96, 54 + posts.length * 8 + Math.round(totalLikesAndSavesCount / 2800)),
-    tokenPrice,
-    supply: 9600 + posts.length * 1400,
-    graduationProgress:
-      state === "S2_ACTIVE" ? 100 : Math.min(92, 38 + posts.length * 18),
-    buyoutStatus: stageStatusLabel(state),
+    momentumScore: contentMomentumScore,
+    tokenPrice: 0,
+    supply: 0,
+    graduationProgress: 0,
+    buyoutStatus: `${stageStatusLabel(state)} · market projection unavailable`,
     state,
     teaser,
     tags: derivedTags,
-    holderCount: 820 + posts.length * 380,
-    topHolders: buildTopHolders(primaryPost.creatorId),
-    targetGraduationPrice,
+    holderCount: 0,
+    topHolders: [],
+    targetGraduationPrice: 0,
     potentialSponsors: buildPotentialSponsors(posts),
-    supporterDistributableUsd: 38000 + posts.length * 21000,
-    buyoutOfferUsd: 160000 + posts.length * 98000,
-    buyoutTimeline:
-      state === "S1_BUYOUT"
-        ? ["Signal building", "Sponsor attention", "Window approaching"]
-        : undefined,
-    activeCampaignCount:
-      state === "S2_ACTIVE" ? Math.max(1, posts.length - 1) : undefined,
-    activityScore:
-      state === "S2_ACTIVE" ? 72 + posts.length * 4 : undefined,
-    valuationUsd:
-      state === "S2_ACTIVE" ? 480000 + posts.length * 180000 : undefined,
+    supporterDistributableUsd: undefined,
+    buyoutOfferUsd: undefined,
+    buyoutTimeline: undefined,
+    activeCampaignCount: undefined,
+    activityScore: undefined,
+    valuationUsd: undefined,
     contentPool:
       posts.slice(0, 3).map((post) => compactPreview(post.title, 28)),
   };

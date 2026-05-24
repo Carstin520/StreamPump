@@ -63,6 +63,23 @@ interface PresignAssetPlan {
   fileSizeBytes: bigint;
 }
 
+const isAssetPublicDeliveryReady = (asset: {
+  assetType: AssetType;
+  uploadStatus: AssetUploadStatus;
+  processingStatus: AssetProcessingStatus;
+  muxPlaybackId: string | null;
+}): boolean => {
+  if (asset.uploadStatus !== AssetUploadStatus.UPLOADED) {
+    return false;
+  }
+
+  if (asset.assetType === AssetType.VIDEO) {
+    return asset.processingStatus === AssetProcessingStatus.READY && Boolean(asset.muxPlaybackId);
+  }
+
+  return asset.processingStatus === AssetProcessingStatus.READY;
+};
+
 export const issueCreatorAuthSignature = withController(
   "ISSUE_CREATOR_AUTH_SIGNATURE_FAILED",
   async (req, res) => {
@@ -507,7 +524,19 @@ export const createContentPublication = withController(
 
     const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
-    await requireOwnedManifest(manifestId, creatorWallet);
+    const manifest = await prisma.contentManifest.findFirst({
+      where: {
+        id: manifestId,
+        creatorWallet,
+      },
+      include: {
+        assets: true,
+      },
+    });
+
+    if (!manifest) {
+      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
+    }
 
     const platform = parseNonEmptyString(req.body.platform, "platform").toUpperCase();
     const externalUrl = parseNonEmptyString(req.body.externalUrl, "externalUrl");
@@ -524,18 +553,18 @@ export const createContentPublication = withController(
       },
     });
 
-    const manifestStatus = await prisma.contentManifest.findUnique({
-      where: { id: manifestId },
-      select: { status: true },
-    });
-
-    const nextStatus = manifestStatus?.status
-      ? nextManifestStatusAfterPublication(manifestStatus.status)
+    const assetsReadyForPublicFeed =
+      manifest.assets.length > 0 && manifest.assets.every(isAssetPublicDeliveryReady);
+    const publicationVerified =
+      publication.verificationStatus === PublicationVerificationStatus.VERIFIED;
+    const publicFeedEligible = assetsReadyForPublicFeed && publicationVerified;
+    const nextStatus = publicFeedEligible
+      ? nextManifestStatusAfterPublication(manifest.status)
       : null;
 
     const manifestUpdateData: Prisma.ContentManifestUpdateInput = {
-      isPublicFeedEligible: true,
-      publishedAt: new Date(),
+      isPublicFeedEligible: manifest.isPublicFeedEligible || publicFeedEligible,
+      publishedAt: publicFeedEligible ? new Date() : manifest.publishedAt,
     };
 
     if (nextStatus) {

@@ -119,13 +119,23 @@ export default function EndorsePage() {
     : endorsers.reduce((s, e) => s + e.amount, 0);
   const projectedEndorsed = totalEndorsed + stakeAmount;
   const successUsdc = projectedEndorsed > 0 ? (stakeAmount / projectedEndorsed) * fanPoolShare : 0;
-  const failLoss = stakeAmount * 0.05;
+  const failLoss = 0;
+  const cancelVoidLoss = stakeAmount * 0.05;
+  const cancelVoidRefund = stakeAmount - cancelVoidLoss;
   const creatorName = campaign
     ? shortWallet(campaign.creatorWallet)
     : locale === "en"
       ? "Midnight Save"
       : creator.name;
   const campaignTitle = `${creatorName} × ${SPONSOR_NAME}`;
+  const deadlineMs = campaign ? new Date(campaign.deadlineAt).getTime() : null;
+  const isDeadlinePassed = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs <= Date.now();
+  const liveEndorsementBlockedReason =
+    campaign?.status && campaign.status !== "FUNDED"
+      ? `Campaign status is ${campaign.status}; endorse_proposal only accepts FUNDED campaigns.`
+      : isDeadlinePassed
+        ? "Campaign deadline has passed; endorse_proposal is closed."
+        : null;
   const visibleEndorsers = campaign
     ? [
         {
@@ -213,6 +223,11 @@ export default function EndorsePage() {
     }
 
     if (campaign) {
+      if (liveEndorsementBlockedReason) {
+        setDemoSummary(liveEndorsementBlockedReason);
+        return;
+      }
+
       void proposalFlow.execute((token) =>
         buildEndorseProposalTransaction(token, campaign.proposalPda, {
           amount: stakeAmount,
@@ -226,7 +241,7 @@ export default function EndorsePage() {
     }
 
     demoFlow.begin();
-  }, [campaign, demoFlow, proposalFlow, router, stakeAmount]);
+  }, [campaign, demoFlow, liveEndorsementBlockedReason, proposalFlow, router, stakeAmount]);
 
   return (
     <>
@@ -368,7 +383,7 @@ export default function EndorsePage() {
                     {compactNumber(failLoss)}
                   </p>
                   <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                    SPUMP at risk
+                    Fail slash
                   </p>
                 </div>
               </div>
@@ -415,24 +430,24 @@ export default function EndorsePage() {
                 <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#de402a]">
                   If Fail
                 </p>
-                <p className="mt-4 text-[32px] font-bold tracking-[-0.05em] text-[#de402a]">95%</p>
+                <p className="mt-4 text-[32px] font-bold tracking-[-0.05em] text-[#de402a]">100%</p>
                 <p className="text-xs text-[#8ea0ba]">SPUMP returned</p>
 
                 <div className="mt-5 space-y-3">
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-white">
-                      {compactNumber(stakeAmount * 0.95)}
+                      {compactNumber(stakeAmount)}
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       SPUMP back
                     </p>
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
-                    <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#de402a]">
-                      −{compactNumber(failLoss)}
+                    <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
+                      0
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      SPUMP slashed (5%)
+                      SPUMP slashed on fail
                     </p>
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
@@ -446,7 +461,7 @@ export default function EndorsePage() {
                 </div>
 
                 <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
-                  Track 2 metric &lt; {track2CliffFraction * 100}% cliff
+                  Track 2 metric &lt; {track2CliffFraction * 100}% cliff. Cancelled/voided campaigns still return only {compactNumber(cancelVoidRefund)} SPUMP and leave {compactNumber(cancelVoidLoss)} SPUMP unminted.
                 </p>
               </section>
             </div>
@@ -567,7 +582,8 @@ export default function EndorsePage() {
               className="glass-button-primary section-enter w-full rounded-full py-4 text-base font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
               disabled={
                 isLiveCampaign
-                  ? proposalFlow.state.status === "building" ||
+                  ? Boolean(liveEndorsementBlockedReason) ||
+                    proposalFlow.state.status === "building" ||
                     proposalFlow.state.status === "waiting_signature" ||
                     proposalFlow.state.status === "submitting"
                   : demoFlow.busy || demoFlow.state.status === "success"
@@ -584,6 +600,8 @@ export default function EndorsePage() {
                       ? "Waiting for wallet..."
                       : proposalFlow.state.status === "submitting"
                         ? "Submitting..."
+                        : liveEndorsementBlockedReason
+                          ? "Endorsement closed"
                         : `Endorse ${compactNumber(stakeAmount)} SPUMP`
                 : demoFlow.busy
                   ? "Simulating..."
@@ -595,7 +613,9 @@ export default function EndorsePage() {
               <section className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">Wallet transaction</p>
                 <p className="mt-1 text-xs leading-5 text-[#a7b2c4]">
-                  {proposalFlow.state.status === "failed"
+                  {liveEndorsementBlockedReason
+                    ? liveEndorsementBlockedReason
+                    : proposalFlow.state.status === "failed"
                     ? proposalFlow.state.error
                     : proposalFlow.state.signature
                       ? `Signature ${proposalFlow.state.signature}`

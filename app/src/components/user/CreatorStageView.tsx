@@ -77,7 +77,7 @@ export const CreatorStageView = ({
             onBuyAmountChange={setBuyAmount}
             onRequireAuth={() => requireInteractiveSession(router)}
           />
-          {creator.state === "S1_BUYOUT" ? <BuyoutOfferCard creator={creator} /> : null}
+          {creator.state === "S1_BUYOUT" && creator.buyoutOfferUsd ? <BuyoutOfferCard creator={creator} /> : null}
           <TopHoldersCard creator={creator} />
         </aside>
       </div>
@@ -105,15 +105,17 @@ type MarketModel = {
 };
 
 const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
-  const priceSpump = Math.max(1, Math.round(creator.tokenPrice * SPUMP_PER_USD));
-  const targetPriceSpump = Math.max(
-    priceSpump + 8,
-    Math.round(creator.targetGraduationPrice * SPUMP_PER_USD),
-  );
+  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
+  const priceSpump = hasMarketProjection ? Math.round(creator.tokenPrice * SPUMP_PER_USD) : 0;
+  const targetPriceSpump = hasMarketProjection
+    ? Math.max(priceSpump + 8, Math.round(creator.targetGraduationPrice * SPUMP_PER_USD))
+    : 0;
   const supply = creator.supply;
-  const maxSupply = Math.max(supply * 1.6, supply + 5_000);
-  const change24hPct = Number(((creator.momentumScore - 70) * 0.18).toFixed(2));
-  const nextPriceSpump = Math.round(priceSpump * 1.012);
+  const maxSupply = hasMarketProjection ? Math.max(supply * 1.6, supply + 5_000) : 1;
+  const change24hPct = hasMarketProjection
+    ? Number(((creator.momentumScore - 70) * 0.18).toFixed(2))
+    : 0;
+  const nextPriceSpump = hasMarketProjection ? Math.round(priceSpump * 1.012) : 0;
   const supporterPoolUsd = creator.supporterDistributableUsd ?? 0;
   const liquiditySpump = Math.round(priceSpump * supply * 0.18);
   const level = creator.state === "S2_ACTIVE" ? 5 : creator.state === "S1_BUYOUT" ? 3 : 2;
@@ -368,6 +370,7 @@ const PriceHistoryPanel = ({
   creator: CreatorMarketRecord;
   market: MarketModel;
 }) => {
+  const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
   const priceHistory = useMemo(
     () =>
       createMockPriceHistory({
@@ -376,6 +379,25 @@ const PriceHistoryPanel = ({
       }),
     [creator.id, market.priceSpump],
   );
+
+  if (!hasMarketProjection) {
+    return (
+      <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
+        <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Market History</p>
+            <h3 className="mt-1 text-sm font-semibold text-white">Projection pending</h3>
+          </div>
+          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
+            Content only
+          </span>
+        </header>
+        <div className="px-4 py-10 text-center text-xs leading-5 text-[#8ea0ba]">
+          This public profile is derived from feed content. S1 price, supply, holders, and graduation history require CreatorMarketProjection from the market API.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.88)_0%,rgba(10,15,23,0.88)_100%)] p-4 md:p-5">
@@ -425,6 +447,8 @@ const BuyPanel = ({
 }) => {
   const [pulse, setPulse] = useState(false);
   const disabled = market.state !== "S1_DISCOVERY";
+  const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
+  const previewDisabled = disabled || !hasMarketProjection;
   const liveCreatorWallet = resolveCreatorWalletForRoute(creator.id);
   const currentHolding = 0;
   const futureHolding = currentHolding + buyPreview.amount;
@@ -443,11 +467,11 @@ const BuyPanel = ({
             S1 Position Access
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-white">
-            {liveCreatorWallet ? "Seeded S1 Market" : disabled ? "Preview Mode" : "Preview S1 Position"}
+            {liveCreatorWallet ? "Seeded S1 Market" : !hasMarketProjection ? "Content Signals Only" : disabled ? "Preview Mode" : "Preview S1 Position"}
           </h3>
         </div>
         <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
-          1 S1 ≈ {market.priceSpump} SPUMP
+          {hasMarketProjection ? `1 S1 ≈ ${market.priceSpump} SPUMP` : "Market projection pending"}
         </span>
       </header>
 
@@ -505,17 +529,21 @@ const BuyPanel = ({
         </div>
 
         <div className="space-y-1.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <SummaryRow label="Avg price" value={`${buyPreview.avgPrice} SPUMP`} />
-          <SummaryRow accent label="Estimated cost" value={`${buyPreview.cost} SPUMP`} />
+          <SummaryRow label="Avg price" value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
+          <SummaryRow accent label="Estimated cost" value={hasMarketProjection ? `${buyPreview.cost} SPUMP` : "—"} />
           <SummaryRow
             label="You will hold"
-            value={`${futureHolding} S1`}
-            sublabel={`+${buyPreview.amount} new`}
+            value={hasMarketProjection ? `${futureHolding} S1` : "—"}
+            sublabel={hasMarketProjection ? `+${buyPreview.amount} new` : undefined}
           />
           <SummaryRow
             label="Price after buy"
-            value={`${buyPreview.priceAfter} SPUMP`}
-            sublabel={`${(((buyPreview.priceAfter - market.priceSpump) / market.priceSpump) * 100).toFixed(2)}%`}
+            value={hasMarketProjection ? `${buyPreview.priceAfter} SPUMP` : "—"}
+            sublabel={
+              hasMarketProjection
+                ? `${(((buyPreview.priceAfter - market.priceSpump) / market.priceSpump) * 100).toFixed(2)}%`
+                : undefined
+            }
           />
         </div>
 
@@ -548,7 +576,7 @@ const BuyPanel = ({
           <>
             <button
               className={`relative w-full overflow-hidden rounded-xl py-2.5 text-xs font-semibold transition ${
-                disabled
+                previewDisabled
                   ? "border border-white/[0.08] bg-white/[0.04] text-[#8ea0ba]"
                   : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] hover:brightness-[1.05]"
               } ${pulse ? "tap-bounce-active" : ""}`}
@@ -559,9 +587,12 @@ const BuyPanel = ({
 
                 setPulse(true);
               }}
+              disabled={previewDisabled}
               type="button"
             >
-              {disabled
+              {!hasMarketProjection
+                ? "Market Projection Pending"
+                : disabled
                 ? market.state === "S1_BUYOUT"
                   ? "Buyout Live · Buy Locked"
                   : "Graduated · S2 Active"
@@ -586,7 +617,9 @@ const BuyPanel = ({
 
         {!liveCreatorWallet && !disabled ? (
           <p className="text-center text-[10px] text-[#5a6b82]">
-            Local preview only. Open a seeded market route for transaction builders.
+            {hasMarketProjection
+              ? "Local preview only. Open a seeded market route for transaction builders."
+              : "Public content feed does not provide S1 price, supply, holders, or buyout truth."}
           </p>
         ) : null}
       </div>
@@ -753,7 +786,7 @@ const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
       </span>
     </header>
     <div className="space-y-0.5 px-2.5 py-2">
-      {creator.topHolders.map((holder) => (
+      {creator.topHolders.length > 0 ? creator.topHolders.map((holder) => (
         <div
           className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition hover:bg-white/[0.03]"
           key={holder.rank}
@@ -764,7 +797,11 @@ const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
           </span>
           <span className="text-xs font-semibold text-white">{holder.share}</span>
         </div>
-      ))}
+      )) : (
+        <div className="rounded-lg px-2.5 py-3 text-xs leading-5 text-[#8ea0ba]">
+          Holder data is unavailable on content-only public profiles.
+        </div>
+      )}
     </div>
   </section>
 );

@@ -55,9 +55,6 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
     .replace(/^-+|-+$/g, "") || "creator";
 
-const hashString = (value: string) =>
-  Array.from(value).reduce((result, char) => (result * 33 + char.charCodeAt(0)) % 2147483647, 7);
-
 const isRenderableUrl = (value: string | null | undefined): value is string => {
   if (!value) {
     return false;
@@ -165,9 +162,6 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   const creatorName = post.creatorName?.trim() || "Imported Creator";
   const creatorKey = slugify(creatorName);
   const avatarSeed = `${creatorKey}:${post.slug}`;
-  const likes = 320 + (hashString(`${post.slug}:likes`) % 7600);
-  const saves = 48 + (hashString(`${post.slug}:saves`) % 1800);
-  const commentsCount = 4 + (hashString(`${post.slug}:comments`) % 18);
 
   return {
     id: post.postId,
@@ -181,9 +175,9 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     body: post.body?.trim() || post.excerpt?.trim() || "",
     tags: post.tags,
     stage: stageFromMetadata(post.creatorStage),
-    likes,
-    saves,
-    commentsCount,
+    likes: 0,
+    saves: 0,
+    commentsCount: 0,
     timeLabel: post.publishTimeLabel?.trim() || "Imported",
     location: post.location?.trim() || "Unknown",
     mediaHeightClass: inferMediaHeightClass(post),
