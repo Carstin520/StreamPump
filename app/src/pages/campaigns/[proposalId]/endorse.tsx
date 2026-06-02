@@ -8,6 +8,7 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
 import { buildEndorseProposalTransaction } from "@/lib/api/proposal";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
+import { formatUsdcAtomic } from "@/lib/formatting";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useI18n } from "@/lib/i18n";
 import { requireInteractiveSession } from "@/lib/interaction-auth";
@@ -95,6 +96,8 @@ export default function EndorsePage() {
   const dashOffset = DIAL_CIRCUMFERENCE * (1 - fraction);
 
   const isLiveCampaign = Boolean(campaign);
+  const formatCampaignUsdValue = (value: number) =>
+    campaign ? formatUsdcAtomic(Math.round(value)) : formatUsd(value);
   const track2Budget = campaign
     ? parseAmount(campaign.budgetTracks.track2UsdcDeposited, TRACK2_BUDGET)
     : TRACK2_BUDGET;
@@ -113,6 +116,12 @@ export default function EndorsePage() {
     : TRACK2_CURRENT;
   const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString() : DEADLINE;
   const statusLabel = campaign?.status ?? STATUS;
+  const track1Budget = campaign
+    ? parseAmount(campaign.budgetTracks.track1BaseUsdc, TRACK1_BASE)
+    : TRACK1_BASE;
+  const track3Budget = campaign
+    ? parseAmount(campaign.budgetTracks.track3UsdcDeposited, TRACK3_BUDGET)
+    : TRACK3_BUDGET;
 
   const totalEndorsed = campaign
     ? parseAmount(campaign.endorsementSummary?.totalStakedSpump, 0)
@@ -147,19 +156,19 @@ export default function EndorsePage() {
   const visibleTracks = [
     {
       label: "Track 1 · Base",
-      value: campaign ? parseAmount(campaign.budgetTracks.track1BaseUsdc, TRACK1_BASE) : TRACK1_BASE,
+      valueLabel: formatCampaignUsdValue(track1Budget),
       settled: campaign?.budgetTracks.track1Claimed ?? true,
       color: "#65ecaf",
     },
     {
       label: `Track 2 · ${track2Metric}`,
-      value: track2Budget,
+      valueLabel: formatCampaignUsdValue(track2Budget),
       settled: Boolean(campaign?.budgetTracks.track2SettledAt),
       color: "#67b8ff",
     },
     {
       label: "Track 3 · CPS",
-      value: campaign ? parseAmount(campaign.budgetTracks.track3UsdcDeposited, TRACK3_BUDGET) : TRACK3_BUDGET,
+      valueLabel: formatCampaignUsdValue(track3Budget),
       settled: Boolean(campaign?.budgetTracks.track3SettledAt),
       color: "#f3b33e",
     },
@@ -284,7 +293,7 @@ export default function EndorsePage() {
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
-                  <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsd(fanPoolShare)}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatCampaignUsdValue(fanPoolShare)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
@@ -364,7 +373,7 @@ export default function EndorsePage() {
               <div className="flex w-full max-w-sm justify-between text-center">
                 <div>
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
-                    {formatUsd(successUsdc)}
+                    {formatCampaignUsdValue(successUsdc)}
                   </p>
                   <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
                     Est. USDC if success
@@ -412,7 +421,7 @@ export default function EndorsePage() {
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
-                      +{formatUsd(successUsdc)}
+                      +{formatCampaignUsdValue(successUsdc)}
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       USDC share
@@ -479,7 +488,7 @@ export default function EndorsePage() {
                       <div className="mb-1.5 flex items-center justify-between">
                         <span className="text-xs text-[#8ea0ba]">{t.label}</span>
                         <span className="text-sm font-semibold tracking-[-0.05em] text-white">
-                          {formatUsd(t.value)}
+                          {t.valueLabel}
                         </span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -564,7 +573,7 @@ export default function EndorsePage() {
                 {[
                   ["Track 2 target", `${compactNumber(track2Target)} ${track2Metric.toLowerCase()}`],
                   ["Cliff", `${track2CliffFraction * 100}%`],
-                  ["Fan pool (20%)", formatUsd(fanPoolShare)],
+                  ["Fan pool (20%)", formatCampaignUsdValue(fanPoolShare)],
                   ["Your balance", `${compactNumber(FAN_BALANCE)} SPUMP`],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between">

@@ -7,9 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import {
   PreviewHoldingsTable,
-  PreviewPortfolioHero,
   PreviewRewardsPanel,
-  PreviewSnapshotStrip,
   PreviewWatchlistPanel,
   usePreviewPortfolio,
   usePreviewWatchlist,
@@ -1013,9 +1011,6 @@ function PortfolioPage() {
               sessionWallet={sessionWallet}
               sourceLabel={isMockPortfolioSession ? "Demo Portfolio" : "Backend Portfolio"}
             />
-
-            <PreviewPortfolioHero portfolio={previewPortfolio} />
-            <PreviewSnapshotStrip portfolio={previewPortfolio} />
 
             <MetricsStrip portfolio={portfolio} />
 

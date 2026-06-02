@@ -13,6 +13,7 @@ import {
   issueCreatorAuthSignature,
   listContentManifests,
   presignManifestAssets,
+  verifyContentPublication,
 } from "../../controllers/contentManifestController";
 import { requireSessionAuth } from "../../middleware/walletAuth";
 
@@ -28,5 +29,6 @@ router.post("/manifests/:manifestId/assets/presign", presignManifestAssets);
 router.post("/manifests/:manifestId/assets/:assetId/complete", completeManifestAssetUpload);
 router.post("/manifests/:manifestId/finalize", finalizeContentManifest);
 router.post("/publications", createContentPublication);
+router.patch("/publications/:publicationId/verify", verifyContentPublication);
 
 export default router;

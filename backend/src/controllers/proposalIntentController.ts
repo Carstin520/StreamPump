@@ -776,6 +776,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
 export const getProposalIntentStatus = withController(
   "GET_PROPOSAL_INTENT_STATUS_FAILED",
   async (req, res) => {
+    const requesterWallet = requireSessionWallet(req);
     const intentId = parseNonEmptyString(req.params.intentId, "intentId");
     const intent = await prisma.proposalIntent.findUnique({
       where: { id: intentId },
@@ -792,6 +793,8 @@ export const getProposalIntentStatus = withController(
     if (!intent) {
       throw new HttpError(404, "INTENT_NOT_FOUND", "proposal intent not found");
     }
+
+    assertProposalIntentParticipant(requesterWallet, intent);
 
     ok(res, {
       intent: serializeIntent(intent),

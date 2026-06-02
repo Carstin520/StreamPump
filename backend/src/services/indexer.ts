@@ -39,6 +39,7 @@ type ParsedAnchorEventRecord = {
 const PROGRAM_INSTRUCTIONS_FOR_PROJECTION = new Set([
   "create_proposal",
   "sponsor_fund",
+  "endorse_proposal",
   "settle_track1_base",
   "settle_track2",
   "settle_track3_cps",
@@ -65,6 +66,7 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
   S1Graduated: "execute_s1_graduation",
   S1BuyoutUsdcClaimed: "claim_s1_buyout_usdc",
   Track1Settled: "settle_track1_base",
+  EndorsementCreated: "endorse_proposal",
   Track2Settled: "settle_track2",
   Track3Settled: "settle_track3_cps",
   EndorsementSettled: "claim_endorsement",

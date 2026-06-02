@@ -3,7 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 
-const PROGRAM_ID = new PublicKey("EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre");
+const PROGRAM_ID = new PublicKey("FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp");
 
 export const useProgram = (idl?: Idl) => {
   const { connection } = useConnection();

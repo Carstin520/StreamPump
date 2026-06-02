@@ -6,6 +6,7 @@ import { AssetProcessingSource, AssetProcessingStatus } from "@prisma/client";
 import { Request, Response } from "express";
 
 import { muxService } from "../services/MuxService";
+import { syncManifestPublicationEligibility } from "../services/contentPublicationEligibility";
 import { prisma } from "../services/prisma";
 
 type MuxWebhookEvent = {
@@ -142,6 +143,22 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
           processingError: null,
         },
       });
+
+      const readyAssets = await prisma.contentAsset.findMany({
+        where: {
+          muxAssetId,
+          processingStatus: AssetProcessingStatus.READY,
+          muxPlaybackId: playbackId,
+        },
+        select: {
+          manifestId: true,
+        },
+      });
+      await Promise.all(
+        Array.from(new Set(readyAssets.map((asset) => asset.manifestId))).map((manifestId) =>
+          syncManifestPublicationEligibility(manifestId)
+        )
+      );
 
       res.json({
         received: true,

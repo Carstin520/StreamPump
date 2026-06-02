@@ -79,6 +79,11 @@ pub(crate) fn handler(ctx: Context<SettleTrack1Base>) -> Result<()> {
         !proposal.track1_claimed,
         StreamPumpError::ProposalAlreadySettled
     );
+    let now = Clock::get()?.unix_timestamp;
+    require!(
+        now >= proposal.deadline,
+        StreamPumpError::ProposalNotExpired
+    );
 
     let deadline_bytes = proposal.deadline.to_le_bytes();
     let nonce_bytes = proposal.nonce.to_le_bytes();

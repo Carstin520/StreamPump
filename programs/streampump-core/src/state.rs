@@ -20,6 +20,7 @@ pub const DEFAULT_MAX_S1_DAILY_BUY_SPUMP: u64 = 15_000_000;
 pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
 pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
 pub const DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3_600;
+pub const DEFAULT_MAX_ENDORSEMENT_HARD_CEILING: u64 = 1_000_000_000;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
 pub const USER_ROLE_CREATOR: u16 = 1 << 1;
 pub const USER_ROLE_SPONSOR_OPERATOR: u16 = 1 << 2;
@@ -137,6 +138,9 @@ pub struct ProtocolConfig {
     pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
+    /// Protocol-level total endorsement ceiling for proposals with max_endorsement_spump == 0.
+    /// 0 means truly uncapped by explicit admin intent.
+    pub max_endorsement_hard_ceiling: u64,
     /// Maximum endorsement per user as basis points of proposal's max_endorsement_spump (e.g. 2000 = 20%).
     pub max_endorsement_per_user_bps: u16,
     pub bump: u8,
@@ -162,6 +166,7 @@ impl ProtocolConfig {
         + 2
         + 2
         + 2
+        + 8
         + 8
         + 8
         + 8

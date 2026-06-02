@@ -2,51 +2,22 @@
  * CN: Sponsor KYB 内部运营审核路由。
  * EN: Internal operator routes for Sponsor KYB review.
  */
-import { NextFunction, Request, Response, Router } from "express";
+import { Router } from "express";
 
 import {
   HttpError,
-  fail,
   ok,
   parseNonEmptyString,
   withController,
 } from "../../controllers/http";
-import { optionalSessionAuth } from "../../middleware/walletAuth";
+import { requireInternalOperatorAuth } from "../../middleware/internalOperatorAuth";
 import {
   listPendingSponsorProfiles,
   reviewSponsorProfile,
 } from "../../services/sponsorProfile";
 import { r2Service } from "../../services/R2Service";
-import { getAnchorService } from "../../services/AnchorService";
-import { config } from "../../../config/default";
 
 const router = Router();
-
-const requireInternalOperatorAuth = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const configuredKey = config.auth.internalOperatorApiKey?.trim();
-  const providedKey = String(req.header("x-internal-operator-key") ?? "").trim();
-
-  if (configuredKey && providedKey && configuredKey === providedKey) {
-    next();
-    return;
-  }
-
-  await optionalSessionAuth(req, res, () => {
-    const wallet = req.auth?.wallet;
-    const oracleWallet = getAnchorService().getOracleAuthorityPublicKey().toBase58();
-
-    if (wallet === oracleWallet) {
-      next();
-      return;
-    }
-
-    fail(res, 403, "OPERATOR_AUTH_REQUIRED", "operator authorization is required");
-  });
-};
 
 router.use(requireInternalOperatorAuth);
 

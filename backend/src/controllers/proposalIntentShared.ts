@@ -4,6 +4,7 @@ import {
   CampaignProofStatus,
   ContentManifestStatus,
   OracleSyncStatus,
+  PublicationVerificationStatus,
   Proposal,
   ProposalStatus,
   ProposalIntent,
@@ -266,6 +267,7 @@ export const serializeProposal = (proposal: Proposal) => ({
   track3DelayDays: proposal.track3DelayDays,
   track3SettledAt: proposal.track3SettledAt?.toISOString() ?? null,
   onChainTxSignature: proposal.onChainTxSignature,
+  nonce: proposal.nonce?.toString() ?? null,
   oracleSyncStatus: proposal.oracleSyncStatus,
   contentHashHex: proposal.contentHashHex,
   contentAnchorPda: proposal.contentAnchorPda,
@@ -291,7 +293,19 @@ export const finalizeConfirmedLaunchBundle = async (params: {
   const latestIntent = await prisma.proposalIntent.findUnique({
     where: { id: params.intentId },
     include: {
-      manifest: true,
+      manifest: {
+        include: {
+          publications: {
+            where: {
+              verificationStatus: PublicationVerificationStatus.VERIFIED,
+            },
+            orderBy: {
+              verifiedAt: "desc",
+            },
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -345,6 +359,8 @@ export const finalizeConfirmedLaunchBundle = async (params: {
     const proofStatus = contentAnchorPda
       ? CampaignProofStatus.ANCHORED
       : CampaignProofStatus.FUNDED;
+    const contentPublishedVerifiedAt =
+      latestIntent.manifest.publications[0]?.verifiedAt ?? null;
 
     await tx.proposal.upsert({
       where: {
@@ -359,6 +375,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
         onChainTxSignature: params.chainTxSignature,
+        nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
         status: ProposalStatus.FUNDED,
         track1BaseUsdc: latestIntent.track1BaseUsdc,
@@ -370,6 +387,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3UsdcDeposited: latestIntent.track3UsdcDeposited,
         track3DelayDays: latestIntent.track3DelayDays,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        contentPublishedVerifiedAt,
         proofStatus,
         fundingTxSignature: params.chainTxSignature,
       },
@@ -383,6 +401,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         intentId: latestIntent.id,
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
+        nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
         status: ProposalStatus.FUNDED,
         track1BaseUsdc: latestIntent.track1BaseUsdc,
@@ -395,6 +414,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3DelayDays: latestIntent.track3DelayDays,
         onChainTxSignature: params.chainTxSignature,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        contentPublishedVerifiedAt,
         proofStatus,
         fundingTxSignature: params.chainTxSignature,
       },

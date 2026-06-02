@@ -201,6 +201,15 @@ pub struct Track1Settled {
 }
 
 #[event]
+pub struct EndorsementCreated {
+    pub proposal: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub total_staked: u64,
+    pub endorser_count: u32,
+}
+
+#[event]
 pub struct EndorsementSettled {
     pub proposal: Pubkey,
     pub user: Pubkey,

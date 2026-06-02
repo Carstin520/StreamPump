@@ -128,6 +128,7 @@ export const syncProposalProjectionFromChain = async (params: {
     track3DelayDays: onChain.track3DelayDays,
     track3SettledAt,
     onChainTxSignature: params.signature,
+    nonce: onChain.nonce,
     oracleSyncStatus: shouldMarkOracleSynced(params.instructionName)
       ? OracleSyncStatus.SYNCED
       : existing?.oracleSyncStatus ?? OracleSyncStatus.PENDING,
@@ -139,7 +140,11 @@ export const syncProposalProjectionFromChain = async (params: {
       normalizedStatus === ProposalStatus.FUNDED
         ? params.signature
         : existing?.fundingTxSignature ?? null,
-    latestSettlementTxSignature: isSettlingOrSettled ? params.signature : null,
+    latestSettlementTxSignature: isSettlingOrSettled
+      ? params.signature
+      : existing?.latestSettlementTxSignature ?? null,
+    endorserCount: onChain.track2EndorserCount,
+    totalSpumpStaked: onChain.totalSpumpStaked,
   };
 
   return prisma.proposal.upsert({

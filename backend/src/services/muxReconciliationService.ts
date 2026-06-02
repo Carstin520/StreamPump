@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 
 import { config } from "../../config/default";
+import { syncManifestPublicationEligibility } from "./contentPublicationEligibility";
 import { muxService, NormalizedMuxAssetStatus } from "./MuxService";
 import { prisma } from "./prisma";
 import { r2Service } from "./R2Service";
@@ -205,6 +206,8 @@ export const reconcileMuxAssetById = async (assetId: string): Promise<ReconcileM
   });
 
   if (updated.processingStatus === AssetProcessingStatus.READY) {
+    await syncManifestPublicationEligibility(updated.manifestId);
+
     return {
       status: "READY",
       muxAssetId: updated.muxAssetId as string,

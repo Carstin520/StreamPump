@@ -137,6 +137,10 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
         StreamPumpError::InsufficientCreatorLevel
     );
     require!(
+        ctx.accounts.creator_profile.status != CreatorStatus::Suspended,
+        StreamPumpError::CreatorSuspended
+    );
+    require!(
         ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,
         StreamPumpError::InvalidCreatorStatus
     );

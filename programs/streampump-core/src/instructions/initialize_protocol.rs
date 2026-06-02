@@ -14,9 +14,10 @@ use anchor_spl::token_2022::{
 use crate::{
     errors::StreamPumpError,
     state::{
-        ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_SPUMP, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
-        DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
-        DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS, DEFAULT_S1_RATING_BPS,
+        ProtocolConfig, DEFAULT_MAX_ENDORSEMENT_HARD_CEILING, DEFAULT_MAX_S1_DAILY_BUY_SPUMP,
+        DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS, DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD,
+        DEFAULT_S1_GRADUATION_TARGET_SUPPLY, DEFAULT_S1_MIN_USER_XP,
+        DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS, DEFAULT_S1_RATING_BPS,
         DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS, MAX_S1_RATING_BPS,
         MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
     },
@@ -120,8 +121,7 @@ pub(crate) fn handler(
         StreamPumpError::InvalidS1GuardConfig
     );
     require!(
-        args.max_endorsement_per_user_bps > 0
-            && args.max_endorsement_per_user_bps <= 10_000,
+        args.max_endorsement_per_user_bps > 0 && args.max_endorsement_per_user_bps <= 10_000,
         StreamPumpError::InvalidEmissionConfig
     );
 
@@ -178,6 +178,7 @@ pub(crate) fn handler(
     config.s1_rage_quit_window_seconds = args.s1_rage_quit_window_seconds;
     config.s2_min_followers = args.s2_min_followers;
     config.s2_min_valid_views = args.s2_min_valid_views;
+    config.max_endorsement_hard_ceiling = DEFAULT_MAX_ENDORSEMENT_HARD_CEILING;
     config.max_endorsement_per_user_bps = args.max_endorsement_per_user_bps;
     config.bump = ctx.bumps.protocol_config;
 

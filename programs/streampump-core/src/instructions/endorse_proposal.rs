@@ -23,6 +23,7 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::EndorsementCreated,
     state::{EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig},
     utils::{amount_from_bps, checked_add},
 };
@@ -157,6 +158,15 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
                     StreamPumpError::EndorsementPerUserCapExceeded
                 );
             }
+        } else if ctx.accounts.protocol_config.max_endorsement_hard_ceiling > 0 {
+            require!(
+                proposal
+                    .total_spump_staked
+                    .checked_add(args.amount)
+                    .ok_or(StreamPumpError::MathOverflow)?
+                    <= ctx.accounts.protocol_config.max_endorsement_hard_ceiling,
+                StreamPumpError::EndorsementCapExceeded
+            );
         }
     }
 
@@ -183,6 +193,14 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
             .ok_or(StreamPumpError::MathOverflow)?;
     }
     proposal.total_spump_staked = checked_add(proposal.total_spump_staked, args.amount)?;
+
+    emit!(EndorsementCreated {
+        proposal: proposal_key,
+        user: ctx.accounts.user.key(),
+        amount: args.amount,
+        total_staked: proposal.total_spump_staked,
+        endorser_count: proposal.track2_endorser_count,
+    });
 
     Ok(())
 }
