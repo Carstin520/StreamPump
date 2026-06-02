@@ -580,7 +580,7 @@ describe("streampump-core S1 guards", function () {
     expect(ctx.enumKey(memberMembershipAfter.role)).to.equal("finance");
   });
 
-  it("applies new-account emission discount on daily SPUMP claims", async () => {
+  it("applies new-account emission discount and streak bonus on daily SPUMP claims", async () => {
     const freshFan = Keypair.generate();
     await fundSigner(ctx, freshFan);
     const userProfile = deriveUserProfile(ctx, freshFan.publicKey);
@@ -625,7 +625,7 @@ describe("streampump-core S1 guards", function () {
       undefined,
       TOKEN_2022_PROGRAM_ID
     );
-    expect(tokenAccount.amount.toString()).to.equal("1250000");
+    expect(tokenAccount.amount.toString()).to.equal("1275000");
   });
 
   it("schedules oracle rating updates and rate-limits repeat reports", async () => {

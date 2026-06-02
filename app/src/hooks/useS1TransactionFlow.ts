@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 import {
+  executeManagedWalletAction,
   S1BuildTransactionResponse,
   S1ProjectionSyncResponse,
   S1SubmitTransactionResponse,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/api/s1";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import { signVersionedTransactionBase64 } from "@/lib/solana/signVersionedTransaction";
+import { useManagedWallet } from "./useManagedWallet";
 
 export type S1TransactionFlowStatus =
   | "idle"
@@ -38,12 +40,16 @@ const errorMessage = (error: unknown) =>
 
 export const useS1TransactionFlow = () => {
   const wallet = useWallet();
+  const managedWallet = useManagedWallet();
   const [state, setState] = useState<S1TransactionFlowState>(initialState);
 
   const reset = useCallback(() => setState(initialState), []);
 
   const execute = useCallback(
-    async (build: (token: string) => Promise<S1BuildTransactionResponse>): Promise<S1SubmitTransactionResponse | null> => {
+    async (
+      build: (token: string) => Promise<S1BuildTransactionResponse>,
+      managedAction?: { action: string; params?: Record<string, unknown> },
+    ): Promise<S1SubmitTransactionResponse | null> => {
       const session = getStoredAuthSession();
       if (!session?.accessToken) {
         setState({
@@ -53,6 +59,48 @@ export const useS1TransactionFlow = () => {
           error: "Sign in before sending an S1 transaction.",
         });
         return null;
+      }
+
+      if (managedWallet.isManagedWallet) {
+        if (!managedAction) {
+          setState({
+            status: "failed",
+            signature: null,
+            projectionSync: null,
+            error: "Managed wallet execution is not available for this action.",
+          });
+          return null;
+        }
+
+        try {
+          setState({ status: "building", signature: null, projectionSync: null, error: null });
+          const submitted = await executeManagedWalletAction(session.accessToken, managedAction);
+          setState({
+            status: "syncing_projection",
+            signature: submitted.signature,
+            projectionSync: submitted.projectionSync,
+            error: null,
+          });
+          setState({
+            status: "success",
+            signature: submitted.signature,
+            projectionSync: submitted.projectionSync,
+            error: submitted.projectionSync.status === "FAILED" ? submitted.projectionSync.error ?? null : null,
+          });
+
+          return {
+            signature: submitted.signature,
+            projectionSync: submitted.projectionSync,
+          };
+        } catch (error) {
+          setState({
+            status: "failed",
+            signature: null,
+            projectionSync: null,
+            error: errorMessage(error),
+          });
+          return null;
+        }
       }
 
       if (!wallet.publicKey || !wallet.connected) {
@@ -114,7 +162,7 @@ export const useS1TransactionFlow = () => {
         return null;
       }
     },
-    [wallet],
+    [managedWallet.isManagedWallet, wallet],
   );
 
   return {

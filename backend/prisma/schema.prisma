@@ -699,16 +699,18 @@ enum WalletType {
 /// CN: 账户多钱包关联表，支持托管钱包和外部钱包绑定。
 /// EN: Multi-wallet join table for accounts, supporting both managed and external wallet bindings.
 model AccountWallet {
-  id               String         @id @default(cuid())
-  accountProfileId String
-  accountProfile   AccountProfile @relation(fields: [accountProfileId], references: [id], onDelete: Cascade)
-  walletAddress    String         @unique
-  walletType       WalletType     @default(MANAGED)
-  isPrimary        Boolean        @default(false)
-  label            String?
-  boundAt          DateTime       @default(now())
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id                 String         @id @default(cuid())
+  accountProfileId   String
+  accountProfile     AccountProfile @relation(fields: [accountProfileId], references: [id], onDelete: Cascade)
+  walletAddress      String         @unique
+  walletType         WalletType     @default(MANAGED)
+  isPrimary          Boolean        @default(false)
+  label              String?
+  /// Encrypted secret key bytes (only for MANAGED wallets; null for EXTERNAL)
+  encryptedSecretKey Bytes?
+  boundAt            DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([accountProfileId])
 }

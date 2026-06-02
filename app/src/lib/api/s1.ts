@@ -35,6 +35,12 @@ export type S1SubmitTransactionResponse = {
   projectionSync: S1ProjectionSyncResponse;
 };
 
+export type S1ManagedExecuteResponse = {
+  signature: string;
+  action: string;
+  projectionSync: S1ProjectionSyncResponse;
+};
+
 export type S1TransactionStatusResponse = {
   signature: string;
   status: string;
@@ -143,6 +149,39 @@ export const buildS1BuyTransaction = (token: string, input: S1BuildWithAmountInp
   apiClient.post<S1BuildTransactionResponse>("/s1/buy/build", {
     token,
     body: amountBody(input),
+  });
+
+export const executeManagedWalletAction = (
+  token: string,
+  input: { action: string; params?: Record<string, unknown> },
+) =>
+  apiClient.post<S1ManagedExecuteResponse>("/s1/managed/execute", {
+    token,
+    body: input,
+    timeoutMs: 30000,
+  });
+
+export const buildClaimDailySpumpTransaction = (token: string) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/claim-daily-spump/build", {
+    token,
+    body: {},
+  });
+
+export const buildClaimEngagementRewardTransaction = (
+  token: string,
+  input: {
+    missionType: string;
+    rewardAmount: number | string;
+    xpGain: number | string;
+    newLevel?: number | string | null;
+    reportIdHex: string;
+    reportDigestHex: string;
+    observedAtUnix: number | string;
+  },
+) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/engagement-reward/build", {
+    token,
+    body: input,
   });
 
 export const buildS1SellTransaction = (token: string, input: S1BuildWithAmountInput) =>

@@ -1,4 +1,10 @@
-import { AccountProfile, AccountRole, AuthIdentity, Prisma } from "@prisma/client";
+import {
+  AccountProfile,
+  AccountRole,
+  AuthIdentity,
+  Prisma,
+  WalletType,
+} from "@prisma/client";
 
 import { prisma } from "./prisma";
 
@@ -36,6 +42,12 @@ const defaultDisplayName = (wallet: string, identity: AuthIdentity | null) =>
   identity?.email?.split("@")[0]?.trim() ||
   `Wallet ${shortenWallet(wallet)}`;
 
+const walletTypeForSessionWallet = (
+  wallet: string,
+  identity: AuthIdentity | null
+): WalletType =>
+  identity?.managedWalletAddress === wallet ? WalletType.MANAGED : WalletType.EXTERNAL;
+
 export const serializeAccountIdentity = (
   identity: AuthIdentity | null
 ): SerializedAccountIdentity | null =>
@@ -67,24 +79,64 @@ export const isAccountProfileStorageError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   (error.code === "P2021" || error.code === "P2022");
 
+export const resolveAccountProfileByWallet = async (
+  wallet: string
+): Promise<AccountProfile | null> => {
+  const boundWallet = await prisma.accountWallet.findUnique({
+    where: { walletAddress: wallet },
+    include: { accountProfile: true },
+  });
+
+  if (boundWallet) {
+    return boundWallet.accountProfile;
+  }
+
+  return prisma.accountProfile.findUnique({
+    where: { wallet },
+  });
+};
+
+const ensurePrimaryWalletBinding = async (
+  profile: AccountProfile,
+  walletType: WalletType
+) => {
+  await prisma.accountWallet.upsert({
+    where: { walletAddress: profile.wallet },
+    update: {
+      accountProfileId: profile.id,
+      walletType,
+      isPrimary: true,
+    },
+    create: {
+      accountProfileId: profile.id,
+      walletAddress: profile.wallet,
+      walletType,
+      isPrimary: true,
+    },
+  });
+};
+
 export const getOrCreateAccountProfile = async (
   wallet: string,
   identity: AuthIdentity | null
 ) => {
-  const existing = await prisma.accountProfile.findUnique({
-    where: { wallet },
-  });
+  const existing = await resolveAccountProfileByWallet(wallet);
 
   if (existing) {
+    await ensurePrimaryWalletBinding(existing, walletTypeForSessionWallet(existing.wallet, identity));
     return existing;
   }
 
-  return prisma.accountProfile.create({
+  const profile = await prisma.accountProfile.create({
     data: {
       wallet,
       displayName: defaultDisplayName(wallet, identity),
     },
   });
+
+  await ensurePrimaryWalletBinding(profile, walletTypeForSessionWallet(wallet, identity));
+
+  return profile;
 };
 
 export const updateAccountProfile = async (
@@ -93,8 +145,28 @@ export const updateAccountProfile = async (
   input: AccountProfileInput
 ) => {
   const onboardingCompletedAt = input.completeOnboarding ? new Date() : undefined;
+  const existing = await resolveAccountProfileByWallet(wallet);
 
-  return prisma.accountProfile.upsert({
+  if (existing) {
+    const updated = await prisma.accountProfile.update({
+      where: { id: existing.id },
+      data: {
+        role: input.role,
+        displayName: input.displayName ?? defaultDisplayName(existing.wallet, identity),
+        handle: input.handle,
+        ...(onboardingCompletedAt ? { onboardingCompletedAt } : {}),
+      },
+    });
+
+    await ensurePrimaryWalletBinding(
+      updated,
+      walletTypeForSessionWallet(updated.wallet, identity)
+    );
+
+    return updated;
+  }
+
+  const profile = await prisma.accountProfile.upsert({
     where: { wallet },
     create: {
       wallet,
@@ -110,4 +182,8 @@ export const updateAccountProfile = async (
       ...(onboardingCompletedAt ? { onboardingCompletedAt } : {}),
     },
   });
+
+  await ensurePrimaryWalletBinding(profile, walletTypeForSessionWallet(wallet, identity));
+
+  return profile;
 };

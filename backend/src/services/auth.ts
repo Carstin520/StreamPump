@@ -5,13 +5,15 @@
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { ed25519 } from "@noble/curves/ed25519";
-import { AccountRole, IdentityProvider } from "@prisma/client";
+import { AccountRole, IdentityProvider, WalletType } from "@prisma/client";
 import bs58 from "bs58";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 import { config } from "../../config/default";
 import { HttpError } from "../controllers/http";
+import { resolveAccountProfileByWallet } from "./accountProfile";
 import { prisma } from "./prisma";
+import { encryptSecretKey } from "./walletEncryption";
 
 const CHALLENGE_TTL_MS = config.auth.challengeTtlSeconds * 1000;
 const SESSION_TTL_MS = config.auth.sessionTtlSeconds * 1000;
@@ -155,14 +157,72 @@ const parseSessionToken = (
   }
 };
 
-const createPlatformManagedWalletAddress = (): string =>
-  Keypair.generate().publicKey.toBase58();
+const createPlatformManagedWallet = (): {
+  address: string;
+  encryptedSecretKey: Uint8Array<ArrayBuffer>;
+} => {
+  const keypair = Keypair.generate();
+
+  return {
+    address: keypair.publicKey.toBase58(),
+    encryptedSecretKey: encryptSecretKey(keypair.secretKey),
+  };
+};
+
+const requestManagedWalletDevnetAirdrop = async (walletAddress: string): Promise<void> => {
+  if (!config.solana.isDevnet) {
+    return;
+  }
+
+  try {
+    const connection = new Connection(config.solana.rpcEndpoint);
+    const signature = await connection.requestAirdrop(
+      new PublicKey(walletAddress),
+      Math.floor(0.01 * LAMPORTS_PER_SOL)
+    );
+    await connection.confirmTransaction(signature, "confirmed");
+  } catch (error) {
+    console.warn(
+      "Managed wallet devnet airdrop failed (non-fatal):",
+      error instanceof Error ? error.message : error
+    );
+  }
+};
 
 const ensureFanAccountProfile = async (
   wallet: string,
-  displayName?: string | null
-) =>
-  prisma.accountProfile.upsert({
+  displayName?: string | null,
+  walletType: WalletType = WalletType.EXTERNAL,
+  encryptedSecretKey?: Uint8Array<ArrayBuffer>
+) => {
+  const boundWallet = await prisma.accountWallet.findUnique({
+    where: { walletAddress: wallet },
+    include: { accountProfile: true },
+  });
+
+  if (boundWallet) {
+    if (displayName) {
+      await prisma.accountProfile.update({
+        where: { id: boundWallet.accountProfileId },
+        data: { displayName },
+      });
+    }
+
+    if (walletType === WalletType.MANAGED && encryptedSecretKey) {
+      await prisma.accountWallet.update({
+        where: { walletAddress: wallet },
+        data: { encryptedSecretKey },
+      });
+    }
+
+    return boundWallet.accountProfile;
+  }
+
+  if (walletType === WalletType.MANAGED && !encryptedSecretKey) {
+    throw new Error("encrypted managed wallet secret is required");
+  }
+
+  const profile = await prisma.accountProfile.upsert({
     where: { wallet },
     update: {
       displayName: displayName ?? undefined,
@@ -173,6 +233,28 @@ const ensureFanAccountProfile = async (
       displayName: displayName ?? undefined,
     },
   });
+
+  await prisma.accountWallet.upsert({
+    where: { walletAddress: wallet },
+    update: {
+      accountProfileId: profile.id,
+      walletType,
+      isPrimary: true,
+      encryptedSecretKey:
+        walletType === WalletType.MANAGED ? encryptedSecretKey : null,
+    },
+    create: {
+      accountProfileId: profile.id,
+      walletAddress: wallet,
+      walletType,
+      isPrimary: true,
+      encryptedSecretKey:
+        walletType === WalletType.MANAGED ? encryptedSecretKey : null,
+    },
+  });
+
+  return profile;
+};
 
 const normalizeEmail = (email: string): string => {
   const normalized = email.trim().toLowerCase();
@@ -357,7 +439,7 @@ export const verifyWalletAuthChallenge = async (params: {
     }),
   ]);
 
-  await ensureFanAccountProfile(normalizedWallet);
+  await ensureFanAccountProfile(normalizedWallet, null, WalletType.EXTERNAL);
 
   return {
     wallet: normalizedWallet,
@@ -471,8 +553,12 @@ export const exchangeProviderIdentitySession = async (params: {
   // wallet addresses are ignored here so users cannot bind arbitrary wallets during
   // preview/social registration. External user-owned wallets need a separate
   // challenge/signature link flow.
+  const newManagedWallet = existingIdentity ? null : createPlatformManagedWallet();
   const managedWalletAddress =
-    existingIdentity?.managedWalletAddress ?? createPlatformManagedWalletAddress();
+    existingIdentity?.managedWalletAddress ?? newManagedWallet?.address;
+  if (!managedWalletAddress) {
+    throw new Error("failed to allocate managed wallet");
+  }
 
   const identity = existingIdentity
     ? await prisma.authIdentity.update({
@@ -494,7 +580,15 @@ export const exchangeProviderIdentitySession = async (params: {
       });
 
   const session = await createWalletSession(identity.managedWalletAddress);
-  await ensureFanAccountProfile(identity.managedWalletAddress, identity.displayName);
+  await ensureFanAccountProfile(
+    identity.managedWalletAddress,
+    identity.displayName,
+    WalletType.MANAGED,
+    newManagedWallet?.encryptedSecretKey
+  );
+  if (newManagedWallet) {
+    void requestManagedWalletDevnetAirdrop(newManagedWallet.address);
+  }
 
   return {
     ...session,
@@ -525,30 +619,27 @@ export const bindExternalWalletToIdentitySession = async (params: {
     throw new Error("current session is not linked to a provider identity");
   }
 
-  const currentAccountProfile = await prisma.accountProfile.findUnique({
-    where: {
-      wallet: currentSession.wallet,
-    },
-  });
-  if (currentAccountProfile?.onboardingCompletedAt) {
-    throw new HttpError(
-      400,
-      "CANNOT_BIND_ONBOARDED",
-      "Cannot bind external wallet: onboarding has already been completed with the managed account."
-    );
-  }
+  const currentAccountProfile =
+    (await resolveAccountProfileByWallet(currentSession.wallet)) ??
+    (await ensureFanAccountProfile(
+      identity.managedWalletAddress,
+      identity.displayName,
+      WalletType.MANAGED
+    ));
 
   const normalizedWallet = new PublicKey(params.wallet).toBase58();
-  const existingWalletIdentity = await prisma.authIdentity.findUnique({
-    where: {
-      managedWalletAddress: normalizedWallet,
-    },
+  const existingWalletBinding = await prisma.accountWallet.findUnique({
+    where: { walletAddress: normalizedWallet },
+    include: { accountProfile: true },
   });
-  if (existingWalletIdentity && existingWalletIdentity.id !== identity.id) {
+  const existingManagedIdentity = await prisma.authIdentity.findUnique({
+    where: { managedWalletAddress: normalizedWallet },
+  });
+  if (existingWalletBinding || existingManagedIdentity) {
     throw new HttpError(
       409,
       "WALLET_ALREADY_BOUND",
-      "This external wallet is already bound to another social account."
+      "This external wallet is already bound to an account profile."
     );
   }
 
@@ -572,10 +663,12 @@ export const bindExternalWalletToIdentitySession = async (params: {
         consumedAt: new Date(),
       },
     }),
-    prisma.authIdentity.update({
-      where: { id: identity.id },
+    prisma.accountWallet.create({
       data: {
-        managedWalletAddress: normalizedWallet,
+        accountProfileId: currentAccountProfile.id,
+        walletAddress: normalizedWallet,
+        walletType: WalletType.EXTERNAL,
+        isPrimary: false,
       },
     }),
     prisma.walletSession.create({
@@ -588,8 +681,6 @@ export const bindExternalWalletToIdentitySession = async (params: {
     }),
   ]);
 
-  await ensureFanAccountProfile(normalizedWallet, identity.displayName);
-
   return {
     wallet: normalizedWallet,
     accessToken,
@@ -600,17 +691,33 @@ export const bindExternalWalletToIdentitySession = async (params: {
       providerSubject: identity.providerSubject,
       email: identity.email,
       displayName: identity.displayName,
-      managedWalletAddress: normalizedWallet,
+      managedWalletAddress: identity.managedWalletAddress,
     },
   };
 };
 
-export const findAuthIdentityByWallet = async (wallet: string) =>
-  prisma.authIdentity.findFirst({
+export const findAuthIdentityByWallet = async (wallet: string) => {
+  const directIdentity = await prisma.authIdentity.findFirst({
     where: {
       managedWalletAddress: wallet,
     },
   });
+
+  if (directIdentity) {
+    return directIdentity;
+  }
+
+  const profile = await resolveAccountProfileByWallet(wallet);
+  if (!profile || profile.wallet === wallet) {
+    return null;
+  }
+
+  return prisma.authIdentity.findFirst({
+    where: {
+      managedWalletAddress: profile.wallet,
+    },
+  });
+};
 
 export const verifyWalletSessionToken = async (token: string) => {
   const parsed = parseSessionToken(token);

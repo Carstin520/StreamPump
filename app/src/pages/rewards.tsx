@@ -1,8 +1,11 @@
 import Head from "next/head";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import { useManagedWallet } from "@/hooks/useManagedWallet";
+import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
+import { buildClaimDailySpumpTransaction } from "@/lib/api/s1";
 import { useI18n } from "@/lib/i18n";
 
 const MISSIONS = [
@@ -34,10 +37,34 @@ function fmt(n: number) {
 export default function RewardsPage() {
   const { t } = useI18n();
   const [claimed, setClaimed] = useState(false);
+  const flow = useS1TransactionFlow();
+  const managedWallet = useManagedWallet();
 
   const completedXP = MISSIONS.filter((m) => m.done).reduce((a, m) => a + m.xp, 0);
   const totalXP = CURRENT_XP + completedXP;
   const xpPct = Math.min((totalXP / LEVEL_XP) * 100, 100);
+  const busy =
+    flow.state.status === "building" ||
+    flow.state.status === "waiting_signature" ||
+    flow.state.status === "submitting" ||
+    flow.state.status === "syncing_projection";
+  const claimLabel = managedWallet.isManagedWallet ? "Claim" : "Preview Claim";
+  const claimedLabel = managedWallet.isManagedWallet ? "Claimed" : "Previewed";
+
+  const handleDailyClaim = useCallback(async () => {
+    if (managedWallet.isManagedWallet) {
+      const submitted = await flow.execute(
+        (token) => buildClaimDailySpumpTransaction(token),
+        { action: "claim-daily-spump" }
+      );
+      if (submitted) {
+        setClaimed(true);
+      }
+      return;
+    }
+
+    setClaimed(true);
+  }, [flow, managedWallet.isManagedWallet]);
 
   return (
     <>
@@ -144,27 +171,39 @@ export default function RewardsPage() {
                     ? "border-[#65ecaf]/40 bg-[#65ecaf]/10 shadow-[0_0_50px_rgba(101,236,175,0.18)]"
                     : "border-[#de402a]/45 bg-[#de402a]/10 shadow-[0_0_70px_rgba(222,64,42,0.22)] hover:scale-[1.04] hover:shadow-[0_0_90px_rgba(222,64,42,0.3)]"
                 }`}
-                disabled={claimed}
-                onClick={() => setClaimed(true)}
+                disabled={claimed || busy}
+                onClick={() => void handleDailyClaim()}
                 type="button"
               >
                 {claimed ? (
                   <>
                     <span className="text-2xl">✓</span>
-                    <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">Previewed</span>
+                    <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">{claimedLabel}</span>
                     <span className="text-xs font-medium text-[#65ecaf]/70">{fmt(DAILY_AMOUNT)}</span>
-                    <span className="text-center text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">local state</span>
+                    <span className="text-center text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">
+                      {managedWallet.isManagedWallet ? "managed tx" : "local state"}
+                    </span>
+                  </>
+                ) : busy ? (
+                  <>
+                    <span className="text-2xl">...</span>
+                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Claiming</span>
+                    <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
+                    <span className="text-[8px] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
                 ) : (
                   <>
                     <span className="text-3xl">🪙</span>
-                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Preview Claim</span>
+                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">{claimLabel}</span>
                     <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
                     <span className="text-[8px] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
                 )}
               </button>
             </div>
+            {flow.state.error && managedWallet.isManagedWallet ? (
+              <p className="mt-3 max-w-sm text-center text-xs text-[#ff8a75]">{flow.state.error}</p>
+            ) : null}
           </section>
 
           {/* Row 3: Login Streak — below the claim button */}

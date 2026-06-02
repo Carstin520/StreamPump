@@ -29,6 +29,7 @@ pub struct ClaimEngagementReward<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    #[account(mut)]
     pub oracle: Signer<'info>,
 
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
@@ -44,7 +45,7 @@ pub struct ClaimEngagementReward<'info> {
 
     #[account(
         init,
-        payer = user,
+        payer = oracle,
         seeds = [
             b"user_reward_receipt",
             user_profile.key().as_ref(),
