@@ -71,7 +71,8 @@ const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
 };
 
 const previewSocialAuthEnabled =
-  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH !== "false";
+  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH === "true" ||
+  process.env.NODE_ENV === "development";
 
 const PREVIEW_MANAGED_WALLET = "C8tzqwn5ghvKEgkcwf822vxQA5fgt7cmr49mqCtyK8fX";
 
@@ -199,6 +200,10 @@ export const AuthOptionsPanel = ({
       const session = await exchangeProviderSession(identity);
       beginWalletChoice(session, successLabel);
     } catch (error) {
+      if (!previewSocialAuthEnabled) {
+        setLastAction(error instanceof Error ? error.message : t("auth.socialDisabled"));
+        return;
+      }
       const session = createLocalProviderSession(identity);
       beginWalletChoice(session, `${successLabel} 本地预览`);
     } finally {
@@ -218,6 +223,10 @@ export const AuthOptionsPanel = ({
 
     try {
       if (!signMessage) {
+        if (!previewSocialAuthEnabled) {
+          setLastAction("Wallet message signing is unavailable, and local preview sessions are disabled.");
+          return;
+        }
         const session = createLocalWalletSession(walletAddress);
         storeAuthSession(session);
         setLastAction(t("auth.walletConnectedLocal"));
@@ -239,6 +248,11 @@ export const AuthOptionsPanel = ({
     } catch (error) {
       if (isUserRejectedWalletRequest(error)) {
         setLastAction(t("auth.walletRejected"));
+        return;
+      }
+
+      if (!previewSocialAuthEnabled) {
+        setLastAction(error instanceof Error ? error.message : "Wallet session creation failed.");
         return;
       }
 
@@ -270,6 +284,10 @@ export const AuthOptionsPanel = ({
 
     try {
       if (!signMessage || pendingIdentitySession.accessToken.startsWith("preview-local.")) {
+        if (!previewSocialAuthEnabled) {
+          setLastAction("External wallet binding preview is disabled by environment variables.");
+          return;
+        }
         const localWalletSession: AuthSessionRecord = {
           ...createLocalWalletSession(walletAddress),
           identity: pendingIdentitySession.identity
@@ -427,6 +445,12 @@ export const AuthOptionsPanel = ({
             </button>
           ))}
         </div>
+
+        {previewSocialAuthEnabled ? (
+          <div className="mb-5 rounded-full border border-[#f3b33e]/25 bg-[#2a1f0b]/80 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f8d48a]">
+            Preview Session Enabled
+          </div>
+        ) : null}
 
         {pendingIdentitySession ? (
           <div className="space-y-5">

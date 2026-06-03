@@ -24,10 +24,10 @@ const CURRENT_LEVEL = 3;
 const STREAK = 3;
 const BOOST_DAYS_LEFT = 5;
 const REWARD_BOUNDARIES = [
-  { label: "Daily claim", value: "local UI state only" },
-  { label: "SPUMP balance", value: "no mint or ledger write" },
+  { label: "Daily claim", value: "wallet or managed transaction" },
+  { label: "SPUMP balance", value: "on-chain mint path" },
   { label: "Missions", value: "fixture progress" },
-  { label: "Production gate", value: "auth + anti-abuse + claim API" },
+  { label: "Production gate", value: "anti-abuse + live reward ledger" },
 ] as const;
 
 function fmt(n: number) {
@@ -48,22 +48,17 @@ export default function RewardsPage() {
     flow.state.status === "waiting_signature" ||
     flow.state.status === "submitting" ||
     flow.state.status === "syncing_projection";
-  const claimLabel = managedWallet.isManagedWallet ? "Claim" : "Preview Claim";
-  const claimedLabel = managedWallet.isManagedWallet ? "Claimed" : "Previewed";
+  const claimLabel = managedWallet.isManagedWallet ? "Claim" : "Claim with Wallet";
+  const claimedLabel = "Claimed";
 
   const handleDailyClaim = useCallback(async () => {
-    if (managedWallet.isManagedWallet) {
-      const submitted = await flow.execute(
-        (token) => buildClaimDailySpumpTransaction(token),
-        { action: "claim-daily-spump" }
-      );
-      if (submitted) {
-        setClaimed(true);
-      }
-      return;
+    const submitted = await flow.execute(
+      (token) => buildClaimDailySpumpTransaction(token),
+      managedWallet.isManagedWallet ? { action: "claim-daily-spump" } : undefined,
+    );
+    if (submitted) {
+      setClaimed(true);
     }
-
-    setClaimed(true);
   }, [flow, managedWallet.isManagedWallet]);
 
   return (
@@ -75,23 +70,23 @@ export default function RewardsPage() {
       <PageShell>
         <div className="mx-auto max-w-3xl space-y-5">
           <ProductReadinessBanner
-            description="Missions, streaks, and daily claim are local preview data. The button only changes browser UI state; no SPUMP mint, account balance, reward ledger, or backend claim API is touched."
-            status="MOCK_PREVIEW"
-            title="Rewards are a mock engagement surface"
+            description="Daily SPUMP claim now uses the live S1 transaction builder: managed wallets submit through backend signing, and external wallets sign through the wallet adapter. Mission cards and streak progress remain fixture preview data."
+            status="SEEDED_DEMO"
+            title="Daily reward claim is transaction-wired; missions remain preview"
           />
 
           <section className="glass-card section-enter border-[#f3b33e]/20 px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Preview rewards ledger</p>
-                <p className="mt-1 text-sm font-semibold text-white">This page does not claim real daily SPUMP yet.</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Mixed rewards ledger</p>
+                <p className="mt-1 text-sm font-semibold text-white">Daily claim is live-wired; mission progress is still preview.</p>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-[#95a6bf]">
-                  Rewards are still a product preview. Production promotion requires a signed-in account, abuse controls, a backend claim record,
-                  and a verifiable balance/projection path before missions can affect user holdings.
+                  Use a signed-in managed wallet for one-click backend signing, or an external wallet for the normal wallet-sign flow.
+                  Mission rewards still need live claim records and abuse controls before they affect holdings.
                 </p>
               </div>
               <span className="w-fit rounded-full border border-[#f3b33e]/30 bg-[#f3b33e]/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
-                MOCK_PREVIEW
+                SEEDED_DEMO
               </span>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -165,7 +160,7 @@ export default function RewardsPage() {
                 <span className="absolute inset-0 -m-3 rounded-full bg-[#65ecaf]/8" />
               )}
               <button
-                aria-label="Preview daily SPUMP claim"
+                aria-label="Claim daily SPUMP"
                 className={`relative z-10 flex h-32 w-32 flex-col items-center justify-center rounded-full border-2 transition-all duration-500 md:h-36 md:w-36 ${
                   claimed
                     ? "border-[#65ecaf]/40 bg-[#65ecaf]/10 shadow-[0_0_50px_rgba(101,236,175,0.18)]"
@@ -181,7 +176,7 @@ export default function RewardsPage() {
                     <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">{claimedLabel}</span>
                     <span className="text-xs font-medium text-[#65ecaf]/70">{fmt(DAILY_AMOUNT)}</span>
                     <span className="text-center text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">
-                      {managedWallet.isManagedWallet ? "managed tx" : "local state"}
+                      {managedWallet.isManagedWallet ? "managed tx" : "wallet tx"}
                     </span>
                   </>
                 ) : busy ? (
@@ -201,7 +196,7 @@ export default function RewardsPage() {
                 )}
               </button>
             </div>
-            {flow.state.error && managedWallet.isManagedWallet ? (
+            {flow.state.error ? (
               <p className="mt-3 max-w-sm text-center text-xs text-[#ff8a75]">{flow.state.error}</p>
             ) : null}
           </section>

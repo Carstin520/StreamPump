@@ -26,6 +26,7 @@ import {
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
+  verifyContentPublication,
 } from "@/lib/api/workspace";
 import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
@@ -94,6 +95,13 @@ const isAssetWaiting = (a: ManifestAssetRecord) => {
   const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
     .map((status) => status?.toUpperCase?.() ?? "");
   return statuses.some((status) => ["PENDING", "PROCESSING", "QUEUED", "UPLOADING"].includes(status));
+};
+const isAssetDeliveryReady = (a: ManifestAssetRecord) => {
+  if (hasAssetIssue(a)) return false;
+  if (isVideoAsset(a) && a.preferredPlaybackSource === "MUX") {
+    return isMuxAssetReady(a);
+  }
+  return isRenderableUrl(a.preferredPlaybackUrl) || isRenderableUrl(a.originUrl);
 };
 const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
   if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
@@ -177,6 +185,7 @@ export default function ManifestDetailPage() {
   const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
+  const [verifyingPublicationId, setVerifyingPublicationId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
@@ -309,6 +318,21 @@ export default function ManifestDetailPage() {
     finally { setBusyAction(null); }
   };
 
+  const handleVerifyPublication = async (publicationId: string) => {
+    const token = getAccessToken();
+    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
+    if (!token) { handleAuthFailure(); return; }
+    if (!manifestId) return;
+    setVerifyingPublicationId(publicationId);
+    try {
+      await verifyContentPublication(token, publicationId);
+      const next = await refreshManifest(token, manifestId);
+      const eligible = next.isPublicFeedEligible ? "，已进入 public feed eligibility" : "，等待媒体交付就绪后进入 public feed";
+      setActionMessage(`发布验证已完成${eligible}`);
+    } catch (error) { handleApiError(error, "验证发布失败"); }
+    finally { setVerifyingPublicationId(null); }
+  };
+
   const handleCreateProposalIntent = async () => {
     const token = getAccessToken();
     const manifest = state.kind === "ready" ? state.data : null;
@@ -377,6 +401,14 @@ export default function ManifestDetailPage() {
   const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0, t);
   const assetsWithIssues = d.assets.filter(hasAssetIssue);
   const assetsWaiting = d.assets.filter(isAssetWaiting);
+  const assetsDeliveryReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
+  const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
+  const isPublicFeedEligible = Boolean(d.isPublicFeedEligible) || (assetsDeliveryReady && hasVerifiedPublication);
+  const publicFeedBlockedReason = !hasVerifiedPublication
+    ? "Awaiting verified publication"
+    : !assetsDeliveryReady
+      ? "Assets still processing"
+      : "Backend eligibility flag pending";
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -404,11 +436,44 @@ export default function ManifestDetailPage() {
 
       {d.publications.length > 0 && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
+              <p className={`mt-1 text-[10px] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
+                {isPublicFeedEligible ? "Public Feed Eligible" : publicFeedBlockedReason}
+              </p>
+            </div>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+              isPublicFeedEligible
+                ? "border-[#65ecaf]/30 bg-[#65ecaf]/10 text-[#8df0c4]"
+                : "border-white/10 bg-white/[0.04] text-[#8ea0ba]"
+            }`}>
+              {isPublicFeedEligible ? "Eligible" : "Pending"}
+            </span>
+          </div>
           {d.publications.map((pub) => (
             <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={pub.publicationId}>
-              <p className="text-xs font-medium text-white">{pub.platform}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-white">{pub.platform}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] ${
+                  pub.verificationStatus === "VERIFIED"
+                    ? "bg-[#65ecaf]/10 text-[#8df0c4]"
+                    : "bg-[#f3b33e]/10 text-[#f3c66e]"
+                }`}>
+                  {pub.verificationStatus}
+                </span>
+              </div>
               <p className="mt-0.5 truncate text-[10px] text-[#5a6b82]">{pub.externalUrl}</p>
+              {pub.verificationStatus === "PENDING" ? (
+                <button
+                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[10px] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
+                  disabled={busyAction !== null || verifyingPublicationId !== null}
+                  onClick={() => void handleVerifyPublication(pub.publicationId)}
+                  type="button"
+                >
+                  {verifyingPublicationId === pub.publicationId ? "Verifying..." : "Verify Publication"}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>

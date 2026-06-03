@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
+import { formatUsdcAtomic } from "@/lib/formatting";
 import { useI18n } from "@/lib/i18n";
 import { findCreator, formatUsd } from "@/lib/public-data";
 
@@ -45,7 +47,7 @@ type Track3 = {
 
 type SettlementData = {
   proposalId: string;
-  status: "RESOLVED_SUCCESS" | "RESOLVED_FAIL" | "VOIDED";
+  status: string;
   track1: Track1;
   track2: Track2;
   track3: Track3;
@@ -87,6 +89,69 @@ const MOCK: SettlementData = {
   },
 };
 
+const usdcAtomicToUsdNumber = (value: string | number | bigint | null | undefined) => {
+  const label = formatUsdcAtomic(value);
+  const parsed = Number(label.replace(/[$,]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseMetricValue = (value: string | null | undefined) => {
+  const parsed = Number(value ?? "0");
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const deriveTrackStatus = (settled: boolean, proofStatus: PublicCampaignProofResponse["proofStatus"]): TrackStatus => {
+  if (proofStatus === "VOIDED" || proofStatus === "CANCELLED") {
+    return "VOIDED";
+  }
+  return settled ? "SETTLED" : "PENDING";
+};
+
+const mapCampaignProofToSettlement = (proof: PublicCampaignProofResponse): SettlementData => {
+  const track2Budget = usdcAtomicToUsdNumber(proof.budgetTracks.track2UsdcDeposited);
+  const track2FanPool = usdcAtomicToUsdNumber(proof.budgetTracks.track2InitialFanPool) || track2Budget * 0.2;
+  const track2Target = parseMetricValue(proof.budgetTracks.track2TargetValue);
+  const track2Actual = parseMetricValue(proof.budgetTracks.track2ActualValue);
+  const achievement = track2Target > 0 ? Math.min(track2Actual / track2Target, 1) : 0;
+  const aboveCliff = achievement >= proof.budgetTracks.track2MinAchievementBps / 10_000;
+  const track2CreatorPayout = aboveCliff ? Math.max(track2Budget - track2FanPool, 0) * achievement : 0;
+  const track2SponsorRefund = Math.max(track2Budget - track2CreatorPayout - (aboveCliff ? track2FanPool : 0), 0);
+  const track3Budget = usdcAtomicToUsdNumber(proof.budgetTracks.track3UsdcDeposited);
+  const track3Payout = usdcAtomicToUsdNumber(proof.budgetTracks.track3CpsPayout);
+
+  return {
+    proposalId: proof.proposalId,
+    status: proof.status,
+    track1: {
+      label: "Fixed Base",
+      budgetUsd: usdcAtomicToUsdNumber(proof.budgetTracks.track1BaseUsdc),
+      status: deriveTrackStatus(proof.budgetTracks.track1Claimed, proof.proofStatus),
+      creatorWallet: `${proof.creatorWallet.slice(0, 4)}...${proof.creatorWallet.slice(-4)}`,
+    },
+    track2: {
+      label: proof.budgetTracks.track2MetricType || "Performance",
+      budgetUsd: track2Budget,
+      target: track2Target,
+      actual: track2Actual,
+      cliffPct: proof.budgetTracks.track2MinAchievementBps / 100,
+      fanPoolPct: track2Budget > 0 ? Math.round((track2FanPool / track2Budget) * 100) : 0,
+      status: deriveTrackStatus(Boolean(proof.budgetTracks.track2SettledAt), proof.proofStatus),
+      creatorPayoutUsd: track2CreatorPayout,
+      fanPoolUsd: aboveCliff ? track2FanPool : 0,
+      sponsorRefundUsd: track2SponsorRefund,
+    },
+    track3: {
+      label: "CPS Commission",
+      budgetUsd: track3Budget,
+      approvedCpsUsd: track3Payout,
+      status: deriveTrackStatus(Boolean(proof.budgetTracks.track3SettledAt), proof.proofStatus),
+      creatorPayoutUsd: track3Payout,
+      sponsorRefundUsd: Math.max(track3Budget - track3Payout, 0),
+      delayed: !proof.budgetTracks.track3SettledAt && proof.budgetTracks.track3DelayDays > 0,
+    },
+  };
+};
+
 /* ------------------------------------------------------------------ */
 /*  Colour helpers                                                     */
 /* ------------------------------------------------------------------ */
@@ -112,7 +177,7 @@ const C = {
 /* ------------------------------------------------------------------ */
 
 function AchievementGauge({ target, actual, cliffPct }: { actual: number; cliffPct: number; target: number }) {
-  const pct = Math.min(actual / target, 1);
+  const pct = target > 0 ? Math.min(actual / target, 1) : 0;
   const aboveCliff = pct >= cliffPct / 100;
 
   const r = 82;
@@ -441,15 +506,30 @@ function VoidOverlay({ total }: { total: number }) {
   );
 }
 
-function SettlementPreviewNotice({ proposalId }: { proposalId: string }) {
+function SettlementPreviewNotice({
+  error,
+  isLive,
+  proposalId,
+}: {
+  error: string | null;
+  isLive: boolean;
+  proposalId: string;
+}) {
   return (
     <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">Operator preview</p>
-          <p className="mt-1 text-sm font-semibold text-white">No live settlement projection is loaded here</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">
+            {isLive ? "Campaign proof projection" : "Operator preview"}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-white">
+            {isLive ? "Live settlement fields loaded from campaign proof" : "No live settlement projection is loaded here"}
+          </p>
           <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
-            The route keeps the proposal id for context, but every track value on this page comes from a local mock. Production promotion needs proposal settlement read models, oracle permission checks, idempotent operator triggers, evidence digests, and Track 3 merchant reconciliation.
+            {isLive
+              ? "Track budgets and settlement markers come from the public campaign proof API. Track 3 remains gated by real merchant reconciliation before production promotion."
+              : "The route keeps the proposal id for context, but every track value on this page comes from a local mock. Production promotion needs proposal settlement read models, oracle permission checks, idempotent operator triggers, evidence digests, and Track 3 merchant reconciliation."}
+            {error ? ` API fallback reason: ${error}` : ""}
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
@@ -467,13 +547,42 @@ function SettlementPreviewNotice({ proposalId }: { proposalId: string }) {
 export default function SettlementPage() {
   const router = useRouter();
   const { locale } = useI18n();
-  const data = MOCK;
+  const [data, setData] = useState<SettlementData>(MOCK);
+  const [source, setSource] = useState<"live" | "mock">("mock");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const creator = useMemo(() => findCreator("neo-park"), []);
   const creatorName = locale === "en" ? "Midnight Save" : creator.name;
   const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
   const isVoided = data.status === "VOIDED";
   const totalBudget = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
   const totalCreatorPayout = data.track1.budgetUsd + data.track2.creatorPayoutUsd + data.track3.creatorPayoutUsd;
+
+  useEffect(() => {
+    if (!router.isReady || !routeProposalId) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadError(null);
+    getPublicCampaignProof(routeProposalId)
+      .then((proof) => {
+        if (!cancelled) {
+          setData(mapCampaignProofToSettlement(proof));
+          setSource("live");
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setData(MOCK);
+          setSource("mock");
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, routeProposalId]);
 
   return (
     <>
@@ -488,11 +597,15 @@ export default function SettlementPage() {
       >
         <div className="relative space-y-6">
           <ProductReadinessBanner
-            description="This dashboard renders local settlement data only. Track 1/2 settlement can be smoked with seeded data outside this page, while Track 3 CPS remains operator/mock until merchant reconciliation is integrated."
-            status="MOCK_PREVIEW"
-            title="Settlement dashboard is not fully live data yet"
+            description={
+              source === "live"
+                ? "This dashboard maps public campaign proof fields into the tri-track settlement view. Track 1/2 seeded settlement markers are readable here; Track 3 CPS remains operator-gated until merchant reconciliation is integrated."
+                : "This dashboard is using local settlement fallback data because no campaign proof projection loaded for this route."
+            }
+            status={source === "live" ? "SEEDED_DEMO" : "MOCK_PREVIEW"}
+            title={source === "live" ? "Settlement dashboard is campaign-proof wired" : "Settlement dashboard is using mock fallback"}
           />
-          <SettlementPreviewNotice proposalId={routeProposalId} />
+          <SettlementPreviewNotice error={loadError} isLive={source === "live"} proposalId={routeProposalId} />
 
           {/* ---- Top stats ---- */}
           <div className="grid gap-4 sm:grid-cols-3">

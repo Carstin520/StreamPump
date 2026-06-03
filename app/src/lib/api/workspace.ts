@@ -101,6 +101,7 @@ export type ContentManifestDetailResponse = {
   internalCanonicalUrl: string | null;
   internalUrlDigestHex: string | null;
   coverAssetId: string | null;
+  isPublicFeedEligible?: boolean;
   createdAt: string;
   updatedAt: string;
   assets: ContentManifestAssetResponse[];
@@ -485,6 +486,14 @@ export const createContentPublication = (token: string, input: CreatePublication
     },
     body: input,
   });
+
+export const verifyContentPublication = (token: string, publicationId: string) =>
+  apiClient.patch<Pick<ContentPublicationResponse, "publicationId" | "verificationStatus">>(
+    `/content/publications/${publicationId}/verify`,
+    {
+      token,
+    },
+  );
 
 export const createProposalIntent = (token: string, input: CreateProposalIntentInput) =>
   apiClient.post<IntentSummaryResponse>("/proposal-intents", {

@@ -5,10 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
+import { useManagedWallet } from "@/hooks/useManagedWallet";
 import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
-import { buildEndorseProposalTransaction } from "@/lib/api/proposal";
+import { buildClaimEndorsementTransaction, buildEndorseProposalTransaction } from "@/lib/api/proposal";
+import { executeManagedWalletAction, getS1Portfolio, S1PortfolioResponse } from "@/lib/api/s1";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
 import { formatUsdcAtomic } from "@/lib/formatting";
+import { getStoredAuthSession } from "@/lib/auth-session";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
 import { useI18n } from "@/lib/i18n";
 import { requireInteractiveSession } from "@/lib/interaction-auth";
@@ -53,6 +56,8 @@ const parseAmount = (value: string | null | undefined, fallback = 0) => {
 const shortWallet = (wallet: string | null | undefined) =>
   wallet ? `${wallet.slice(0, 4)}...${wallet.slice(-4)}` : "Unknown";
 
+type UserEndorsement = NonNullable<S1PortfolioResponse["s2Endorsements"]>[number];
+
 export default function EndorsePage() {
   const router = useRouter();
   const { locale } = useI18n();
@@ -61,11 +66,45 @@ export default function EndorsePage() {
   const [demoSummary, setDemoSummary] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<PublicCampaignProofResponse | null>(null);
   const [campaignError, setCampaignError] = useState<string | null>(null);
+  const [userEndorsement, setUserEndorsement] = useState<UserEndorsement | null>(null);
+  const [managedEndorseBusy, setManagedEndorseBusy] = useState(false);
+  const [managedEndorseError, setManagedEndorseError] = useState<string | null>(null);
   const demoFlow = useDemoActionFlow();
   const proposalFlow = useProposalTransactionFlow();
+  const claimFlow = useProposalTransactionFlow();
+  const managedWallet = useManagedWallet();
   const dialRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
   const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
+
+  const refreshCampaign = useCallback(async () => {
+    if (!routeProposalId) {
+      return null;
+    }
+    const record = await getPublicCampaignProof(routeProposalId);
+    setCampaign(record);
+    return record;
+  }, [routeProposalId]);
+
+  const refreshUserEndorsement = useCallback(async (record: PublicCampaignProofResponse | null) => {
+    const session = getStoredAuthSession();
+    if (!session?.accessToken) {
+      setUserEndorsement(null);
+      return;
+    }
+    try {
+      const portfolio = await getS1Portfolio(session.accessToken);
+      const match = portfolio.s2Endorsements?.find((item) =>
+        item.proposalPda === record?.proposalPda ||
+        item.proposalId === record?.proposalId ||
+        item.proposalPda === routeProposalId ||
+        item.proposalId === routeProposalId
+      ) ?? null;
+      setUserEndorsement(match);
+    } catch {
+      setUserEndorsement(null);
+    }
+  }, [routeProposalId]);
 
   useEffect(() => {
     if (!router.isReady || !routeProposalId) {
@@ -74,10 +113,11 @@ export default function EndorsePage() {
 
     let cancelled = false;
     setCampaignError(null);
-    getPublicCampaignProof(routeProposalId)
+    refreshCampaign()
       .then((record) => {
-        if (!cancelled) {
+        if (!cancelled && record) {
           setCampaign(record);
+          void refreshUserEndorsement(record);
         }
       })
       .catch((error) => {
@@ -90,7 +130,7 @@ export default function EndorsePage() {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, routeProposalId]);
+  }, [refreshCampaign, refreshUserEndorsement, router.isReady, routeProposalId]);
 
   const fraction = stakeAmount / FAN_BALANCE;
   const dashOffset = DIAL_CIRCUMFERENCE * (1 - fraction);
@@ -145,6 +185,11 @@ export default function EndorsePage() {
       : isDeadlinePassed
         ? "Campaign deadline has passed; endorse_proposal is closed."
         : null;
+  const isClaimableEndorsement = Boolean(
+    userEndorsement &&
+    !userEndorsement.claimedStatus &&
+    ["RESOLVED_SUCCESS", "RESOLVED_FAIL", "CANCELLED", "VOIDED"].includes(userEndorsement.status ?? ""),
+  );
   const visibleEndorsers = campaign
     ? [
         {
@@ -237,20 +282,75 @@ export default function EndorsePage() {
         return;
       }
 
+      if (managedWallet.isManagedWallet) {
+        const session = getStoredAuthSession();
+        if (!session?.accessToken) {
+          setDemoSummary("Sign in before sending an endorsement transaction.");
+          return;
+        }
+        setManagedEndorseBusy(true);
+        setManagedEndorseError(null);
+        void executeManagedWalletAction(session.accessToken, {
+          action: "endorse-proposal",
+          params: {
+            proposalPda: campaign.proposalPda,
+            amount: stakeAmount,
+          },
+        })
+          .then(async (result) => {
+            setDemoSummary(`Managed endorse submitted: ${result.signature.slice(0, 8)}...`);
+            const refreshed = await refreshCampaign();
+            await refreshUserEndorsement(refreshed);
+          })
+          .catch((error) => {
+            setManagedEndorseError(error instanceof Error ? error.message : String(error));
+          })
+          .finally(() => setManagedEndorseBusy(false));
+        return;
+      }
+
       void proposalFlow.execute((token) =>
         buildEndorseProposalTransaction(token, campaign.proposalPda, {
           amount: stakeAmount,
         })
-      ).then((result) => {
+      ).then(async (result) => {
         if (result) {
           setDemoSummary(`Endorse transaction submitted: ${result.signature.slice(0, 8)}...`);
+          const refreshed = await refreshCampaign();
+          await refreshUserEndorsement(refreshed);
         }
       });
       return;
     }
 
     demoFlow.begin();
-  }, [campaign, demoFlow, liveEndorsementBlockedReason, proposalFlow, router, stakeAmount]);
+  }, [
+    campaign,
+    demoFlow,
+    liveEndorsementBlockedReason,
+    managedWallet.isManagedWallet,
+    proposalFlow,
+    refreshCampaign,
+    refreshUserEndorsement,
+    router,
+    stakeAmount,
+  ]);
+
+  const handleClaimEndorsement = useCallback(() => {
+    if (!campaign || !userEndorsement || !requireInteractiveSession(router)) {
+      return;
+    }
+
+    void claimFlow.execute((token) =>
+      buildClaimEndorsementTransaction(token, campaign.proposalPda)
+    ).then(async (result) => {
+      if (result) {
+        setDemoSummary(`Claim transaction submitted: ${result.signature.slice(0, 8)}...`);
+        const refreshed = await refreshCampaign();
+        await refreshUserEndorsement(refreshed);
+      }
+    });
+  }, [campaign, claimFlow, refreshCampaign, refreshUserEndorsement, router, userEndorsement]);
 
   return (
     <>
@@ -594,14 +694,17 @@ export default function EndorsePage() {
                   ? Boolean(liveEndorsementBlockedReason) ||
                     proposalFlow.state.status === "building" ||
                     proposalFlow.state.status === "waiting_signature" ||
-                    proposalFlow.state.status === "submitting"
+                    proposalFlow.state.status === "submitting" ||
+                    managedEndorseBusy
                   : demoFlow.busy || demoFlow.state.status === "success"
               }
               onClick={handleBeginEndorse}
               type="button"
             >
               {isLiveCampaign
-                ? proposalFlow.state.status === "success"
+                ? managedEndorseBusy
+                  ? "Submitting managed endorsement..."
+                  : proposalFlow.state.status === "success"
                   ? "Endorse transaction submitted"
                   : proposalFlow.state.status === "building"
                     ? "Building transaction..."
@@ -611,7 +714,9 @@ export default function EndorsePage() {
                         ? "Submitting..."
                         : liveEndorsementBlockedReason
                           ? "Endorsement closed"
-                        : `Endorse ${compactNumber(stakeAmount)} SPUMP`
+                        : managedWallet.isManagedWallet
+                          ? `Managed endorse ${compactNumber(stakeAmount)} SPUMP`
+                          : `Endorse ${compactNumber(stakeAmount)} SPUMP`
                 : demoFlow.busy
                   ? "Simulating..."
                   : demoFlow.state.status === "success"
@@ -624,11 +729,15 @@ export default function EndorsePage() {
                 <p className="mt-1 text-xs leading-5 text-[#a7b2c4]">
                   {liveEndorsementBlockedReason
                     ? liveEndorsementBlockedReason
+                    : managedEndorseError
+                      ? managedEndorseError
                     : proposalFlow.state.status === "failed"
                     ? proposalFlow.state.error
                     : proposalFlow.state.signature
                       ? `Signature ${proposalFlow.state.signature}`
-                      : "The backend builds endorse_proposal; your wallet signs and the backend relays the signed transaction."}
+                      : managedWallet.isManagedWallet
+                        ? "The backend signs and relays endorse_proposal with the managed wallet; oracle pays the transaction fee."
+                        : "The backend builds endorse_proposal; your wallet signs and the backend relays the signed transaction."}
                 </p>
               </section>
             ) : (
@@ -648,6 +757,58 @@ export default function EndorsePage() {
               <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
                 {demoSummary}
               </div>
+            ) : null}
+            {isLiveCampaign && userEndorsement ? (
+              <section className="liquid-card section-enter rounded-[28px] p-5">
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#8ea0ba]">
+                  Your Endorsement
+                </p>
+                <div className="mt-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#8ea0ba]">Staked</span>
+                    <span className="text-sm font-semibold text-white">{compactNumber(Number(userEndorsement.stakedSpumpAmount))} SPUMP</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#8ea0ba]">Estimated reward</span>
+                    <span className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAtomic(Number(userEndorsement.estimatedUsdcReward))}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#8ea0ba]">Status</span>
+                    <span className="text-sm font-semibold text-white">
+                      {userEndorsement.claimedStatus ? "Claimed" : userEndorsement.status ?? "Pending"}
+                    </span>
+                  </div>
+                </div>
+                {isClaimableEndorsement ? (
+                  <button
+                    className="mt-4 w-full rounded-full border border-[#65ecaf]/25 bg-[#113222] px-4 py-2.5 text-sm font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-not-allowed disabled:opacity-55"
+                    disabled={
+                      claimFlow.state.status === "building" ||
+                      claimFlow.state.status === "waiting_signature" ||
+                      claimFlow.state.status === "submitting"
+                    }
+                    onClick={handleClaimEndorsement}
+                    type="button"
+                  >
+                    {claimFlow.state.status === "building"
+                      ? "Building claim..."
+                      : claimFlow.state.status === "waiting_signature"
+                        ? "Waiting for wallet..."
+                        : claimFlow.state.status === "submitting"
+                          ? "Submitting claim..."
+                          : "Claim endorsement reward"}
+                  </button>
+                ) : (
+                  <p className="mt-4 rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-[#8ea0ba]">
+                    {userEndorsement.claimedStatus
+                      ? "Reward has already been claimed."
+                      : "Claim opens after Track 2 settlement or cancellation/void resolution."}
+                  </p>
+                )}
+                {claimFlow.state.status === "failed" ? (
+                  <p className="mt-3 text-xs text-[#ff8a75]">{claimFlow.state.error}</p>
+                ) : null}
+              </section>
             ) : null}
           </div>
         </div>
