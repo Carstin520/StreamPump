@@ -27,7 +27,7 @@ Read these first when doing product, architecture, roadmap, or implementation wo
 5. `DEMO.md` — controlled S1/S2 demo runbook, environment flags, smoke paths, and known devnet state.
 6. `docs/streamPump-page-readiness-goal.md` — page-level optimization rules when working one surface at a time.
 
-`docs/streamPump-long-term-roadmap.md` is the canonical roadmap. Treat `docs/streamPump-long-term-roadmap 2.md` as a non-canonical duplicate. The roadmap progress ledger may be newer than the README status snapshot — when they conflict, prefer the roadmap ledger, then verify against code.
+`docs/streamPump-long-term-roadmap.md` is the canonical roadmap. If an old duplicate roadmap copy appears, treat it as non-canonical. The roadmap progress ledger may be newer than the README status snapshot — when they conflict, prefer the roadmap ledger, then verify against code.
 
 ## Repository Structure
 
