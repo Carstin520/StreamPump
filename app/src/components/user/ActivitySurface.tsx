@@ -52,7 +52,7 @@ export const ActivitySurface = ({
   return (
     <PageShell searchPlaceholder={t("feed.searchActivityPlaceholder")}>
       <div className="mx-auto max-w-[1400px] space-y-4 py-4">
-        <ActivitySourceNotice error={error ?? initialError} />
+        <ActivitySourceNotice error={error} />
         <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)_280px]">
           <aside className="hidden xl:block">
             <div className="sticky top-24 space-y-2.5">

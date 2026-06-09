@@ -61,7 +61,7 @@ export const ProgressiveImage = ({
           className={`${props.fill ? "absolute inset-0 h-full w-full" : ""} ${imageClassName}`}
           decoding="async"
           height={typeof props.height === "number" ? props.height : undefined}
-          loading={props.priority ? "eager" : props.loading ?? "lazy"}
+          loading={props.priority || props.fill ? "eager" : props.loading ?? "lazy"}
           onError={(event) => {
             setHasFailed(true);
             onError?.(event);
@@ -80,6 +80,7 @@ export const ProgressiveImage = ({
           {...props}
           alt={alt}
           className={imageClassName}
+          loading={props.priority ? undefined : props.fill ? "eager" : props.loading}
           onError={(event) => {
             setHasFailed(true);
             onError?.(event);
