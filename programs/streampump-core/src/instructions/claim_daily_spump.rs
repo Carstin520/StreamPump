@@ -76,7 +76,7 @@ pub(crate) fn handler(ctx: Context<ClaimDailySpump>) -> Result<()> {
             .protocol_config
             .daily_spump_emission_multiplier_bps,
     )?;
-    let reward_amount = apply_new_user_emission_discount(
+    let discounted_reward_amount = apply_new_user_emission_discount(
         platform_reward_amount,
         user_profile.created_at,
         now,
@@ -85,6 +85,17 @@ pub(crate) fn handler(ctx: Context<ClaimDailySpump>) -> Result<()> {
             .new_user_emission_window_seconds,
         ctx.accounts.protocol_config.new_user_emission_bps,
     )?;
+    let streak_bonus_bps = u64::from(user_profile.daily_claim_streak)
+        .checked_mul(200)
+        .ok_or(StreamPumpError::MathOverflow)?
+        .min(2_000);
+    let reward_amount_u128 = u128::from(discounted_reward_amount)
+        .checked_mul(u128::from(10_000_u64 + streak_bonus_bps))
+        .ok_or(StreamPumpError::MathOverflow)?
+        .checked_div(10_000)
+        .ok_or(StreamPumpError::MathOverflow)?;
+    let reward_amount =
+        u64::try_from(reward_amount_u128).map_err(|_| StreamPumpError::MathOverflow)?;
 
     let bump_bytes = [ctx.accounts.protocol_config.bump];
     let signer_seeds: [&[u8]; 2] = [b"protocol_config", bump_bytes.as_ref()];

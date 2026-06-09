@@ -8,6 +8,8 @@ import {
   createAuthChallenge,
   exchangeProviderSession,
   getCurrentSession,
+  presignSponsorDocumentUpload,
+  registerSponsorProfile,
   requestEmailLoginCode,
   verifyEmailLoginCode,
   verifyAuthChallenge,
@@ -24,6 +26,8 @@ router.post("/verify", verifyAuthChallenge);
 router.post("/email/request-code", requestEmailLoginCode);
 router.post("/email/verify-code", verifyEmailLoginCode);
 router.post("/provider-exchange", exchangeProviderSession);
+router.post("/sponsor/documents/presign", requireSessionAuth, presignSponsorDocumentUpload);
+router.post("/sponsor/register", requireSessionAuth, registerSponsorProfile);
 router.get("/session", requireSessionAuth, getCurrentSession);
 router.post("/logout", requireSessionAuth, logoutWalletSession);
 

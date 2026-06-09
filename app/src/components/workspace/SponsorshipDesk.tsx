@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -296,26 +295,40 @@ const statusLabel = (campaign: DeskCampaign) => {
 };
 
 const getDeskSignatureCta = (campaign: DeskCampaign) => {
-  const href = `/workspace/intents/${campaign.id}`;
   if (campaign.viewerRole === "Observer") {
-    return { disabled: false as const, href, label: "View details" as const };
+    return {
+      hint: "This fixture can be inspected in the desk only; no proposal API is called.",
+      label: "Desk preview only",
+    };
   }
   if (campaign.needsActionFor === campaign.viewerRole) {
     const label =
-      campaign.viewerRole === "Creator" ? "Preview sign · creator part" : "Preview sign & funding";
-    return { disabled: false as const, href, label };
+      campaign.viewerRole === "Creator" ? "Mock creator action only" : "Mock sponsor action only";
+    return {
+      hint: "This desk row is local fixture data. Open a real proposal intent from a content detail page to sign or fund.",
+      label,
+    };
   }
-  return { disabled: true as const, href: "#" as const, label: "Coming soon" as const };
+  if (campaign.status === "FUNDED") {
+    return {
+      hint: "Settlement status is illustrative here; operator/oracle settlement controls are not wired to this page.",
+      label: "Mock settlement only",
+    };
+  }
+  return {
+    hint: "This row is a local preview of the desired operator state model.",
+    label: "Desk preview only",
+  };
 };
 
 const getBoardRowCta = (campaign: DeskCampaign) => {
   if (campaign.viewerRole === "Observer") return "View";
   if (campaign.needsActionFor === campaign.viewerRole) {
-    return campaign.viewerRole === "Creator" ? "Preview sign" : "Preview fund";
+    return campaign.viewerRole === "Creator" ? "Inspect mock sign" : "Inspect mock fund";
   }
-  if (campaign.status === "BUNDLE_BUILT") return "Review";
-  if (campaign.status === "FUNDED") return "Demo settle";
-  return "View";
+  if (campaign.status === "BUNDLE_BUILT") return "Inspect";
+  if (campaign.status === "FUNDED") return "Inspect mock settle";
+  return "Inspect";
 };
 
 const statusToneClass = (campaign: DeskCampaign) => {
@@ -390,41 +403,52 @@ const DeskHeader = () => (
   <section className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.95)_0%,rgba(8,12,20,0.95)_100%)] px-4 py-3.5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#7486a1]">Workspace</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#7486a1]">Workspace</p>
+          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2 py-0.5 font-mono text-[9px] font-semibold text-[#f8d48a]">
+            LOCAL FIXTURES
+          </span>
+        </div>
         <h1 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-white md:text-[20px]">Sponsorship Desk</h1>
         <p className="mt-1 max-w-[640px] text-[12px] leading-relaxed text-[#9aabc4] md:text-[13px]">
-          Review terms, signatures, funding, and settlement across creator campaigns.
+          Review the intended operator model for terms, signatures, funding, and settlement across mock creator campaigns.
         </p>
         <p className="mt-1 max-w-[640px] text-[10px] leading-relaxed text-[#6f8099]">
-          Tracks, vaults, oracle sync — not a generic partnership list.
+          This page does not import live proposals, submit signatures, fund vaults, run oracle jobs, or settle campaigns.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <button
-          className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+          aria-disabled="true"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[10px] font-medium text-[#7e90aa]"
+          disabled
           type="button"
         >
           <SparklesIcon className="h-3.5 w-3.5" />
-          Import proposal
+          Import blocked
         </button>
         <button
-          className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+          aria-disabled="true"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[10px] font-medium text-[#7e90aa]"
+          disabled
           type="button"
         >
           <ClockIcon className="h-3.5 w-3.5" />
-          Settlement queue
+          Queue preview
         </button>
         <button
-          className="flex items-center gap-1.5 rounded-md bg-[#de402a] px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-[#ea523e]"
+          aria-disabled="true"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-[#de402a]/20 bg-[#de402a]/10 px-3 py-1.5 text-[10px] font-semibold text-[#ff9a88]"
+          disabled
           type="button"
         >
           <SignatureIcon className="h-3.5 w-3.5" />
-          Create sponsorship intent
+          Create via content flow
         </button>
       </div>
     </div>
     <p className="mt-3 border-t border-white/[0.04] pt-3 text-[9px] text-[#5a6b82]">
-      Preview · intent build, signing, and submit flows are end-to-end in product design; wire to API when ready.
+      Mock preview · use `/workspace/content/[manifestId]` and `/workspace/intents/[intentId]` for the API/wallet-wired proposal flow.
     </p>
   </section>
 );
@@ -443,19 +467,19 @@ const DeskAlerts = ({ campaigns }: { campaigns: DeskCampaign[] }) => {
       <AlertTile
         accent="#f3b33e"
         hint={`${alerts.length} bundles flagged`}
-        label="Risk windows"
+        label="Mock risk windows"
         message={alerts.length > 0 ? alerts[0].flag : "No deadline pressure"}
       />
       <AlertTile
         accent="#de402a"
         hint={sponsorMissing > 0 ? "Action required" : "Idle"}
-        label="Sponsor signatures"
+        label="Mock sponsor signatures"
         message={sponsorMissing > 0 ? `${sponsorMissing} bundles awaiting sponsor` : "All signatures collected"}
       />
       <AlertTile
         accent="#67b8ff"
         hint={oraclePending > 0 ? "Track 2 sync" : "Synced"}
-        label="Oracle proofs"
+        label="Mock oracle proofs"
         message={oraclePending > 0 ? `${oraclePending} proofs queued` : "All proofs reconciled"}
       />
     </section>
@@ -590,7 +614,7 @@ const BoardRow = ({
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-white">{campaign.title}</p>
           <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">
-            PDA {campaign.proposalPda}
+            Mock PDA {campaign.proposalPda}
           </p>
         </div>
       </div>
@@ -636,13 +660,11 @@ const BoardRow = ({
       </div>
 
       <div className="flex items-center justify-end gap-1.5">
-        <Link
-          className="flex h-8 items-center justify-center rounded-md bg-[#de402a] px-3 text-[11px] font-semibold text-white transition hover:bg-[#ea523e]"
-          href={`/workspace/intents/${campaign.id}`}
-          onClick={(event) => event.stopPropagation()}
+        <span
+          className="flex h-8 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] px-3 text-[11px] font-semibold text-[#cbd6e7]"
         >
           {ctaLabel}
-        </Link>
+        </span>
         <ChevronRightIcon className="h-3.5 w-3.5 text-[#7e90aa]" />
       </div>
     </button>
@@ -671,21 +693,15 @@ const MobileDeskCtaBar = ({ campaign }: { campaign: DeskCampaign }) => {
   const cta = getDeskSignatureCta(campaign);
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[rgba(8,10,16,0.92)] px-4 py-3 backdrop-blur-md xl:hidden">
-      <Link
-        aria-disabled={cta.disabled}
-        className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-[13px] font-semibold transition ${
-          cta.disabled
-            ? "border border-white/[0.06] bg-white/[0.03] text-[#7e90aa]"
-            : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_10px_24px_rgba(222,64,42,0.25)]"
-        }`}
-        href={cta.disabled ? "#" : cta.href}
-        onClick={(event) => {
-          if (cta.disabled) event.preventDefault();
-        }}
+      <button
+        className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-3 text-[13px] font-semibold text-[#7e90aa]"
+        disabled
+        title={cta.hint}
+        type="button"
       >
         <SignatureIcon className="h-4 w-4 shrink-0" />
         {cta.label}
-      </Link>
+      </button>
     </div>
   );
 };
@@ -728,12 +744,15 @@ const DrawerSummary = ({ campaign }: { campaign: DeskCampaign }) => (
 
 const DrawerOnChain = ({ campaign }: { campaign: DeskCampaign }) => (
   <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3.5">
-    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">On-chain</p>
+    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Illustrative Chain Proof</p>
+    <p className="mt-1 text-[10px] leading-4 text-[#6f8099]">
+      These identifiers are deterministic local fixtures, not Solana or backend reads.
+    </p>
     <div className="mt-2 space-y-1.5 text-[11px]">
-      <HashRow label="Manifest hash" value={campaign.manifestHash} />
-      <HashRow label="Anchor PDA" value={campaign.anchorPda} />
-      <HashRow label="Proposal PDA" value={campaign.proposalPda} />
-      <HashRow label="USDC vault PDA" value={campaign.usdcVaultPda} />
+      <HashRow label="Mock manifest hash" value={campaign.manifestHash} />
+      <HashRow label="Mock anchor PDA" value={campaign.anchorPda} />
+      <HashRow label="Mock proposal PDA" value={campaign.proposalPda} />
+      <HashRow label="Mock USDC vault PDA" value={campaign.usdcVaultPda} />
     </div>
   </section>
 );
@@ -806,21 +825,16 @@ const DrawerSignatures = ({ campaign }: { campaign: DeskCampaign }) => {
         ))}
       </div>
       <div className="hidden border-t border-white/[0.05] p-3 xl:block">
-        <Link
-          aria-disabled={cta.disabled}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition ${
-            cta.disabled
-              ? "border border-white/[0.06] bg-white/[0.03] text-[#7e90aa]"
-              : "bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] text-white shadow-[0_14px_28px_rgba(222,64,42,0.28)] hover:brightness-[1.05]"
-          }`}
-          href={cta.href}
-          onClick={(event) => {
-            if (cta.disabled) event.preventDefault();
-          }}
+        <button
+          className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[12px] font-semibold text-[#7e90aa]"
+          disabled
+          title={cta.hint}
+          type="button"
         >
           <SignatureIcon className="h-3.5 w-3.5" />
           {cta.label}
-        </Link>
+        </button>
+        <p className="mt-2 text-center text-[10px] leading-4 text-[#6f8099]">{cta.hint}</p>
       </div>
     </section>
   );

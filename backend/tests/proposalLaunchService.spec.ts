@@ -48,14 +48,16 @@ describe("proposalLaunchService", () => {
   it("derive_intent_addresses_matches_onchain_pdas", () => {
     const creator = Keypair.generate().publicKey;
     const deadlineUnix = 1_900_000_000n;
+    const nonce = 42n;
     const anchorService = getAnchorService();
     const derived = deriveIntentAddresses({
       creatorWallet: creator.toBase58(),
       deadlineUnix,
+      nonce,
     });
 
     expect(derived.proposalPda).to.equal(
-      anchorService.deriveProposalPda(creator, deadlineUnix).toBase58()
+      anchorService.deriveProposalPda(creator, deadlineUnix, nonce).toBase58()
     );
     expect(derived.proposalUsdcVaultPda).to.equal(
       anchorService
@@ -121,6 +123,7 @@ describe("proposalLaunchService", () => {
       creatorWallet,
       sponsorWallet,
       deadlineUnix: 1_900_000_000n,
+      nonce: 1n,
       track1BaseUsdc: 100n,
       track2MetricType: Track2MetricType.VIEWS,
       track2TargetValue: 1_000n,
@@ -128,6 +131,7 @@ describe("proposalLaunchService", () => {
       track2UsdcDeposited: 200n,
       track3UsdcDeposited: 300n,
       track3DelayDays: 7,
+      maxEndorsementSpump: 0n,
       lockedAnchorPda: null,
       plannedProposalPda: Keypair.generate().publicKey.toBase58(),
       plannedUsdcVaultPda: Keypair.generate().publicKey.toBase58(),

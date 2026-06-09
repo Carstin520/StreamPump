@@ -1,8 +1,10 @@
 import {
   BundleStatus,
   BundleSubmitMode,
+  CampaignProofStatus,
   ContentManifestStatus,
   OracleSyncStatus,
+  PublicationVerificationStatus,
   Proposal,
   ProposalStatus,
   ProposalIntent,
@@ -14,7 +16,6 @@ import bs58 from "bs58";
 import { HttpError } from "./http";
 import { serializeAsset } from "./contentManifestShared";
 import { decodeVersionedTransaction, derivePlannedContentAnchorPda } from "../services/proposalLaunchService";
-import { syncCampaignProofProjectionFromProposalPda } from "../services/marketProjectionService";
 import { prisma } from "../services/prisma";
 
 type SerializedBundleInput = {
@@ -206,6 +207,7 @@ export const serializeIntent = (intent: ProposalIntent) => ({
   lockedManifestHashHex: intent.lockedManifestHashHex,
   lockedAnchorPda: intent.lockedAnchorPda,
   deadlineUnix: intent.deadlineUnix.toString(),
+  nonce: intent.nonce.toString(),
   track1BaseUsdc: intent.track1BaseUsdc.toString(),
   track2MetricType: intent.track2MetricType,
   track2TargetValue: intent.track2TargetValue.toString(),
@@ -213,6 +215,7 @@ export const serializeIntent = (intent: ProposalIntent) => ({
   track2UsdcDeposited: intent.track2UsdcDeposited.toString(),
   track3UsdcDeposited: intent.track3UsdcDeposited.toString(),
   track3DelayDays: intent.track3DelayDays,
+  maxEndorsementSpump: intent.maxEndorsementSpump.toString(),
   plannedProposalPda: intent.plannedProposalPda,
   plannedUsdcVaultPda: intent.plannedUsdcVaultPda,
   creatorApprovedAt: intent.creatorApprovedAt?.toISOString() ?? null,
@@ -257,11 +260,14 @@ export const serializeProposal = (proposal: Proposal) => ({
   track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
   track2ActualValue: proposal.track2ActualValue?.toString() ?? null,
   track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+  track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+  track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
   track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
   track3CpsPayout: proposal.track3CpsPayout?.toString() ?? null,
   track3DelayDays: proposal.track3DelayDays,
   track3SettledAt: proposal.track3SettledAt?.toISOString() ?? null,
   onChainTxSignature: proposal.onChainTxSignature,
+  nonce: proposal.nonce?.toString() ?? null,
   oracleSyncStatus: proposal.oracleSyncStatus,
   contentHashHex: proposal.contentHashHex,
   contentAnchorPda: proposal.contentAnchorPda,
@@ -287,7 +293,19 @@ export const finalizeConfirmedLaunchBundle = async (params: {
   const latestIntent = await prisma.proposalIntent.findUnique({
     where: { id: params.intentId },
     include: {
-      manifest: true,
+      manifest: {
+        include: {
+          publications: {
+            where: {
+              verificationStatus: PublicationVerificationStatus.VERIFIED,
+            },
+            orderBy: {
+              verifiedAt: "desc",
+            },
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -338,6 +356,12 @@ export const finalizeConfirmedLaunchBundle = async (params: {
       },
     });
 
+    const proofStatus = contentAnchorPda
+      ? CampaignProofStatus.ANCHORED
+      : CampaignProofStatus.FUNDED;
+    const contentPublishedVerifiedAt =
+      latestIntent.manifest.publications[0]?.verifiedAt ?? null;
+
     await tx.proposal.upsert({
       where: {
         proposalPda: latestIntent.plannedProposalPda!,
@@ -351,6 +375,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
         onChainTxSignature: params.chainTxSignature,
+        nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
         status: ProposalStatus.FUNDED,
         track1BaseUsdc: latestIntent.track1BaseUsdc,
@@ -362,6 +387,9 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3UsdcDeposited: latestIntent.track3UsdcDeposited,
         track3DelayDays: latestIntent.track3DelayDays,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        contentPublishedVerifiedAt,
+        proofStatus,
+        fundingTxSignature: params.chainTxSignature,
       },
       create: {
         proposalPda: latestIntent.plannedProposalPda!,
@@ -373,6 +401,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         intentId: latestIntent.id,
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
+        nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
         status: ProposalStatus.FUNDED,
         track1BaseUsdc: latestIntent.track1BaseUsdc,
@@ -385,15 +414,14 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         track3DelayDays: latestIntent.track3DelayDays,
         onChainTxSignature: params.chainTxSignature,
         oracleSyncStatus: OracleSyncStatus.PENDING,
+        contentPublishedVerifiedAt,
+        proofStatus,
+        fundingTxSignature: params.chainTxSignature,
       },
     });
 
     return updatedBundle;
   });
-
-  if (latestIntent.plannedProposalPda) {
-    await syncCampaignProofProjectionFromProposalPda(latestIntent.plannedProposalPda);
-  }
 
   return updatedBundle;
 };
@@ -505,4 +533,6 @@ export const serializePublicProposalView = (proposal: Proposal) => ({
   track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
   track2ActualValue: proposal.track2ActualValue?.toString() ?? null,
   track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+  track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+  track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
 });

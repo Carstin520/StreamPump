@@ -8,6 +8,8 @@ pub enum StreamPumpError {
     Unauthorized,
     #[msg("Invalid handle")]
     InvalidHandle,
+    #[msg("Invalid creator authorization signature")]
+    InvalidCreatorSignature,
     #[msg("String exceeds configured limit")]
     StringTooLong,
     #[msg("Invalid amount")]
@@ -132,4 +134,10 @@ pub enum StreamPumpError {
     LegacyProtocolConfigAlreadyMigrated,
     #[msg("Invalid legacy protocol config account")]
     InvalidLegacyProtocolConfig,
+    #[msg("Total endorsement cap exceeded for this proposal")]
+    EndorsementCapExceeded,
+    #[msg("Per-user endorsement cap exceeded for this proposal")]
+    EndorsementPerUserCapExceeded,
+    #[msg("Creator account is suspended")]
+    CreatorSuspended,
 }

@@ -81,13 +81,14 @@ export const buildInstructionPlan = (
 export const deriveIntentAddresses = (params: {
   creatorWallet: string;
   deadlineUnix: bigint;
+  nonce?: bigint;
 }): {
   proposalPda: string;
   proposalUsdcVaultPda: string;
 } => {
   const anchorService = getAnchorService();
   const creator = new PublicKey(params.creatorWallet);
-  const proposalPda = anchorService.deriveProposalPda(creator, params.deadlineUnix);
+  const proposalPda = anchorService.deriveProposalPda(creator, params.deadlineUnix, params.nonce ?? 0n);
   const proposalUsdcVaultPda = anchorService.deriveProposalUsdcVaultPda(proposalPda);
 
   return {
@@ -194,6 +195,8 @@ export const buildLaunchBundleTransaction = async (params: {
     | "creatorWallet"
     | "sponsorWallet"
     | "deadlineUnix"
+    | "nonce"
+    | "maxEndorsementSpump"
     | "track1BaseUsdc"
     | "track2MetricType"
     | "track2TargetValue"
@@ -265,6 +268,8 @@ export const buildLaunchBundleTransaction = async (params: {
     track2MinAchievementBps: params.intent.track2MinAchievementBps,
     track3DelayDays: params.intent.track3DelayDays,
     deadlineUnix: params.intent.deadlineUnix,
+    nonce: params.intent.nonce ?? 0n,
+    maxEndorsementSpump: params.intent.maxEndorsementSpump ?? 0n,
   });
   instructions.push(createProposalInstruction);
 

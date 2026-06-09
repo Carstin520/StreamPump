@@ -59,7 +59,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const unwrapEventPayload = (payload: Record<string, unknown>): Record<string, unknown> => {
   if (isRecord(payload.eventData)) {
-    return payload.eventData;
+    return {
+      ...(isRecord(payload.accounts) ? payload.accounts : {}),
+      ...(isRecord(payload.args) ? payload.args : {}),
+      ...payload.eventData,
+    };
   }
 
   if (isRecord(payload.args)) {
@@ -84,6 +88,18 @@ const readBigInt = (record: Record<string, unknown>, key: string): bigint | null
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
   if (typeof value === "string" && /^-?\d+$/.test(value.trim())) return BigInt(value.trim());
+  return null;
+};
+
+const readBigIntAlias = (
+  record: Record<string, unknown>,
+  ...keys: string[]
+): bigint | null => {
+  for (const key of keys) {
+    const value = readBigInt(record, key);
+    if (value !== null) return value;
+  }
+
   return null;
 };
 
@@ -159,6 +175,112 @@ const mapProofStatus = (proposal: Proposal): CampaignProofStatus => {
 const serializeBigInt = (value: bigint | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toString();
 
+type ProjectedPositionForClaim = {
+  internalTokenBalance: bigint;
+  earlyCohortBalance?: bigint | null;
+};
+
+type ProjectedBuyoutPools = {
+  status: BuyoutProjectionStatus;
+  claimableS1SupplyRemaining: bigint;
+  earlyClaimableUsdcRemaining: bigint;
+  earlyClaimableS1SupplyRemaining: bigint;
+  regularClaimableUsdcRemaining: bigint;
+  regularClaimableS1SupplyRemaining: bigint;
+};
+
+const calculateEstimatedClaimableUsdc = (
+  position: ProjectedPositionForClaim,
+  buyout: ProjectedBuyoutPools | null | undefined
+): bigint | null => {
+  if (!buyout || buyout.status !== BuyoutProjectionStatus.GRADUATED) {
+    return null;
+  }
+
+  try {
+    if (buyout.claimableS1SupplyRemaining <= 0n || position.internalTokenBalance <= 0n) {
+      return 0n;
+    }
+
+    const safeShare = (balance: bigint, usdcRemaining: bigint, supplyRemaining: bigint) => {
+      if (balance <= 0n || usdcRemaining <= 0n || supplyRemaining <= 0n) {
+        return 0n;
+      }
+      return (balance * usdcRemaining) / supplyRemaining;
+    };
+    const earlyBalance =
+      position.earlyCohortBalance && position.earlyCohortBalance > 0n
+        ? position.earlyCohortBalance
+        : 0n;
+    const normalizedEarlyBalance =
+      earlyBalance > position.internalTokenBalance ? position.internalTokenBalance : earlyBalance;
+    const regularBalance = position.internalTokenBalance - normalizedEarlyBalance;
+    const earlyShare = safeShare(
+      normalizedEarlyBalance,
+      buyout.earlyClaimableUsdcRemaining,
+      buyout.earlyClaimableS1SupplyRemaining
+    );
+    const regularShare = safeShare(
+      regularBalance,
+      buyout.regularClaimableUsdcRemaining,
+      buyout.regularClaimableS1SupplyRemaining
+    );
+
+    return earlyShare + regularShare;
+  } catch {
+    return 0n;
+  }
+};
+
+const calculateEstimatedS2Reward = (
+  stakedSpumpAmount: bigint,
+  initialFanPool: bigint | null | undefined,
+  initialSpumpStaked: bigint | null | undefined
+): bigint => {
+  try {
+    const fanPool = initialFanPool && initialFanPool > 0n ? initialFanPool : 0n;
+    const spumpStaked = initialSpumpStaked && initialSpumpStaked > 0n ? initialSpumpStaked : 0n;
+    if (stakedSpumpAmount <= 0n || fanPool <= 0n || spumpStaked <= 0n) {
+      return 0n;
+    }
+
+    return (stakedSpumpAmount * fanPool) / spumpStaked;
+  } catch {
+    return 0n;
+  }
+};
+
+const updateS2EndorsementEstimatesForProposal = async (
+  proposalPda: string,
+  initialFanPool: bigint,
+  initialSpumpStaked: bigint,
+  event: { signature?: string; observedAt?: Date } = {}
+) => {
+  const positions = await prisma.s2EndorsementPositionProjection.findMany({
+    where: {
+      proposalPda,
+      claimedStatus: false,
+    },
+  });
+
+  await Promise.all(
+    positions.map((position) =>
+      prisma.s2EndorsementPositionProjection.update({
+        where: { positionPda: position.positionPda },
+        data: {
+          estimatedUsdcReward: calculateEstimatedS2Reward(
+            position.stakedSpumpAmount,
+            initialFanPool,
+            initialSpumpStaked
+          ),
+          lastEventSignature: event.signature ?? position.lastEventSignature,
+          lastEventAt: event.observedAt ?? position.lastEventAt,
+        },
+      })
+    )
+  );
+};
+
 type S1GraduatedBuyoutProjectionPatch = {
   creatorWallet: string | null;
   buyoutStatePda: string | null;
@@ -168,6 +290,10 @@ type S1GraduatedBuyoutProjectionPatch = {
   usdcDeposited: bigint | null;
   claimableUsdcRemaining: bigint | null;
   claimableS1SupplyRemaining: bigint | null;
+  earlyClaimableUsdcRemaining: bigint | null;
+  earlyClaimableS1SupplyRemaining: bigint | null;
+  regularClaimableUsdcRemaining: bigint | null;
+  regularClaimableS1SupplyRemaining: bigint | null;
 };
 
 const compactNullablePatch = (data: Record<string, unknown>): Record<string, any> =>
@@ -181,8 +307,27 @@ const resolveGraduatedBuyoutProjectionPatch = async (
     where: { creatorProfilePda },
   });
   const buyoutStatePda = readString(eventData, "s1BuyoutState") ?? existing?.buyoutStatePda ?? null;
+  const eventClaimableUsdcRemaining = readBigInt(eventData, "claimableUsdcRemaining");
+  const eventClaimableS1SupplyRemaining = readBigInt(eventData, "claimableS1SupplyRemaining");
+  const eventEarlyClaimableUsdcRemaining = readBigInt(eventData, "earlyClaimableUsdcRemaining");
+  const eventEarlyClaimableS1SupplyRemaining = readBigInt(
+    eventData,
+    "earlyClaimableS1SupplyRemaining"
+  );
+  const eventRegularClaimableUsdcRemaining = readBigInt(eventData, "regularClaimableUsdcRemaining");
+  const eventRegularClaimableS1SupplyRemaining = readBigInt(
+    eventData,
+    "regularClaimableS1SupplyRemaining"
+  );
+  const hasEventPoolSnapshot =
+    eventClaimableUsdcRemaining !== null &&
+    eventClaimableS1SupplyRemaining !== null &&
+    eventEarlyClaimableUsdcRemaining !== null &&
+    eventEarlyClaimableS1SupplyRemaining !== null &&
+    eventRegularClaimableUsdcRemaining !== null &&
+    eventRegularClaimableS1SupplyRemaining !== null;
   const onChain =
-    buyoutStatePda
+    buyoutStatePda && !hasEventPoolSnapshot
       ? await getAnchorService().fetchS1BuyoutStateByPda(new PublicKey(buyoutStatePda)).catch(() => null)
       : null;
   const offerPda = existing?.acceptedOfferPda ?? existing?.latestOfferPda ?? null;
@@ -222,14 +367,34 @@ const resolveGraduatedBuyoutProjectionPatch = async (
       acceptedOfferUsdc ??
       null,
     claimableUsdcRemaining:
-      readBigInt(eventData, "claimableUsdcRemaining") ??
+      eventClaimableUsdcRemaining ??
       onChain?.claimableUsdcRemaining ??
       existing?.claimableUsdcRemaining ??
       null,
     claimableS1SupplyRemaining:
-      readBigInt(eventData, "claimableS1SupplyRemaining") ??
+      eventClaimableS1SupplyRemaining ??
       onChain?.claimableS1SupplyRemaining ??
       existing?.claimableS1SupplyRemaining ??
+      null,
+    earlyClaimableUsdcRemaining:
+      eventEarlyClaimableUsdcRemaining ??
+      onChain?.earlyClaimableUsdcRemaining ??
+      existing?.earlyClaimableUsdcRemaining ??
+      null,
+    earlyClaimableS1SupplyRemaining:
+      eventEarlyClaimableS1SupplyRemaining ??
+      onChain?.earlyClaimableS1SupplyRemaining ??
+      existing?.earlyClaimableS1SupplyRemaining ??
+      null,
+    regularClaimableUsdcRemaining:
+      eventRegularClaimableUsdcRemaining ??
+      onChain?.regularClaimableUsdcRemaining ??
+      existing?.regularClaimableUsdcRemaining ??
+      null,
+    regularClaimableS1SupplyRemaining:
+      eventRegularClaimableS1SupplyRemaining ??
+      onChain?.regularClaimableS1SupplyRemaining ??
+      existing?.regularClaimableS1SupplyRemaining ??
       null,
   };
 };
@@ -372,11 +537,13 @@ export const refreshS1PositionProjectionByPda = async (
       creatorProfilePda,
     },
   });
-  const estimatedClaimableUsdc =
-    buyout && buyout.claimableS1SupplyRemaining > 0n
-      ? (position.internalTokenBalance * buyout.claimableUsdcRemaining) /
-        buyout.claimableS1SupplyRemaining
-      : null;
+  const estimatedClaimableUsdc = calculateEstimatedClaimableUsdc(
+    {
+      internalTokenBalance: position.internalTokenBalance,
+      earlyCohortBalance: position.earlyCohortBalance,
+    },
+    buyout
+  );
 
   const projected = await prisma.s1PositionProjection.upsert({
     where: {
@@ -387,6 +554,7 @@ export const refreshS1PositionProjectionByPda = async (
       creatorWallet: creator?.authority.toBase58() ?? null,
       creatorProfilePda,
       internalTokenBalance: position.internalTokenBalance,
+      earlyCohortBalance: position.earlyCohortBalance,
       spumpCostBasis: position.spumpCostBasis,
       estimatedClaimableUsdc,
       lastEventSignature: event?.signature,
@@ -398,6 +566,7 @@ export const refreshS1PositionProjectionByPda = async (
       creatorProfilePda,
       positionPda,
       internalTokenBalance: position.internalTokenBalance,
+      earlyCohortBalance: position.earlyCohortBalance,
       spumpCostBasis: position.spumpCostBasis,
       estimatedClaimableUsdc,
       lastEventSignature: event?.signature,
@@ -425,77 +594,23 @@ export const refreshAllCreatorMarketProjections = async (
   );
 };
 
-export const syncCampaignProofProjectionFromProposal = async (proposal: Proposal) => {
+const refreshProposalProofStatus = async (proposalPda: string, signature?: string) => {
+  const proposal = await prisma.proposal.findUnique({ where: { proposalPda } });
+  if (!proposal) return;
+
   const proofStatus = mapProofStatus(proposal);
-  const settledAt =
-    proposal.track3SettledAt ?? proposal.track2SettledAt ?? (proposal.track1Claimed ? proposal.updatedAt : null);
-  const latestSettlementTxSignature =
-    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED
-      ? proposal.onChainTxSignature
-      : null;
+  const isSettlingOrSettled =
+    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED;
 
-  return prisma.campaignProofProjection.upsert({
-    where: {
-      proposalPda: proposal.proposalPda,
-    },
-    update: {
-      proposalId: proposal.id,
-      creatorWallet: proposal.creatorWallet,
-      sponsorWallet: proposal.sponsorWallet,
-      manifestId: proposal.manifestId,
-      intentId: proposal.intentId,
-      status: proposal.status,
+  await prisma.proposal.update({
+    where: { proposalPda },
+    data: {
       proofStatus,
-      contentHashHex: proposal.contentHashHex,
-      contentAnchorPda: proposal.contentAnchorPda,
-      contentAnchorTx: proposal.contentAnchorTx,
-      fundingTxSignature:
-        proposal.status === ProposalStatus.FUNDED ? proposal.onChainTxSignature : undefined,
-      latestSettlementTxSignature,
-      track1BaseUsdc: proposal.track1BaseUsdc,
-      track2UsdcDeposited: proposal.track2UsdcDeposited,
-      track3UsdcDeposited: proposal.track3UsdcDeposited,
-      track2MetricType: proposal.track2MetricType,
-      track2TargetValue: proposal.track2TargetValue,
-      track2ActualValue: proposal.track2ActualValue,
-      deadlineAt: proposal.deadlineAt,
-      settledAt,
-    },
-    create: {
-      proposalId: proposal.id,
-      proposalPda: proposal.proposalPda,
-      creatorWallet: proposal.creatorWallet,
-      sponsorWallet: proposal.sponsorWallet,
-      manifestId: proposal.manifestId,
-      intentId: proposal.intentId,
-      status: proposal.status,
-      proofStatus,
-      contentHashHex: proposal.contentHashHex,
-      contentAnchorPda: proposal.contentAnchorPda,
-      contentAnchorTx: proposal.contentAnchorTx,
-      fundingTxSignature:
-        proposal.status === ProposalStatus.FUNDED ? proposal.onChainTxSignature : null,
-      latestSettlementTxSignature,
-      track1BaseUsdc: proposal.track1BaseUsdc,
-      track2UsdcDeposited: proposal.track2UsdcDeposited,
-      track3UsdcDeposited: proposal.track3UsdcDeposited,
-      track2MetricType: proposal.track2MetricType,
-      track2TargetValue: proposal.track2TargetValue,
-      track2ActualValue: proposal.track2ActualValue,
-      deadlineAt: proposal.deadlineAt,
-      settledAt,
+      latestSettlementTxSignature: isSettlingOrSettled
+        ? (signature ?? proposal.onChainTxSignature)
+        : proposal.latestSettlementTxSignature,
     },
   });
-};
-
-export const syncCampaignProofProjectionFromProposalPda = async (proposalPda: string) => {
-  const proposal = await prisma.proposal.findUnique({
-    where: {
-      proposalPda,
-    },
-  });
-
-  return proposal ? syncCampaignProofProjectionFromProposal(proposal) : null;
 };
 
 export const syncMarketProjectionFromChainInstruction = async (params: ChainProjectionEvent) => {
@@ -721,6 +836,63 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     return;
   }
 
+  if (params.instructionName === "abort_s1_buyout") {
+    const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
+    const sponsorWallet = readString(eventData, "sponsor");
+    if (!creatorProfilePda) return;
+
+    if (sponsorWallet) {
+      await prisma.s1BuyoutOfferProjection.updateMany({
+        where: {
+          creatorProfilePda,
+          sponsorWallet,
+          status: BuyoutOfferProjectionStatus.ACCEPTED,
+        },
+        data: {
+          status: BuyoutOfferProjectionStatus.ABORTED,
+          lastEventSignature: params.signature,
+          lastEventAt: observedAt,
+        },
+      });
+    }
+
+    await prisma.s1BuyoutProjection.upsert({
+      where: { creatorProfilePda },
+      update: {
+        buyoutStatePda: null,
+        status: BuyoutProjectionStatus.NONE,
+        winningSponsorWallet: null,
+        acceptedOfferPda: null,
+        acceptedOfferUsdc: null,
+        usdcDeposited: 0n,
+        claimableUsdcRemaining: 0n,
+        claimableS1SupplyRemaining: 0n,
+        earlyClaimableUsdcRemaining: 0n,
+        earlyClaimableS1SupplyRemaining: 0n,
+        regularClaimableUsdcRemaining: 0n,
+        regularClaimableS1SupplyRemaining: 0n,
+        rageQuitDeadlineAt: null,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        creatorProfilePda,
+        status: BuyoutProjectionStatus.NONE,
+        usdcDeposited: 0n,
+        claimableUsdcRemaining: 0n,
+        claimableS1SupplyRemaining: 0n,
+        earlyClaimableUsdcRemaining: 0n,
+        earlyClaimableS1SupplyRemaining: 0n,
+        regularClaimableUsdcRemaining: 0n,
+        regularClaimableS1SupplyRemaining: 0n,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+    await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+    return;
+  }
+
   if (
     params.instructionName === "buy_s1_token" ||
     params.instructionName === "sell_s1_token" ||
@@ -755,6 +927,10 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
           usdcDeposited: graduatedPatch.usdcDeposited,
           claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining,
           claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining,
+          earlyClaimableUsdcRemaining: graduatedPatch.earlyClaimableUsdcRemaining,
+          earlyClaimableS1SupplyRemaining: graduatedPatch.earlyClaimableS1SupplyRemaining,
+          regularClaimableUsdcRemaining: graduatedPatch.regularClaimableUsdcRemaining,
+          regularClaimableS1SupplyRemaining: graduatedPatch.regularClaimableS1SupplyRemaining,
         }),
         status: BuyoutProjectionStatus.GRADUATED,
         lastEventSignature: params.signature,
@@ -771,6 +947,10 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         usdcDeposited: graduatedPatch.usdcDeposited ?? 0n,
         claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining ?? 0n,
         claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining ?? 0n,
+        earlyClaimableUsdcRemaining: graduatedPatch.earlyClaimableUsdcRemaining ?? 0n,
+        earlyClaimableS1SupplyRemaining: graduatedPatch.earlyClaimableS1SupplyRemaining ?? 0n,
+        regularClaimableUsdcRemaining: graduatedPatch.regularClaimableUsdcRemaining ?? 0n,
+        regularClaimableS1SupplyRemaining: graduatedPatch.regularClaimableS1SupplyRemaining ?? 0n,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -789,50 +969,241 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       const buyout = await prisma.s1BuyoutProjection.findUnique({
         where: { creatorProfilePda },
       });
-      if (buyout?.buyoutStatePda) {
-        const onChain = await getAnchorService().fetchS1BuyoutStateByPda(
-          new PublicKey(buyout.buyoutStatePda)
-        );
-        if (onChain) {
-          await prisma.s1BuyoutProjection.update({
-            where: { creatorProfilePda },
-            data: {
-              claimableUsdcRemaining: onChain.claimableUsdcRemaining,
-              claimableS1SupplyRemaining: onChain.claimableS1SupplyRemaining,
-              lastEventSignature: params.signature,
-              lastEventAt: observedAt,
-            },
-          });
-        }
-      } else {
-        const buyoutStatePda = readString(eventData, "s1BuyoutState");
-        await prisma.s1BuyoutProjection.upsert({
-          where: { creatorProfilePda },
-          update: {
-            buyoutStatePda,
-            claimableUsdcRemaining: readBigInt(eventData, "remainingUsdc") ?? undefined,
-            claimableS1SupplyRemaining: readBigInt(eventData, "remainingSupply") ?? undefined,
-            lastEventSignature: params.signature,
-            lastEventAt: observedAt,
-          },
-          create: {
-            creatorProfilePda,
-            buyoutStatePda,
-            status: BuyoutProjectionStatus.GRADUATED,
-            claimableUsdcRemaining: readBigInt(eventData, "remainingUsdc") ?? 0n,
-            claimableS1SupplyRemaining: readBigInt(eventData, "remainingSupply") ?? 0n,
-            lastEventSignature: params.signature,
-            lastEventAt: observedAt,
-          },
-        });
-      }
+      const buyoutStatePda = readString(eventData, "s1BuyoutState") ?? buyout?.buyoutStatePda ?? null;
+      const eventClaimableUsdcRemaining = readBigIntAlias(
+        eventData,
+        "claimableUsdcRemaining",
+        "remainingUsdc"
+      );
+      const eventClaimableS1SupplyRemaining = readBigIntAlias(
+        eventData,
+        "claimableS1SupplyRemaining",
+        "remainingSupply"
+      );
+      const eventEarlyClaimableUsdcRemaining = readBigInt(eventData, "earlyClaimableUsdcRemaining");
+      const eventEarlyClaimableS1SupplyRemaining = readBigInt(
+        eventData,
+        "earlyClaimableS1SupplyRemaining"
+      );
+      const eventRegularClaimableUsdcRemaining = readBigInt(
+        eventData,
+        "regularClaimableUsdcRemaining"
+      );
+      const eventRegularClaimableS1SupplyRemaining = readBigInt(
+        eventData,
+        "regularClaimableS1SupplyRemaining"
+      );
+      const hasEventPoolSnapshot =
+        eventClaimableUsdcRemaining !== null &&
+        eventClaimableS1SupplyRemaining !== null &&
+        eventEarlyClaimableUsdcRemaining !== null &&
+        eventEarlyClaimableS1SupplyRemaining !== null &&
+        eventRegularClaimableUsdcRemaining !== null &&
+        eventRegularClaimableS1SupplyRemaining !== null;
+      const onChain =
+        buyoutStatePda && !hasEventPoolSnapshot
+          ? await getAnchorService().fetchS1BuyoutStateByPda(new PublicKey(buyoutStatePda))
+          : null;
+      const poolPatch = compactNullablePatch({
+        buyoutStatePda,
+        claimableUsdcRemaining:
+          eventClaimableUsdcRemaining ?? onChain?.claimableUsdcRemaining ?? null,
+        claimableS1SupplyRemaining:
+          eventClaimableS1SupplyRemaining ?? onChain?.claimableS1SupplyRemaining ?? null,
+        earlyClaimableUsdcRemaining:
+          eventEarlyClaimableUsdcRemaining ?? onChain?.earlyClaimableUsdcRemaining ?? null,
+        earlyClaimableS1SupplyRemaining:
+          eventEarlyClaimableS1SupplyRemaining ?? onChain?.earlyClaimableS1SupplyRemaining ?? null,
+        regularClaimableUsdcRemaining:
+          eventRegularClaimableUsdcRemaining ?? onChain?.regularClaimableUsdcRemaining ?? null,
+        regularClaimableS1SupplyRemaining:
+          eventRegularClaimableS1SupplyRemaining ??
+          onChain?.regularClaimableS1SupplyRemaining ??
+          null,
+      });
+      await prisma.s1BuyoutProjection.upsert({
+        where: { creatorProfilePda },
+        update: {
+          ...poolPatch,
+          lastEventSignature: params.signature,
+          lastEventAt: observedAt,
+        },
+        create: {
+          creatorProfilePda,
+          buyoutStatePda,
+          status: BuyoutProjectionStatus.GRADUATED,
+          claimableUsdcRemaining:
+            eventClaimableUsdcRemaining ?? onChain?.claimableUsdcRemaining ?? 0n,
+          claimableS1SupplyRemaining:
+            eventClaimableS1SupplyRemaining ?? onChain?.claimableS1SupplyRemaining ?? 0n,
+          earlyClaimableUsdcRemaining:
+            eventEarlyClaimableUsdcRemaining ?? onChain?.earlyClaimableUsdcRemaining ?? 0n,
+          earlyClaimableS1SupplyRemaining:
+            eventEarlyClaimableS1SupplyRemaining ?? onChain?.earlyClaimableS1SupplyRemaining ?? 0n,
+          regularClaimableUsdcRemaining:
+            eventRegularClaimableUsdcRemaining ?? onChain?.regularClaimableUsdcRemaining ?? 0n,
+          regularClaimableS1SupplyRemaining:
+            eventRegularClaimableS1SupplyRemaining ??
+            onChain?.regularClaimableS1SupplyRemaining ??
+            0n,
+          lastEventSignature: params.signature,
+          lastEventAt: observedAt,
+        },
+      });
       await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
     }
     return;
   }
 
+  if (params.instructionName === "endorse_proposal") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    const userWallet = readString(eventData, "user");
+    const amount = readBigInt(eventData, "amount");
+    let positionPda = readString(eventData, "endorsementPosition");
+    if (!positionPda && userWallet && proposalPda) {
+      positionPda = getAnchorService()
+        .deriveEndorsementPositionPda(new PublicKey(userWallet), new PublicKey(proposalPda))
+        .toBase58();
+    }
+    if (!proposalPda || !userWallet || !positionPda || amount === null) return;
+
+    const existing = await prisma.s2EndorsementPositionProjection.findUnique({
+      where: { positionPda },
+    });
+    const nextStakedAmount =
+      existing?.lastEventSignature === params.signature
+        ? existing.stakedSpumpAmount
+        : (existing?.stakedSpumpAmount ?? 0n) + amount;
+    const proposal = await prisma.proposal.findUnique({
+      where: { proposalPda },
+      select: {
+        track2InitialFanPool: true,
+        track2InitialSpumpStaked: true,
+      },
+    });
+
+    await prisma.s2EndorsementPositionProjection.upsert({
+      where: { positionPda },
+      update: {
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: nextStakedAmount,
+        claimedStatus: false,
+        estimatedUsdcReward: calculateEstimatedS2Reward(
+          nextStakedAmount,
+          proposal?.track2InitialFanPool,
+          proposal?.track2InitialSpumpStaked
+        ),
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        positionPda,
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: amount,
+        claimedStatus: false,
+        estimatedUsdcReward: calculateEstimatedS2Reward(
+          amount,
+          proposal?.track2InitialFanPool,
+          proposal?.track2InitialSpumpStaked
+        ),
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+
+    if (existing?.lastEventSignature !== params.signature) {
+      const endorserIncrement = existing ? 0 : 1;
+      await prisma.proposal.updateMany({
+        where: { proposalPda },
+        data: {
+          endorserCount: { increment: endorserIncrement },
+          totalSpumpStaked: { increment: amount },
+        },
+      });
+    }
+
+    return;
+  }
+
+  if (params.instructionName === "settle_track2") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    if (!proposalPda) return;
+    const initialFanPool = readBigIntAlias(
+      eventData,
+      "initialFanPool",
+      "track2InitialFanPool",
+      "fanPoolRemaining"
+    ) ?? 0n;
+    const initialSpumpStaked = readBigIntAlias(
+      eventData,
+      "initialSpumpStaked",
+      "track2InitialSpumpStaked"
+    ) ?? 0n;
+
+    await prisma.proposal.updateMany({
+      where: { proposalPda },
+      data: {
+        track2InitialFanPool: initialFanPool,
+        track2InitialSpumpStaked: initialSpumpStaked,
+      },
+    });
+    await updateS2EndorsementEstimatesForProposal(proposalPda, initialFanPool, initialSpumpStaked, event);
+    await refreshProposalProofStatus(proposalPda, params.signature);
+    return;
+  }
+
+  if (params.instructionName === "claim_endorsement") {
+    const proposalPda = readString(eventData, "proposal") ?? params.proposalPda;
+    const userWallet = readString(eventData, "user");
+    const stakedAmount = readBigInt(eventData, "stakedAmount");
+    const usdcReward = readBigInt(eventData, "usdcReward") ?? 0n;
+    let positionPda = readString(eventData, "endorsementPosition");
+    if (!positionPda && userWallet && proposalPda) {
+      positionPda = getAnchorService()
+        .deriveEndorsementPositionPda(new PublicKey(userWallet), new PublicKey(proposalPda))
+        .toBase58();
+    }
+    if (!proposalPda || !userWallet || !positionPda) return;
+
+    await prisma.s2EndorsementPositionProjection.upsert({
+      where: { positionPda },
+      update: {
+        userWallet,
+        proposalPda,
+        ...(stakedAmount === null ? {} : { stakedSpumpAmount: stakedAmount }),
+        claimedStatus: true,
+        estimatedUsdcReward: usdcReward,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        positionPda,
+        userWallet,
+        proposalPda,
+        stakedSpumpAmount: stakedAmount ?? 0n,
+        claimedStatus: true,
+        estimatedUsdcReward: usdcReward,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+
+    const claimedCount = await prisma.s2EndorsementPositionProjection.count({
+      where: { proposalPda, claimedStatus: true },
+    });
+    await prisma.proposal.updateMany({
+      where: { proposalPda },
+      data: { claimedEndorserCount: claimedCount },
+    });
+
+    await refreshProposalProofStatus(proposalPda, params.signature);
+    return;
+  }
+
   if (params.proposalPda) {
-    await syncCampaignProofProjectionFromProposalPda(params.proposalPda);
+    await refreshProposalProofStatus(params.proposalPda, params.signature);
   }
 };
 
@@ -946,7 +1317,7 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
       },
       take: 5,
     }),
-    prisma.campaignProofProjection.findMany({
+    prisma.proposal.findMany({
       where: {
         creatorWallet: creator.creatorWallet,
       },
@@ -971,6 +1342,10 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
           usdcDeposited: buyout.usdcDeposited.toString(),
           claimableUsdcRemaining: buyout.claimableUsdcRemaining.toString(),
           claimableS1SupplyRemaining: buyout.claimableS1SupplyRemaining.toString(),
+          earlyClaimableUsdcRemaining: buyout.earlyClaimableUsdcRemaining.toString(),
+          earlyClaimableS1SupplyRemaining: buyout.earlyClaimableS1SupplyRemaining.toString(),
+          regularClaimableUsdcRemaining: buyout.regularClaimableUsdcRemaining.toString(),
+          regularClaimableS1SupplyRemaining: buyout.regularClaimableS1SupplyRemaining.toString(),
           rageQuitDeadlineAt: buyout.rageQuitDeadlineAt?.toISOString() ?? null,
         }
       : null,
@@ -982,7 +1357,7 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
       sponsorCancelAfterAt: offer.sponsorCancelAfterAt?.toISOString() ?? null,
     })),
     campaigns: campaigns.map((campaign) => ({
-      proposalId: campaign.proposalId,
+      proposalId: campaign.id,
       proposalPda: campaign.proposalPda,
       status: campaign.status,
       proofStatus: campaign.proofStatus,
@@ -1031,6 +1406,10 @@ export const reconcileGraduatedS1BuyoutProjection = async (
         usdcDeposited: patch.usdcDeposited,
         claimableUsdcRemaining: patch.claimableUsdcRemaining,
         claimableS1SupplyRemaining: patch.claimableS1SupplyRemaining,
+        earlyClaimableUsdcRemaining: patch.earlyClaimableUsdcRemaining,
+        earlyClaimableS1SupplyRemaining: patch.earlyClaimableS1SupplyRemaining,
+        regularClaimableUsdcRemaining: patch.regularClaimableUsdcRemaining,
+        regularClaimableS1SupplyRemaining: patch.regularClaimableS1SupplyRemaining,
       }),
       lastEventSignature: event.signature ?? existing.lastEventSignature,
       lastEventAt: event.observedAt ?? existing.lastEventAt,
@@ -1041,14 +1420,24 @@ export const reconcileGraduatedS1BuyoutProjection = async (
 };
 
 export const getPortfolioProjection = async (userWallet: string) => {
-  const positions = await prisma.s1PositionProjection.findMany({
-    where: {
-      userWallet,
-    },
-    orderBy: {
-      updatedAt: "desc",
-    },
-  });
+  const [positions, s2Endorsements] = await Promise.all([
+    prisma.s1PositionProjection.findMany({
+      where: {
+        userWallet,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    }),
+    prisma.s2EndorsementPositionProjection.findMany({
+      where: {
+        userWallet,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    }),
+  ]);
   const creatorProfiles = await prisma.creatorMarketProjection.findMany({
     where: {
       creatorProfilePda: {
@@ -1056,20 +1445,59 @@ export const getPortfolioProjection = async (userWallet: string) => {
       },
     },
   });
+  const buyouts = await prisma.s1BuyoutProjection.findMany({
+    where: {
+      creatorProfilePda: {
+        in: positions.map((position) => position.creatorProfilePda),
+      },
+    },
+  });
+  const s2Proposals = await prisma.proposal.findMany({
+    where: {
+      proposalPda: {
+        in: s2Endorsements.map((position) => position.proposalPda),
+      },
+    },
+  });
   const creatorMap = new Map(creatorProfiles.map((creator) => [creator.creatorProfilePda, creator]));
+  const buyoutMap = new Map(buyouts.map((buyout) => [buyout.creatorProfilePda, buyout]));
+  const proposalMap = new Map(s2Proposals.map((proposal) => [proposal.proposalPda, proposal]));
 
   return {
     userWallet,
     positions: positions.map((position) => {
       const creator = creatorMap.get(position.creatorProfilePda);
+      const estimatedClaimableUsdc = calculateEstimatedClaimableUsdc(
+        {
+          internalTokenBalance: position.internalTokenBalance,
+          earlyCohortBalance: position.earlyCohortBalance,
+        },
+        buyoutMap.get(position.creatorProfilePda)
+      );
       return {
         positionPda: position.positionPda,
         creatorWallet: position.creatorWallet,
         creatorProfilePda: position.creatorProfilePda,
         creator: creator ? serializeCreatorMarketProjection(creator) : null,
         internalTokenBalance: position.internalTokenBalance.toString(),
+        earlyCohortBalance: position.earlyCohortBalance.toString(),
         spumpCostBasis: position.spumpCostBasis.toString(),
-        estimatedClaimableUsdc: serializeBigInt(position.estimatedClaimableUsdc),
+        estimatedClaimableUsdc: serializeBigInt(estimatedClaimableUsdc),
+        updatedAt: position.updatedAt.toISOString(),
+      };
+    }),
+    s2Endorsements: s2Endorsements.map((position) => {
+      const proposal = proposalMap.get(position.proposalPda);
+      return {
+        positionPda: position.positionPda,
+        proposalPda: position.proposalPda,
+        proposalId: proposal?.id ?? null,
+        creatorWallet: proposal?.creatorWallet ?? null,
+        sponsorWallet: proposal?.sponsorWallet ?? null,
+        status: proposal?.status ?? null,
+        stakedSpumpAmount: position.stakedSpumpAmount.toString(),
+        claimedStatus: position.claimedStatus,
+        estimatedUsdcReward: position.estimatedUsdcReward.toString(),
         updatedAt: position.updatedAt.toISOString(),
       };
     }),
@@ -1123,13 +1551,12 @@ const serializeManifestProof = (manifest: MarketProofManifest | null) => {
 
 export const serializePublicCampaignProof = (
   proposal: PublicCampaignProposal,
-  proof?: Awaited<ReturnType<typeof syncCampaignProofProjectionFromProposal>> | null
 ) => ({
   proposalId: proposal.id,
   proposalPda: proposal.proposalPda,
   viewerRole: "PUBLIC",
   status: proposal.status,
-  proofStatus: proof?.proofStatus ?? mapProofStatus(proposal),
+  proofStatus: proposal.proofStatus ?? mapProofStatus(proposal),
   creatorWallet: proposal.creatorWallet,
   sponsorWallet: proposal.sponsorWallet,
   manifestId: proposal.manifestId,
@@ -1144,6 +1571,8 @@ export const serializePublicCampaignProof = (
     track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
     track2ActualValue: serializeBigInt(proposal.track2ActualValue),
     track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+    track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+    track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
     track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
     track3CpsPayout: serializeBigInt(proposal.track3CpsPayout),
     track3DelayDays: proposal.track3DelayDays,
@@ -1201,6 +1630,12 @@ export const getPublicCampaignProof = async (id: string) => {
     return null;
   }
 
-  const proof = await syncCampaignProofProjectionFromProposal(proposal);
-  return serializePublicCampaignProof(proposal, proof);
+  return {
+    ...serializePublicCampaignProof(proposal),
+    endorsementSummary: {
+      endorserCount: proposal.endorserCount,
+      totalStakedSpump: proposal.totalSpumpStaked.toString(),
+      claimedEndorserCount: proposal.claimedEndorserCount,
+    },
+  };
 };

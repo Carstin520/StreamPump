@@ -1,6 +1,6 @@
 import type { AppProps } from "next/app";
 import dynamic from "next/dynamic";
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 
 import { AppBootGate } from "@/components/layout/AppBootGate";
 import { I18nProvider } from "@/lib/i18n";
@@ -21,11 +21,21 @@ const ClientProviders = dynamic(
   { ssr: false }
 );
 
+function FoucRecoveryGuard() {
+  useEffect(() => {
+    document.querySelectorAll("style[data-next-hide-fouc]").forEach((node) => node.remove());
+    document.body.style.removeProperty("display");
+  }, []);
+
+  return null;
+}
+
 export default function App({ Component, pageProps }: StreamPumpAppProps) {
   const page = <Component {...pageProps} />;
 
   return (
     <Fragment>
+      <FoucRecoveryGuard />
       <I18nProvider>
         <AppBootGate>
           {Component.requiresWalletProviders ? (

@@ -41,7 +41,7 @@ pub struct SettleTrack3Cps<'info> {
     /// ZH: 提案账户；必须是 funded/resolved，且不能是 cancelled/voided。
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump,
         constraint = proposal.status != ProposalStatus::Open @ StreamPumpError::ProposalNotFunded,
         constraint = proposal.status != ProposalStatus::Cancelled @ StreamPumpError::ProposalNotActive,
@@ -128,11 +128,13 @@ pub(crate) fn handler(ctx: Context<SettleTrack3Cps>, args: SettleTrack3CpsArgs) 
     let refund_amount = checked_sub(proposal.track3_usdc_deposited, args.approved_cps_payout)?;
 
     let deadline_bytes = proposal.deadline.to_le_bytes();
+    let nonce_bytes = proposal.nonce.to_le_bytes();
     let proposal_bump_bytes = [proposal.bump];
-    let signer_seeds: [&[u8]; 4] = [
+    let signer_seeds: [&[u8]; 5] = [
         b"proposal",
         proposal.creator.as_ref(),
         deadline_bytes.as_ref(),
+        nonce_bytes.as_ref(),
         proposal_bump_bytes.as_ref(),
     ];
     let signer: &[&[&[u8]]] = &[&signer_seeds];

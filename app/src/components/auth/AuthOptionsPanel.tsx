@@ -26,6 +26,7 @@ import {
   LoginPreviewMode,
 } from "@/lib/api/types";
 import { storeAuthSession } from "@/lib/auth-session";
+import { useI18n } from "@/lib/i18n";
 import { loginAccounts, loginMethods } from "@/lib/public-data";
 import { WORKSPACE_PATH } from "@/lib/routes";
 
@@ -70,7 +71,8 @@ const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
 };
 
 const previewSocialAuthEnabled =
-  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH !== "false";
+  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH === "true" ||
+  process.env.NODE_ENV === "development";
 
 const PREVIEW_MANAGED_WALLET = "C8tzqwn5ghvKEgkcwf822vxQA5fgt7cmr49mqCtyK8fX";
 
@@ -130,14 +132,17 @@ export const AuthOptionsPanel = ({
   onModeChange,
 }: AuthOptionsPanelProps) => {
   const router = useRouter();
+  const { t } = useI18n();
   const { connected, connecting, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState("alex@streampump.local");
   const [emailCode, setEmailCode] = useState("");
   const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<string>("选择邮箱、Google、Apple 或钱包继续。");
+  const [lastAction, setLastAction] = useState<string>(() => t("auth.initialAction"));
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
+  const [pendingExternalWalletBind, setPendingExternalWalletBind] = useState(false);
+  const [pendingIdentitySession, setPendingIdentitySession] = useState<AuthSessionRecord | null>(null);
   const [showAccounts, setShowAccounts] = useState(false);
 
   const currentAccount = useMemo(
@@ -167,25 +172,40 @@ export const AuthOptionsPanel = ({
     [emailValue],
   );
 
+  const beginWalletChoice = useCallback((session: AuthSessionRecord, successLabel: string) => {
+    setPendingIdentitySession(session);
+    setLastAction(`${successLabel} 已验证，请选择托管账户或绑定自己的钱包。`);
+  }, []);
+
+  const completeWithManagedWallet = useCallback(() => {
+    if (!pendingIdentitySession) {
+      return;
+    }
+
+    storeAuthSession(pendingIdentitySession);
+    setLastAction("已使用平台托管账户进入产品。");
+    void router.push(nextHref);
+  }, [nextHref, pendingIdentitySession, router]);
+
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
     if (!previewSocialAuthEnabled) {
-      setLastAction("社交登录预览被环境变量关闭，请使用钱包登录。");
+      setLastAction(t("auth.socialDisabled"));
       return;
     }
 
     setBusyKey(identity.providerSubject);
-    setLastAction(`正在创建 ${successLabel} 会话...`);
+    setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
 
     try {
       const session = await exchangeProviderSession(identity);
-      storeAuthSession(session);
-      setLastAction(`${successLabel} 会话已创建，正在进入产品。`);
-      void router.push(nextHref);
+      beginWalletChoice(session, successLabel);
     } catch (error) {
+      if (!previewSocialAuthEnabled) {
+        setLastAction(error instanceof Error ? error.message : t("auth.socialDisabled"));
+        return;
+      }
       const session = createLocalProviderSession(identity);
-      storeAuthSession(session);
-      setLastAction(`${successLabel} 本地预览会话已创建，后端不可用时也可继续浏览。`);
-      void router.push(resolveLocalPreviewRedirectHref(nextHref));
+      beginWalletChoice(session, `${successLabel} 本地预览`);
     } finally {
       setBusyKey(null);
     }
@@ -199,13 +219,17 @@ export const AuthOptionsPanel = ({
     const walletAddress = publicKey.toBase58();
     setBusyKey("wallet");
     setPendingWalletLogin(false);
-    setLastAction("正在创建钱包登录会话...");
+    setLastAction(t("auth.walletSessionCreating"));
 
     try {
       if (!signMessage) {
+        if (!previewSocialAuthEnabled) {
+          setLastAction("Wallet message signing is unavailable, and local preview sessions are disabled.");
+          return;
+        }
         const session = createLocalWalletSession(walletAddress);
         storeAuthSession(session);
-        setLastAction("钱包已连接，本地预览会话已创建。");
+        setLastAction(t("auth.walletConnectedLocal"));
         void router.push(resolveLocalPreviewRedirectHref(nextHref));
         return;
       }
@@ -219,22 +243,91 @@ export const AuthOptionsPanel = ({
       });
 
       storeAuthSession(session);
-      setLastAction("钱包会话已创建，正在进入产品。");
+      setLastAction(t("auth.walletSessionReady"));
       void router.push(nextHref);
     } catch (error) {
       if (isUserRejectedWalletRequest(error)) {
-        setLastAction("钱包签名已取消，未创建会话。");
+        setLastAction(t("auth.walletRejected"));
+        return;
+      }
+
+      if (!previewSocialAuthEnabled) {
+        setLastAction(error instanceof Error ? error.message : "Wallet session creation failed.");
         return;
       }
 
       const session = createLocalWalletSession(walletAddress);
       storeAuthSession(session);
-      setLastAction("钱包已连接，本地预览会话已创建。");
+      setLastAction(t("auth.walletConnectedLocal"));
       void router.push(resolveLocalPreviewRedirectHref(nextHref));
     } finally {
       setBusyKey(null);
     }
-  }, [nextHref, publicKey, router, signMessage]);
+  }, [nextHref, publicKey, router, signMessage, t]);
+
+  const completeExternalWalletBind = useCallback(async () => {
+    if (!pendingIdentitySession) {
+      return;
+    }
+
+    if (!publicKey) {
+      setPendingExternalWalletBind(true);
+      setVisible(true);
+      setLastAction("请选择并连接要绑定的 Phantom/Solflare 钱包。");
+      return;
+    }
+
+    const walletAddress = publicKey.toBase58();
+    setBusyKey("wallet-bind");
+    setPendingExternalWalletBind(false);
+    setLastAction("正在绑定外部钱包...");
+
+    try {
+      if (!signMessage || pendingIdentitySession.accessToken.startsWith("preview-local.")) {
+        if (!previewSocialAuthEnabled) {
+          setLastAction("External wallet binding preview is disabled by environment variables.");
+          return;
+        }
+        const localWalletSession: AuthSessionRecord = {
+          ...createLocalWalletSession(walletAddress),
+          identity: pendingIdentitySession.identity
+            ? {
+                ...pendingIdentitySession.identity,
+                managedWalletAddress: walletAddress,
+              }
+            : null,
+        };
+        storeAuthSession(localWalletSession);
+        setLastAction("外部钱包已绑定到本地预览会话。");
+        void router.push(resolveLocalPreviewRedirectHref(nextHref));
+        return;
+      }
+
+      const challenge = await createWalletAuthChallenge(walletAddress);
+      const signatureBytes = await signMessage(new TextEncoder().encode(challenge.message));
+      const session = await verifyWalletAuthChallenge(
+        {
+          wallet: walletAddress,
+          nonce: challenge.nonce,
+          signature: bytesToBase64(signatureBytes),
+        },
+        pendingIdentitySession.accessToken,
+      );
+
+      storeAuthSession(session);
+      setLastAction("外部钱包已完成签名绑定。");
+      void router.push(nextHref);
+    } catch (error) {
+      if (isUserRejectedWalletRequest(error)) {
+        setLastAction(t("auth.walletRejected"));
+        return;
+      }
+
+      setLastAction(error instanceof Error ? error.message : "外部钱包绑定失败。");
+    } finally {
+      setBusyKey(null);
+    }
+  }, [nextHref, pendingIdentitySession, publicKey, router, setVisible, signMessage, t]);
 
   useEffect(() => {
     if (!pendingWalletLogin || !connected || !publicKey || busyKey) {
@@ -244,11 +337,19 @@ export const AuthOptionsPanel = ({
     void completeWalletLogin();
   }, [busyKey, completeWalletLogin, connected, pendingWalletLogin, publicKey]);
 
+  useEffect(() => {
+    if (!pendingExternalWalletBind || !connected || !publicKey || busyKey) {
+      return;
+    }
+
+    void completeExternalWalletBind();
+  }, [busyKey, completeExternalWalletBind, connected, pendingExternalWalletBind, publicKey]);
+
   const handleWalletLogin = async () => {
     if (!connected || !publicKey) {
       setPendingWalletLogin(true);
       setVisible(true);
-      setLastAction("请选择并连接 Solana 钱包，连接成功后会自动继续登录。");
+      setLastAction(t("auth.walletRequired"));
       return;
     }
 
@@ -258,20 +359,20 @@ export const AuthOptionsPanel = ({
   const handleEmailRequestCode = async () => {
     const email = emailValue.trim();
     if (!email) {
-      setLastAction("请输入邮箱地址。");
+      setLastAction(t("auth.emailRequired"));
       return;
     }
 
     setBusyKey("email");
-    setLastAction("正在发送邮箱验证码...");
+    setLastAction(t("auth.sendingEmailCode"));
 
     try {
       const challenge = await requestEmailLoginCode(email);
       setEmailCode("");
       setEmailCodeExpiresAt(challenge.expiresAt);
-      setLastAction("验证码已发送，请查看邮箱。");
+      setLastAction(t("auth.codeSent"));
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : "邮箱验证码发送失败。");
+      setLastAction(error instanceof Error ? error.message : t("auth.emailSendFailed"));
     } finally {
       setBusyKey(null);
     }
@@ -281,20 +382,18 @@ export const AuthOptionsPanel = ({
     const email = emailValue.trim();
     const code = emailCode.trim();
     if (!email || !code) {
-      setLastAction("请输入邮箱和验证码。");
+      setLastAction(t("auth.emailAndCodeRequired"));
       return;
     }
 
     setBusyKey("email-verify");
-    setLastAction("正在验证邮箱验证码...");
+    setLastAction(t("auth.verifyingEmailCode"));
 
     try {
       const session = await verifyEmailLoginCode({ email, code });
-      storeAuthSession(session);
-      setLastAction("邮箱会话已创建，正在进入产品。");
-      void router.push(nextHref);
+      beginWalletChoice(session, "邮箱 OTP");
     } catch (error) {
-      setLastAction(error instanceof Error ? error.message : "邮箱验证码验证失败。");
+      setLastAction(error instanceof Error ? error.message : t("auth.emailCodeFailed"));
     } finally {
       setBusyKey(null);
     }
@@ -311,18 +410,18 @@ export const AuthOptionsPanel = ({
       return;
     }
 
-    await createPreviewSession(resolveMethodIdentity(method.id), method.label);
+    await createPreviewSession(resolveMethodIdentity(method.id), getLoginMethodLabel(method.id, t));
   };
 
   const handleAccountSwitch = async (accountId: string, accountName: string) => {
     const identity = ACCOUNT_IDENTITIES[accountId];
     if (!identity) {
-      setLastAction(`${accountName} will use the connected wallet instead of the old preview path.`);
+      setLastAction(t("auth.walletSwitchFallback", { name: accountName }));
       await handleWalletLogin();
       return;
     }
 
-    await createPreviewSession(identity, `${accountName} account`);
+    await createPreviewSession(identity, t("auth.accountSessionLabel", { name: accountName }));
   };
 
   return (
@@ -342,21 +441,67 @@ export const AuthOptionsPanel = ({
               onClick={() => onModeChange(previewMode)}
               type="button"
             >
-              {previewMode === "welcome" ? "初次登录" : "切换账号"}
+              {previewMode === "welcome" ? t("auth.welcome") : t("auth.switchAccount")}
             </button>
           ))}
         </div>
 
-        {mode === "welcome" ? (
+        {previewSocialAuthEnabled ? (
+          <div className="mb-5 rounded-full border border-[#f3b33e]/25 bg-[#2a1f0b]/80 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f8d48a]">
+            Preview Session Enabled
+          </div>
+        ) : null}
+
+        {pendingIdentitySession ? (
+          <div className="space-y-5">
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#87e7bd]">
+                Identity verified
+              </p>
+              <h2 className="mt-3 text-[30px] font-semibold text-white">选择钱包模式</h2>
+              <p className="mt-3 text-sm leading-6 text-[#93a3bb]">
+                使用平台分配的托管账户可立即浏览和互动；绑定 Phantom/Solflare 会把这个登录身份映射到你的自有钱包。
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                className="card-radius flex w-full items-center justify-between border border-[#5fca9f]/25 bg-[#113222] px-4 py-4 text-left transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-70"
+                disabled={Boolean(busyKey)}
+                onClick={completeWithManagedWallet}
+                type="button"
+              >
+                <span>
+                  <span className="block text-sm font-semibold text-[#b9f7d4]">使用平台托管账户</span>
+                  <span className="mt-1 block text-xs text-[#7bc59f]">推荐给普通 Viewer，无需单独签名即可入网</span>
+                </span>
+                <ChevronRightIcon className="h-4 w-4 text-[#b9f7d4]" />
+              </button>
+
+              <button
+                className="card-radius flex w-full items-center justify-between border border-[#8f5824] bg-[#2e1e17] px-4 py-4 text-left text-[#ffd0a6] transition hover:border-[#b06f34] disabled:cursor-wait disabled:opacity-70"
+                disabled={Boolean(busyKey)}
+                onClick={() => void completeExternalWalletBind()}
+                type="button"
+              >
+                <span>
+                  <span className="block text-sm font-semibold">连接自己的 Solana 钱包</span>
+                  <span className="mt-1 block text-xs text-[#dca56e]">适合后续签名、创作者准入或 Sponsor 管理钱包</span>
+                </span>
+                <WalletIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-[40px] font-semibold tracking-[-0.05em] text-white">欢迎回来</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">登录或注册 StreamPump 账号</p>
+              <h2 className="text-[40px] font-semibold tracking-[-0.05em] text-white">{t("auth.welcomeBack")}</h2>
+              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.signInOrCreate")}</p>
             </div>
 
             <label className="block">
               <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
-                Email
+                {t("common.email")}
               </span>
               <input
                 className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
@@ -372,7 +517,7 @@ export const AuthOptionsPanel = ({
               <div className="space-y-3">
                 <label className="block">
                   <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
-                    Verification code
+                    {t("auth.verificationCode")}
                   </span>
                   <input
                     className="card-radius w-full border border-white/[0.08] bg-[#0d1420]/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#53627a] focus:border-[#de513c]/60 focus:bg-[#111a2a]"
@@ -390,7 +535,7 @@ export const AuthOptionsPanel = ({
                   onClick={() => void handleEmailVerifyCode()}
                   type="button"
                 >
-                  Verify email code
+                  {t("auth.verifyEmailCode")}
                 </button>
               </div>
             ) : null}
@@ -420,15 +565,15 @@ export const AuthOptionsPanel = ({
                         <LoginMethodIcon id={method.id} />
                       </span>
                       <div>
-                        <p className="text-sm font-medium">{method.label}</p>
+                        <p className="text-sm font-medium">{getLoginMethodLabel(method.id, t)}</p>
                         <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
                           {method.id === "email"
                             ? emailCodeExpiresAt
-                              ? "重新发送邮箱验证码"
-                              : "发送一次性邮箱验证码"
+                              ? t("auth.resendEmailCode")
+                              : t("auth.sendEmailCode")
                             : socialDisabled
-                              ? "社交登录已被环境变量关闭"
-                              : method.subtitle}
+                              ? t("auth.socialDisabledShort")
+                              : getLoginMethodSubtitle(method.id, t)}
                         </p>
                       </div>
                     </div>
@@ -439,15 +584,15 @@ export const AuthOptionsPanel = ({
                         </span>
                       ) : socialDisabled ? (
                         <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
-                          Env off
+                          {t("auth.envOff")}
                         </span>
                       ) : method.id === "wallet" ? (
                         <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
-                          {connecting ? "Connecting" : connected ? "Wallet ready" : "Web3"}
+                          {connecting ? t("auth.walletConnecting") : connected ? t("auth.walletReady") : "Web3"}
                         </span>
                       ) : (
                         <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
-                          Ready
+                          {t("auth.ready")}
                         </span>
                       )}
                       <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
@@ -458,14 +603,14 @@ export const AuthOptionsPanel = ({
             </div>
 
             <p className="text-center text-xs text-[#70819d]">
-              继续即表示你同意 <span className="text-[#96a8c0]">服务条款</span> 和 <span className="text-[#96a8c0]">隐私政策</span>
+              {t("auth.termsPrefix")} <span className="text-[#96a8c0]">{t("auth.termsService")}</span> {t("auth.termsAnd")} <span className="text-[#96a8c0]">{t("auth.termsPrivacy")}</span>
             </p>
           </div>
         ) : (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className="text-[32px] font-semibold tracking-[-0.05em] text-white">切换账号</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">继续当前身份，或切换到另一个 StreamPump 会话</p>
+              <h2 className="text-[32px] font-semibold tracking-[-0.05em] text-white">{t("auth.switchAccount")}</h2>
+              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.continueCurrent")}</p>
             </div>
 
             <div className="card-radius border border-white/[0.08] bg-[#111827]/90 p-5 shadow-[0_20px_52px_rgba(0,0,0,0.18)]">
@@ -477,8 +622,8 @@ export const AuthOptionsPanel = ({
                 </div>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/92">{currentAccount.sessionLabel}</span>
-                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#93a3bb]">{currentAccount.methodLabel}</span>
+                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/92">{getAccountSessionLabel(currentAccount.id, t)}</span>
+                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#93a3bb]">{getAccountMethodLabel(currentAccount.id, t)}</span>
               </div>
             </div>
 
@@ -487,7 +632,7 @@ export const AuthOptionsPanel = ({
               onClick={() => {
                 setShowAccounts((value) => {
                   const nextValue = !value;
-                  setLastAction(nextValue ? "Expanded alternate accounts preview." : "Switched back to compact account view.");
+                  setLastAction(nextValue ? t("auth.expandedAccounts") : t("auth.compactAccounts"));
                   return nextValue;
                 });
               }}
@@ -498,8 +643,8 @@ export const AuthOptionsPanel = ({
                   <SearchIcon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-[18px] font-semibold tracking-[-0.03em]">切换账号</p>
-                  <p className="mt-1 text-sm text-[#8ea0ba]">查看其他登录身份与钱包会话</p>
+                  <p className="text-[18px] font-semibold tracking-[-0.03em]">{t("auth.accountSwitcherTitle")}</p>
+                  <p className="mt-1 text-sm text-[#8ea0ba]">{t("auth.accountSwitcherBody")}</p>
                 </div>
               </div>
               <ChevronRightIcon className={`h-5 w-5 text-white/52 transition ${showAccounts ? "rotate-90" : ""}`} />
@@ -519,7 +664,7 @@ export const AuthOptionsPanel = ({
                       <img alt={account.name} className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" src={account.avatarSrc} />
                       <div>
                         <p className="text-sm font-medium text-white">{account.name}</p>
-                        <p className="mt-1 text-xs text-[#8697b1]">{account.handle} · {account.methodLabel}</p>
+                        <p className="mt-1 text-xs text-[#8697b1]">{account.handle} · {getAccountMethodLabel(account.id, t)}</p>
                       </div>
                     </div>
                     <FollowCheckIcon className="h-4 w-4 text-[#93c8ff]" />
@@ -536,6 +681,34 @@ export const AuthOptionsPanel = ({
       </div>
     </section>
   );
+};
+
+type TFunction = ReturnType<typeof useI18n>["t"];
+
+const getLoginMethodLabel = (id: LoginMethodRecord["id"], t: TFunction) => {
+  if (id === "email") return t("auth.emailLogin");
+  if (id === "google") return t("auth.googleLogin");
+  if (id === "apple") return t("auth.appleLogin");
+  return t("auth.walletLogin");
+};
+
+const getLoginMethodSubtitle = (id: LoginMethodRecord["id"], t: TFunction) => {
+  if (id === "email") return t("auth.emailSubtitle");
+  if (id === "google") return t("auth.googleSubtitle");
+  if (id === "apple") return t("auth.appleSubtitle");
+  return t("auth.walletSubtitle");
+};
+
+const getAccountSessionLabel = (id: string, t: TFunction) => {
+  if (id === "neo-preview-account") return t("auth.recentLogin");
+  if (id === "wallet-preview-account") return t("auth.walletIdentity");
+  return t("auth.currentSession");
+};
+
+const getAccountMethodLabel = (id: string, t: TFunction) => {
+  if (id === "neo-preview-account") return t("auth.appleMethodLabel");
+  if (id === "wallet-preview-account") return "Phantom";
+  return t("auth.googleEmbeddedWallet");
 };
 
 const LoginMethodIcon = ({ id }: { id: LoginMethodRecord["id"] }) => {

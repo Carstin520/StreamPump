@@ -20,7 +20,7 @@ class MuxReconciliationScheduler {
     }
 
     this.task = cron.schedule(config.mux.reconciliation.cron, () => {
-      void this.runOnce();
+      this.runOnceInBackground();
     });
 
     console.log(
@@ -28,7 +28,7 @@ class MuxReconciliationScheduler {
     );
 
     if (config.mux.reconciliation.runOnBoot) {
-      void this.runOnce();
+      this.runOnceInBackground();
     }
   }
 
@@ -59,6 +59,12 @@ class MuxReconciliationScheduler {
     } finally {
       this.running = false;
     }
+  }
+
+  private runOnceInBackground(): void {
+    void this.runOnce().catch((error) => {
+      console.error("[mux-reconcile] background run failed", error);
+    });
   }
 }
 

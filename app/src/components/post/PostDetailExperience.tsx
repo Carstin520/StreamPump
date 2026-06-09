@@ -19,6 +19,7 @@ import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
 import { PostRecord } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 
 const DynamicCommentPanel = dynamic(
   () => import("@/components/user/CommentPanel").then((mod) => mod.CommentPanel),
@@ -77,6 +78,7 @@ export const PostDetailExperience = ({
   closeLabel = "Back",
   mode = "page",
 }: PostDetailExperienceProps) => {
+  const { t } = useI18n();
   const {
     currentIndex,
     currentPost,
@@ -157,7 +159,8 @@ export const PostDetailExperience = ({
       className="detail-card-surface immersive-shell resize-detail-card overflow-hidden rounded-[34px] border border-white/[0.055]"
       style={{
         width: mode === "modal" ? "calc(100vw - 120px)" : "min(1500px, calc(100vw - 20px))",
-        height: mode === "modal" ? "calc(100vh - 90px)" : "min(900px, calc(100vh - 20px))",
+        height: mode === "modal" ? "calc(100vh - 90px)" : "min(780px, calc(100vh - 190px))",
+        minHeight: mode === "modal" ? undefined : "520px",
       }}
     >
       <div className={`grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_clamp(312px,26vw,392px)] ${transitionClass}`} key={`${currentPost.id}-${transitionKey}`}>
@@ -196,8 +199,8 @@ export const PostDetailExperience = ({
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[#93a5bd]">
               <StagePill stage={currentPost.stage} />
-              {previousPost ? <RouteHint label="Prev" onClick={goPrevious} post={previousPost} /> : null}
-              {nextPost ? <RouteHint label="Next" onClick={goNext} post={nextPost} /> : null}
+              {previousPost ? <RouteHint label={t("common.previous")} onClick={goPrevious} post={previousPost} /> : null}
+              {nextPost ? <RouteHint label={t("common.next")} onClick={goNext} post={nextPost} /> : null}
             </div>
           </div>
 
@@ -217,7 +220,7 @@ export const PostDetailExperience = ({
     return (
       <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
         <button
-          aria-label="Close post detail"
+          aria-label={t("shell.closePostDetail")}
           className="absolute inset-0 bg-[#090d14]/72 backdrop-blur-[12px]"
           onClick={onClose}
           type="button"
@@ -229,11 +232,11 @@ export const PostDetailExperience = ({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-[#090d14] text-white">
+    <main className="relative min-h-screen bg-[#090d14] text-white">
       <AnimatedFeedBackdrop className="opacity-[0.78]" />
       <div className="pointer-events-none fixed inset-[5%] z-0 rounded-[48px] border border-white/[0.025] bg-[linear-gradient(180deg,rgba(17,24,38,0.3)_0%,rgba(10,14,22,0.16)_100%)] shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur-[4px]" />
-      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1800px] items-center justify-center px-2 py-2 lg:px-5 lg:py-4">
-        {shell}
+      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1800px] flex-col items-center justify-center gap-3 px-2 py-3 lg:px-5 lg:py-4">
+        <div className="flex w-full items-center justify-center">{shell}</div>
       </div>
     </main>
   );
@@ -401,8 +404,11 @@ const StageOverlayControls = ({
   onPrevious: () => void;
   onNext: () => void;
   showScrollHint: boolean;
-}) => (
-  <>
+}) => {
+  const { t } = useI18n();
+
+  return (
+    <>
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-28 bg-gradient-to-b from-black/24 to-transparent" />
     <div className="absolute left-4 top-4 z-30 flex items-center gap-2">
       {closeHref ? (
@@ -411,6 +417,7 @@ const StageOverlayControls = ({
           className="liquid-glass-icon-btn flex h-10 w-10 items-center justify-center rounded-full text-base text-white transition duration-200 hover:scale-[1.03] hover:bg-white/10"
           href={closeHref}
           scroll={false}
+          title={closeLabel}
         >
           {mode === "page" ? <ArrowLeftIcon /> : <CloseIcon />}
         </Link>
@@ -419,6 +426,7 @@ const StageOverlayControls = ({
           aria-label={closeLabel}
           className="liquid-glass-icon-btn flex h-10 w-10 items-center justify-center rounded-full text-base text-white transition duration-200 hover:scale-[1.03] hover:bg-white/10"
           onClick={onClose}
+          title={closeLabel}
           type="button"
         >
           {mode === "page" ? <ArrowLeftIcon /> : <CloseIcon />}
@@ -432,28 +440,31 @@ const StageOverlayControls = ({
     <div className="absolute right-4 top-4 z-30 flex items-start gap-2">
       {showScrollHint ? (
         <div className="hint-flash rounded-full border border-white/[0.08] bg-black/22 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-[#c3d0e2] backdrop-blur-md">
-          Scroll
+          {t("feed.scroll")}
         </div>
       ) : null}
       <div className="flex flex-col items-center gap-1.5 rounded-[18px] border border-white/[0.08] bg-black/22 p-1.5 backdrop-blur-lg">
-        <PostSwitchButton direction="up" disabled={!hasPrevious} onClick={onPrevious} />
-        <PostSwitchButton direction="down" disabled={!hasNext} onClick={onNext} />
+        <PostSwitchButton ariaLabel={t("shell.previousPost")} direction="up" disabled={!hasPrevious} onClick={onPrevious} />
+        <PostSwitchButton ariaLabel={t("shell.nextPost")} direction="down" disabled={!hasNext} onClick={onNext} />
       </div>
     </div>
   </>
-);
+  );
+};
 
 const PostSwitchButton = ({
+  ariaLabel,
   direction,
   disabled,
   onClick,
 }: {
+  ariaLabel: string;
   direction: "up" | "down";
   disabled: boolean;
   onClick: () => void;
 }) => (
   <button
-    aria-label={direction === "up" ? "Previous post" : "Next post"}
+    aria-label={ariaLabel}
     disabled={disabled}
     className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm transition duration-200 ${
       disabled
@@ -475,19 +486,23 @@ const GalleryArrow = ({
   direction: "left" | "right";
   disabled: boolean;
   onClick: () => void;
-}) => (
-  <button
-    aria-label={direction === "left" ? "Previous image" : "Next image"}
-    disabled={disabled}
-    className={`liquid-glass-icon-btn absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white transition duration-200 ${
-      direction === "left" ? "left-4" : "right-4"
-    } ${disabled ? "pointer-events-none opacity-20" : "hover:scale-[1.03] hover:bg-white/12"}`}
-    onClick={onClick}
-    type="button"
-  >
-    {direction === "left" ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-  </button>
-);
+}) => {
+  const { t } = useI18n();
+
+  return (
+    <button
+      aria-label={direction === "left" ? t("shell.previousImage") : t("shell.nextImage")}
+      disabled={disabled}
+      className={`liquid-glass-icon-btn absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white transition duration-200 ${
+        direction === "left" ? "left-4" : "right-4"
+      } ${disabled ? "pointer-events-none opacity-20" : "hover:scale-[1.03] hover:bg-white/12"}`}
+      onClick={onClick}
+      type="button"
+    >
+      {direction === "left" ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+    </button>
+  );
+};
 
 const RouteHint = ({
   label,

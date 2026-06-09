@@ -8,6 +8,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   sendAndConfirmTransaction,
   SystemProgram,
@@ -96,8 +97,10 @@ const createS1Creator = async (ctx: TestContext, handle: string) => {
       authority: creator.publicKey,
       protocolConfig: ctx.protocolConfig,
       creatorProfile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, handle)])
     .signers([creator])
     .rpc();
 
@@ -313,8 +316,10 @@ describe("streampump-core S1 guards", function () {
         authority: creator.publicKey,
         protocolConfig: ctx.protocolConfig,
         creatorProfile,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
+      .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, "init_reentry_creator")])
       .signers([creator])
       .rpc();
 
@@ -329,8 +334,10 @@ describe("streampump-core S1 guards", function () {
         authority: creator.publicKey,
         protocolConfig: ctx.protocolConfig,
         creatorProfile,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
+      .preInstructions([ctx.creatorAuthPreInstruction(creator.publicKey, "init_reentry_creator_v2")])
       .signers([creator])
       .rpc();
 
@@ -573,7 +580,7 @@ describe("streampump-core S1 guards", function () {
     expect(ctx.enumKey(memberMembershipAfter.role)).to.equal("finance");
   });
 
-  it("applies new-account emission discount on daily SPUMP claims", async () => {
+  it("applies new-account emission discount and streak bonus on daily SPUMP claims", async () => {
     const freshFan = Keypair.generate();
     await fundSigner(ctx, freshFan);
     const userProfile = deriveUserProfile(ctx, freshFan.publicKey);
@@ -618,7 +625,7 @@ describe("streampump-core S1 guards", function () {
       undefined,
       TOKEN_2022_PROGRAM_ID
     );
-    expect(tokenAccount.amount.toString()).to.equal("1250000");
+    expect(tokenAccount.amount.toString()).to.equal("1275000");
   });
 
   it("schedules oracle rating updates and rate-limits repeat reports", async () => {

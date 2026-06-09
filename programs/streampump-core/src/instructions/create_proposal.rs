@@ -57,6 +57,12 @@ pub struct CreateProposalArgs {
     /// EN: Unix timestamp after which Track 1 can be settled and no new endorsements accepted.
     /// ZH: Unix 时间戳，超过后 Track1 可开始结算且不再接受新背书。
     pub deadline: i64,
+    /// EN: Nonce to disambiguate proposals with the same creator and deadline.
+    /// ZH: 用于区分同一创作者和截止时间的提案的随机数。
+    pub nonce: u64,
+    /// EN: Maximum total SPUMP endorsement for this proposal (0 = uncapped).
+    /// ZH: 该提案的最大 SPUMP 背书总量（0 = 不限）。
+    pub max_endorsement_spump: u64,
 }
 
 #[derive(Accounts)]
@@ -87,12 +93,12 @@ pub struct CreateProposal<'info> {
     )]
     pub creator_profile: Box<Account<'info, CreatorProfile>>,
 
-    /// EN: Proposal state PDA, seeded by [creator, deadline].
-    /// ZH: 提案状态 PDA，种子为 [创作者, 截止时间]。
+    /// EN: Proposal state PDA, seeded by [creator, deadline, nonce].
+    /// ZH: 提案状态 PDA，种子为 [创作者, 截止时间, nonce]。
     #[account(
         init,
         payer = payer,
-        seeds = [b"proposal", creator.key().as_ref(), &args.deadline.to_le_bytes()],
+        seeds = [b"proposal", creator.key().as_ref(), &args.deadline.to_le_bytes(), &args.nonce.to_le_bytes()],
         bump,
         space = 8 + Proposal::INIT_SPACE
     )]
@@ -129,6 +135,10 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     require!(
         ctx.accounts.creator_profile.level >= MIN_PROPOSAL_CREATOR_LEVEL,
         StreamPumpError::InsufficientCreatorLevel
+    );
+    require!(
+        ctx.accounts.creator_profile.status != CreatorStatus::Suspended,
+        StreamPumpError::CreatorSuspended
     );
     require!(
         ctx.accounts.creator_profile.status == CreatorStatus::S2_Active,
@@ -216,6 +226,8 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     proposal.track2_endorser_count = 0;
     proposal.track2_unsettled_endorser_count = 0;
     proposal.track2_unsettled_spump = 0;
+    proposal.track2_initial_fan_pool = 0;
+    proposal.track2_initial_spump_staked = 0;
 
     // EN: Track 3 initialization — delayed CPS settlement.
     // ZH: Track3 初始化——延迟 CPS 结算。
@@ -231,12 +243,15 @@ pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) ->
     proposal.usdc_vault_bump = ctx.bumps.usdc_vault;
     proposal.total_spump_staked = 0;
     proposal.bump = ctx.bumps.proposal;
+    proposal.nonce = args.nonce;
+    proposal.max_endorsement_spump = args.max_endorsement_spump;
 
     emit!(ProposalCreated {
         proposal: proposal.key(),
         creator: ctx.accounts.creator.key(),
         payer: ctx.accounts.payer.key(),
         deadline: proposal.deadline,
+        nonce: proposal.nonce,
         content_kind: proposal.content_kind as u8,
         content_hash: proposal.content_hash,
         content_anchor: proposal.content_anchor,

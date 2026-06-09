@@ -14,7 +14,7 @@ pub struct CancelProposal<'info> {
     pub creator: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump,
         constraint = proposal.creator == creator.key() @ StreamPumpError::Unauthorized,
         constraint = proposal.status == ProposalStatus::Open @ StreamPumpError::ProposalNotOpen

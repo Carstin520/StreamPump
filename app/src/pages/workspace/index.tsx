@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StagePill } from "@/components/shared/StagePill";
 import {
   ConsoleAuthRequired,
@@ -109,6 +110,12 @@ export default function WorkspacePage() {
         <title>StreamPump | Operating Console</title>
       </Head>
       <WorkspaceShell aside={<OverviewAside persona={persona} />} stage={persona.stage} wallet={persona.wallet}>
+        <ProductReadinessBanner
+          description="This console loads live workspace manifests, proposal intents, and campaign summaries when an authenticated session is available. Demo mode and preview sessions still use seeded persona data; claimable balances and production operator states are not part of this overview API yet."
+          status="SEEDED_DEMO"
+          title="Workspace overview mixes live workflow reads with labeled preview fallback"
+        />
+
         {isDemoMode ? <StageSwitcher activeStage={activeStage} onChange={setActiveStage} /> : null}
 
         {!isDemoMode && state.status === "loading" ? <ConsoleLoading /> : null}

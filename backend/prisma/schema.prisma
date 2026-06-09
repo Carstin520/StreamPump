@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -116,6 +116,26 @@ enum IdentityProvider {
   APPLE
   EMAIL
   PASSKEY
+  TWITTER
+}
+
+enum AccountRole {
+  FAN
+  CREATOR
+  SPONSOR
+}
+
+enum SponsorVerificationStatus {
+  UNSUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum SponsorType {
+  BRAND
+  AGENCY
+  INDIVIDUAL
 }
 
 enum MarketCreatorStage {
@@ -129,6 +149,7 @@ enum BuyoutOfferProjectionStatus {
   ACCEPTED
   CANCELLED
   RECLAIMED
+  ABORTED
 }
 
 enum BuyoutProjectionStatus {
@@ -150,55 +171,78 @@ enum CampaignProofStatus {
 }
 
 model Proposal {
-  id                         String           @id @default(cuid())
+  id                          String              @id @default(cuid())
   /// CN: 链上 Proposal PDA，数据库用它和链上账户强绑定。
   /// EN: On-chain Proposal PDA used as the canonical binding key between DB rows and chain accounts.
-  proposalPda                String           @unique
-  creatorWallet              String
-  sponsorWallet              String?
-  sponsorOrgId               String?
-  creatorOrgId               String?
+  proposalPda                 String              @unique
+  creatorWallet               String
+  sponsorWallet               String?
+  sponsorOrgId                String?
+  creatorOrgId                String?
   /// CN: 绑定的内容清单版本 ID。
   /// EN: Bound content manifest version ID.
-  manifestId                 String?
-  manifest                   ContentManifest? @relation(fields: [manifestId], references: [id], onDelete: SetNull)
+  manifestId                  String?
+  manifest                    ContentManifest?    @relation(fields: [manifestId], references: [id], onDelete: SetNull)
   /// CN: 发起 proposal 前的业务草稿 ID。
   /// EN: Business-draft intent ID created before the on-chain proposal exists.
-  intentId                   String?          @unique
-  intent                     ProposalIntent?  @relation(fields: [intentId], references: [id], onDelete: SetNull)
+  intentId                    String?             @unique
+  intent                      ProposalIntent?     @relation(fields: [intentId], references: [id], onDelete: SetNull)
   /// CN: 内容清单的 32-byte SHA-256 十六进制摘要。
   /// EN: 32-byte SHA-256 hex digest of the bound content manifest.
-  contentHashHex             String?
+  contentHashHex              String?
   /// CN: 内容锚点 PDA，指向链上的 content anchor 账户。
   /// EN: Content anchor PDA pointing to the on-chain content anchor account.
-  contentAnchorPda           String?
-  contentAnchorTx            String?
-  deadlineAt                 DateTime
-  status                     ProposalStatus   @default(OPEN)
-  track1BaseUsdc             BigInt
-  track1Claimed              Boolean          @default(false)
-  track2MetricType           Track2MetricType
-  track2TargetValue          BigInt
-  track2MinAchievementBps    Int
-  track2UsdcDeposited        BigInt
-  track2ActualValue          BigInt?
-  track2SettledAt            DateTime?
-  track3UsdcDeposited        BigInt
-  track3CpsPayout            BigInt?
-  track3DelayDays            Int
-  track3SettledAt            DateTime?
+  contentAnchorPda            String?
+  contentAnchorTx             String?
+  deadlineAt                  DateTime
+  status                      ProposalStatus      @default(OPEN)
+  track1BaseUsdc              BigInt
+  track1Claimed               Boolean             @default(false)
+  track2MetricType            Track2MetricType
+  track2TargetValue           BigInt
+  track2MinAchievementBps     Int
+  track2UsdcDeposited         BigInt
+  track2ActualValue           BigInt?
+  track2SettledAt             DateTime?
+  track2InitialFanPool        BigInt              @default(0)
+  track2InitialSpumpStaked    BigInt              @default(0)
+  track3UsdcDeposited         BigInt
+  track3CpsPayout             BigInt?
+  track3DelayDays             Int
+  track3SettledAt             DateTime?
   /// CN: 最近一次链上提交或结算交易签名。
   /// EN: Most recent chain submission or settlement transaction signature.
-  onChainTxSignature         String?
-  oracleSyncStatus           OracleSyncStatus @default(PENDING)
-  oracleLastError            String?
+  onChainTxSignature          String?
+  /// CN: 链上 Proposal PDA nonce，来自 launch intent 或链上 Proposal 状态。
+  /// EN: On-chain Proposal PDA nonce copied from launch intent or chain state.
+  nonce                       BigInt?
+  oracleSyncStatus            OracleSyncStatus    @default(PENDING)
+  oracleLastError             String?
   /// CN: 内容已发布且通过后端/人工核验的时间。
   /// EN: Timestamp when content publication has been verified by backend/manual review.
-  contentPublishedVerifiedAt DateTime?
-  metadata                   Json?
-  createdAt                  DateTime         @default(now())
-  updatedAt                  DateTime         @updatedAt
-  track2Events               Track2Event[]
+  contentPublishedVerifiedAt  DateTime?
+  /// CN: 从 proposal 状态派生的公开证明状态（DRAFT/FUNDED/ANCHORED/SETTLING/SETTLED/CANCELLED/VOIDED）。
+  /// EN: Public proof status derived from proposal state (replaces CampaignProofProjection).
+  proofStatus                 CampaignProofStatus @default(DRAFT)
+  /// CN: 注资成功时的链上交易签名。
+  /// EN: On-chain transaction signature when funding was confirmed.
+  fundingTxSignature          String?
+  /// CN: 最近一次结算交易签名。
+  /// EN: Most recent settlement transaction signature.
+  latestSettlementTxSignature String?
+  /// CN: 当前 endorse 的总人数。
+  /// EN: Total number of unique endorsers for this proposal.
+  endorserCount               Int                 @default(0)
+  /// CN: 所有 endorser 累计质押的 SPUMP 总量。
+  /// EN: Total SPUMP staked by all endorsers.
+  totalSpumpStaked            BigInt              @default(0)
+  /// CN: 已 claim 的 endorser 数量。
+  /// EN: Number of endorsers who have claimed their reward.
+  claimedEndorserCount        Int                 @default(0)
+  metadata                    Json?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  track2Events                Track2Event[]
 
   @@index([status, track1Claimed])
   @@index([status, deadlineAt, track2SettledAt])
@@ -206,19 +250,49 @@ model Proposal {
   @@index([manifestId])
 }
 
+model S2EndorsementPositionProjection {
+  id                   String    @id @default(cuid())
+  positionPda          String    @unique
+  userWallet           String
+  proposalPda          String
+  stakedSpumpAmount    BigInt    @default(0)
+  /// CN: 已提取（部分 unstake）的 SPUMP 数量。
+  /// EN: Total SPUMP amount withdrawn via partial unstake.
+  withdrawnSpumpAmount BigInt    @default(0)
+  /// CN: 最近一次提取时间。
+  /// EN: Timestamp of the most recent withdrawal.
+  withdrawnAt          DateTime?
+  /// CN: 因提前退出而被扣除的罚金数量（SPUMP）。
+  /// EN: Penalty SPUMP amount deducted due to early withdrawal.
+  penaltySpumpAmount   BigInt    @default(0)
+  /// CN: 累计部分 unstake 次数。
+  /// EN: Cumulative number of partial unstake operations.
+  partialUnstakeCount  Int       @default(0)
+  claimedStatus        Boolean   @default(false)
+  estimatedUsdcReward  BigInt    @default(0)
+  lastEventSignature   String?
+  lastEventAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([userWallet, proposalPda])
+  @@index([proposalPda, claimedStatus])
+  @@index([userWallet, updatedAt])
+}
+
 model ContentManifest {
-  id                    String                 @id @default(cuid())
+  id                    String                @id @default(cuid())
   creatorWallet         String
   contentType           ContentType
-  status                ContentManifestStatus  @default(DRAFT)
-  isPublicFeedEligible  Boolean                @default(false)
+  status                ContentManifestStatus @default(DRAFT)
+  isPublicFeedEligible  Boolean               @default(false)
   publishedAt           DateTime?
   publicSlug            String?
   creatorDisplayName    String?
   publicExcerpt         String?
   /// CN: 内容版本号。草稿变更通过新版本推进，而不是覆盖已绑定版本。
   /// EN: Content version number. Mutations should advance via new versions instead of mutating already-bound content.
-  version               Int                    @default(1)
+  version               Int                   @default(1)
   title                 String?
   captionText           String?
   captionTextHash       String?
@@ -229,22 +303,22 @@ model ContentManifest {
   canonicalManifestJson Json?
   /// CN: manifest 的 SHA-256 十六进制摘要，对应链上的 content_hash。
   /// EN: SHA-256 hex digest of the manifest, matching the on-chain content_hash.
-  manifestHashHex       String?                @unique
+  manifestHashHex       String?               @unique
   /// CN: 后端内部 canonical URL，不依赖外部平台发帖链接。
   /// EN: Backend-owned canonical URL that does not depend on an external platform post URL.
-  internalCanonicalUrl  String?                @unique
+  internalCanonicalUrl  String?               @unique
   /// CN: internalCanonicalUrl 的 Keccak 摘要，对应链上 url_digest。
   /// EN: Keccak digest of internalCanonicalUrl, matching the on-chain url_digest.
   internalUrlDigestHex  String?
   /// CN: 当前版本 manifest 对应的链上内容锚点 PDA。
   /// EN: On-chain content anchor PDA for the current manifest version.
-  currentAnchorPda      String?                @unique
+  currentAnchorPda      String?               @unique
   currentAnchorTx       String?
   /// CN: 封面资产 ID；未显式指定时通常回退到第一个素材。
   /// EN: Cover asset ID; usually falls back to the first asset when unspecified.
   coverAssetId          String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   assets                ContentAsset[]
   publications          ContentPublication[]
   proposalIntents       ProposalIntent[]
@@ -256,54 +330,54 @@ model ContentManifest {
 }
 
 model ContentAsset {
-  id               String                @id @default(cuid())
-  manifestId       String
-  manifest         ContentManifest       @relation(fields: [manifestId], references: [id], onDelete: Cascade)
-  assetType        AssetType
+  id                   String                 @id @default(cuid())
+  manifestId           String
+  manifest             ContentManifest        @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  assetType            AssetType
   /// CN: 素材在 manifest 内的稳定顺序，用于生成 canonical manifest hash。
   /// EN: Stable per-manifest ordering used when generating the canonical manifest hash.
-  orderIndex       Int
+  orderIndex           Int
   /// CN: 原始文件内容的 SHA-256 十六进制摘要。
   /// EN: SHA-256 hex digest of the raw uploaded file.
-  sha256Hex        String
-  mimeType         String
-  fileSizeBytes    BigInt
-  width            Int?
-  height           Int?
-  durationMs       Int?
+  sha256Hex            String
+  mimeType             String
+  fileSizeBytes        BigInt
+  width                Int?
+  height               Int?
+  durationMs           Int?
   /// CN: 对象存储中的稳定 key，作为 S3/R2 与 DB 的桥接主键。
   /// EN: Stable object-storage key that bridges S3/R2 objects with DB state.
-  storageKey       String                @unique
-  cdnUrl           String?
+  storageKey           String                 @unique
+  cdnUrl               String?
   /// CN: Mux 资产 ID，用于转码状态与播放地址回写。
   /// EN: Mux asset ID used to reconcile processing status and playback info.
-  muxAssetId       String?               @unique
+  muxAssetId           String?                @unique
   /// CN: Mux playback ID，对应最终可播放资源。
   /// EN: Mux playback ID for the final playable asset.
-  muxPlaybackId    String?               @unique
+  muxPlaybackId        String?                @unique
   /// CN: 最近一次从 Mux 观察到的原始状态，如 preparing / ready / errored。
   /// EN: Last raw status observed from Mux, such as preparing / ready / errored.
-  muxLastKnownStatus String?
+  muxLastKnownStatus   String?
   /// CN: 最近一次收到 Mux webhook 的时间。
   /// EN: Timestamp when the most recent Mux webhook was received.
   muxWebhookReceivedAt DateTime?
   /// CN: 最近一次主动向 Mux 查询资产状态的时间。
   /// EN: Timestamp of the most recent active reconciliation query against Mux.
-  muxLastCheckedAt DateTime?
+  muxLastCheckedAt     DateTime?
   /// CN: 主动 reconciliation 已尝试的次数。
   /// EN: Number of active reconciliation attempts executed so far.
-  muxReconcileAttempts Int               @default(0)
+  muxReconcileAttempts Int                    @default(0)
   /// CN: 视频被确认为 ready 的时间，无论来源是 webhook 还是补偿任务。
   /// EN: Timestamp when the video was confirmed ready, whether by webhook or reconciliation.
-  muxReadyAt       DateTime?
-  uploadStatus     AssetUploadStatus     @default(PENDING)
-  processingStatus AssetProcessingStatus @default(NONE)
+  muxReadyAt           DateTime?
+  uploadStatus         AssetUploadStatus      @default(PENDING)
+  processingStatus     AssetProcessingStatus  @default(NONE)
   /// CN: 当前 processing 状态是由哪条链路推进的。
   /// EN: Source that most recently advanced the processing state.
-  processingSource AssetProcessingSource?
-  processingError  String?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  processingSource     AssetProcessingSource?
+  processingError      String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@unique([manifestId, orderIndex])
   @@index([manifestId, assetType])
@@ -311,22 +385,22 @@ model ContentAsset {
 }
 
 model ContentPublication {
-  id                  String                        @id @default(cuid())
-  manifestId          String
-  manifest            ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
-  platform            String
+  id                   String                        @id @default(cuid())
+  manifestId           String
+  manifest             ContentManifest               @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  platform             String
   /// CN: 外部平台帖子 ID 的摘要，避免在 DB 中直接依赖原始平台 ID。
   /// EN: Digest of the external platform post ID to avoid coupling directly to raw platform identifiers.
-  externalPostIdHash  String?
-  externalUrl         String
+  externalPostIdHash   String?
+  externalUrl          String
   /// CN: externalUrl 的摘要，可用于后续去重和链下证据比对。
   /// EN: Digest of externalUrl for later dedupe and off-chain evidence matching.
   externalUrlDigestHex String
-  verificationStatus  PublicationVerificationStatus @default(PENDING)
-  verificationSource  String?
-  verifiedAt          DateTime?
-  createdAt           DateTime                      @default(now())
-  updatedAt           DateTime                      @updatedAt
+  verificationStatus   PublicationVerificationStatus @default(PENDING)
+  verificationSource   String?
+  verifiedAt           DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
 
   @@unique([platform, externalUrl])
   @@index([manifestId, platform, verificationStatus])
@@ -358,6 +432,12 @@ model ProposalIntent {
   track2UsdcDeposited     BigInt               @default(0)
   track3UsdcDeposited     BigInt
   track3DelayDays         Int
+  /// CN: 提案 PDA nonce，允许同一创作者、同一截止时间创建多个提案。
+  /// EN: Proposal PDA nonce allowing multiple proposals per creator per deadline.
+  nonce                   BigInt               @default(0)
+  /// CN: 该提案的最大 SPUMP 背书总量上限（0 = 不限制）。
+  /// EN: Maximum total SPUMP endorsement for this proposal (0 = uncapped).
+  maxEndorsementSpump     BigInt               @default(0)
   /// CN: 预推导的 Proposal PDA，供 bundle 组装和后续链上投影使用。
   /// EN: Pre-derived Proposal PDA used during bundle assembly and later on-chain projection.
   plannedProposalPda      String?
@@ -411,25 +491,25 @@ model TxBundle {
 }
 
 model ChainEvent {
-  id              String   @id @default(cuid())
+  id               String   @id @default(cuid())
   /// CN: 对应链上交易签名；一笔交易内可能产生多条事件记录。
   /// EN: On-chain transaction signature; one transaction may yield multiple event rows.
-  signature       String
+  signature        String
   /// CN: 指令在交易消息内的顺序，用来和 signature 一起保证唯一性。
   /// EN: Instruction order inside the transaction message, used with the signature for uniqueness.
   instructionIndex Int
-  slot            BigInt
-  programId       String
+  slot             BigInt
+  programId        String
   /// CN: 通过 IDL 指令解码得到的指令名。
   /// EN: Instruction name decoded from the IDL.
-  instructionName String
-  proposalPda     String?
+  instructionName  String
+  proposalPda      String?
   /// CN: 事件主实体地址；没有 proposal 时可回落到 creator_profile/content_anchor 等地址。
   /// EN: Primary entity address for the event; falls back to creator_profile/content_anchor when no proposal exists.
-  entityPda       String?
-  payloadJson     Json?
-  observedAt      DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  entityPda        String?
+  payloadJson      Json?
+  observedAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([signature, instructionIndex])
   @@index([proposalPda, observedAt])
@@ -471,6 +551,7 @@ model S1PositionProjection {
   creatorProfilePda      String
   positionPda            String    @unique
   internalTokenBalance   BigInt    @default(0)
+  earlyCohortBalance     BigInt    @default(0)
   spumpCostBasis         BigInt    @default(0)
   estimatedClaimableUsdc BigInt?
   lastEventSignature     String?
@@ -503,59 +584,31 @@ model S1BuyoutOfferProjection {
 }
 
 model S1BuyoutProjection {
-  id                         String                 @id @default(cuid())
-  creatorWallet              String?
-  creatorProfilePda          String                 @unique
-  buyoutStatePda             String?                @unique
-  status                     BuyoutProjectionStatus @default(NONE)
-  winningSponsorWallet       String?
-  acceptedOfferPda           String?
-  acceptedOfferUsdc          BigInt?
-  latestOfferPda             String?
-  latestOfferUsdc            BigInt?
-  usdcDeposited              BigInt                 @default(0)
-  claimableUsdcRemaining     BigInt                 @default(0)
-  claimableS1SupplyRemaining BigInt                 @default(0)
-  rageQuitDeadlineAt         DateTime?
-  lastEventSignature         String?
-  lastEventAt                DateTime?
-  createdAt                  DateTime               @default(now())
-  updatedAt                  DateTime               @updatedAt
+  id                                String                 @id @default(cuid())
+  creatorWallet                     String?
+  creatorProfilePda                 String                 @unique
+  buyoutStatePda                    String?                @unique
+  status                            BuyoutProjectionStatus @default(NONE)
+  winningSponsorWallet              String?
+  acceptedOfferPda                  String?
+  acceptedOfferUsdc                 BigInt?
+  latestOfferPda                    String?
+  latestOfferUsdc                   BigInt?
+  usdcDeposited                     BigInt                 @default(0)
+  claimableUsdcRemaining            BigInt                 @default(0)
+  claimableS1SupplyRemaining        BigInt                 @default(0)
+  earlyClaimableUsdcRemaining       BigInt                 @default(0)
+  earlyClaimableS1SupplyRemaining   BigInt                 @default(0)
+  regularClaimableUsdcRemaining     BigInt                 @default(0)
+  regularClaimableS1SupplyRemaining BigInt                 @default(0)
+  rageQuitDeadlineAt                DateTime?
+  lastEventSignature                String?
+  lastEventAt                       DateTime?
+  createdAt                         DateTime               @default(now())
+  updatedAt                         DateTime               @updatedAt
 
   @@index([status, updatedAt])
   @@index([creatorWallet])
-}
-
-model CampaignProofProjection {
-  id                          String              @id @default(cuid())
-  proposalId                  String?             @unique
-  proposalPda                 String              @unique
-  creatorWallet               String
-  sponsorWallet               String?
-  manifestId                  String?
-  intentId                    String?
-  status                      ProposalStatus
-  proofStatus                 CampaignProofStatus @default(DRAFT)
-  contentHashHex              String?
-  contentAnchorPda            String?
-  contentAnchorTx             String?
-  fundingTxSignature          String?
-  latestSettlementTxSignature String?
-  track1BaseUsdc              BigInt              @default(0)
-  track2UsdcDeposited         BigInt              @default(0)
-  track3UsdcDeposited         BigInt              @default(0)
-  track2MetricType            Track2MetricType
-  track2TargetValue           BigInt              @default(0)
-  track2ActualValue           BigInt?
-  deadlineAt                  DateTime
-  settledAt                   DateTime?
-  metadataJson                Json?
-  createdAt                   DateTime            @default(now())
-  updatedAt                   DateTime            @updatedAt
-
-  @@index([proofStatus, updatedAt])
-  @@index([creatorWallet, updatedAt])
-  @@index([sponsorWallet, updatedAt])
 }
 
 model IndexerCursor {
@@ -568,40 +621,40 @@ model IndexerCursor {
 }
 
 model WalletAuthChallenge {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   wallet     String
-  nonce      String   @unique
+  nonce      String    @unique
   message    String
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([wallet, expiresAt])
 }
 
 model EmailAuthChallenge {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   email      String
   codeHash   String
   expiresAt  DateTime
   consumedAt DateTime?
-  attempts   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([email, expiresAt])
 }
 
 model WalletSession {
-  id         String   @id
+  id         String    @id
   wallet     String
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
   lastSeenAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([wallet, expiresAt])
 }
@@ -620,6 +673,88 @@ model AuthIdentity {
 
   @@unique([provider, providerSubject])
   @@index([managedWalletAddress])
+}
+
+model AccountProfile {
+  id                    String          @id @default(cuid())
+  wallet                String          @unique
+  role                  AccountRole     @default(FAN)
+  displayName           String?
+  handle                String?         @unique
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  /// CN: 关联的多钱包列表。
+  /// EN: Associated wallets for this account.
+  wallets               AccountWallet[]
+
+  @@index([role, onboardingCompletedAt])
+}
+
+enum WalletType {
+  MANAGED
+  EXTERNAL
+}
+
+/// CN: 账户多钱包关联表，支持托管钱包和外部钱包绑定。
+/// EN: Multi-wallet join table for accounts, supporting both managed and external wallet bindings.
+model AccountWallet {
+  id                 String         @id @default(cuid())
+  accountProfileId   String
+  accountProfile     AccountProfile @relation(fields: [accountProfileId], references: [id], onDelete: Cascade)
+  walletAddress      String         @unique
+  walletType         WalletType     @default(MANAGED)
+  isPrimary          Boolean        @default(false)
+  label              String?
+  /// Encrypted secret key bytes (only for MANAGED wallets; null for EXTERNAL)
+  encryptedSecretKey Bytes?
+  boundAt            DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([accountProfileId])
+}
+
+model SponsorProfile {
+  id                  String                    @id @default(cuid())
+  wallet              String                    @unique
+  companyName         String
+  sponsorType         SponsorType               @default(BRAND)
+  registrationNumber  String
+  businessLicenseKey  String
+  legalRepresentative String
+  contactPhone        String
+  contactEmail        String
+  powerOfAttorneyKey  String?
+  status              SponsorVerificationStatus @default(UNSUBMITTED)
+  rejectReason        String?
+  approvedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  /// CN: KYB 审核事件审计日志。
+  /// EN: KYB review event audit trail.
+  reviewEvents        SponsorReviewEvent[]
+
+  @@index([status, updatedAt])
+  @@index([sponsorType, status])
+}
+
+/// CN: Sponsor KYB 审核事件，记录每次状态变更的审计轨迹。
+/// EN: Sponsor KYB review event recording an immutable audit trail of each verification status change.
+model SponsorReviewEvent {
+  id               String                    @id @default(cuid())
+  sponsorProfileId String
+  sponsorProfile   SponsorProfile            @relation(fields: [sponsorProfileId], references: [id], onDelete: Cascade)
+  reviewerWallet   String
+  previousStatus   SponsorVerificationStatus
+  newStatus        SponsorVerificationStatus
+  reason           String?
+  note             String?
+  documentSnapshot Json?
+  createdAt        DateTime                  @default(now())
+
+  @@index([sponsorProfileId, createdAt])
+  @@index([reviewerWallet])
 }
 
 model Track2Event {
@@ -641,6 +776,18 @@ model Track2Event {
   /// CN: 原始 webhook/body 负载，供排障和风控回放使用。
   /// EN: Raw webhook/body payload used for debugging and fraud-review replay.
   rawPayload      Json?
+  /// CN: 人工审核者钱包或标识。
+  /// EN: Wallet address or identifier of the manual reviewer.
+  reviewedBy      String?
+  /// CN: 审核完成时间。
+  /// EN: Timestamp when the review was completed.
+  reviewedAt      DateTime?
+  /// CN: 审核备注。
+  /// EN: Free-text note left by the reviewer.
+  reviewNote      String?
+  /// CN: 审核来源（如 manual、auto-rule、oracle）。
+  /// EN: Source of the review decision (e.g. manual, auto-rule, oracle).
+  reviewSource    String?
   createdAt       DateTime         @default(now())
 
   @@index([proposalId, eventType, fraudStatus])

@@ -132,6 +132,10 @@ describe("streampump-core S2 traffic market", function () {
       .signers([ctx.fanA])
       .rpc();
 
+    // Wait for the proposal deadline to pass before settlement.
+    // 等待提案截止时间过去，然后进行结算。
+    await ctx.waitUntilDeadline(deadline);
+
     // ----- Oracle settles Track 1: fixed base pay to creator -----
     // ----- 预言机结算 Track 1：固定基础报酬支付给创作者 -----
     await ctx.program.methods
@@ -172,10 +176,6 @@ describe("streampump-core S2 traffic market", function () {
           .rpc(),
       "ProposalAlreadySettled"
     );
-
-    // Wait for the proposal deadline to pass before Track 2 settlement
-    // 等待提案截止时间过去，然后进行 Track 2 结算
-    await ctx.waitUntilDeadline(deadline);
 
     // ----- Oracle settles Track 2: actual_value = 800 / target = 1000 -----
     // ----- 预言机结算 Track 2：actual_value = 800 / target = 1000 -----
@@ -219,6 +219,8 @@ describe("streampump-core S2 traffic market", function () {
     // Assert: track2UsdcDeposited reflects the fan pool share (160,000)
     // 断言：track2UsdcDeposited 反映粉丝池份额（160,000）
     expect(proposalAfterSettle.track2UsdcDeposited.toString()).to.equal("160000");
+    expect(proposalAfterSettle.track2InitialFanPool.toString()).to.equal("160000");
+    expect(proposalAfterSettle.track2InitialSpumpStaked.toString()).to.equal(stakeAmount.toString());
 
     // ----- Fan claims endorsement reward: SPUMP principal + USDC share -----
     // ----- 粉丝领取背书奖励：SPUMP 本金 + USDC 份额 -----
@@ -260,8 +262,8 @@ describe("streampump-core S2 traffic market", function () {
   });
 
   // =====================================================================
-  // TEST 2: Track 2 failure → 95% SPUMP refund (5% slash)
-  // 测试 2：Track 2 失败 → 95% SPUMP 退还（5% 罚没）
+  // TEST 2: Track 2 failure → 100% SPUMP refund
+  // 测试 2：Track 2 失败 → 100% SPUMP 退还
   //
   // Scenario / 场景:
   //   - Track 2: target = 1,000, cliff = 50% (5,000 bps)
@@ -270,12 +272,12 @@ describe("streampump-core S2 traffic market", function () {
   //     预言机报告 actual_value = 300 → 30% < 50% 悬崖 → 失败
   //   - Sponsor gets 100% Track 2 budget back
   //     赞助商获得 100% 的 Track 2 预算退还
-  //   - Fan claims: only 95% SPUMP minted back, 5% permanently slashed
-  //     粉丝领取：只有 95% SPUMP 铸回，5% 永久罚没
+  //   - Fan claims: 100% SPUMP minted back; underperformance does not slash fans
+  //     粉丝领取：100% SPUMP 铸回；活动未达标不罚没粉丝
   //   - No USDC payout to fan on failure
   //     失败时粉丝不获得 USDC 支付
   // =====================================================================
-  it("settles track2 fail branch and returns 95% SPUMP on claim", async () => {
+  it("settles track2 fail branch and returns 100% SPUMP on claim", async () => {
     // ----- Configuration / 配置 -----
     const track1Base = 50_000n;
     const track2Budget = 500_000n;
@@ -351,8 +353,8 @@ describe("streampump-core S2 traffic market", function () {
     // 断言：track2UsdcDeposited 重置为 0（全部退还给赞助商）
     expect(proposalAfterSettle.track2UsdcDeposited.toNumber()).to.equal(0);
 
-    // ----- Fan claims: 95% SPUMP back, 0 USDC -----
-    // ----- 粉丝领取：95% SPUMP 退还，0 USDC -----
+    // ----- Fan claims: 100% SPUMP back, 0 USDC -----
+    // ----- 粉丝领取：100% SPUMP 退还，0 USDC -----
     await ctx.program.methods
       .claimEndorsement()
       .accounts({
@@ -372,15 +374,9 @@ describe("streampump-core S2 traffic market", function () {
     const fanSpumpAfterClaim = await ctx.tokenAmount(ctx.fanASpumpAta, TOKEN_2022_PROGRAM_ID);
     const fanUsdcAfterClaim = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
 
-    // Calculate the 5% slash (500 bps penalty for failed endorsement)
-    // 计算 5% 的罚没（失败背书的 500 基点惩罚）
-    // expectedSlash = 120,000 × 500 / 10,000 = 6,000 SPUMP permanently lost
-    // expectedSlash = 120,000 × 500 / 10,000 = 6,000 SPUMP 永久损失
-    const expectedSlash = (stakeAmount * 500n) / 10_000n;
-
-    // Assert: fan gets back original balance minus the slash
-    // 断言：粉丝取回原始余额减去罚没部分
-    expect(fanSpumpAfterClaim).to.equal(fanSpumpBefore - expectedSlash);
+    // Assert: fan gets back original balance; failed campaign performance does not slash fans.
+    // 断言：粉丝取回原始余额；活动效果失败不会罚没粉丝。
+    expect(fanSpumpAfterClaim).to.equal(fanSpumpBefore);
 
     // Assert: no USDC payout on failure
     // 断言：失败时无 USDC 支付
@@ -535,8 +531,8 @@ describe("streampump-core S2 traffic market", function () {
   });
 
   // =====================================================================
-  // TEST 5: Emergency void → full vault refund + 100% SPUMP return
-  // 测试 5：紧急作废 → 完全退回资金库 + 100% SPUMP 退还
+  // TEST 5: Emergency void → full vault refund + 95% SPUMP return
+  // 测试 5：紧急作废 → 完全退回资金库 + 95% SPUMP 退还
   //
   // Scenario / 场景:
   //   - Admin triggers `emergency_void` on a funded proposal
@@ -545,12 +541,12 @@ describe("streampump-core S2 traffic market", function () {
   //     资金库中所有剩余 USDC 退还给赞助商
   //   - Proposal status → `Voided`, all tracks zeroed out
   //     提案状态 → `Voided`，所有轨道归零
-  //   - Fan claims: 100% SPUMP minted back (no penalty for cancelled proposals)
-  //     粉丝领取：100% SPUMP 铸回（取消的提案无惩罚）
+  //   - Fan claims: 95% SPUMP minted back per current voided-claim policy
+  //     粉丝领取：按当前作废领取策略铸回 95% SPUMP
   //   - No USDC payout to fan
   //     粉丝不获得 USDC 支付
   // =====================================================================
-  it("emergency_void refunds vault and still allows 100% SPUMP claim", async () => {
+  it("emergency_void refunds vault and still allows 95% SPUMP claim", async () => {
     const track1Base = 70_000n;
     const track2Budget = 400_000n;
     const track3Budget = 500_000n;
@@ -622,8 +618,8 @@ describe("streampump-core S2 traffic market", function () {
     expect(proposalAfterVoid.track2UsdcDeposited.toNumber()).to.equal(0);
     expect(proposalAfterVoid.track3UsdcDeposited.toNumber()).to.equal(0);
 
-    // ----- Fan claims after void: 100% SPUMP back, 0 USDC -----
-    // ----- 粉丝在作废后领取：100% SPUMP 退还，0 USDC -----
+    // ----- Fan claims after void: 95% SPUMP back, 0 USDC -----
+    // ----- 粉丝在作废后领取：95% SPUMP 退还，0 USDC -----
     await ctx.program.methods
       .claimEndorsement()
       .accounts({
@@ -643,9 +639,10 @@ describe("streampump-core S2 traffic market", function () {
     const fanSpumpAfterClaim = await ctx.tokenAmount(ctx.fanASpumpAta, TOKEN_2022_PROGRAM_ID);
     const fanUsdcAfterClaim = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
 
-    // Assert: fan gets 100% SPUMP back (voided = no penalty)
-    // 断言：粉丝取回 100% SPUMP（作废 = 无罚没）
-    expect(fanSpumpAfterClaim).to.equal(fanSpumpBefore);
+    // Assert: fan gets 95% SPUMP back under the current voided-claim policy
+    // 断言：按当前作废领取策略，粉丝取回 95% SPUMP
+    const expectedSlash = (stakeAmount * 500n) / 10_000n;
+    expect(fanSpumpAfterClaim).to.equal(fanSpumpBefore - expectedSlash);
 
     // Assert: no USDC payout (voided, nothing to distribute)
     // 断言：无 USDC 支付（已作废，无可分配）

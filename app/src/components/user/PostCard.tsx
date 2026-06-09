@@ -63,7 +63,9 @@ export const PostCard = ({
               <img alt={post.creatorName} className="h-6 w-6 rounded-full object-cover" src={post.creatorAvatarSrc} />
               <span className="truncate text-xs text-[#cbd7e8]">{post.creatorName}</span>
             </div>
-            <span className="shrink-0 text-xs text-[#8ea0ba]">♡ {compactNumber(post.likes)}</span>
+            <span className="shrink-0 text-xs text-[#8ea0ba]">
+              {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : "metrics pending"}
+            </span>
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ export const WORKSPACE_PATH = "/workspace";
 export const WORKSPACE_CONTENT_NEW_PATH = "/workspace/content/new";
 export const WORKSPACE_LIBRARY_PATH = "/workspace/library";
 export const WORKSPACE_SPONSORSHIPS_PATH = "/workspace/sponsorships";
+export const WORKSPACE_SPONSOR_ONBOARDING_PATH = "/workspace/sponsor-onboarding";
 export const WORKSPACE_CAMPAIGNS_PATH = "/workspace/campaigns";
 export const WORKSPACE_ANALYTICS_PATH = "/workspace/analytics";
 export const WORKSPACE_EARNINGS_PATH = "/workspace/earnings";
@@ -158,6 +159,7 @@ export const workspaceSidebarNav: WorkspaceNavItem[] = [
   { href: WORKSPACE_CONTENT_NEW_PATH, label: "创作", labelKey: "nav.create", iconName: "create", prefixes: ["/workspace/content"] },
   { href: WORKSPACE_LIBRARY_PATH, label: "内容库", labelKey: "nav.library", iconName: "library", disabled: true },
   { href: WORKSPACE_SPONSORSHIPS_PATH, label: "赞助合作", labelKey: "nav.sponsorships", iconName: "sponsor", prefixes: ["/workspace/sponsorships", "/workspace/intents"] },
+  { href: WORKSPACE_SPONSOR_ONBOARDING_PATH, label: "Sponsor KYB", labelKey: "nav.sponsorKyb", iconName: "sponsor", prefixes: [WORKSPACE_SPONSOR_ONBOARDING_PATH] },
   { href: WORKSPACE_BUYOUT_PATH, label: "Buyout", labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
   { href: WORKSPACE_CAMPAIGNS_PATH, label: "Campaign", labelKey: "nav.campaign", iconName: "campaign", disabled: true },
   { href: WORKSPACE_ANALYTICS_PATH, label: "数据", labelKey: "nav.analytics", iconName: "analytics", disabled: true },

@@ -4,13 +4,21 @@
  */
 import { Router } from "express";
 
+import {
+  buildClaimEndorsementTransaction,
+  buildEndorseProposalTransaction,
+  submitProposalActionTransaction,
+} from "../../controllers/proposalActionController";
 import { getProposalById } from "../../controllers/proposalIntentController";
-import { optionalSessionAuth } from "../../middleware/walletAuth";
+import { optionalSessionAuth, requireSessionAuth } from "../../middleware/walletAuth";
 
 const router = Router();
 
 router.use(optionalSessionAuth);
 
+router.post("/transactions/submit", requireSessionAuth, submitProposalActionTransaction);
+router.post("/:id/endorse/build", requireSessionAuth, buildEndorseProposalTransaction);
+router.post("/:id/endorsement/claim/build", requireSessionAuth, buildClaimEndorsementTransaction);
 router.get("/:id", getProposalById);
 
 export default router;

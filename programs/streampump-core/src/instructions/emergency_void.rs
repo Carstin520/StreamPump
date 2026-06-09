@@ -6,15 +6,16 @@
 //       vault balance back to the sponsor in a single transfer.
 //     - Zeroes Track2/Track3 variable-budget fields and marks Track1 as claimed-disabled.
 //     - If no sponsor exists, asserts vault is already empty.
-//     After voiding, endorsers can claim 100% SPUMP principal back via
-//     claim_endorsement (Cancel/Void path).
+//     After voiding, endorsers can claim 95% SPUMP principal back via
+//     claim_endorsement (Cancel/Void path); 5% remains slashed.
 //
 // ZH: 管理员紧急作废提案（欺诈/违规场景）。
 //     - 强制将提案置为 `Voided` 状态。
 //     - 如果有 Sponsor 注资，将金库内全部剩余 USDC 一次性退还给 Sponsor。
 //     - 清零 Track2/Track3 预算字段，并禁用 Track1 保底领取。
 //     - 如果没有 Sponsor，则断言金库余额为零。
-//     作废后，Endorser 可通过 claim_endorsement 的取消/作废路径领回 100% SPUMP 本金。
+//     作废后，Endorser 可通过 claim_endorsement 的取消/作废路径领回 95% SPUMP 本金，
+//     剩余 5% 作为 slash。
 // ────────────────────────────────────────────────────────────────────────────────
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
@@ -34,8 +35,11 @@ pub struct EmergencyVoid<'info> {
     pub protocol_config: Account<'info, ProtocolConfig>,
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
-        bump = proposal.bump
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
+        bump = proposal.bump,
+        constraint = proposal.status != ProposalStatus::Voided @ StreamPumpError::ProposalNotActive,
+        constraint = proposal.status != ProposalStatus::Resolved_Success @ StreamPumpError::ProposalAlreadySettled,
+        constraint = proposal.status != ProposalStatus::Resolved_Fail @ StreamPumpError::ProposalAlreadySettled
     )]
     pub proposal: Account<'info, Proposal>,
 
@@ -73,6 +77,7 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
 
     let proposal_creator = ctx.accounts.proposal.creator;
     let proposal_deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
+    let proposal_nonce_bytes = ctx.accounts.proposal.nonce.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
     let sponsor = ctx.accounts.proposal.sponsor;
     let mut sponsor_refund = 0u64;
@@ -90,10 +95,11 @@ pub(crate) fn handler(ctx: Context<EmergencyVoid>) -> Result<()> {
         // ZH: 退还金库全部余额（未领取 Track1 保底 + Track2 池 + Track3 剩余）。
         let refund_amount = ctx.accounts.proposal_usdc_vault.amount;
         if refund_amount > 0 {
-            let signer_seeds: [&[u8]; 4] = [
+            let signer_seeds: [&[u8]; 5] = [
                 b"proposal",
                 proposal_creator.as_ref(),
                 proposal_deadline_bytes.as_ref(),
+                proposal_nonce_bytes.as_ref(),
                 proposal_bump_bytes.as_ref(),
             ];
             let signer: &[&[&[u8]]] = &[&signer_seeds];

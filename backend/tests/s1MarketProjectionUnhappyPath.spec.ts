@@ -12,6 +12,8 @@ import { syncMarketProjectionFromChainInstruction } from "../src/services/market
 
 type OfferRecord = {
   buyoutOfferPda: string;
+  creatorProfilePda: string;
+  sponsorWallet: string;
   status: BuyoutOfferProjectionStatus;
   lastEventSignature: string | null;
   lastEventAt: Date | null;
@@ -22,6 +24,7 @@ describe("S1 market projection unhappy path events", () => {
   const creator = Keypair.generate().publicKey;
   const creatorProfilePda = Keypair.generate().publicKey.toBase58();
   const positionPda = Keypair.generate().publicKey.toBase58();
+  const sponsorWallet = Keypair.generate().publicKey.toBase58();
   const user = Keypair.generate().publicKey;
   let offers: Map<string, OfferRecord>;
   let creatorMarketProjection: Map<string, any>;
@@ -38,6 +41,8 @@ describe("S1 market projection unhappy path events", () => {
         buyoutOfferPda,
         {
           buyoutOfferPda,
+          creatorProfilePda,
+          sponsorWallet,
           status: BuyoutOfferProjectionStatus.OPEN,
           lastEventSignature: null,
           lastEventAt: null,
@@ -150,18 +155,38 @@ describe("S1 market projection unhappy path events", () => {
         status: "RAGE_QUIT_OPEN",
         claimableUsdcRemaining: 1_000_000n,
         claimableS1SupplyRemaining: 20n,
+        earlyClaimableUsdcRemaining: 1_000_000n,
+        earlyClaimableS1SupplyRemaining: 20n,
+        regularClaimableUsdcRemaining: 0n,
+        regularClaimableS1SupplyRemaining: 0n,
+      }),
+      upsert: async (args: any) => ({
+        id: `${args.where.creatorProfilePda}-buyout`,
+        creatorProfilePda: args.where.creatorProfilePda,
+        ...args.create,
+        ...args.update,
       }),
     };
     prismaAny.s1BuyoutOfferProjection = {
       findFirst: async () => null,
       updateMany: async (args: any) => {
-        const existing = offers.get(args.where.buyoutOfferPda);
-        if (!existing) return { count: 0 };
-        offers.set(args.where.buyoutOfferPda, {
-          ...existing,
-          ...args.data,
-        });
-        return { count: 1 };
+        let count = 0;
+        for (const [key, record] of offers.entries()) {
+          const where = args.where ?? {};
+          const matches =
+            (!where.buyoutOfferPda || record.buyoutOfferPda === where.buyoutOfferPda) &&
+            (!where.creatorProfilePda || record.creatorProfilePda === where.creatorProfilePda) &&
+            (!where.sponsorWallet || record.sponsorWallet === where.sponsorWallet) &&
+            (!where.status || record.status === where.status);
+          if (matches) {
+            offers.set(key, {
+              ...record,
+              ...args.data,
+            });
+            count += 1;
+          }
+        }
+        return { count };
       },
     };
     prismaAny.contentManifest = {
@@ -236,6 +261,29 @@ describe("S1 market projection unhappy path events", () => {
     expect(offers.get(buyoutOfferPda)?.lastEventSignature).to.equal("reclaim-sig");
   });
 
+  it("marks accepted offers as aborted after an abort_s1_buyout event", async () => {
+    offers.set(buyoutOfferPda, {
+      ...offers.get(buyoutOfferPda)!,
+      status: BuyoutOfferProjectionStatus.ACCEPTED,
+    });
+
+    await syncMarketProjectionFromChainInstruction({
+      signature: "abort-sig",
+      instructionName: "abort_s1_buyout",
+      proposalPda: null,
+      entityPda: creatorProfilePda,
+      payload: {
+        eventData: {
+          creatorProfile: creatorProfilePda,
+          sponsor: sponsorWallet,
+        },
+      },
+    });
+
+    expect(offers.get(buyoutOfferPda)?.status).to.equal(BuyoutOfferProjectionStatus.ABORTED);
+    expect(offers.get(buyoutOfferPda)?.lastEventSignature).to.equal("abort-sig");
+  });
+
   it("ignores malformed offer events instead of throwing", async () => {
     await syncMarketProjectionFromChainInstruction({
       signature: "malformed",
@@ -269,7 +317,8 @@ describe("S1 market projection unhappy path events", () => {
 
     const position = s1PositionProjection.get(positionPda);
     expect(position.internalTokenBalance).to.equal(20n);
-    expect(position.estimatedClaimableUsdc).to.equal(1_000_000n);
+    expect(position.earlyCohortBalance).to.equal(20n);
+    expect(position.estimatedClaimableUsdc).to.equal(null);
     expect(position.lastEventSignature).to.equal("rage-quit-sig");
 
     const creatorMarket = creatorMarketProjection.get(creatorProfilePda);

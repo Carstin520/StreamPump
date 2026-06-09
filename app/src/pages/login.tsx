@@ -62,10 +62,6 @@ export default function LoginPage() {
               </span>
               <span className="text-lg font-semibold tracking-[-0.04em] text-white">StreamPump</span>
             </Link>
-
-            <div className="hidden rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-[#8ea0ba] md:block">
-              {t("auth.previewSync")} <code className="text-white/80">?preview=</code>
-            </div>
           </div>
 
           <div className="flex flex-1 items-center justify-center py-10">

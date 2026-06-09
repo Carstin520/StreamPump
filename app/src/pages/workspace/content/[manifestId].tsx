@@ -12,6 +12,7 @@ import {
   VideoIcon,
 } from "@/components/shared/AppIcons";
 import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StatusDot } from "@/components/workspace/StatusDot";
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -25,6 +26,7 @@ import {
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
+  verifyContentPublication,
 } from "@/lib/api/workspace";
 import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
@@ -48,6 +50,11 @@ type UploadStage = "selected" | "hashing" | "presigning" | "uploading" | "comple
 type UploadQueueItem = { file: File; key: string; message: string; stage: UploadStage };
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
+const TRACK3_OPERATOR_GATED_USDC = "0";
+const TRACK3_OPERATOR_GATED_DELAY_DAYS = 0;
+
+const CONTENT_DETAIL_READINESS_DESCRIPTION =
+  "This page reads live content manifests and can resume asset upload, finalize content, record publication URLs, and create proposal intents. It still depends on authenticated session state, R2/Mux/backend configuration, and seeded S2 creator readiness; failed asset cleanup and webhook reconciliation are not fully productized.";
 
 const STATUS_LABELS: Record<ContentManifestStatus, string> = {
   DRAFT: "草稿", UPLOADING: "上传中", READY: "可发布", LOCKED: "已锁定",
@@ -78,6 +85,24 @@ const isRenderableUrl = (v: string | null | undefined) => {
 const isVideoAsset = (a: ManifestAssetRecord) => a.assetType === "VIDEO";
 const isMuxAssetReady = (a: ManifestAssetRecord) =>
   isVideoAsset(a) && a.preferredPlaybackSource === "MUX" && isRenderableUrl(a.muxPlaybackUrl);
+const hasAssetIssue = (a: ManifestAssetRecord) => {
+  const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
+    .map((status) => status?.toUpperCase?.() ?? "");
+  return Boolean(a.processingError) || statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"));
+};
+const isAssetWaiting = (a: ManifestAssetRecord) => {
+  if (hasAssetIssue(a)) return false;
+  const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
+    .map((status) => status?.toUpperCase?.() ?? "");
+  return statuses.some((status) => ["PENDING", "PROCESSING", "QUEUED", "UPLOADING"].includes(status));
+};
+const isAssetDeliveryReady = (a: ManifestAssetRecord) => {
+  if (hasAssetIssue(a)) return false;
+  if (isVideoAsset(a) && a.preferredPlaybackSource === "MUX") {
+    return isMuxAssetReady(a);
+  }
+  return isRenderableUrl(a.preferredPlaybackUrl) || isRenderableUrl(a.originUrl);
+};
 const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
   if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
   if (isRenderableUrl(a.originUrl)) return a.originUrl;
@@ -160,6 +185,7 @@ export default function ManifestDetailPage() {
   const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
+  const [verifyingPublicationId, setVerifyingPublicationId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
@@ -173,8 +199,6 @@ export default function ManifestDetailPage() {
   const [track2TargetValue, setTrack2TargetValue] = useState("10000");
   const [track2MinAchievementBps, setTrack2MinAchievementBps] = useState("7000");
   const [track2BudgetUsdc, setTrack2BudgetUsdc] = useState("1000");
-  const [track3BudgetUsdc, setTrack3BudgetUsdc] = useState("300");
-  const [track3DelayDays, setTrack3DelayDays] = useState("14");
   const [activeSection, setActiveSection] = useState<"assets" | "publish" | "sponsor">("assets");
 
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
@@ -252,6 +276,13 @@ export default function ManifestDetailPage() {
       setActionMessage("素材上传完成");
     } catch (error) {
       setUploadQueue((items) => items.map((i) => i.stage === "uploaded" ? i : { ...i, message: "上传失败", stage: "failed" }));
+      if (!isAuthError(error)) {
+        try {
+          await refreshManifest(token, manifestId);
+        } catch {
+          // Keep the original upload error visible; recovery details can be retried by refreshing the page.
+        }
+      }
       handleApiError(error, "上传失败");
     } finally { setBusyAction(null); }
   };
@@ -282,9 +313,24 @@ export default function ManifestDetailPage() {
       await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId: publicationPostId.trim() || null });
       await refreshManifest(token, manifestId);
       setPublicationUrl(""); setPublicationPostId("");
-      setActionMessage("发布记录已创建");
+      setActionMessage("发布记录已创建，等待验证和媒体交付就绪后进入 public feed");
     } catch (error) { handleApiError(error, "发布失败"); }
     finally { setBusyAction(null); }
+  };
+
+  const handleVerifyPublication = async (publicationId: string) => {
+    const token = getAccessToken();
+    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
+    if (!token) { handleAuthFailure(); return; }
+    if (!manifestId) return;
+    setVerifyingPublicationId(publicationId);
+    try {
+      await verifyContentPublication(token, publicationId);
+      const next = await refreshManifest(token, manifestId);
+      const eligible = next.isPublicFeedEligible ? "，已进入 public feed eligibility" : "，等待媒体交付就绪后进入 public feed";
+      setActionMessage(`发布验证已完成${eligible}`);
+    } catch (error) { handleApiError(error, "验证发布失败"); }
+    finally { setVerifyingPublicationId(null); }
   };
 
   const handleCreateProposalIntent = async () => {
@@ -307,7 +353,9 @@ export default function ManifestDetailPage() {
         manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
         deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),
         track2MetricType, track2TargetValue: track2TargetValue.trim(), track2MinAchievementBps: Number(track2MinAchievementBps),
-        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc), track3UsdcDeposited: toUsdcAtomicString(track3BudgetUsdc), track3DelayDays: Number(track3DelayDays),
+        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc),
+        track3UsdcDeposited: toUsdcAtomicString(TRACK3_OPERATOR_GATED_USDC),
+        track3DelayDays: TRACK3_OPERATOR_GATED_DELAY_DAYS,
       });
       setActionMessage("合作意向已创建");
       void router.push(`/workspace/intents/${intent.intentId}`);
@@ -322,6 +370,11 @@ export default function ManifestDetailPage() {
       <>
         <Head><title>{`StreamPump | ${title}`}</title></Head>
         <WorkspaceShell>
+          <ProductReadinessBanner
+            description={CONTENT_DETAIL_READINESS_DESCRIPTION}
+            status="SEEDED_DEMO"
+            title="Content detail is live API/R2-wired with media recovery gaps"
+          />
           {state.kind === "loading" && (
             <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
@@ -346,6 +399,16 @@ export default function ManifestDetailPage() {
 
   const d = state.data;
   const steps = deriveManifestSteps(d.status, d.assets.length > 0, d.publications.length > 0, t);
+  const assetsWithIssues = d.assets.filter(hasAssetIssue);
+  const assetsWaiting = d.assets.filter(isAssetWaiting);
+  const assetsDeliveryReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
+  const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
+  const isPublicFeedEligible = Boolean(d.isPublicFeedEligible) || (assetsDeliveryReady && hasVerifiedPublication);
+  const publicFeedBlockedReason = !hasVerifiedPublication
+    ? "Awaiting verified publication"
+    : !assetsDeliveryReady
+      ? "Assets still processing"
+      : "Backend eligibility flag pending";
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -373,11 +436,44 @@ export default function ManifestDetailPage() {
 
       {d.publications.length > 0 && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
+              <p className={`mt-1 text-[10px] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
+                {isPublicFeedEligible ? "Public Feed Eligible" : publicFeedBlockedReason}
+              </p>
+            </div>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+              isPublicFeedEligible
+                ? "border-[#65ecaf]/30 bg-[#65ecaf]/10 text-[#8df0c4]"
+                : "border-white/10 bg-white/[0.04] text-[#8ea0ba]"
+            }`}>
+              {isPublicFeedEligible ? "Eligible" : "Pending"}
+            </span>
+          </div>
           {d.publications.map((pub) => (
             <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={pub.publicationId}>
-              <p className="text-xs font-medium text-white">{pub.platform}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-white">{pub.platform}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] ${
+                  pub.verificationStatus === "VERIFIED"
+                    ? "bg-[#65ecaf]/10 text-[#8df0c4]"
+                    : "bg-[#f3b33e]/10 text-[#f3c66e]"
+                }`}>
+                  {pub.verificationStatus}
+                </span>
+              </div>
               <p className="mt-0.5 truncate text-[10px] text-[#5a6b82]">{pub.externalUrl}</p>
+              {pub.verificationStatus === "PENDING" ? (
+                <button
+                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[10px] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
+                  disabled={busyAction !== null || verifyingPublicationId !== null}
+                  onClick={() => void handleVerifyPublication(pub.publicationId)}
+                  type="button"
+                >
+                  {verifyingPublicationId === pub.publicationId ? "Verifying..." : "Verify Publication"}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -395,6 +491,12 @@ export default function ManifestDetailPage() {
     <>
       <Head><title>{`StreamPump | ${title}`}</title></Head>
       <WorkspaceShell aside={previewPanel}>
+        <ProductReadinessBanner
+          description={CONTENT_DETAIL_READINESS_DESCRIPTION}
+          status="SEEDED_DEMO"
+          title="Content detail is live API/R2-wired with media recovery gaps"
+        />
+
         {/* Header */}
         <div>
           <h2 className="text-lg font-semibold text-white">{d.title ?? t("workspace.unknownContent")}</h2>
@@ -438,6 +540,34 @@ export default function ManifestDetailPage() {
         {/* Assets section */}
         {activeSection === "assets" && (
           <div className="section-enter space-y-4">
+            {(assetsWithIssues.length > 0 || assetsWaiting.length > 0) && (
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Media recovery status</p>
+                    <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+                      {assetsWithIssues.length > 0
+                        ? `${assetsWithIssues.length} asset(s) need operator/user recovery. Upload replacement files here, then finalize again after storage is healthy.`
+                        : `${assetsWaiting.length} asset(s) are still waiting on upload, processing, ingest, or delivery updates.`}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f3c66e]">
+                    {assetsWithIssues.length > 0 ? "RECOVERY_NEEDED" : "PROCESSING"}
+                  </span>
+                </div>
+                {assetsWithIssues.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {assetsWithIssues.slice(0, 3).map((asset) => (
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[11px]" key={asset.assetId}>
+                        <span className="font-mono text-[#8ea0ba]">{asset.assetType} #{asset.orderIndex + 1}</span>
+                        <span className="truncate text-[#f67263]">{asset.processingError || `${asset.uploadStatus} / ${asset.processingStatus} / ${asset.deliveryStatus}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <label className="block cursor-pointer">
               <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] p-6 transition hover:border-[#de402a]/30">
                 <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
@@ -533,7 +663,7 @@ export default function ManifestDetailPage() {
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
@@ -542,12 +672,8 @@ export default function ManifestDetailPage() {
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
                 </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delaySettlement")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3BudgetUsdc(e.target.value)} value={track3BudgetUsdc} />
-                </label>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
                   <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
@@ -558,10 +684,12 @@ export default function ManifestDetailPage() {
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
                 </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.delayDays")}</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack3DelayDays(e.target.value)} value={track3DelayDays} />
-                </label>
+              </div>
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Track 3 CPS operator-gated</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+                  Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
+                </p>
               </div>
             </div>
             <button

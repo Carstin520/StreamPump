@@ -1,6 +1,7 @@
 import Head from "next/head";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 type Offer = {
@@ -8,12 +9,13 @@ type Offer = {
   avatar: string;
   amount: number;
   time: string;
+  lockHoursRemaining: number;
 };
 
 const OFFERS: Offer[] = [
-  { sponsor: "Apex Motion", avatar: "AM", amount: 850_000, time: "2h ago" },
-  { sponsor: "Gridline Lab", avatar: "GL", amount: 720_000, time: "5h ago" },
-  { sponsor: "Velocity House", avatar: "VH", amount: 680_000, time: "1d ago" },
+  { sponsor: "Apex Motion", avatar: "AM", amount: 850_000, time: "2h ago", lockHoursRemaining: 22 },
+  { sponsor: "Gridline Lab", avatar: "GL", amount: 720_000, time: "5h ago", lockHoursRemaining: 19 },
+  { sponsor: "Velocity House", avatar: "VH", amount: 680_000, time: "1d ago", lockHoursRemaining: 1 },
 ];
 
 const WALLET = "0x7A...2F";
@@ -27,6 +29,27 @@ const AVATAR_COLORS: Record<string, string> = {
   GL: "from-[#4a8dbf] to-[#3a7aaa]",
   VH: "from-[#c89630] to-[#b08228]",
 };
+
+function OfferLockCountdown({ initialHours }: { initialHours: number }) {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const deadline = Date.now() + Math.max(0, initialHours) * 3_600_000;
+    const update = () => setRemainingMs(Math.max(0, deadline - Date.now()));
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, [initialHours]);
+
+  if (remainingMs === null) {
+    return <span>锁定期剩余 -- 小时</span>;
+  }
+
+  const hours = Math.floor(remainingMs / 3_600_000);
+  const minutes = Math.floor((remainingMs % 3_600_000) / 60_000);
+
+  return <span>锁定期剩余 {hours} 小时 {minutes} 分钟</span>;
+}
 
 function OfferCard({
   offer,
@@ -64,6 +87,9 @@ function OfferCard({
             <div>
               <p className="text-[13px] font-semibold text-white">{offer.sponsor}</p>
               <p className="text-[11px] text-[#6f8099]">{offer.time}</p>
+              <p className="mt-1 text-[10px] font-medium text-[#f3c66e]">
+                <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
+              </p>
             </div>
           </div>
           <div className="text-right">
@@ -80,14 +106,14 @@ function OfferCard({
             onClick={onAccept}
             type="button"
           >
-            Accept
+            Preview accept
           </button>
           <button
             className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[12px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
             onClick={onDecline}
             type="button"
           >
-            Decline
+            Dismiss preview
           </button>
         </div>
       </div>
@@ -107,7 +133,7 @@ function ConfirmModal({
   const STEPS = [
     { label: "Accept Offer", detail: `$${fmt(offer.amount)} from ${offer.sponsor}`, active: true },
     { label: "48h Rage Quit Window", detail: "Holders may exit position", active: false },
-    { label: "Graduation", detail: "S1 → S2 transition", active: false },
+    { label: "Graduation", detail: "S1 to S2 transition", active: false },
     { label: "S2 Active", detail: "Sponsored creator status", active: false },
   ];
 
@@ -115,9 +141,12 @@ function ConfirmModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(14,19,28,0.97)_0%,rgba(9,13,20,0.97)_100%)] p-5 shadow-[0_24px_56px_rgba(0,0,0,0.5)]">
-        <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-white">Confirm buyout</h3>
+        <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-white">Preview buyout acceptance</h3>
         <p className="mt-0.5 text-[12px] text-[#9aabc4]">
           Accept ${fmt(offer.amount)} USDC from {offer.sponsor}
+        </p>
+        <p className="mt-2 rounded-lg border border-[#f3b33e]/15 bg-[#1f1708]/55 px-3 py-2 text-[11px] font-medium text-[#f3c66e]">
+          <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
         </p>
 
         <div className="mt-5 space-y-0">
@@ -153,7 +182,7 @@ function ConfirmModal({
             onClick={onConfirm}
             type="button"
           >
-            Confirm accept
+            Confirm preview
           </button>
           <button
             className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[12px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
@@ -182,6 +211,12 @@ export default function BuyoutPage() {
       </Head>
 
       <WorkspaceShell stage="S1_BUYOUT" wallet={WALLET}>
+        <ProductReadinessBanner
+          description="Offer comparison and accept/decline controls use static local offers. Real S1 buyout offer creation, acceptance, rage quit, graduation, and reclaim remain backend-ready or operator-driven."
+          status="MOCK_PREVIEW"
+          title="Buyout workspace is a static offer preview"
+        />
+
         <section className="section-enter rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.95)_0%,rgba(8,12,20,0.95)_100%)] px-4 py-3.5 md:px-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -192,7 +227,7 @@ export default function BuyoutPage() {
                 Buyout Auction
               </h1>
               <p className="mt-0.5 text-[12px] text-[#9aabc4]">
-                {buyoutOpen ? "Auction is live — sponsors can submit offers" : "S1 Discovery — not open for buyout"}
+                {buyoutOpen ? "Preview open: static sponsor offers are visible" : "S1 Discovery preview: no offer inbox shown"}
               </p>
             </div>
 
@@ -220,7 +255,7 @@ export default function BuyoutPage() {
           {buyoutOpen && (
             <div className="mt-2 flex items-center gap-1.5 border-t border-white/[0.04] pt-2">
               <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
-              <span className="text-[10px] text-[#8df0c4]">Open for offers</span>
+              <span className="text-[10px] text-[#8df0c4]">Static offers visible</span>
             </div>
           )}
         </section>
@@ -230,7 +265,7 @@ export default function BuyoutPage() {
             {/* Terms comparison (if 2+ offers) */}
             {sortedOffers.length >= 2 && (
               <section className="section-enter">
-                <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Offer Comparison</h2>
+                <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Static Offer Comparison</h2>
                 <div className="grid grid-cols-3 gap-2">
                   {sortedOffers.map((o, i) => (
                     <div
@@ -262,7 +297,7 @@ export default function BuyoutPage() {
             {/* Offer inbox */}
             <section className="section-enter">
               <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
-                Incoming Offers ({sortedOffers.length})
+                Static Incoming Offers ({sortedOffers.length})
               </h2>
               <div className="space-y-4">
                 {sortedOffers.map((offer, i) => (
@@ -288,9 +323,9 @@ export default function BuyoutPage() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03] text-[#7e90aa]">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"><path d="M12 2C9.24 2 7 4.24 7 7v3H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2V7c0-2.76-2.24-5-5-5Zm0 2c1.65 0 3 1.35 3 3v3H9V7c0-1.65 1.35-3 3-3Z" fill="currentColor"/></svg>
             </span>
-            <h2 className="mt-4 text-[15px] font-semibold text-white">Buyout disabled</h2>
+            <h2 className="mt-4 text-[15px] font-semibold text-white">Buyout preview hidden</h2>
             <p className="mt-1.5 max-w-xs text-[12px] text-[#7e90aa]">
-              Toggle the switch above to open your S1 for buyout offers from sponsors.
+              Toggle the switch above to show the static S1 buyout offer preview. Real offer creation still requires backend or operator wiring.
             </p>
           </section>
         )}

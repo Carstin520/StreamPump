@@ -14,11 +14,11 @@ use anchor_spl::token_2022::{
 use crate::{
     errors::StreamPumpError,
     state::{
-        ProtocolConfig, DEFAULT_MAX_S1_DAILY_BUY_SPUMP, DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
-        DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
-        DEFAULT_S1_MIN_USER_XP, DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
-        DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS, MAX_S1_RATING_BPS,
-        MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
+        ProtocolConfig, DEFAULT_MAX_ENDORSEMENT_HARD_CEILING, DEFAULT_MAX_S1_DAILY_BUY_SPUMP,
+        DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS, DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD,
+        DEFAULT_S1_GRADUATION_TARGET_SUPPLY, DEFAULT_S1_MIN_USER_XP,
+        DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS, DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
+        MAX_S1_RATING_BPS, MAX_S1_RATING_DAILY_DELTA_BPS, MIN_S1_RATING_BPS,
     },
     utils::SPUMP_DECIMALS,
 };
@@ -27,6 +27,7 @@ const ACCOUNT_DISCRIMINATOR_LEN: usize = 8;
 const LEGACY_PROTOCOL_CONFIG_ACCOUNT_LEN: usize = 174;
 const CURRENT_PROTOCOL_CONFIG_ACCOUNT_LEN: usize =
     ACCOUNT_DISCRIMINATOR_LEN + ProtocolConfig::INIT_SPACE;
+const PRE_HARD_CEILING_PROTOCOL_CONFIG_ACCOUNT_LEN: usize = CURRENT_PROTOCOL_CONFIG_ACCOUNT_LEN - 8;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct MigrateLegacyProtocolConfigArgs {
@@ -60,6 +61,36 @@ struct LegacyProtocolConfig {
     tax_decay_threshold_supply: u64,
     s2_min_followers: u64,
     s2_min_valid_views: u64,
+    bump: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+struct PreviousProtocolConfig {
+    admin: Pubkey,
+    oracle_authority: Pubkey,
+    usdc_mint: Pubkey,
+    spump_mint: Pubkey,
+    spump_mint_bump: u8,
+    max_proposal_duration_seconds: i64,
+    max_exit_tax_bps: u16,
+    min_exit_tax_bps: u16,
+    tax_decay_threshold_supply: u64,
+    daily_spump_emission_multiplier_bps: u16,
+    new_user_emission_bps: u16,
+    new_user_emission_window_seconds: i64,
+    s1_min_user_xp: u64,
+    max_s1_daily_buy_spump: u64,
+    s1_early_cohort_supply_threshold: u64,
+    s1_early_cohort_buyout_cap_bps: u16,
+    min_creator_rating_bps: u16,
+    max_creator_rating_bps: u16,
+    max_creator_rating_daily_delta_bps: u16,
+    s1_rating_effective_delay_seconds: i64,
+    default_s1_graduation_target_supply: u64,
+    s1_rage_quit_window_seconds: i64,
+    s2_min_followers: u64,
+    s2_min_valid_views: u64,
+    max_endorsement_per_user_bps: u16,
     bump: u8,
 }
 
@@ -130,6 +161,21 @@ fn parse_legacy_protocol_config(data: &[u8]) -> Result<LegacyProtocolConfig> {
     })
 }
 
+fn parse_previous_protocol_config(data: &[u8]) -> Result<PreviousProtocolConfig> {
+    require!(
+        data.len() == PRE_HARD_CEILING_PROTOCOL_CONFIG_ACCOUNT_LEN,
+        StreamPumpError::InvalidLegacyProtocolConfig
+    );
+    require!(
+        data.get(..ACCOUNT_DISCRIMINATOR_LEN) == Some(ProtocolConfig::DISCRIMINATOR),
+        StreamPumpError::InvalidLegacyProtocolConfig
+    );
+
+    let mut reader = &data[ACCOUNT_DISCRIMINATOR_LEN..];
+    PreviousProtocolConfig::deserialize(&mut reader)
+        .map_err(|_| error!(StreamPumpError::InvalidLegacyProtocolConfig))
+}
+
 pub(crate) fn handler(
     ctx: Context<MigrateLegacyProtocolConfig>,
     args: MigrateLegacyProtocolConfigArgs,
@@ -152,27 +198,102 @@ pub(crate) fn handler(
     if current_len == CURRENT_PROTOCOL_CONFIG_ACCOUNT_LEN {
         return err!(StreamPumpError::LegacyProtocolConfigAlreadyMigrated);
     }
-    require!(
-        current_len == LEGACY_PROTOCOL_CONFIG_ACCOUNT_LEN,
-        StreamPumpError::InvalidLegacyProtocolConfig
-    );
 
-    let legacy = {
-        let data = protocol_config_info.try_borrow_data()?;
-        parse_legacy_protocol_config(&data)?
+    let migrated = if current_len == PRE_HARD_CEILING_PROTOCOL_CONFIG_ACCOUNT_LEN {
+        let previous = {
+            let data = protocol_config_info.try_borrow_data()?;
+            parse_previous_protocol_config(&data)?
+        };
+        require_keys_eq!(
+            previous.admin,
+            ctx.accounts.admin.key(),
+            StreamPumpError::Unauthorized
+        );
+        require!(
+            previous.bump == expected_bump && previous.spump_mint_bump == expected_bump,
+            StreamPumpError::InvalidLegacyProtocolConfig
+        );
+
+        ProtocolConfig {
+            admin: previous.admin,
+            oracle_authority: previous.oracle_authority,
+            usdc_mint: previous.usdc_mint,
+            spump_mint: previous.spump_mint,
+            spump_mint_bump: previous.spump_mint_bump,
+            max_proposal_duration_seconds: previous.max_proposal_duration_seconds,
+            max_exit_tax_bps: previous.max_exit_tax_bps,
+            min_exit_tax_bps: previous.min_exit_tax_bps,
+            tax_decay_threshold_supply: previous.tax_decay_threshold_supply,
+            daily_spump_emission_multiplier_bps: previous.daily_spump_emission_multiplier_bps,
+            new_user_emission_bps: previous.new_user_emission_bps,
+            new_user_emission_window_seconds: previous.new_user_emission_window_seconds,
+            s1_min_user_xp: previous.s1_min_user_xp,
+            max_s1_daily_buy_spump: previous.max_s1_daily_buy_spump,
+            s1_early_cohort_supply_threshold: previous.s1_early_cohort_supply_threshold,
+            s1_early_cohort_buyout_cap_bps: previous.s1_early_cohort_buyout_cap_bps,
+            min_creator_rating_bps: previous.min_creator_rating_bps,
+            max_creator_rating_bps: previous.max_creator_rating_bps,
+            max_creator_rating_daily_delta_bps: previous.max_creator_rating_daily_delta_bps,
+            s1_rating_effective_delay_seconds: previous.s1_rating_effective_delay_seconds,
+            default_s1_graduation_target_supply: previous.default_s1_graduation_target_supply,
+            s1_rage_quit_window_seconds: previous.s1_rage_quit_window_seconds,
+            s2_min_followers: previous.s2_min_followers,
+            s2_min_valid_views: previous.s2_min_valid_views,
+            max_endorsement_hard_ceiling: DEFAULT_MAX_ENDORSEMENT_HARD_CEILING,
+            max_endorsement_per_user_bps: previous.max_endorsement_per_user_bps,
+            bump: previous.bump,
+        }
+    } else if current_len == LEGACY_PROTOCOL_CONFIG_ACCOUNT_LEN {
+        let legacy = {
+            let data = protocol_config_info.try_borrow_data()?;
+            parse_legacy_protocol_config(&data)?
+        };
+        require_keys_eq!(
+            legacy.admin,
+            ctx.accounts.admin.key(),
+            StreamPumpError::Unauthorized
+        );
+        require!(
+            legacy.bump == expected_bump && legacy.spump_mint_bump == expected_bump,
+            StreamPumpError::InvalidLegacyProtocolConfig
+        );
+
+        ProtocolConfig {
+            admin: legacy.admin,
+            oracle_authority: args.new_oracle_authority,
+            usdc_mint: legacy.usdc_mint,
+            spump_mint: legacy.spump_mint,
+            spump_mint_bump: legacy.spump_mint_bump,
+            max_proposal_duration_seconds: legacy.max_proposal_duration_seconds,
+            max_exit_tax_bps: legacy.max_exit_tax_bps,
+            min_exit_tax_bps: legacy.min_exit_tax_bps,
+            tax_decay_threshold_supply: legacy.tax_decay_threshold_supply,
+            daily_spump_emission_multiplier_bps: 50_000,
+            new_user_emission_bps: 2_500,
+            new_user_emission_window_seconds: 7 * 86_400,
+            s1_min_user_xp: DEFAULT_S1_MIN_USER_XP,
+            max_s1_daily_buy_spump: DEFAULT_MAX_S1_DAILY_BUY_SPUMP,
+            s1_early_cohort_supply_threshold: DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD,
+            s1_early_cohort_buyout_cap_bps: DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
+            min_creator_rating_bps: MIN_S1_RATING_BPS,
+            max_creator_rating_bps: MAX_S1_RATING_BPS,
+            max_creator_rating_daily_delta_bps: MAX_S1_RATING_DAILY_DELTA_BPS,
+            s1_rating_effective_delay_seconds: DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
+            default_s1_graduation_target_supply: DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
+            s1_rage_quit_window_seconds: DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
+            s2_min_followers: legacy.s2_min_followers,
+            s2_min_valid_views: legacy.s2_min_valid_views,
+            max_endorsement_hard_ceiling: DEFAULT_MAX_ENDORSEMENT_HARD_CEILING,
+            max_endorsement_per_user_bps: 2_000,
+            bump: legacy.bump,
+        }
+    } else {
+        return err!(StreamPumpError::InvalidLegacyProtocolConfig);
     };
-    require_keys_eq!(
-        legacy.admin,
-        ctx.accounts.admin.key(),
-        StreamPumpError::Unauthorized
-    );
-    require!(
-        legacy.bump == expected_bump && legacy.spump_mint_bump == expected_bump,
-        StreamPumpError::InvalidLegacyProtocolConfig
-    );
+
     require_keys_eq!(
         ctx.accounts.spump_mint.key(),
-        legacy.spump_mint,
+        migrated.spump_mint,
         StreamPumpError::InvalidMint
     );
     require_keys_eq!(
@@ -220,34 +341,6 @@ pub(crate) fn handler(
     }
 
     protocol_config_info.realloc(CURRENT_PROTOCOL_CONFIG_ACCOUNT_LEN, true)?;
-
-    let migrated = ProtocolConfig {
-        admin: legacy.admin,
-        oracle_authority: args.new_oracle_authority,
-        usdc_mint: legacy.usdc_mint,
-        spump_mint: legacy.spump_mint,
-        spump_mint_bump: legacy.spump_mint_bump,
-        max_proposal_duration_seconds: legacy.max_proposal_duration_seconds,
-        max_exit_tax_bps: legacy.max_exit_tax_bps,
-        min_exit_tax_bps: legacy.min_exit_tax_bps,
-        tax_decay_threshold_supply: legacy.tax_decay_threshold_supply,
-        daily_spump_emission_multiplier_bps: 50_000,
-        new_user_emission_bps: 2_500,
-        new_user_emission_window_seconds: 7 * 86_400,
-        s1_min_user_xp: DEFAULT_S1_MIN_USER_XP,
-        max_s1_daily_buy_spump: DEFAULT_MAX_S1_DAILY_BUY_SPUMP,
-        s1_early_cohort_supply_threshold: DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD,
-        s1_early_cohort_buyout_cap_bps: DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS,
-        min_creator_rating_bps: MIN_S1_RATING_BPS,
-        max_creator_rating_bps: MAX_S1_RATING_BPS,
-        max_creator_rating_daily_delta_bps: MAX_S1_RATING_DAILY_DELTA_BPS,
-        s1_rating_effective_delay_seconds: DEFAULT_S1_RATING_EFFECTIVE_DELAY_SECONDS,
-        default_s1_graduation_target_supply: DEFAULT_S1_GRADUATION_TARGET_SUPPLY,
-        s1_rage_quit_window_seconds: DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
-        s2_min_followers: legacy.s2_min_followers,
-        s2_min_valid_views: legacy.s2_min_valid_views,
-        bump: legacy.bump,
-    };
 
     let mut data = protocol_config_info.try_borrow_mut_data()?;
     data[..ACCOUNT_DISCRIMINATOR_LEN].copy_from_slice(ProtocolConfig::DISCRIMINATOR);

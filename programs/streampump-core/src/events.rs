@@ -6,6 +6,7 @@ pub struct ProposalCreated {
     pub creator: Pubkey,
     pub payer: Pubkey,
     pub deadline: i64,
+    pub nonce: u64,
     pub content_kind: u8,
     pub content_hash: [u8; 32],
     pub content_anchor: Option<Pubkey>,
@@ -26,6 +27,7 @@ pub struct ContentAnchored {
     pub url_digest: [u8; 32],
     pub content_digest: [u8; 32],
     pub anchored_at: i64,
+    pub version: u32,
 }
 
 #[event]
@@ -79,6 +81,13 @@ pub struct S1BuyoutOfferReclaimed {
 #[event]
 pub struct S1BuyoutOfferCancelled {
     pub buyout_offer: Pubkey,
+    pub creator_profile: Pubkey,
+    pub sponsor: Pubkey,
+    pub refund_amount: u64,
+}
+
+#[event]
+pub struct S1BuyoutAborted {
     pub creator_profile: Pubkey,
     pub sponsor: Pubkey,
     pub refund_amount: u64,
@@ -144,6 +153,10 @@ pub struct S1Graduated {
     pub winning_sponsor: Pubkey,
     pub claimable_usdc_remaining: u64,
     pub claimable_s1_supply_remaining: u64,
+    pub early_claimable_usdc_remaining: u64,
+    pub early_claimable_s1_supply_remaining: u64,
+    pub regular_claimable_usdc_remaining: u64,
+    pub regular_claimable_s1_supply_remaining: u64,
     pub creator_spump_bonus: u64,
     pub status: u8,
 }
@@ -157,6 +170,10 @@ pub struct S1BuyoutUsdcClaimed {
     pub usdc_amount: u64,
     pub remaining_usdc: u64,
     pub remaining_supply: u64,
+    pub early_claimable_usdc_remaining: u64,
+    pub early_claimable_s1_supply_remaining: u64,
+    pub regular_claimable_usdc_remaining: u64,
+    pub regular_claimable_s1_supply_remaining: u64,
 }
 
 #[event]
@@ -184,6 +201,15 @@ pub struct Track1Settled {
 }
 
 #[event]
+pub struct EndorsementCreated {
+    pub proposal: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub total_staked: u64,
+    pub endorser_count: u32,
+}
+
+#[event]
 pub struct EndorsementSettled {
     pub proposal: Pubkey,
     pub user: Pubkey,
@@ -204,6 +230,8 @@ pub struct Track2Settled {
     pub creator_payout: u64,
     pub sponsor_refund: u64,
     pub fan_pool_remaining: u64,
+    pub initial_fan_pool: u64,
+    pub initial_spump_staked: u64,
     pub status: u8,
     pub settled_at: i64,
 }

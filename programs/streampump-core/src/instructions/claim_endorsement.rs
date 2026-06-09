@@ -4,8 +4,8 @@
 //     After Track 2 is settled, anyone can execute settlement for an endorser:
 //     - Resolved_Success: 100% SPUMP principal minted back + pro-rata share
 //       of the Track 2 fan pool (20% of achieved budget).
-//     - Resolved_Fail: 95% SPUMP minted back; 5% permanently unissued (deflation).
-//     - Cancelled/Voided: 100% SPUMP principal minted back.
+//     - Resolved_Fail: 100% SPUMP minted back (fans not punished for underperformance).
+//     - Cancelled/Voided: 95% SPUMP minted back; 5% permanently unissued (deflation cost).
 //     - Open but expired and unfunded: 100% SPUMP principal minted back.
 //     SPUMP is minted (not transferred from a vault) because endorsement burns
 //     SPUMP on entry. The protocol_config PDA is the mint authority.
@@ -13,8 +13,8 @@
 // ZH: 背书仓位的免签执行结算。
 //     Track2 结算完成后，任何人都可以为 Endorser 执行结算：
 //     - 成功：100% SPUMP 本金铸回 + 按比例分享 Track2 粉丝池（达成预算的 20%）。
-//     - 失败：95% SPUMP 铸回；5% 永久不铸造（通缩）。
-//     - 取消/作废：100% SPUMP 本金铸回。
+//     - 失败：100% SPUMP 铸回（粉丝不因活动效果不佳而受罚）。
+//     - 取消/作废：95% SPUMP 铸回；5% 永久不铸造（取消代价通缩）。
 //     - 仍为 Open 但已过期且未获注资：100% SPUMP 本金铸回。
 //     SPUMP 通过 mint 而非从 vault 转出——因为背书时已经将 SPUMP 销毁。
 //     protocol_config PDA 是 SPUMP 的 mint authority。
@@ -33,11 +33,12 @@ use crate::{
     utils::{amount_from_bps, checked_sub},
 };
 
-/// EN: Slash percentage for failed endorsements: 5% (500 bps).
-///     The slashed 5% is never re-minted, creating permanent supply deflation.
-/// ZH: 失败背书的罚没比例：5%（500 基点）。
-///     被罚没的 5% 永远不会被重新铸造，实现永久通缩。
-pub const FAILED_SLASH_BPS: u16 = 500;
+/// EN: Slash percentage for cancelled/voided endorsements: 5% (500 bps).
+///     The slashed 5% is never re-minted, creating permanent supply deflation
+///     as a cost for creator/sponsor-initiated cancellation.
+/// ZH: 取消/作废背书的罚没比例：5%（500 基点）。
+///     被罚没的 5% 永远不会被重新铸造，作为创作者/赞助商主动取消的代价实现永久通缩。
+pub const CANCEL_VOID_SLASH_BPS: u16 = 500;
 
 #[derive(Accounts)]
 pub struct ClaimEndorsement<'info> {
@@ -53,7 +54,7 @@ pub struct ClaimEndorsement<'info> {
     ///     已过期但未注资的提案可直接退还本金。
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump
     )]
     pub proposal: Box<Account<'info, Proposal>>,
@@ -139,12 +140,14 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     let mut usdc_reward = 0u64;
     let proposal_creator = ctx.accounts.proposal.creator;
     let deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
+    let nonce_bytes = ctx.accounts.proposal.nonce.to_le_bytes();
     let proposal_bump_bytes = [ctx.accounts.proposal.bump];
     let proposal_account_info = ctx.accounts.proposal.to_account_info();
-    let proposal_signer_seeds: [&[u8]; 4] = [
+    let proposal_signer_seeds: [&[u8]; 5] = [
         b"proposal",
         proposal_creator.as_ref(),
         deadline_bytes.as_ref(),
+        nonce_bytes.as_ref(),
         proposal_bump_bytes.as_ref(),
     ];
     let proposal_signer: &[&[&[u8]]] = &[&proposal_signer_seeds];
@@ -190,16 +193,21 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
 
             usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
                 proposal.track2_usdc_deposited
-            } else if proposal.track2_unsettled_spump == 0 || proposal.track2_usdc_deposited == 0 {
+            } else if proposal.track2_initial_spump_staked == 0
+                || proposal.track2_initial_fan_pool == 0
+                || proposal.track2_usdc_deposited == 0
+            {
                 0
             } else {
                 let numerator = (staked_amount as u128)
-                    .checked_mul(proposal.track2_usdc_deposited as u128)
+                    .checked_mul(proposal.track2_initial_fan_pool as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
                 let quotient = numerator
-                    .checked_div(proposal.track2_unsettled_spump as u128)
+                    .checked_div(proposal.track2_initial_spump_staked as u128)
                     .ok_or(StreamPumpError::MathOverflow)?;
-                u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?
+                let reward =
+                    u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+                std::cmp::min(reward, proposal.track2_usdc_deposited)
             };
 
             if usdc_reward > 0 {
@@ -229,15 +237,50 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
         ProposalStatus::Resolved_Fail => {
             // ────────────────────────────────────────────────────────────────
             // EN: FAIL PATH:
-            //     Mint only 95% SPUMP back. The remaining 5% is never minted,
-            //     achieving permanent supply deflation without needing a
-            //     burn/treasury ATA.
+            //     100% SPUMP refund — fans are not punished for campaign
+            //     underperformance. The campaign simply didn't hit its target.
             //
             // ZH: 失败路径：
-            //     只铸回 95% SPUMP。剩余 5% 永远不会被铸造，
-            //     无需 burn/treasury ATA 即实现永久通缩。
+            //     100% SPUMP 全额退回——粉丝不因活动效果不佳而受罚。
             // ────────────────────────────────────────────────────────────────
-            let slash_amount = amount_from_bps(staked_amount, FAILED_SLASH_BPS)?;
+            token_interface::mint_to(
+                CpiContext::new_with_signer(
+                    ctx.accounts.spump_token_program.to_account_info(),
+                    MintTo {
+                        mint: ctx.accounts.spump_mint.to_account_info(),
+                        to: ctx.accounts.user_spump_ata.to_account_info(),
+                        authority: ctx.accounts.protocol_config.to_account_info(),
+                    },
+                    protocol_signer,
+                ),
+                staked_amount,
+            )?;
+            spump_refund = staked_amount;
+
+            let proposal = &mut ctx.accounts.proposal;
+            if proposal.track2_unsettled_endorser_count > 0 {
+                proposal.track2_unsettled_endorser_count = proposal
+                    .track2_unsettled_endorser_count
+                    .checked_sub(1)
+                    .ok_or(StreamPumpError::MathOverflow)?;
+            }
+            if proposal.track2_unsettled_spump > 0 {
+                proposal.track2_unsettled_spump =
+                    checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
+            }
+        }
+        ProposalStatus::Cancelled | ProposalStatus::Voided => {
+            // ────────────────────────────────────────────────────────────────
+            // EN: CANCEL/VOID PATH:
+            //     5% SPUMP slash — creator/sponsor cancellation cost.
+            //     The slashed 5% is never re-minted, creating permanent
+            //     supply deflation.
+            //
+            // ZH: 取消/作废路径：
+            //     5% SPUMP 罚没——创作者/赞助商取消的代价。
+            //     被罚没的 5% 永远不会被重新铸造，实现永久通缩。
+            // ────────────────────────────────────────────────────────────────
+            let slash_amount = amount_from_bps(staked_amount, CANCEL_VOID_SLASH_BPS)?;
             let refund_amount = checked_sub(staked_amount, slash_amount)?;
             spump_refund = refund_amount;
 
@@ -255,35 +298,6 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                     refund_amount,
                 )?;
             }
-
-            let proposal = &mut ctx.accounts.proposal;
-            if proposal.track2_unsettled_endorser_count > 0 {
-                proposal.track2_unsettled_endorser_count = proposal
-                    .track2_unsettled_endorser_count
-                    .checked_sub(1)
-                    .ok_or(StreamPumpError::MathOverflow)?;
-            }
-            if proposal.track2_unsettled_spump > 0 {
-                proposal.track2_unsettled_spump =
-                    checked_sub(proposal.track2_unsettled_spump, staked_amount)?;
-            }
-        }
-        ProposalStatus::Cancelled | ProposalStatus::Voided => {
-            // EN: CANCEL/VOID PATH: Mint 100% SPUMP principal back (neutral).
-            // ZH: 取消/作废路径：铸回 100% SPUMP 本金（中性操作）。
-            token_interface::mint_to(
-                CpiContext::new_with_signer(
-                    ctx.accounts.spump_token_program.to_account_info(),
-                    MintTo {
-                        mint: ctx.accounts.spump_mint.to_account_info(),
-                        to: ctx.accounts.user_spump_ata.to_account_info(),
-                        authority: ctx.accounts.protocol_config.to_account_info(),
-                    },
-                    protocol_signer,
-                ),
-                staked_amount,
-            )?;
-            spump_refund = staked_amount;
 
             let proposal = &mut ctx.accounts.proposal;
             if proposal.track2_unsettled_endorser_count > 0 {

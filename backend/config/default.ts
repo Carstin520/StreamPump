@@ -24,6 +24,14 @@ export const config = {
       process.env.AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE,
       false
     ),
+    internalOperatorApiKey: process.env.INTERNAL_OPERATOR_API_KEY,
+    creatorAuthAllowPreviewTwitter: env.readBoolean(
+      process.env.CREATOR_AUTH_ALLOW_PREVIEW_TWITTER,
+      process.env.NODE_ENV !== "production"
+    ),
+  },
+  managedWallet: {
+    encryptionKey: env.readString(process.env.MANAGED_WALLET_ENCRYPTION_KEY, ""),
   },
   email: {
     deliveryMode: env.readString(process.env.EMAIL_DELIVERY_MODE, "console"),
@@ -35,6 +43,10 @@ export const config = {
   },
   solana: {
     rpcEndpoint: env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com"),
+    isDevnet: env.readBoolean(
+      process.env.SOLANA_IS_DEVNET,
+      (process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com").includes("devnet")
+    ),
     programId: env.readString(
       process.env.STREAMPUMP_PROGRAM_ID,
       "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp"
@@ -125,6 +137,10 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   if (runtimeConfig.email.deliveryMode === "console") {
     failures.push("EMAIL_DELIVERY_MODE=console is not allowed in production");
+  }
+
+  if (!/^[0-9a-fA-F]{64}$/.test(runtimeConfig.managedWallet.encryptionKey)) {
+    failures.push("MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars");
   }
 
   if (failures.length > 0) {

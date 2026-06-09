@@ -48,9 +48,13 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  Ed25519Program,
   SYSVAR_RENT_PUBKEY,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
+import { ed25519 } from "@noble/curves/ed25519";
 
 // Re-export BN type for convenience across test files
 // 重新导出 BN 类型，方便其他测试文件使用
@@ -182,13 +186,21 @@ export interface TestContext {
     fn: () => Promise<string>,
     expectedNeedle: string
   ) => Promise<void>;
+  /**
+   * Build the required Ed25519 oracle authorization instruction for register_creator.
+   */
+  creatorAuthPreInstruction: (
+    creator: PublicKey,
+    handle: string,
+    signerOverride?: Keypair
+  ) => TransactionInstruction;
 
   // --- PDA derivation helpers / PDA 推导辅助函数 ---
 
   /** seeds: ["creator", authority] / 种子：["creator", authority] */
   deriveCreatorProfile: (authority: PublicKey) => PublicKey;
-  /** seeds: ["proposal", creator, deadline_le_8] / 种子：["proposal", creator, deadline_le_8] */
-  deriveProposal: (creator: PublicKey, deadline: BN) => PublicKey;
+  /** seeds: ["proposal", creator, deadline_le_8, nonce_le_8] / 种子：["proposal", creator, deadline_le_8, nonce_le_8] */
+  deriveProposal: (creator: PublicKey, deadline: BN, nonce?: number) => PublicKey;
   /** seeds: ["proposal_usdc_vault", proposal] / 种子：["proposal_usdc_vault", proposal] */
   deriveProposalUsdcVault: (proposal: PublicKey) => PublicKey;
   /** seeds: ["endorsement", user, proposal] / 种子：["endorsement", user, proposal] */
@@ -320,16 +332,21 @@ const buildContext = async (): Promise<TestContext> => {
   const deriveCreatorProfile = (authority: PublicKey): PublicKey =>
     PublicKey.findProgramAddressSync([Buffer.from("creator"), authority.toBuffer()], program.programId)[0];
 
-  /** Derive Proposal PDA (unique per creator + deadline) / 推导提案 PDA（按创作者 + 截止时间唯一） */
-  const deriveProposal = (creator: PublicKey, deadline: BN): PublicKey =>
-    PublicKey.findProgramAddressSync(
+  /** Derive Proposal PDA (unique per creator + deadline + nonce) / 推导提案 PDA（按创作者 + 截止时间 + nonce 唯一） */
+  const deriveProposal = (creator: PublicKey, deadline: BN, nonce = 0): PublicKey => {
+    const nonceBytes = Buffer.alloc(8);
+    nonceBytes.writeBigUInt64LE(BigInt(nonce));
+
+    return PublicKey.findProgramAddressSync(
       [
         Buffer.from("proposal"),
         creator.toBuffer(),
         deadline.toArrayLike(Buffer, "le", 8),
+        nonceBytes,
       ],
       program.programId
     )[0];
+  };
 
   /** Derive the USDC vault PDA for a proposal / 推导提案的 USDC 资金库 PDA */
   const deriveProposalUsdcVault = (proposal: PublicKey): PublicKey =>
@@ -446,6 +463,47 @@ const buildContext = async (): Promise<TestContext> => {
         `Expected error containing "${expectedNeedle}", got:\n${text}`
       );
     }
+  };
+
+  const buildCreatorAuthMessage = (
+    creator: PublicKey,
+    handle: string,
+    timestampUnix: number,
+    nonce: Uint8Array
+  ): Buffer => {
+    const domain = Buffer.from("streampump:creator-register:v1");
+    const handleBytes = Buffer.from(handle, "utf8");
+    const handleLen = Buffer.alloc(2);
+    handleLen.writeUInt16LE(handleBytes.length, 0);
+    const timestamp = Buffer.alloc(8);
+    timestamp.writeBigInt64LE(BigInt(timestampUnix), 0);
+
+    return Buffer.concat([
+      domain,
+      creator.toBuffer(),
+      handleLen,
+      handleBytes,
+      Buffer.from(nonce),
+      timestamp,
+    ]);
+  };
+
+  const creatorAuthPreInstruction = (
+    creator: PublicKey,
+    handle: string,
+    signerOverride?: Keypair
+  ): TransactionInstruction => {
+    const signer = signerOverride ?? oracle;
+    const normalizedHandle = handle.toLowerCase();
+    const nonce = Keypair.generate().publicKey.toBytes();
+    const message = buildCreatorAuthMessage(creator, normalizedHandle, nowTs(), nonce);
+    const signature = ed25519.sign(message, signer.secretKey.slice(0, 32));
+
+    return Ed25519Program.createInstructionWithPublicKey({
+      publicKey: signer.publicKey.toBytes(),
+      message,
+      signature,
+    });
   };
 
   // ===========================================================================
@@ -703,6 +761,7 @@ const buildContext = async (): Promise<TestContext> => {
       s1RageQuitWindowSeconds: bn(48 * 3_600),          // Production rage-quit window / 生产默认 rage-quit 窗口
       s2MinFollowers: bn(100),                         // Min followers for S2 upgrade / S2 升级所需最低粉丝数
       s2MinValidViews: bn(1_000),                      // Min views for S2 upgrade / S2 升级所需最低有效观看数
+      maxEndorsementPerUserBps: 2_000,                 // Per-user endorsement cap / 单用户背书上限
     })
     .accounts({
       admin: payer.publicKey,
@@ -726,32 +785,38 @@ const buildContext = async (): Promise<TestContext> => {
   const creatorS1Profile = deriveCreatorProfile(creatorS1.publicKey);
 
   // Register S2 creator / 注册 S2 创作者
+  const creatorS2Handle = "creator_s2";
   await program.methods
     .registerCreator({
-      handle: "creator_s2",
+      handle: creatorS2Handle,
       payoutUsdcAta: creatorS2UsdcAta,
     })
     .accounts({
       authority: creatorS2.publicKey,
       protocolConfig,
       creatorProfile: creatorS2Profile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([creatorAuthPreInstruction(creatorS2.publicKey, creatorS2Handle)])
     .signers([creatorS2])
     .rpc();
 
   // Register S1 creator / 注册 S1 创作者
+  const creatorS1Handle = "creator_s1";
   await program.methods
     .registerCreator({
-      handle: "creator_s1",
+      handle: creatorS1Handle,
       payoutUsdcAta: creatorS1UsdcAta,
     })
     .accounts({
       authority: creatorS1.publicKey,
       protocolConfig,
       creatorProfile: creatorS1Profile,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions([creatorAuthPreInstruction(creatorS1.publicKey, creatorS1Handle)])
     .signers([creatorS1])
     .rpc();
 
@@ -822,6 +887,7 @@ const buildContext = async (): Promise<TestContext> => {
         track2MinAchievementBps: params.track2MinAchievementBps, // Cliff threshold / 悬崖门槛
         track3DelayDays: params.track3DelayDays ?? 45,       // CPS delay / CPS 延迟天数
         deadline,                                            // Proposal deadline / 提案截止时间
+        nonce: bn(0),                                        // PDA nonce / PDA nonce
       })
       .accounts({
         creator: params.creator.publicKey,
@@ -896,6 +962,7 @@ const buildContext = async (): Promise<TestContext> => {
     tokenAmount,
     waitUntilDeadline,
     expectAnchorError,
+    creatorAuthPreInstruction,
 
     deriveCreatorProfile,
     deriveProposal,

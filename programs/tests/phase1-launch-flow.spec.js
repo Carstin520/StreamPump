@@ -83,6 +83,7 @@ describe("streampump-core Phase 1 launch flow", function () {
             track2MinAchievementBps: 5_000,
             track3DelayDays: 45,
             deadline,
+            nonce: ctx.bn(0),
         })
             .accounts({
             creator: ctx.creatorS2.publicKey,
@@ -157,6 +158,7 @@ describe("streampump-core Phase 1 launch flow", function () {
                 track2MinAchievementBps: 5_000,
                 track3DelayDays: 45,
                 deadline,
+                nonce: ctx.bn(0),
             })
                 .accounts({
                 creator: ctx.creatorS2.publicKey,
@@ -194,6 +196,7 @@ describe("streampump-core Phase 1 launch flow", function () {
             track2MinAchievementBps: 5_000,
             track3DelayDays: 45,
             deadline,
+            nonce: ctx.bn(0),
         })
             .accounts({
             creator: ctx.creatorS2.publicKey,
@@ -257,6 +260,7 @@ describe("streampump-core Phase 1 launch flow", function () {
             track2MinAchievementBps: 5_000,
             track3DelayDays: 45,
             deadline,
+            nonce: ctx.bn(0),
         })
             .accounts({
             creator: ctx.creatorS2.publicKey,

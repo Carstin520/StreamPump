@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
@@ -10,6 +11,7 @@ import {
   UploadIcon,
   VideoIcon,
 } from "@/components/shared/AppIcons";
+import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { StepProgress, StepItem } from "@/components/workspace/StepProgress";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { ContentType } from "@/lib/api/types";
@@ -41,6 +43,9 @@ const FLOW_STEPS: { id: FlowStep; labelKey: string }[] = [
 ];
 
 const STEP_INDEX: Record<FlowStep, number> = { details: 0, media: 1, checks: 2, publish: 3, sponsorship: 4 };
+
+const CONTENT_CREATE_READINESS_DESCRIPTION =
+  "This route calls live content manifest APIs, R2 presign/upload, asset-complete, and finalize endpoints. It still depends on an authenticated session plus backend storage/R2/Mux configuration; interrupted uploads can leave a recoverable draft that must be resumed from the content detail page.";
 
 const TYPE_OPTIONS: { type: ContentType; labelKey: string; descKey: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { type: "IMAGE_CAROUSEL", labelKey: "workspace.imageCarousel", descKey: "workspace.imageCarouselDesc", icon: ImageIcon },
@@ -106,6 +111,7 @@ export default function NewContentPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [recoveryManifestId, setRecoveryManifestId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
@@ -166,7 +172,9 @@ export default function NewContentPage() {
     setBusy(true);
     setSaveStatus("saving");
     setMessage(null);
+    setRecoveryManifestId(null);
 
+    let createdManifestId: string | null = null;
     try {
       const manifest = await createContentManifest(token, {
         contentType,
@@ -174,6 +182,7 @@ export default function NewContentPage() {
         captionText,
         tags: parseTags(tagsInput),
       });
+      createdManifestId = manifest.manifestId;
 
       if (selectedFiles.length > 0) {
         setMessage(t("workspace.draftCreatedUploading"));
@@ -230,7 +239,12 @@ export default function NewContentPage() {
         clearAuthSession();
         setAuthState("auth");
       }
-      setMessage(msg);
+      if (createdManifestId) {
+        setRecoveryManifestId(createdManifestId);
+        setMessage(`${msg}. Draft ${createdManifestId} may have been created; open it to retry uploads or finalize once storage is healthy.`);
+      } else {
+        setMessage(msg);
+      }
       setSaveStatus("idle");
     } finally {
       setBusy(false);
@@ -251,6 +265,11 @@ export default function NewContentPage() {
       <>
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
+          <ProductReadinessBanner
+            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            status="SEEDED_DEMO"
+            title="Content creation is API/R2-wired with recovery gaps"
+          />
           <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
             <p className="text-sm text-[#8ea0ba]">{t("common.loading")}</p>
@@ -265,6 +284,11 @@ export default function NewContentPage() {
       <>
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
+          <ProductReadinessBanner
+            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            status="SEEDED_DEMO"
+            title="Content creation is API/R2-wired with recovery gaps"
+          />
           <div className="liquid-card card-radius px-6 py-8">
             <p className="text-[10px] uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.loginRequired")}</p>
             <h2 className="mt-2 text-lg font-semibold text-white">{t("workspace.loginToCreate")}</h2>
@@ -325,6 +349,12 @@ export default function NewContentPage() {
     <>
       <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
       <WorkspaceShell aside={previewPanel}>
+        <ProductReadinessBanner
+          description={CONTENT_CREATE_READINESS_DESCRIPTION}
+          status="SEEDED_DEMO"
+          title="Content creation is API/R2-wired with recovery gaps"
+        />
+
         {/* Top bar with save status */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">{t("workspace.newContent")}</h2>
@@ -556,7 +586,15 @@ export default function NewContentPage() {
 
         {message && (
           <div className="mt-3 rounded-2xl border border-[#f67263]/20 bg-[#f67263]/[0.06] px-4 py-3 text-sm text-[#f67263]">
-            {message}
+            <p>{message}</p>
+            {recoveryManifestId && (
+              <Link
+                className="mt-2 inline-flex rounded-full border border-[#f67263]/25 px-3 py-1 text-[11px] font-semibold text-[#ff9a88] transition hover:border-[#f67263]/45 hover:text-white"
+                href={`/workspace/content/${recoveryManifestId}`}
+              >
+                Open recoverable draft
+              </Link>
+            )}
           </div>
         )}
       </WorkspaceShell>

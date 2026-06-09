@@ -8,8 +8,11 @@ import {
   reconcileMuxAsset,
   runMuxReconciliation,
 } from "../../controllers/internalMuxController";
+import { requireInternalOperatorAuth } from "../../middleware/internalOperatorAuth";
 
 const router = Router();
+
+router.use(requireInternalOperatorAuth);
 
 router.post("/reconcile/run-once", runMuxReconciliation);
 router.post("/assets/:assetId/reconcile", reconcileMuxAsset);

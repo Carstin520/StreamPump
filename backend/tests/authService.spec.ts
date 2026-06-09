@@ -4,19 +4,22 @@
  */
 import { expect } from "chai";
 import { ed25519 } from "@noble/curves/ed25519";
-import { IdentityProvider } from "@prisma/client";
+import { AccountRole, IdentityProvider, WalletType } from "@prisma/client";
 import bs58 from "bs58";
 import { Keypair } from "@solana/web3.js";
 
+import { config } from "../config/default";
 import { prisma } from "../src/services/prisma";
 import {
   createWalletAuthChallenge,
   exchangeProviderIdentitySession,
   findAuthIdentityByWallet,
   revokeWalletSession,
+  bindExternalWalletToIdentitySession,
   verifyWalletAuthChallenge,
   verifyWalletSessionToken,
 } from "../src/services/auth";
+import { loadManagedWalletKeypair } from "../src/services/managedWalletService";
 
 type ChallengeRecord = {
   id: string;
@@ -51,13 +54,41 @@ type IdentityRecord = {
   updatedAt: Date;
 };
 
+type AccountProfileRecord = {
+  id: string;
+  wallet: string;
+  role: AccountRole;
+  displayName: string | null;
+  handle: string | null;
+  onboardingCompletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type AccountWalletRecord = {
+  id: string;
+  accountProfileId: string;
+  walletAddress: string;
+  walletType: WalletType;
+  isPrimary: boolean;
+  label: string | null;
+  encryptedSecretKey: Uint8Array | null;
+  boundAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 const installMockAuthPrisma = () => {
   const challenges = new Map<string, ChallengeRecord>();
   const sessions = new Map<string, SessionRecord>();
   const identities = new Map<string, IdentityRecord>();
+  const accountProfiles = new Map<string, AccountProfileRecord>();
+  const accountWallets = new Map<string, AccountWalletRecord>();
 
   let challengeCounter = 0;
   let identityCounter = 0;
+  let accountProfileCounter = 0;
+  let accountWalletCounter = 0;
 
   const prismaAny = prisma as any;
   const original = {
@@ -79,6 +110,17 @@ const installMockAuthPrisma = () => {
       create: prisma.authIdentity.create,
       update: prisma.authIdentity.update,
       findFirst: prisma.authIdentity.findFirst,
+    },
+    accountProfile: {
+      findUnique: prisma.accountProfile.findUnique,
+      update: prisma.accountProfile.update,
+      upsert: prisma.accountProfile.upsert,
+    },
+    accountWallet: {
+      findUnique: prisma.accountWallet.findUnique,
+      create: prisma.accountWallet.create,
+      update: prisma.accountWallet.update,
+      upsert: prisma.accountWallet.upsert,
     },
     $transaction: prismaAny.$transaction,
   };
@@ -194,7 +236,26 @@ const installMockAuthPrisma = () => {
     return { count: removable.length };
   };
 
-  prismaAny.authIdentity.findUnique = async ({ where }: { where: { provider_providerSubject: { provider: IdentityProvider; providerSubject: string } } }) => {
+  prismaAny.authIdentity.findUnique = async ({
+    where,
+  }: {
+    where: {
+      provider_providerSubject?: { provider: IdentityProvider; providerSubject: string };
+      managedWalletAddress?: string;
+    };
+  }) => {
+    if (where.managedWalletAddress) {
+      return (
+        Array.from(identities.values()).find(
+          (identity) => identity.managedWalletAddress === where.managedWalletAddress,
+        ) ?? null
+      );
+    }
+
+    if (!where.provider_providerSubject) {
+      return null;
+    }
+
     const key = `${where.provider_providerSubject.provider}:${where.provider_providerSubject.providerSubject}`;
     return identities.get(key) ?? null;
   };
@@ -239,6 +300,162 @@ const installMockAuthPrisma = () => {
     );
   };
 
+  prismaAny.accountProfile.upsert = async ({
+    where,
+    update,
+    create,
+  }: {
+    where: { wallet: string };
+    update: Partial<AccountProfileRecord>;
+    create: Pick<AccountProfileRecord, "wallet" | "role"> & Partial<AccountProfileRecord>;
+  }) => {
+    const existing = accountProfiles.get(where.wallet);
+    const now = new Date();
+
+    if (existing) {
+      const updated: AccountProfileRecord = {
+        ...existing,
+        ...update,
+        displayName: update.displayName === undefined ? existing.displayName : update.displayName ?? null,
+        updatedAt: now,
+      };
+      accountProfiles.set(where.wallet, updated);
+      return updated;
+    }
+
+    accountProfileCounter += 1;
+    const record: AccountProfileRecord = {
+      id: `account-profile-${accountProfileCounter}`,
+      wallet: create.wallet,
+      role: create.role,
+      displayName: create.displayName ?? null,
+      handle: create.handle ?? null,
+      onboardingCompletedAt: create.onboardingCompletedAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    accountProfiles.set(record.wallet, record);
+    return record;
+  };
+
+  prismaAny.accountProfile.findUnique = async ({ where }: { where: { wallet: string } }) =>
+    accountProfiles.get(where.wallet) ?? null;
+
+  prismaAny.accountProfile.update = async ({
+    where,
+    data,
+  }: {
+    where: { id: string };
+    data: Partial<AccountProfileRecord>;
+  }) => {
+    const current = Array.from(accountProfiles.values()).find((profile) => profile.id === where.id);
+    if (!current) {
+      throw new Error(`account profile ${where.id} not found`);
+    }
+
+    const updated: AccountProfileRecord = {
+      ...current,
+      ...data,
+      updatedAt: new Date(),
+    };
+    accountProfiles.delete(current.wallet);
+    accountProfiles.set(updated.wallet, updated);
+    return updated;
+  };
+
+  prismaAny.accountWallet.findUnique = async ({
+    where,
+    include,
+  }: {
+    where: { walletAddress: string };
+    include?: { accountProfile?: boolean };
+  }) => {
+    const record = accountWallets.get(where.walletAddress) ?? null;
+    if (!record || !include?.accountProfile) {
+      return record;
+    }
+
+    return {
+      ...record,
+      accountProfile: Array.from(accountProfiles.values()).find(
+        (profile) => profile.id === record.accountProfileId,
+      ),
+    };
+  };
+
+  prismaAny.accountWallet.create = async ({
+    data,
+  }: {
+    data: Pick<AccountWalletRecord, "accountProfileId" | "walletAddress" | "walletType" | "isPrimary"> &
+      Partial<Pick<AccountWalletRecord, "encryptedSecretKey">>;
+  }) => {
+    if (accountWallets.has(data.walletAddress)) {
+      throw new Error("wallet already exists");
+    }
+
+    accountWalletCounter += 1;
+    const now = new Date();
+    const record: AccountWalletRecord = {
+      id: `account-wallet-${accountWalletCounter}`,
+      accountProfileId: data.accountProfileId,
+      walletAddress: data.walletAddress,
+      walletType: data.walletType,
+      isPrimary: data.isPrimary,
+      label: null,
+      encryptedSecretKey: data.encryptedSecretKey ?? null,
+      boundAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    accountWallets.set(record.walletAddress, record);
+    return record;
+  };
+
+  prismaAny.accountWallet.upsert = async ({
+    where,
+    update,
+    create,
+  }: {
+    where: { walletAddress: string };
+    update: Partial<AccountWalletRecord>;
+    create: Pick<AccountWalletRecord, "accountProfileId" | "walletAddress" | "walletType" | "isPrimary"> &
+      Partial<Pick<AccountWalletRecord, "encryptedSecretKey">>;
+  }) => {
+    const existing = accountWallets.get(where.walletAddress);
+    if (!existing) {
+      return prismaAny.accountWallet.create({ data: create });
+    }
+
+    const updated: AccountWalletRecord = {
+      ...existing,
+      ...update,
+      updatedAt: new Date(),
+    };
+    accountWallets.set(where.walletAddress, updated);
+    return updated;
+  };
+
+  prismaAny.accountWallet.update = async ({
+    where,
+    data,
+  }: {
+    where: { walletAddress: string };
+    data: Partial<AccountWalletRecord>;
+  }) => {
+    const existing = accountWallets.get(where.walletAddress);
+    if (!existing) {
+      throw new Error(`account wallet ${where.walletAddress} not found`);
+    }
+
+    const updated: AccountWalletRecord = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    accountWallets.set(where.walletAddress, updated);
+    return updated;
+  };
+
   prismaAny.$transaction = async (operations: Promise<unknown>[]) => Promise.all(operations);
 
   return {
@@ -256,24 +473,34 @@ const installMockAuthPrisma = () => {
       prismaAny.authIdentity.create = original.authIdentity.create;
       prismaAny.authIdentity.update = original.authIdentity.update;
       prismaAny.authIdentity.findFirst = original.authIdentity.findFirst;
+      prismaAny.accountProfile.findUnique = original.accountProfile.findUnique;
+      prismaAny.accountProfile.update = original.accountProfile.update;
+      prismaAny.accountProfile.upsert = original.accountProfile.upsert;
+      prismaAny.accountWallet.findUnique = original.accountWallet.findUnique;
+      prismaAny.accountWallet.create = original.accountWallet.create;
+      prismaAny.accountWallet.update = original.accountWallet.update;
+      prismaAny.accountWallet.upsert = original.accountWallet.upsert;
       prismaAny.$transaction = original.$transaction;
     },
+    accountProfiles,
+    accountWallets,
   };
 };
 
 describe("wallet auth service", function () {
   this.timeout(20_000);
 
-  let restorePrisma: (() => void) | null = null;
+  let mockPrisma: ReturnType<typeof installMockAuthPrisma> | null = null;
 
   beforeEach(() => {
-    const mock = installMockAuthPrisma();
-    restorePrisma = mock.restore;
+    config.managedWallet.encryptionKey = "0".repeat(64);
+    config.solana.isDevnet = false;
+    mockPrisma = installMockAuthPrisma();
   });
 
   afterEach(() => {
-    restorePrisma?.();
-    restorePrisma = null;
+    mockPrisma?.restore();
+    mockPrisma = null;
   });
 
   it("creates a challenge, verifies a wallet signature, and validates the resulting session", async () => {
@@ -297,6 +524,8 @@ describe("wallet auth service", function () {
 
     const validated = await verifyWalletSessionToken(session.accessToken);
     expect(validated?.wallet).to.equal(walletAddress);
+    expect(mockPrisma?.accountWallets.get(walletAddress)?.walletType).to.equal(WalletType.EXTERNAL);
+    expect(mockPrisma?.accountWallets.get(walletAddress)?.isPrimary).to.equal(true);
 
     await revokeWalletSession(session.accessToken);
     const revoked = await verifyWalletSessionToken(session.accessToken);
@@ -352,5 +581,82 @@ describe("wallet auth service", function () {
 
     const validated = await verifyWalletSessionToken(secondSession.accessToken);
     expect(validated?.wallet).to.equal(firstSession.wallet);
+    const managedWalletRecord = mockPrisma?.accountWallets.get(firstSession.wallet);
+    expect(managedWalletRecord?.walletType).to.equal(WalletType.MANAGED);
+    expect(managedWalletRecord?.encryptedSecretKey).to.be.instanceOf(Uint8Array);
+    const loadedKeypair = await loadManagedWalletKeypair(firstSession.wallet);
+    expect(loadedKeypair?.publicKey.toBase58()).to.equal(firstSession.wallet);
+  });
+
+  it("binds a provider identity to a user-owned external wallet without replacing the managed profile", async () => {
+    const identitySession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.EMAIL,
+      providerSubject: "sam@example.com",
+      email: "sam@example.com",
+      displayName: "Sam",
+    });
+    const externalWallet = Keypair.generate();
+    const walletAddress = externalWallet.publicKey.toBase58();
+    const challenge = await createWalletAuthChallenge(walletAddress);
+    const signature = ed25519.sign(
+      Buffer.from(challenge.message, "utf8"),
+      externalWallet.secretKey.slice(0, 32),
+    );
+
+    const boundSession = await bindExternalWalletToIdentitySession({
+      currentAccessToken: identitySession.accessToken,
+      wallet: walletAddress,
+      nonce: challenge.nonce,
+      signature: bs58.encode(signature),
+    });
+
+    expect(boundSession.wallet).to.equal(walletAddress);
+    expect(boundSession.identity.managedWalletAddress).to.equal(identitySession.wallet);
+
+    const mappedIdentity = await findAuthIdentityByWallet(walletAddress);
+    expect(mappedIdentity?.providerSubject).to.equal("sam@example.com");
+
+    const managedProfile = mockPrisma?.accountProfiles.get(identitySession.wallet);
+    const externalBinding = mockPrisma?.accountWallets.get(walletAddress);
+    expect(externalBinding?.accountProfileId).to.equal(managedProfile?.id);
+    expect(externalBinding?.walletType).to.equal(WalletType.EXTERNAL);
+    expect(externalBinding?.isPrimary).to.equal(false);
+  });
+
+  it("rejects external wallet binding when the wallet is already bound to another identity", async () => {
+    const firstSession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.EMAIL,
+      providerSubject: "first@example.com",
+      email: "first@example.com",
+      displayName: "First",
+    });
+    const secondSession = await exchangeProviderIdentitySession({
+      provider: IdentityProvider.GOOGLE,
+      providerSubject: "google-second",
+      email: "second@example.com",
+      displayName: "Second",
+    });
+    const walletAddress = firstSession.wallet;
+    const challenge = await createWalletAuthChallenge(walletAddress);
+    const wallet = Keypair.generate();
+    const signature = ed25519.sign(
+      Buffer.from(challenge.message, "utf8"),
+      wallet.secretKey.slice(0, 32),
+    );
+
+    let thrown: any = null;
+    try {
+      await bindExternalWalletToIdentitySession({
+        currentAccessToken: secondSession.accessToken,
+        wallet: walletAddress,
+        nonce: challenge.nonce,
+        signature: bs58.encode(signature),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown?.status).to.equal(409);
+    expect(thrown?.code).to.equal("WALLET_ALREADY_BOUND");
   });
 });

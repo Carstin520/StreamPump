@@ -13,7 +13,11 @@ export type ProposalIntentStatus =
   | "FAILED"
   | "EXPIRED";
 export type ProposalStatus = "OPEN" | "FUNDED" | "RESOLVED_SUCCESS" | "RESOLVED_FAIL" | "CANCELLED" | "VOIDED";
-export type IdentityProvider = "GOOGLE" | "APPLE" | "EMAIL" | "PASSKEY";
+export type IdentityProvider = "GOOGLE" | "APPLE" | "EMAIL" | "PASSKEY" | "TWITTER";
+export type AccountRole = "FAN" | "CREATOR" | "SPONSOR";
+export type SponsorVerificationStatus = "UNSUBMITTED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+export type SponsorType = "BRAND" | "AGENCY" | "INDIVIDUAL";
+export type AccountProfileStorageStatus = "LIVE" | "MIGRATION_REQUIRED";
 export type LoginPreviewMode = "welcome" | "switch";
 
 export type SessionIdentityRecord = {
@@ -46,11 +50,72 @@ export type EmailAuthChallengeRecord = {
   expiresAt: string;
 };
 
+export type SponsorDocumentUploadRecord = {
+  storageKey: string;
+  mimeType: string;
+  fileName: string;
+  documentType: "BUSINESS_LICENSE" | "POWER_OF_ATTORNEY";
+  presignedUrl: string;
+  expiresInSeconds: number;
+};
+
+export type SponsorProfileRecord = {
+  id: string;
+  wallet: string;
+  companyName: string;
+  sponsorType: SponsorType;
+  registrationNumber: string;
+  businessLicenseKey: string;
+  legalRepresentative: string;
+  contactPhone: string;
+  contactEmail: string;
+  powerOfAttorneyKey: string | null;
+  status: SponsorVerificationStatus;
+  rejectReason: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatorAuthSignatureRecord = {
+  creatorWallet: string;
+  handle: string;
+  twitterSubject: string | null;
+  displayName: string | null;
+  nonceHex: string;
+  timestampUnix: number;
+  messageBase64: string;
+  signatureBase64: string;
+  oracleAuthority: string;
+  verificationMode: "TWITTER_OAUTH" | "PREVIEW_HANDLE";
+  expiresAt: string;
+};
+
 export type CurrentSessionRecord = {
   wallet: string;
   sessionId: string;
   source: string;
   identity: SessionIdentityRecord | null;
+};
+
+export type AccountProfileRecord = {
+  id: string;
+  wallet: string;
+  role: AccountRole;
+  displayName: string | null;
+  handle: string | null;
+  onboardingCompletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccountMeRecord = {
+  wallet: string;
+  sessionId: string | null;
+  source: string;
+  storageStatus: AccountProfileStorageStatus;
+  identity: SessionIdentityRecord | null;
+  profile: AccountProfileRecord | null;
 };
 
 export type CommentRecord = {
@@ -275,6 +340,7 @@ export type ActivityFeedItemRecord = {
   likesCount: number;
   sharesCount: number;
   coverSrc?: string;
+  gallerySrcs?: string[];
   mediaType?: PostType;
   durationLabel?: string;
   stage: CreatorSeasonState | "NONE";

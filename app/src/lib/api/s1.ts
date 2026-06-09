@@ -35,6 +35,12 @@ export type S1SubmitTransactionResponse = {
   projectionSync: S1ProjectionSyncResponse;
 };
 
+export type S1ManagedExecuteResponse = {
+  signature: string;
+  action: string;
+  projectionSync: S1ProjectionSyncResponse;
+};
+
 export type S1TransactionStatusResponse = {
   signature: string;
   status: string;
@@ -80,6 +86,10 @@ export type S1MarketProfileResponse = {
     usdcDeposited: string | null;
     claimableUsdcRemaining: string | null;
     claimableS1SupplyRemaining: string | null;
+    earlyClaimableUsdcRemaining: string | null;
+    earlyClaimableS1SupplyRemaining: string | null;
+    regularClaimableUsdcRemaining: string | null;
+    regularClaimableS1SupplyRemaining: string | null;
     rageQuitDeadlineAt: string | null;
   } | null;
   offers: Array<{
@@ -100,8 +110,21 @@ export type S1PortfolioResponse = {
     creatorProfilePda: string;
     creator: S1MarketProfileResponse["creator"] | null;
     internalTokenBalance: string;
+    earlyCohortBalance: string;
     spumpCostBasis: string;
     estimatedClaimableUsdc: string | null;
+    updatedAt: string;
+  }>;
+  s2Endorsements?: Array<{
+    positionPda: string;
+    proposalPda: string;
+    proposalId: string | null;
+    creatorWallet: string | null;
+    sponsorWallet: string | null;
+    status: string | null;
+    stakedSpumpAmount: string;
+    claimedStatus: boolean;
+    estimatedUsdcReward: string;
     updatedAt: string;
   }>;
 };
@@ -128,6 +151,39 @@ export const buildS1BuyTransaction = (token: string, input: S1BuildWithAmountInp
     body: amountBody(input),
   });
 
+export const executeManagedWalletAction = (
+  token: string,
+  input: { action: string; params?: Record<string, unknown> },
+) =>
+  apiClient.post<S1ManagedExecuteResponse>("/s1/managed/execute", {
+    token,
+    body: input,
+    timeoutMs: 30000,
+  });
+
+export const buildClaimDailySpumpTransaction = (token: string) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/claim-daily-spump/build", {
+    token,
+    body: {},
+  });
+
+export const buildClaimEngagementRewardTransaction = (
+  token: string,
+  input: {
+    missionType: string;
+    rewardAmount: number | string;
+    xpGain: number | string;
+    newLevel?: number | string | null;
+    reportIdHex: string;
+    reportDigestHex: string;
+    observedAtUnix: number | string;
+  },
+) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/engagement-reward/build", {
+    token,
+    body: input,
+  });
+
 export const buildS1SellTransaction = (token: string, input: S1BuildWithAmountInput) =>
   apiClient.post<S1BuildTransactionResponse>("/s1/sell/build", {
     token,
@@ -145,6 +201,15 @@ export const buildS1ClaimUsdcTransaction = (
   input: { creatorWallet: string; sponsorWallet: string },
 ) =>
   apiClient.post<S1BuildTransactionResponse>("/s1/buyout/claim-usdc/build", {
+    token,
+    body: input,
+  });
+
+export const buildS1AbortBuyoutTransaction = (
+  token: string,
+  input: { creatorWallet: string },
+) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/buyout/abort/build", {
     token,
     body: input,
   });

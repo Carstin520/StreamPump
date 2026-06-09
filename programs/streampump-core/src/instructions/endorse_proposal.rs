@@ -23,8 +23,9 @@ use anchor_spl::{
 
 use crate::{
     errors::StreamPumpError,
+    events::EndorsementCreated,
     state::{EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig},
-    utils::checked_add,
+    utils::{amount_from_bps, checked_add},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -44,11 +45,11 @@ pub struct EndorseProposal<'info> {
     #[account(seeds = [b"protocol_config"], bump = protocol_config.bump)]
     pub protocol_config: Account<'info, ProtocolConfig>,
 
-    /// EN: Proposal PDA. Must be Open or Funded and not past deadline.
-    /// ZH: 提案 PDA，必须处于 Open 或 Funded 状态且未过截止时间。
+    /// EN: Proposal PDA. Must be Funded and not past deadline.
+    /// ZH: 提案 PDA，必须处于 Funded 状态且未过截止时间。
     #[account(
         mut,
-        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes()],
+        seeds = [b"proposal", proposal.creator.as_ref(), &proposal.deadline.to_le_bytes(), &proposal.nonce.to_le_bytes()],
         bump = proposal.bump
     )]
     pub proposal: Account<'info, Proposal>,
@@ -93,33 +94,14 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
     let now = Clock::get()?.unix_timestamp;
     {
         let proposal = &ctx.accounts.proposal;
-        // EN: Endorsements are only accepted while the proposal is Open or Funded, before deadline.
-        // ZH: 只有在提案处于 Open 或 Funded 状态且未过截止时间时才接受背书。
+        // EN: Endorsements are only accepted while the proposal is Funded and before deadline.
+        // ZH: 只有在提案处于 Funded 状态且未过截止时间时才接受背书。
         require!(
-            matches!(
-                proposal.status,
-                ProposalStatus::Open | ProposalStatus::Funded
-            ),
-            StreamPumpError::ProposalNotActive
+            proposal.status == ProposalStatus::Funded,
+            StreamPumpError::ProposalNotFunded
         );
         require!(now < proposal.deadline, StreamPumpError::ProposalExpired);
     }
-
-    // EN: Burn SPUMP from the user's ATA. The tokens are permanently removed from supply.
-    //     They will be re-minted (partially or fully) only upon claim.
-    // ZH: 从用户的 ATA 销毁 SPUMP。代币从流通中永久移除，
-    //     仅在领取时按结果重新铸造（部分或全部）。
-    token_interface::burn(
-        CpiContext::new(
-            ctx.accounts.spump_token_program.to_account_info(),
-            Burn {
-                mint: ctx.accounts.spump_mint.to_account_info(),
-                from: ctx.accounts.user_spump_ata.to_account_info(),
-                authority: ctx.accounts.user.to_account_info(),
-            },
-        ),
-        args.amount,
-    )?;
 
     // EN: Initialize or update the endorsement position.
     // ZH: 初始化或更新背书仓位。
@@ -144,6 +126,62 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
         StreamPumpError::ProposalAccountMismatch
     );
 
+    // EN: Validate caps before burning SPUMP.
+    // ZH: 在销毁 SPUMP 之前校验上限。
+    {
+        let proposal = &ctx.accounts.proposal;
+        if proposal.max_endorsement_spump > 0 {
+            require!(
+                proposal
+                    .total_spump_staked
+                    .checked_add(args.amount)
+                    .ok_or(StreamPumpError::MathOverflow)?
+                    <= proposal.max_endorsement_spump,
+                StreamPumpError::EndorsementCapExceeded
+            );
+
+            if ctx.accounts.protocol_config.max_endorsement_per_user_bps > 0 {
+                let max_per_user = amount_from_bps(
+                    proposal.max_endorsement_spump,
+                    ctx.accounts.protocol_config.max_endorsement_per_user_bps,
+                )?;
+                let effective_user_total = if is_new_position {
+                    args.amount
+                } else {
+                    position
+                        .staked_amount
+                        .checked_add(args.amount)
+                        .ok_or(StreamPumpError::MathOverflow)?
+                };
+                require!(
+                    effective_user_total <= max_per_user,
+                    StreamPumpError::EndorsementPerUserCapExceeded
+                );
+            }
+        } else if ctx.accounts.protocol_config.max_endorsement_hard_ceiling > 0 {
+            require!(
+                proposal
+                    .total_spump_staked
+                    .checked_add(args.amount)
+                    .ok_or(StreamPumpError::MathOverflow)?
+                    <= ctx.accounts.protocol_config.max_endorsement_hard_ceiling,
+                StreamPumpError::EndorsementCapExceeded
+            );
+        }
+    }
+
+    token_interface::burn(
+        CpiContext::new(
+            ctx.accounts.spump_token_program.to_account_info(),
+            Burn {
+                mint: ctx.accounts.spump_mint.to_account_info(),
+                from: ctx.accounts.user_spump_ata.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        ),
+        args.amount,
+    )?;
+
     // EN: Update virtual stake ledger (both per-user and aggregate).
     // ZH: 更新虚拟质押账本（用户级和聚合级）。
     position.staked_amount = checked_add(position.staked_amount, args.amount)?;
@@ -155,6 +193,14 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
             .ok_or(StreamPumpError::MathOverflow)?;
     }
     proposal.total_spump_staked = checked_add(proposal.total_spump_staked, args.amount)?;
+
+    emit!(EndorsementCreated {
+        proposal: proposal_key,
+        user: ctx.accounts.user.key(),
+        amount: args.amount,
+        total_staked: proposal.total_spump_staked,
+        endorser_count: proposal.track2_endorser_count,
+    });
 
     Ok(())
 }

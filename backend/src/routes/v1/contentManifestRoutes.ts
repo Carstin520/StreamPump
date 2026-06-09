@@ -10,8 +10,10 @@ import {
   createContentPublication,
   finalizeContentManifest,
   getContentManifestById,
+  issueCreatorAuthSignature,
   listContentManifests,
   presignManifestAssets,
+  verifyContentPublication,
 } from "../../controllers/contentManifestController";
 import { requireSessionAuth } from "../../middleware/walletAuth";
 
@@ -19,6 +21,7 @@ const router = Router();
 
 router.use(requireSessionAuth);
 
+router.post("/creator-auth-signature", issueCreatorAuthSignature);
 router.get("/manifests", listContentManifests);
 router.post("/manifests", createContentManifest);
 router.get("/manifests/:manifestId", getContentManifestById);
@@ -26,5 +29,6 @@ router.post("/manifests/:manifestId/assets/presign", presignManifestAssets);
 router.post("/manifests/:manifestId/assets/:assetId/complete", completeManifestAssetUpload);
 router.post("/manifests/:manifestId/finalize", finalizeContentManifest);
 router.post("/publications", createContentPublication);
+router.patch("/publications/:publicationId/verify", verifyContentPublication);
 
 export default router;

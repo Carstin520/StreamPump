@@ -29,7 +29,6 @@ import {
 } from "./http";
 import {
   assertAssetAndMimeTypeMatch,
-  nextManifestStatusAfterPublication,
   normalizeAssetType,
   requireOwnedManifest,
   serializeAsset,
@@ -53,6 +52,8 @@ import {
   r2Service,
 } from "../services/R2Service";
 import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
+import { issueCreatorAuthSignature as issueCreatorAuthSignatureService } from "../services/creatorAuth";
+import { syncManifestPublicationEligibility } from "../services/contentPublicationEligibility";
 
 interface PresignAssetPlan {
   assetType: AssetType;
@@ -61,6 +62,22 @@ interface PresignAssetPlan {
   mimeType: string;
   fileSizeBytes: bigint;
 }
+
+export const issueCreatorAuthSignature = withController(
+  "ISSUE_CREATOR_AUTH_SIGNATURE_FAILED",
+  async (req, res) => {
+    const creatorWallet = requireSessionWallet(req);
+    const twitterHandle = parseNonEmptyString(req.body.twitterHandle, "twitterHandle");
+    const twitterAccessToken = parseOptionalString(req.body.twitterAccessToken);
+    const authorization = await issueCreatorAuthSignatureService({
+      creatorWallet,
+      twitterHandle,
+      twitterAccessToken,
+    });
+
+    ok(res, authorization, 201);
+  }
+);
 
 const readMaxAssetSizeBytes = (): bigint =>
   BigInt(Math.max(0, Math.floor(config.storage.origin.maxAssetSizeBytes)));
@@ -413,6 +430,8 @@ export const completeManifestAssetUpload = withController(
           processingError: null,
         },
       });
+
+      await syncManifestPublicationEligibility(manifestId);
     }
 
     ok(res, {
@@ -490,7 +509,19 @@ export const createContentPublication = withController(
 
     const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
-    await requireOwnedManifest(manifestId, creatorWallet);
+    const manifest = await prisma.contentManifest.findFirst({
+      where: {
+        id: manifestId,
+        creatorWallet,
+      },
+      include: {
+        assets: true,
+      },
+    });
+
+    if (!manifest) {
+      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
+    }
 
     const platform = parseNonEmptyString(req.body.platform, "platform").toUpperCase();
     const externalUrl = parseNonEmptyString(req.body.externalUrl, "externalUrl");
@@ -507,29 +538,6 @@ export const createContentPublication = withController(
       },
     });
 
-    const manifestStatus = await prisma.contentManifest.findUnique({
-      where: { id: manifestId },
-      select: { status: true },
-    });
-
-    const nextStatus = manifestStatus?.status
-      ? nextManifestStatusAfterPublication(manifestStatus.status)
-      : null;
-
-    const manifestUpdateData: Prisma.ContentManifestUpdateInput = {
-      isPublicFeedEligible: true,
-      publishedAt: new Date(),
-    };
-
-    if (nextStatus) {
-      manifestUpdateData.status = nextStatus;
-    }
-
-    await prisma.contentManifest.update({
-      where: { id: manifestId },
-      data: manifestUpdateData,
-    });
-
     ok(
       res,
       {
@@ -542,6 +550,54 @@ export const createContentPublication = withController(
       },
       201
     );
+  }
+);
+
+export const verifyContentPublication = withController(
+  "VERIFY_PUBLICATION_FAILED",
+  async (req, res) => {
+    const creatorWallet = requireSessionWallet(req);
+    const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
+    const publication = await prisma.contentPublication.findUnique({
+      where: { id: publicationId },
+      include: {
+        manifest: {
+          include: {
+            assets: true,
+          },
+        },
+      },
+    });
+
+    if (!publication) {
+      throw new HttpError(404, "PUBLICATION_NOT_FOUND", "publication not found");
+    }
+
+    if (publication.manifest.creatorWallet !== creatorWallet) {
+      throw new HttpError(403, "FORBIDDEN", "publication does not belong to this creator");
+    }
+
+    const verifiedAt = publication.verifiedAt ?? new Date();
+    const updated = await prisma.contentPublication.update({
+      where: { id: publicationId },
+      data: {
+        verificationStatus: PublicationVerificationStatus.VERIFIED,
+        verificationSource: publication.verificationSource ?? "SELF_VERIFY",
+        verifiedAt,
+      },
+    });
+
+    const manifest = publication.manifest;
+    const eligibility = await syncManifestPublicationEligibility(manifest.id);
+
+    ok(res, {
+      publicationId,
+      manifestId: manifest.id,
+      verificationStatus: updated.verificationStatus,
+      verifiedAt: updated.verifiedAt?.toISOString() ?? null,
+      publicFeedEligible: eligibility.publicFeedEligible,
+      assetsReady: eligibility.assetsReady,
+    });
   }
 );
 

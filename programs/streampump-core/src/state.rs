@@ -20,6 +20,7 @@ pub const DEFAULT_MAX_S1_DAILY_BUY_SPUMP: u64 = 15_000_000;
 pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
 pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
 pub const DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3_600;
+pub const DEFAULT_MAX_ENDORSEMENT_HARD_CEILING: u64 = 1_000_000_000;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
 pub const USER_ROLE_CREATOR: u16 = 1 << 1;
 pub const USER_ROLE_SPONSOR_OPERATOR: u16 = 1 << 2;
@@ -47,6 +48,7 @@ pub enum CreatorStatus {
     S1_Auction_Pending = 1,
     S1_Execution_Pending = 2,
     S2_Active = 3,
+    Suspended = 4,
 }
 
 #[allow(non_camel_case_types)]
@@ -136,6 +138,11 @@ pub struct ProtocolConfig {
     pub s1_rage_quit_window_seconds: i64,
     pub s2_min_followers: u64,
     pub s2_min_valid_views: u64,
+    /// Protocol-level total endorsement ceiling for proposals with max_endorsement_spump == 0.
+    /// 0 means truly uncapped by explicit admin intent.
+    pub max_endorsement_hard_ceiling: u64,
+    /// Maximum endorsement per user as basis points of proposal's max_endorsement_spump (e.g. 2000 = 20%).
+    pub max_endorsement_per_user_bps: u16,
     pub bump: u8,
 }
 
@@ -164,6 +171,8 @@ impl ProtocolConfig {
         + 8
         + 8
         + 8
+        + 8
+        + 2
         + 1;
 }
 
@@ -249,10 +258,12 @@ pub struct ContentHashAnchor {
     pub content_digest: [u8; 32],
     pub anchored_at: i64,
     pub bump: u8,
+    /// Monotonically increasing version counter; starts at 1 for new anchors.
+    pub version: u32,
 }
 
 impl ContentHashAnchor {
-    pub const INIT_SPACE: usize = 32 + 32 + 4 + MAX_CANONICAL_URL_LEN + 32 + 32 + 8 + 1;
+    pub const INIT_SPACE: usize = 32 + 32 + 4 + MAX_CANONICAL_URL_LEN + 32 + 32 + 8 + 1 + 4;
 }
 
 #[account]
@@ -284,6 +295,10 @@ pub struct Proposal {
     pub track2_unsettled_endorser_count: u32,
     /// Remaining SPUMP stake basis used for exact batched payout distribution.
     pub track2_unsettled_spump: u64,
+    /// Immutable Track 2 fan pool snapshot fixed at settlement time.
+    pub track2_initial_fan_pool: u64,
+    /// Immutable SPUMP stake snapshot fixed at settlement time.
+    pub track2_initial_spump_staked: u64,
 
     // Track 3: CPS Sales (Creator Only)
     pub track3_usdc_deposited: u64,
@@ -297,6 +312,10 @@ pub struct Proposal {
     pub usdc_vault_bump: u8,
     pub total_spump_staked: u64,
     pub bump: u8,
+    /// Nonce to allow multiple proposals with the same creator and deadline.
+    pub nonce: u64,
+    /// Maximum total SPUMP endorsement for this proposal (0 = uncapped).
+    pub max_endorsement_spump: u64,
 }
 
 impl Proposal {
@@ -317,6 +336,8 @@ impl Proposal {
         + 4
         + 8
         + 8
+        + 8
+        + 8
         + 9
         + 2
         + 8
@@ -324,7 +345,9 @@ impl Proposal {
         + 1
         + 1
         + 8
-        + 1;
+        + 1
+        + 8
+        + 8;
 }
 
 #[account]

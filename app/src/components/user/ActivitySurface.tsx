@@ -12,6 +12,7 @@ import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { ActivityTab } from "@/lib/api/types";
 import { PostRecord } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import { compactNumber } from "@/lib/public-data";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 
@@ -24,6 +25,7 @@ export const ActivitySurface = ({
   initialError?: string | null;
   initialPosts?: PostRecord[];
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<ActivityTab>("overview");
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(ALL_ACTIVITY);
   const {
@@ -48,8 +50,9 @@ export const ActivitySurface = ({
   );
 
   return (
-    <PageShell searchPlaceholder="搜索动态、创作者、视频">
-      <div className="mx-auto max-w-[1400px] py-4">
+    <PageShell searchPlaceholder={t("feed.searchActivityPlaceholder")}>
+      <div className="mx-auto max-w-[1400px] space-y-4 py-4">
+        <ActivitySourceNotice error={error} />
         <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)_280px]">
           <aside className="hidden xl:block">
             <div className="sticky top-24 space-y-2.5">
@@ -64,7 +67,7 @@ export const ActivitySurface = ({
                 }}
                 type="button"
               >
-                <span className="text-[13px] font-medium">全部动态</span>
+                <span className="text-[13px] font-medium">{t("feed.allActivity")}</span>
                 <span className="text-[11px] text-[#7f91ab]">{activityFeedItems.length}</span>
               </button>
 
@@ -109,9 +112,9 @@ export const ActivitySurface = ({
           <section className="min-w-0 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
               <div className="flex items-baseline gap-3">
-                <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-white">动态</h1>
+                <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-white">{t("common.activity")}</h1>
                 <p className="hidden text-xs text-[#7f90ab] md:block">
-                  Follow-first updates from creators you already care about.
+                  {t("feed.followFirst")}
                 </p>
               </div>
 
@@ -129,15 +132,22 @@ export const ActivitySurface = ({
                     }}
                     type="button"
                   >
-                    {tab.label}
+                    {tab.id === "overview" ? t("feed.tabs.overview") : t("feed.tabs.video")}
                   </button>
                 ))}
               </div>
             </div>
 
-            {loading ? <div className="text-sm text-[#8ea0ba]">Loading imported activity…</div> : null}
+            {loading ? <div className="text-sm text-[#8ea0ba]">{t("feed.loadingActivity")}</div> : null}
 
             {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
+
+            {!loading && !error && activityFeedItems.length === 0 ? (
+              <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
+                <p className="font-semibold text-white">{t("feed.emptyTitle")}</p>
+                <p className="mt-2 text-[#8ea0ba]">{t("feed.emptyBody")}</p>
+              </div>
+            ) : null}
 
             {!loading && !error && activeTab === "overview" ? (
               <div className="space-y-2.5">
@@ -178,23 +188,39 @@ export const ActivitySurface = ({
                         <p className="mt-1.5 text-[11px] text-[#de7a68]">{item.actionSummary}</p>
 
                         {item.coverSrc ? (
-                          <div className="card-radius mt-3 overflow-hidden border border-white/[0.06] bg-[#0b1019]">
-                            <div className="relative aspect-[16/9] max-h-[220px] w-full">
-                              <ProgressiveImage
-                                alt={item.title ?? creator.name}
-                                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
-                                fill
-                                priority={index === 0}
-                                sizes="(max-width: 1024px) 100vw, 720px"
-                                src={item.coverSrc}
-                              />
-                              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,17,28,0.05)_0%,transparent_30%,transparent_60%,rgba(8,17,28,0.4)_100%)]" />
-                              {item.mediaType === "VIDEO" && item.durationLabel ? (
-                                <div className="absolute bottom-2.5 right-2.5 rounded-full border border-white/10 bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                                  {item.durationLabel}
-                                </div>
-                              ) : null}
-                            </div>
+                          <div className="mt-3 overflow-hidden rounded-lg bg-[#0b1019]">
+                            {item.gallerySrcs && item.gallerySrcs.length >= 2 ? (
+                              <div className="grid grid-cols-2 gap-1">
+                                {item.gallerySrcs.slice(0, 2).map((src, imgIdx) => (
+                                  <div className="relative aspect-square overflow-hidden rounded-md" key={imgIdx}>
+                                    <ProgressiveImage
+                                      alt={`${item.title ?? creator.name} ${imgIdx + 1}`}
+                                      className="absolute inset-0 h-full w-full object-cover"
+                                      fill
+                                      priority={index === 0 && imgIdx === 0}
+                                      sizes="(max-width: 1024px) 50vw, 360px"
+                                      src={src}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg">
+                                <ProgressiveImage
+                                  alt={item.title ?? creator.name}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                  fill
+                                  priority={index === 0}
+                                  sizes="(max-width: 1024px) 100vw, 720px"
+                                  src={item.coverSrc}
+                                />
+                                {item.mediaType === "VIDEO" && item.durationLabel ? (
+                                  <div className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                    {item.durationLabel}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                         ) : null}
                       </Link>
@@ -220,7 +246,7 @@ export const ActivitySurface = ({
             ) : null}
 
             {!loading && !error && activeTab === "video" ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {visibleVideoItems.map((item, index) => {
                   const creator = creatorMap.get(item.creatorId);
                   if (!creator) {
@@ -229,46 +255,46 @@ export const ActivitySurface = ({
 
                   return (
                     <Link
-                      className="group block overflow-hidden"
+                      className="group block"
                       href={`/posts/${item.postId}`}
                       key={item.id}
                     >
-                      <article className="glass-card overflow-hidden border-white/[0.06] bg-[#101621]">
-                        <div className="relative aspect-[16/10] overflow-hidden">
-                          <ProgressiveImage
-                            alt={item.title}
-                            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                            fill
-                            priority={index < 2}
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
-                            src={item.coverSrc}
-                          />
-                          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_40%,rgba(7,13,21,0.36)_70%,rgba(7,13,21,0.78)_100%)]" />
-                          <div className="absolute left-2.5 top-2.5">
-                            <StagePill compact stage={creator.state} />
-                          </div>
-                          <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2.5 text-[11px] text-white">
-                            <span>▶ {compactNumber(item.viewsCount)}</span>
-                            <span>◌ {compactNumber(item.commentsCount)}</span>
-                          </div>
-                          {item.durationLabel ? (
-                            <div className="absolute bottom-2.5 right-2.5 rounded-full border border-white/10 bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                              {item.durationLabel}
-                            </div>
-                          ) : null}
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-lg">
+                        <ProgressiveImage
+                          alt={item.title}
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                          fill
+                          priority={index < 2}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
+                          src={item.coverSrc}
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute bottom-1.5 left-2 z-[2] flex items-center gap-2.5 text-[11px] text-white/80">
+                          <span className="flex items-center gap-0.5">
+                            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 16 16"><path d="M6.25 4.72a.75.75 0 0 1 1.06-.02l3.22 3.05a.75.75 0 0 1 0 1.08l-3.22 3.05a.75.75 0 0 1-1.03-1.09L8.87 8.2 6.27 5.78a.75.75 0 0 1-.02-1.06Z" /></svg>
+                            {compactNumber(item.viewsCount)}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <CommentBubbleIcon className="h-3 w-3" />
+                            {compactNumber(item.commentsCount)}
+                          </span>
                         </div>
+                        {item.durationLabel ? (
+                          <div className="absolute bottom-1.5 right-2 z-[2] rounded px-1 py-px text-[11px] font-medium leading-4 text-white/90 bg-black/50">
+                            {item.durationLabel}
+                          </div>
+                        ) : null}
+                      </div>
 
-                        <div className="space-y-2 px-3 py-3">
-                          <p className="line-clamp-2 text-[13px] font-medium leading-5 text-white">{item.title}</p>
-                          <div className="flex items-center justify-between gap-2 text-[11px] text-[#8fa1bb]">
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <img alt={creator.name} className="h-5 w-5 rounded-full object-cover" src={creator.avatarSrc} />
-                              <span className="truncate">{creator.name}</span>
-                            </div>
-                            <span className="shrink-0">{item.timeLabel}</span>
-                          </div>
+                      <div className="mt-2 px-0.5">
+                        <p className="line-clamp-2 text-[13px] font-normal leading-[1.4] text-[#d1d7e0] group-hover:text-[#67b8ff]">{item.title}</p>
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#9aa8bc]">
+                          <img alt={creator.name} className="h-5 w-5 rounded-full object-cover" src={creator.avatarSrc} />
+                          <span className="truncate">{creator.name}</span>
+                          <span className="text-[#4a5568]">·</span>
+                          <span className="shrink-0">{item.timeLabel}</span>
                         </div>
-                      </article>
+                      </div>
                     </Link>
                   );
                 })}
@@ -281,8 +307,8 @@ export const ActivitySurface = ({
               <div className="liquid-glass-shell card-radius px-3.5 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[13px] font-semibold text-white">关注中的活跃创作者</p>
-                    <p className="mt-0.5 text-[11px] text-[#7d8faa]">Creators already shaping your feed.</p>
+                    <p className="text-[13px] font-semibold text-white">{t("feed.activeCreators")}</p>
+                    <p className="mt-0.5 text-[11px] text-[#7d8faa]">{t("feed.activeCreatorsDesc")}</p>
                   </div>
                   <span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#8b9cb7]">
                     {activitySidebarHighlights.length}
@@ -321,6 +347,19 @@ export const ActivitySurface = ({
         </div>
       </div>
     </PageShell>
+  );
+};
+
+const ActivitySourceNotice = ({ error }: { error: string | null }) => {
+  if (!error) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/55 px-4 py-3 text-[#f8d48a]">
+      <p className="text-sm font-semibold text-white">Activity unavailable</p>
+      <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{error}</p>
+    </section>
   );
 };
 

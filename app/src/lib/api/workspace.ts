@@ -101,6 +101,7 @@ export type ContentManifestDetailResponse = {
   internalCanonicalUrl: string | null;
   internalUrlDigestHex: string | null;
   coverAssetId: string | null;
+  isPublicFeedEligible?: boolean;
   createdAt: string;
   updatedAt: string;
   assets: ContentManifestAssetResponse[];
@@ -119,6 +120,7 @@ export type IntentSummaryResponse = {
   lockedManifestHashHex: string | null;
   lockedAnchorPda: string | null;
   deadlineUnix: string;
+  nonce: string;
   track1BaseUsdc: string;
   track2MetricType: string;
   track2TargetValue: string;
@@ -126,6 +128,7 @@ export type IntentSummaryResponse = {
   track2UsdcDeposited: string;
   track3UsdcDeposited: string;
   track3DelayDays: number;
+  maxEndorsementSpump: string;
   plannedProposalPda: string | null;
   plannedUsdcVaultPda: string | null;
   creatorApprovedAt: string | null;
@@ -170,6 +173,8 @@ export type ProposalDetailRecord = {
   track2UsdcDeposited: string;
   track2ActualValue: string | null;
   track2SettledAt: string | null;
+  track2InitialFanPool?: string;
+  track2InitialSpumpStaked?: string;
   track3UsdcDeposited?: string;
   track3CpsPayout?: string | null;
   track3DelayDays?: number;
@@ -202,6 +207,61 @@ export type ProposalIntentDetailResponse = {
 export type ProposalDetailResponse = {
   viewerRole: "CREATOR_OR_SPONSOR" | "PUBLIC_FAN";
   proposal: ProposalDetailRecord;
+};
+
+export type PublicCampaignProofResponse = {
+  proposalId: string;
+  proposalPda: string;
+  viewerRole: "PUBLIC";
+  status: ProposalStatus;
+  proofStatus: "DRAFT" | "FUNDED" | "ANCHORED" | "SETTLING" | "SETTLED" | "CANCELLED" | "VOIDED";
+  creatorWallet: string;
+  sponsorWallet: string | null;
+  manifestId: string | null;
+  intentId: string | null;
+  deadlineAt: string;
+  budgetTracks: {
+    track1BaseUsdc: string;
+    track1Claimed: boolean;
+    track2MetricType: string;
+    track2TargetValue: string;
+    track2MinAchievementBps: number;
+    track2UsdcDeposited: string;
+    track2ActualValue: string | null;
+    track2SettledAt: string | null;
+    track2InitialFanPool: string;
+    track2InitialSpumpStaked: string;
+    track3UsdcDeposited: string;
+    track3CpsPayout: string | null;
+    track3DelayDays: number;
+    track3SettledAt: string | null;
+  };
+  proof: {
+    contentHashHex: string | null;
+    contentAnchorPda: string | null;
+    contentAnchorTx: string | null;
+    latestChainTxSignature: string | null;
+    oracleSyncStatus: string | null;
+    contentPublishedVerifiedAt: string | null;
+  };
+  manifest: {
+    manifestId: string;
+    title: string | null;
+    contentType: ContentType;
+    status: ContentManifestStatus;
+    version: number;
+    manifestHashHex: string | null;
+    currentAnchorPda: string | null;
+    currentAnchorTx: string | null;
+    publishedAt: string | null;
+  } | null;
+  endorsementSummary?: {
+    endorserCount: number;
+    totalStakedSpump: string;
+    estimatedUsdcReward: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CreatorMarketProfileResponse = {
@@ -256,6 +316,7 @@ type CreateProposalIntentInput = {
   track2UsdcDeposited: string;
   track3UsdcDeposited: string;
   track3DelayDays: number;
+  maxEndorsementSpump?: string;
 };
 
 export type PresignManifestAssetsResponse = {
@@ -426,6 +487,14 @@ export const createContentPublication = (token: string, input: CreatePublication
     body: input,
   });
 
+export const verifyContentPublication = (token: string, publicationId: string) =>
+  apiClient.patch<Pick<ContentPublicationResponse, "publicationId" | "verificationStatus">>(
+    `/content/publications/${publicationId}/verify`,
+    {
+      token,
+    },
+  );
+
 export const createProposalIntent = (token: string, input: CreateProposalIntentInput) =>
   apiClient.post<IntentSummaryResponse>("/proposal-intents", {
     token,
@@ -490,6 +559,9 @@ export const getProposalIntentById = (token: string, intentId: string) =>
 
 export const getProposalById = (proposalId: string, token?: string) =>
   apiClient.get<ProposalDetailResponse>(`/proposals/${proposalId}`, token ? { token } : undefined);
+
+export const getPublicCampaignProof = (proposalId: string) =>
+  apiClient.get<PublicCampaignProofResponse>(`/campaigns/${proposalId}/public`);
 
 export const getCreatorMarketProfile = (creatorWallet: string) =>
   apiClient.get<CreatorMarketProfileResponse>(`/market/creators/${creatorWallet}`);

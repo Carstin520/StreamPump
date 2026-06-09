@@ -7,7 +7,9 @@ import {
   BundleSubmitMode,
   ContentManifestStatus,
   ProposalIntentStatus,
+  SponsorVerificationStatus,
 } from "@prisma/client";
+import { randomBytes } from "crypto";
 import { Request } from "express";
 import { PublicKey } from "@solana/web3.js";
 
@@ -49,8 +51,59 @@ import {
 } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
 import { getAnchorService } from "../services/AnchorService";
+import { getSponsorProfileByWallet } from "../services/sponsorProfile";
+import { config } from "../../config/default";
 
 const getRequesterWallet = (req: Request): string => requireSessionWallet(req);
+const MAX_SIGNED_BIGINT_NONCE = (1n << 63n) - 1n;
+
+const parseOptionalNonNegativeBigInt = (
+  value: unknown,
+  fieldName: string,
+  fallback: bigint
+): bigint => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  return parseNonNegativeBigInt(value, fieldName);
+};
+
+const generateProposalNonce = (): bigint => {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = randomBytes(8).readBigUInt64LE() & MAX_SIGNED_BIGINT_NONCE;
+    if (candidate > 0n) {
+      return candidate;
+    }
+  }
+
+  throw new Error("unable to generate proposal nonce");
+};
+
+const allocateProposalNonce = async (
+  creatorWallet: string,
+  deadlineUnix: bigint
+): Promise<bigint> => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const nonce = generateProposalNonce();
+    const existing = await prisma.proposalIntent.findFirst({
+      where: {
+        creatorWallet,
+        deadlineUnix,
+        nonce,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      return nonce;
+    }
+  }
+
+  throw new HttpError(409, "PROPOSAL_NONCE_COLLISION", "unable to allocate a unique proposal nonce");
+};
 
 export const createProposalIntent = withController(
   "CREATE_PROPOSAL_INTENT_FAILED",
@@ -64,6 +117,23 @@ export const createProposalIntent = withController(
 
     if (requesterWallet !== creatorWallet && requesterWallet !== sponsorWallet) {
       throw new HttpError(403, "FORBIDDEN", "requester must be either creatorWallet or sponsorWallet");
+    }
+
+    const sponsorProfile = await getSponsorProfileByWallet(sponsorWallet);
+    if (!sponsorProfile && !config.s1.mockApiEnabled) {
+      throw new HttpError(
+        403,
+        "SPONSOR_KYB_NOT_APPROVED",
+        "sponsor KYB profile must be approved before creating production proposal intents"
+      );
+    }
+
+    if (sponsorProfile && sponsorProfile.status !== SponsorVerificationStatus.APPROVED) {
+      throw new HttpError(
+        403,
+        "SPONSOR_KYB_NOT_APPROVED",
+        "sponsor KYB profile must be approved before creating production proposal intents"
+      );
     }
 
     const track2MinAchievementBps = parseNonNegativeInt(
@@ -117,6 +187,14 @@ export const createProposalIntent = withController(
       );
     }
 
+    const deadlineUnix = parseNonNegativeBigInt(req.body.deadlineUnix, "deadlineUnix");
+    const nonce = await allocateProposalNonce(creatorWallet, deadlineUnix);
+    const maxEndorsementSpump = parseOptionalNonNegativeBigInt(
+      req.body.maxEndorsementSpump,
+      "maxEndorsementSpump",
+      0n
+    );
+
     const intent = await prisma.proposalIntent.create({
       data: {
         creatorWallet,
@@ -124,7 +202,8 @@ export const createProposalIntent = withController(
         sponsorOrgId: parseOptionalString(req.body.sponsorOrgId),
         creatorOrgId: parseOptionalString(req.body.creatorOrgId),
         manifestId,
-        deadlineUnix: parseNonNegativeBigInt(req.body.deadlineUnix, "deadlineUnix"),
+        deadlineUnix,
+        nonce,
         track1BaseUsdc: parseNonNegativeBigInt(req.body.track1BaseUsdc, "track1BaseUsdc"),
         track2MetricType: parseTrack2MetricType(req.body.track2MetricType),
         track2TargetValue: parseNonNegativeBigInt(req.body.track2TargetValue, "track2TargetValue"),
@@ -138,6 +217,7 @@ export const createProposalIntent = withController(
           "track3UsdcDeposited"
         ),
         track3DelayDays: parseNonNegativeInt(req.body.track3DelayDays, "track3DelayDays"),
+        maxEndorsementSpump,
       },
     });
 
@@ -174,6 +254,7 @@ export const lockProposalIntent = withController("LOCK_PROPOSAL_INTENT_FAILED", 
   const derived = deriveIntentAddresses({
     creatorWallet: intent.creatorWallet,
     deadlineUnix: intent.deadlineUnix,
+    nonce: intent.nonce,
   });
 
   const locked = await prisma.$transaction(async (tx) => {
@@ -695,6 +776,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
 export const getProposalIntentStatus = withController(
   "GET_PROPOSAL_INTENT_STATUS_FAILED",
   async (req, res) => {
+    const requesterWallet = requireSessionWallet(req);
     const intentId = parseNonEmptyString(req.params.intentId, "intentId");
     const intent = await prisma.proposalIntent.findUnique({
       where: { id: intentId },
@@ -711,6 +793,8 @@ export const getProposalIntentStatus = withController(
     if (!intent) {
       throw new HttpError(404, "INTENT_NOT_FOUND", "proposal intent not found");
     }
+
+    assertProposalIntentParticipant(requesterWallet, intent);
 
     ok(res, {
       intent: serializeIntent(intent),

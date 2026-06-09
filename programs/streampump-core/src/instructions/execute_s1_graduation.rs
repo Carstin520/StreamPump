@@ -97,6 +97,10 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         ctx.accounts.s1_buyout_state.winning_sponsor.is_some(),
         StreamPumpError::WinningSponsorNotSelected
     );
+    require!(
+        creator_profile.s1_supply > 0,
+        StreamPumpError::InvalidAmount
+    );
     let winning_sponsor = ctx
         .accounts
         .s1_buyout_state
@@ -114,15 +118,11 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
     //     这代表联合曲线中所有 S1 买家销毁的总 SPUMP。
     //     公式：k/2 × S²（S = 总供应量）。
     // ────────────────────────────────────────────────────────────────────────
-    let remaining_virtual_spump = if creator_profile.s1_supply == 0 {
-        0
-    } else {
-        calculate_sell_return_with_rating(
-            creator_profile.s1_supply,
-            creator_profile.s1_supply,
-            creator_profile.s1_rating_bps,
-        )?
-    };
+    let remaining_virtual_spump = calculate_sell_return_with_rating(
+        creator_profile.s1_supply,
+        creator_profile.s1_supply,
+        creator_profile.s1_rating_bps,
+    )?;
 
     // EN: 50% to creator, 50% permanently unissued (deflation).
     // ZH: 50% 给创作者，50% 永久不铸造（通缩）。
@@ -196,6 +196,10 @@ pub(crate) fn handler(ctx: Context<ExecuteS1Graduation>) -> Result<()> {
         winning_sponsor,
         claimable_usdc_remaining: s1_buyout_state.claimable_usdc_remaining,
         claimable_s1_supply_remaining: s1_buyout_state.claimable_s1_supply_remaining,
+        early_claimable_usdc_remaining: s1_buyout_state.early_claimable_usdc_remaining,
+        early_claimable_s1_supply_remaining: s1_buyout_state.early_claimable_s1_supply_remaining,
+        regular_claimable_usdc_remaining: s1_buyout_state.regular_claimable_usdc_remaining,
+        regular_claimable_s1_supply_remaining: s1_buyout_state.regular_claimable_s1_supply_remaining,
         creator_spump_bonus: creator_amount,
         status: creator_profile.status as u8,
     });

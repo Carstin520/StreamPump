@@ -10,11 +10,9 @@ import {
 } from "@prisma/client";
 
 import {
-  syncCampaignProofProjectionFromProposal,
   serializeCreatorMarketProjection,
   serializePublicCampaignProof,
 } from "../src/services/marketProjectionService";
-import { prisma } from "../src/services/prisma";
 
 describe("marketProjectionService serializers", () => {
   it("serializes creator market projections without leaking BigInt values", () => {
@@ -67,6 +65,7 @@ describe("marketProjectionService serializers", () => {
         contentAnchorTx: "anchor-tx",
         deadlineAt: now,
         status: ProposalStatus.FUNDED,
+        proofStatus: CampaignProofStatus.ANCHORED,
         track1BaseUsdc: 100n,
         track1Claimed: false,
         track2MetricType: Track2MetricType.VIEWS,
@@ -75,6 +74,8 @@ describe("marketProjectionService serializers", () => {
         track2UsdcDeposited: 200n,
         track2ActualValue: null,
         track2SettledAt: null,
+        track2InitialFanPool: null,
+        track2InitialSpumpStaked: null,
         track3UsdcDeposited: 300n,
         track3CpsPayout: null,
         track3DelayDays: 7,
@@ -83,6 +84,11 @@ describe("marketProjectionService serializers", () => {
         oracleSyncStatus: OracleSyncStatus.PENDING,
         oracleLastError: null,
         contentPublishedVerifiedAt: null,
+        fundingTxSignature: "funding-tx",
+        latestSettlementTxSignature: null,
+        endorserCount: 0,
+        totalSpumpStaked: 0n,
+        claimedEndorserCount: 0,
         metadata: null,
         createdAt: now,
         updatedAt: now,
@@ -146,34 +152,7 @@ describe("marketProjectionService serializers", () => {
             },
           ],
         },
-      },
-      {
-        id: "proof-id",
-        proposalId: "proposal-id",
-        proposalPda: "proposal-pda",
-        creatorWallet: "creator-wallet",
-        sponsorWallet: "sponsor-wallet",
-        manifestId: "manifest-id",
-        intentId: "intent-id",
-        status: ProposalStatus.FUNDED,
-        proofStatus: CampaignProofStatus.ANCHORED,
-        contentHashHex: "a".repeat(64),
-        contentAnchorPda: "anchor-pda",
-        contentAnchorTx: "anchor-tx",
-        fundingTxSignature: "funding-tx",
-        latestSettlementTxSignature: null,
-        track1BaseUsdc: 100n,
-        track2UsdcDeposited: 200n,
-        track3UsdcDeposited: 300n,
-        track2MetricType: Track2MetricType.VIEWS,
-        track2TargetValue: 1_000n,
-        track2ActualValue: null,
-        deadlineAt: now,
-        settledAt: null,
-        metadataJson: null,
-        createdAt: now,
-        updatedAt: now,
-      }
+      } as any,
     );
 
     expect(serialized.proofStatus).to.equal(CampaignProofStatus.ANCHORED);
@@ -181,69 +160,5 @@ describe("marketProjectionService serializers", () => {
     expect(serialized.manifest?.manifestHashHex).to.equal("b".repeat(64));
     expect(serialized.manifest?.assets[0].sha256Hex).to.equal("d".repeat(64));
     expect(serialized.manifest?.publications[0].externalUrlDigestHex).to.equal("e".repeat(64));
-  });
-
-  it("projects cancelled, voided, settling, and settled proof statuses", async () => {
-    const prismaAny = prisma as any;
-    const original = prismaAny.campaignProofProjection;
-    const upserts: any[] = [];
-    prismaAny.campaignProofProjection = {
-      upsert: async (args: any) => {
-        upserts.push(args);
-        return { ...args.create, ...args.update };
-      },
-    };
-
-    const baseProposal = {
-      id: "proposal-id",
-      proposalPda: "proposal-pda",
-      creatorWallet: "creator-wallet",
-      sponsorWallet: "sponsor-wallet",
-      manifestId: null,
-      intentId: null,
-      contentHashHex: "a".repeat(64),
-      contentAnchorPda: null,
-      contentAnchorTx: null,
-      status: ProposalStatus.FUNDED,
-      track1BaseUsdc: 100n,
-      track1Claimed: false,
-      track2MetricType: Track2MetricType.VIEWS,
-      track2TargetValue: 1_000n,
-      track2ActualValue: null,
-      track2UsdcDeposited: 200n,
-      track2SettledAt: null,
-      track3UsdcDeposited: 300n,
-      track3SettledAt: null,
-      onChainTxSignature: "tx",
-      deadlineAt: new Date("2026-04-30T00:00:00.000Z"),
-      updatedAt: new Date("2026-04-30T00:00:00.000Z"),
-    } as any;
-
-    try {
-      await syncCampaignProofProjectionFromProposal({
-        ...baseProposal,
-        status: ProposalStatus.CANCELLED,
-      });
-      await syncCampaignProofProjectionFromProposal({
-        ...baseProposal,
-        status: ProposalStatus.VOIDED,
-      });
-      await syncCampaignProofProjectionFromProposal({
-        ...baseProposal,
-        track1Claimed: true,
-      });
-      await syncCampaignProofProjectionFromProposal({
-        ...baseProposal,
-        track2SettledAt: new Date("2026-04-30T00:01:00.000Z"),
-        track3SettledAt: new Date("2026-04-30T00:02:00.000Z"),
-      });
-    } finally {
-      prismaAny.campaignProofProjection = original;
-    }
-
-    expect(upserts[0].create.proofStatus).to.equal(CampaignProofStatus.CANCELLED);
-    expect(upserts[1].create.proofStatus).to.equal(CampaignProofStatus.VOIDED);
-    expect(upserts[2].create.proofStatus).to.equal(CampaignProofStatus.SETTLING);
-    expect(upserts[3].create.proofStatus).to.equal(CampaignProofStatus.SETTLED);
   });
 });

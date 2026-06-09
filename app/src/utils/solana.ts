@@ -1,7 +1,7 @@
 import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 
 export const STREAMPUMP_PROGRAM_ID = new PublicKey(
-  "EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre"
+  "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp"
 );
 
 export const getConnection = () =>
