@@ -57,6 +57,7 @@ describe("streampump-core S2 unhappy paths", function () {
         track2MinAchievementBps: params.track2MinAchievementBps ?? 5_000,
         track3DelayDays: params.track3DelayDays ?? 0,
         deadline,
+        nonce: ctx.bn(0),
       })
       .accounts({
         creator: creator.publicKey,

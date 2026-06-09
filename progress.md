@@ -1,3 +1,158 @@
+# StreamPump Progress Review - 2026-06-09 Local Startup And Test Harness Follow-Up
+
+## Scope
+- This review covers material working-tree changes after the latest existing `progress.md` entry for 2026-06-09 frontend closed-loop actions.
+- Comparison evidence is the current uncommitted diff against `894d182`, plus file modification times showing several app/backend changes after the prior progress/roadmap edit.
+- The material current change is local operations hardening: backend background-service startup isolation, Mux reconciliation background error logging, local Anchor build/test command adjustments, S2 Anchor test expectation updates, and Next local build/dev configuration tweaks.
+- No protected files were edited.
+
+## Completed Work
+- Made backend background service startup more failure-isolated.
+  - Indexer startup, Mux reconciliation scheduler startup, and oracle scheduler startup now log their own startup failures instead of one failure aborting the full background-service bootstrap.
+  - Mux reconciliation cron and run-on-boot calls now route through a background wrapper that logs rejected runs.
+- Adjusted local Anchor build/test harness behavior.
+  - `npm run test:anchor` now routes through `scripts/test-anchor-local.sh`.
+  - The fast Anchor build path defaults to `--no-idl` unless IDL generation is explicitly requested.
+  - The local Anchor test wrapper now defaults to all Anchor specs instead of only `s1-guards`.
+- Updated S2 Anchor tests and helpers to match current proposal nonce and settlement semantics.
+  - Test proposal PDA derivation accepts the nonce seed.
+  - Proposal creation calls pass `nonce: 0` where needed.
+  - S2 endorsement/refund expectations now distinguish unfunded proposals, failed Track 2 claims, and voided-claim SPUMP return policy.
+- Adjusted local Next app execution behavior.
+  - App scripts disable Next telemetry.
+  - The custom development `distDir` override was removed.
+  - An inert middleware matcher was added as a local Next runtime compatibility shim.
+
+## Not Completed Or Blocked
+- No production readiness promotion was made.
+- Local app, backend, and Anchor builds/tests have been rerun and passed in this follow-up.
+- Production readiness is still blocked on deployed Vercel/Render/Neon/R2/Mux smoke, operator visibility, and Track3 merchant/reconciliation integration.
+
+## Backend Alignment
+- `backend/src/startup.ts` now treats indexer, Mux reconciliation, and oracle scheduler startup failures independently.
+- `backend/src/schedulers/MuxReconciliationScheduler.ts` now catches asynchronous reconciliation run failures from cron and run-on-boot triggers.
+
+## Frontend Alignment
+- `app/package.json`, `app/next.config.js`, and `app/middleware.ts` were adjusted for local Next execution only.
+- No user-facing frontend route, readiness label, or production claim was changed in this follow-up.
+
+## Chain Alignment
+- No Anchor program source change is part of this follow-up.
+- Anchor tests and helpers were adjusted around proposal nonce PDA usage and current S2 settlement/claim semantics.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a matching progress ledger row.
+- Product boundaries are unchanged: `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth.
+
+## Implemented And Verified
+- Implemented paths observed in the current working-tree diff include:
+  - `app/next.config.js`
+  - `app/package.json`
+  - `app/middleware.ts`
+  - `backend/src/schedulers/MuxReconciliationScheduler.ts`
+  - `backend/src/startup.ts`
+  - `package.json`
+  - `programs/tests/helpers/test_context.ts`
+  - `programs/tests/phase1-launch-flow.spec.ts`
+  - `programs/tests/s2-expired-open-proposal.spec.ts`
+  - `programs/tests/s2-traffic-market.spec.ts`
+  - `programs/tests/s2-unhappy-path.spec.ts`
+  - `scripts/anchor-build-fast.sh`
+  - `scripts/test-anchor-local.sh`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed uncommitted app/backend/Anchor/script/docs changes and no protected files.
+  - `git diff --stat --find-renames` identified 16 changed tracked files plus untracked `app/middleware.ts`.
+  - `git diff --check` passed.
+  - `npm run build --prefix app` passed.
+  - `npm run build --prefix backend` passed.
+  - `npm run test:backend` passed.
+  - `cargo check` passed.
+  - `npm run build:anchor` passed.
+  - `npm run test:anchor` passed.
+  - Local runtime smoke confirmed Next dev served `/login`, `/trending`, and `/activity` without framework errors or broken feed media, and backend `/health` plus `/api/v1/feed/posts` responded when the database was reachable.
+
+# StreamPump Progress Review - 2026-06-09
+
+## Scope
+- This review covers material repository changes after the latest existing `progress.md` entry for 2026-06-03 managed-wallet custodial signing.
+- Comparison evidence is local commit range `7cbd66b..894d182`.
+- The material current change is frontend closed-loop wiring for content publication verification, S2 endorsement/claim state, settlement proof display, daily SPUMP claim, and feed media preview stability.
+- Uncommitted Anchor/test helper and script changes were observed and treated as user-owned work in progress, not recorded here as completed product progress.
+- Stale prompt/reference document cleanup and README refresh commits were noted as documentation alignment, not readiness promotion.
+- No protected files were edited.
+
+## Completed Work
+- Added normal UI hooks for publication verification and public-feed eligibility visibility.
+  - `ContentManifestDetailResponse` now carries `isPublicFeedEligible`.
+  - The workspace content detail page can call the publication verification API and refresh manifest state.
+  - Content detail now separates verified-publication and asset-delivery readiness before showing public-feed eligibility.
+- Extended S2 endorsement UI from submit-only toward closed-loop state.
+  - `/campaigns/[proposalId]/endorse` refreshes campaign proof after endorsement actions.
+  - The page loads the signed-in user's S2 endorsement projection from portfolio data when available.
+  - Managed-wallet endorsement can use backend execution, while external wallets continue through wallet-signed transaction flow.
+  - Claimable endorsement rows can build and submit claim transactions after resolved/cancelled/voided states.
+- Wired settlement display to campaign proof data when available.
+  - `/campaigns/[proposalId]/settlement` attempts to load public campaign proof and maps proof budgets/track markers into the tri-track view.
+  - The page keeps local fallback explicitly labeled as `MOCK_PREVIEW`; proof-backed display is labeled `SEEDED_DEMO`.
+  - Track3 remains gated by real merchant reconciliation.
+- Updated rewards UI around the transaction-wired daily claim path.
+  - Daily SPUMP claim now uses the live S1 transaction builder for external-wallet signing and the managed action path for managed wallets.
+  - Mission cards, streak progress, and broader rewards ledger remain preview-only.
+- Stabilized feed media preview behavior.
+  - Fill-mode `ProgressiveImage` instances are eager-loaded to avoid blank media tiles.
+  - Activity no longer preserves initial SSR feed errors after client state takes over.
+- Cleaned stale duplicate/prompt documentation artifacts and refreshed README status snapshots.
+
+## Not Completed Or Blocked
+- No production readiness promotion was made.
+- S2 endorsement remains `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` until migration/application, upgraded program deployment, seeded balances/ATAs, and wallet-backed devnet endorsement plus claim smoke are verified.
+- Settlement remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED` overall; proof-backed display improves visibility but does not add operator triggers, evidence digests, fraud review, or Track3 merchant reconciliation.
+- Rewards are mixed readiness: daily claim is transaction-wired for seeded flows, while missions and the durable reward ledger remain `MOCK_PREVIEW`.
+- Full media promotion still requires deployed R2/Mux smoke, webhook/reconciliation visibility, failed-asset recovery controls, and proof that no production claim depends on local fallback.
+- Uncommitted Anchor/test helper changes around nonce-based proposal tests and local Anchor script behavior still need their own verification before being recorded.
+
+## Backend Alignment
+- No new backend route implementation was added in this commit range.
+- Frontend now consumes the existing content publication verification API and S1/proposal transaction APIs more directly.
+- The settlement page now derives display state from the public campaign proof API when that projection is available.
+
+## Frontend Alignment
+- `/workspace/content/[manifestId]` shows publication verification status, media delivery readiness, and public-feed eligibility blockers.
+- `/campaigns/[proposalId]/endorse` supports managed endorsement submission, external-wallet endorsement submission, endorsement projection refresh, and claim transaction submission.
+- `/campaigns/[proposalId]/settlement` distinguishes campaign-proof-backed display from mock fallback.
+- `/rewards` no longer presents daily claim as browser-local state only; it uses transaction flow while keeping missions preview-labeled.
+- `ProgressiveImage` and `ActivitySurface` were adjusted to reduce blank feed media and stale initial error display.
+
+## Chain Alignment
+- No Anchor program change is part of the recorded commit range.
+- S2 endorsement, claim, settlement, and daily claim UI continue to depend on existing Anchor instructions and upgraded program deployment before promotion.
+
+## Documentation Alignment
+- `README.md` and `README.zh-CN.md` were refreshed before this recorder pass to describe the verified corridor and current seeded/operator-gated boundaries.
+- Stale duplicate roadmap/prompt/youtube-description artifacts were removed.
+- `docs/streamPump-long-term-roadmap.md` was updated with a matching progress ledger row and rewards gap wording.
+- Product boundaries are unchanged: `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `7cbd66b..894d182` include:
+  - `app/src/components/auth/AuthOptionsPanel.tsx`
+  - `app/src/components/shared/ProgressiveImage.tsx`
+  - `app/src/components/user/ActivitySurface.tsx`
+  - `app/src/lib/api/workspace.ts`
+  - `app/src/pages/campaigns/[proposalId]/endorse.tsx`
+  - `app/src/pages/campaigns/[proposalId]/settlement.tsx`
+  - `app/src/pages/rewards.tsx`
+  - `app/src/pages/workspace/content/[manifestId].tsx`
+  - `README.md`
+  - `README.zh-CN.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed uncommitted Anchor/test helper and script changes before documentation edits; protected files were not present.
+  - `git diff 7cbd66b..HEAD --stat --find-renames` identified 15 changed files after the previous progress entry, including documentation cleanup and README refresh.
+  - `git diff --check` passed before documentation edits.
+  - App, backend, and Anchor builds/tests were not rerun by this recorder; this was a documentation recording pass.
+
 # StreamPump Progress Review - 2026-06-03
 
 ## Scope

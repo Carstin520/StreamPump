@@ -25,7 +25,7 @@ if [ ! -f "$WALLET" ]; then
   solana-keygen new --no-bip39-passphrase --force --silent -o "$WALLET" >/dev/null
 fi
 
-npm run build:anchor
+npm run build:anchor -- --no-idl
 
 if [ ! -f target/deploy/streampump_core.so ]; then
   echo "Missing target/deploy/streampump_core.so after build." >&2
@@ -73,7 +73,7 @@ WALLET_ADDRESS="$(solana address -k "$WALLET")"
 solana --url "$RPC_URL" airdrop 100 "$WALLET_ADDRESS" >/dev/null
 
 if [ "$#" -eq 0 ]; then
-  set -- programs/tests/s1-guards.spec.ts
+  set -- programs/tests/*.spec.ts
 fi
 
 ./node_modules/.bin/ts-mocha -p ./tsconfig.json -t "$TIMEOUT_MS" "$@"

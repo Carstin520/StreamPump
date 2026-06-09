@@ -183,12 +183,17 @@ const buildContext = async () => {
     // --------------------------------------------------
     /** Derive CreatorProfile PDA / 推导创作者资料 PDA */
     const deriveCreatorProfile = (authority) => web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("creator"), authority.toBuffer()], program.programId)[0];
-    /** Derive Proposal PDA (unique per creator + deadline) / 推导提案 PDA（按创作者 + 截止时间唯一） */
-    const deriveProposal = (creator, deadline) => web3_js_1.PublicKey.findProgramAddressSync([
-        Buffer.from("proposal"),
-        creator.toBuffer(),
-        deadline.toArrayLike(Buffer, "le", 8),
-    ], program.programId)[0];
+    /** Derive Proposal PDA (unique per creator + deadline + nonce) / 推导提案 PDA（按创作者 + 截止时间 + nonce 唯一） */
+    const deriveProposal = (creator, deadline, nonce = 0) => {
+        const nonceBytes = Buffer.alloc(8);
+        nonceBytes.writeBigUInt64LE(BigInt(nonce));
+        return web3_js_1.PublicKey.findProgramAddressSync([
+            Buffer.from("proposal"),
+            creator.toBuffer(),
+            deadline.toArrayLike(Buffer, "le", 8),
+            nonceBytes,
+        ], program.programId)[0];
+    };
     /** Derive the USDC vault PDA for a proposal / 推导提案的 USDC 资金库 PDA */
     const deriveProposalUsdcVault = (proposal) => web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("proposal_usdc_vault"), proposal.toBuffer()], program.programId)[0];
     /** Derive the endorsement position PDA (unique per user + proposal) / 推导背书仓位 PDA（按用户 + 提案唯一） */
@@ -353,6 +358,7 @@ const buildContext = async () => {
         s1RageQuitWindowSeconds: bn(48 * 3_600), // Production rage-quit window / 生产默认 rage-quit 窗口
         s2MinFollowers: bn(100), // Min followers for S2 upgrade / S2 升级所需最低粉丝数
         s2MinValidViews: bn(1_000), // Min views for S2 upgrade / S2 升级所需最低有效观看数
+        maxEndorsementPerUserBps: 2_000, // Per-user endorsement cap / 单用户背书上限
     })
         .accounts({
         admin: payer.publicKey,
@@ -467,6 +473,7 @@ const buildContext = async () => {
             track2MinAchievementBps: params.track2MinAchievementBps, // Cliff threshold / 悬崖门槛
             track3DelayDays: params.track3DelayDays ?? 45, // CPS delay / CPS 延迟天数
             deadline, // Proposal deadline / 提案截止时间
+            nonce: bn(0), // PDA nonce / PDA nonce
         })
             .accounts({
             creator: params.creator.publicKey,

@@ -199,8 +199,8 @@ export interface TestContext {
 
   /** seeds: ["creator", authority] / 种子：["creator", authority] */
   deriveCreatorProfile: (authority: PublicKey) => PublicKey;
-  /** seeds: ["proposal", creator, deadline_le_8] / 种子：["proposal", creator, deadline_le_8] */
-  deriveProposal: (creator: PublicKey, deadline: BN) => PublicKey;
+  /** seeds: ["proposal", creator, deadline_le_8, nonce_le_8] / 种子：["proposal", creator, deadline_le_8, nonce_le_8] */
+  deriveProposal: (creator: PublicKey, deadline: BN, nonce?: number) => PublicKey;
   /** seeds: ["proposal_usdc_vault", proposal] / 种子：["proposal_usdc_vault", proposal] */
   deriveProposalUsdcVault: (proposal: PublicKey) => PublicKey;
   /** seeds: ["endorsement", user, proposal] / 种子：["endorsement", user, proposal] */
@@ -332,16 +332,21 @@ const buildContext = async (): Promise<TestContext> => {
   const deriveCreatorProfile = (authority: PublicKey): PublicKey =>
     PublicKey.findProgramAddressSync([Buffer.from("creator"), authority.toBuffer()], program.programId)[0];
 
-  /** Derive Proposal PDA (unique per creator + deadline) / 推导提案 PDA（按创作者 + 截止时间唯一） */
-  const deriveProposal = (creator: PublicKey, deadline: BN): PublicKey =>
-    PublicKey.findProgramAddressSync(
+  /** Derive Proposal PDA (unique per creator + deadline + nonce) / 推导提案 PDA（按创作者 + 截止时间 + nonce 唯一） */
+  const deriveProposal = (creator: PublicKey, deadline: BN, nonce = 0): PublicKey => {
+    const nonceBytes = Buffer.alloc(8);
+    nonceBytes.writeBigUInt64LE(BigInt(nonce));
+
+    return PublicKey.findProgramAddressSync(
       [
         Buffer.from("proposal"),
         creator.toBuffer(),
         deadline.toArrayLike(Buffer, "le", 8),
+        nonceBytes,
       ],
       program.programId
     )[0];
+  };
 
   /** Derive the USDC vault PDA for a proposal / 推导提案的 USDC 资金库 PDA */
   const deriveProposalUsdcVault = (proposal: PublicKey): PublicKey =>
@@ -756,6 +761,7 @@ const buildContext = async (): Promise<TestContext> => {
       s1RageQuitWindowSeconds: bn(48 * 3_600),          // Production rage-quit window / 生产默认 rage-quit 窗口
       s2MinFollowers: bn(100),                         // Min followers for S2 upgrade / S2 升级所需最低粉丝数
       s2MinValidViews: bn(1_000),                      // Min views for S2 upgrade / S2 升级所需最低有效观看数
+      maxEndorsementPerUserBps: 2_000,                 // Per-user endorsement cap / 单用户背书上限
     })
     .accounts({
       admin: payer.publicKey,
@@ -881,6 +887,7 @@ const buildContext = async (): Promise<TestContext> => {
         track2MinAchievementBps: params.track2MinAchievementBps, // Cliff threshold / 悬崖门槛
         track3DelayDays: params.track3DelayDays ?? 45,       // CPS delay / CPS 延迟天数
         deadline,                                            // Proposal deadline / 提案截止时间
+        nonce: bn(0),                                        // PDA nonce / PDA nonce
       })
       .accounts({
         creator: params.creator.publicKey,
