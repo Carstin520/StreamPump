@@ -55,7 +55,7 @@ const defaultHandle = (account: AccountMeRecord | null) =>
 
 function useCountUp(target: number, duration: number, active: boolean) {
   const [value, setValue] = useState(0);
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!active) {
@@ -75,6 +75,7 @@ function useCountUp(target: number, duration: number, active: boolean) {
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     };
   }, [target, duration, active]);
 
