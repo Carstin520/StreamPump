@@ -21,8 +21,80 @@ import {
   isBundleReusable,
   serializeIntent,
 } from "../src/controllers/proposalIntentShared";
+import { createProposalIntent } from "../src/controllers/proposalIntentController";
+import { config } from "../config/default";
+import { prisma } from "../src/services/prisma";
+
+const createMockResponse = () => {
+  const response = {
+    statusCode: 200,
+    body: null as any,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload: unknown) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  return response;
+};
 
 describe("proposalIntentController helpers", () => {
+  it("requires sponsor KYB even when S1 mock API is enabled", async () => {
+    const creatorWallet = Keypair.generate().publicKey.toBase58();
+    const sponsorWallet = Keypair.generate().publicKey.toBase58();
+    const prismaAny = prisma as any;
+    const originalS1MockApiEnabled = config.s1.mockApiEnabled;
+    const originalSponsorFindUnique = prismaAny.sponsorProfile.findUnique;
+    const originalManifestFindUnique = prismaAny.contentManifest.findUnique;
+    let manifestLookupReached = false;
+
+    prismaAny.sponsorProfile.findUnique = async () => null;
+    prismaAny.contentManifest.findUnique = async () => {
+      manifestLookupReached = true;
+      throw new Error("manifest lookup should not run before sponsor KYB approval");
+    };
+    config.s1.mockApiEnabled = true;
+
+    try {
+      const response = createMockResponse();
+      await createProposalIntent(
+        {
+          auth: {
+            wallet: creatorWallet,
+            source: "session",
+          },
+          header: (name: string) => (name.toLowerCase() === "x-idempotency-key" ? "idem-1" : undefined),
+          body: {
+            manifestId: "manifest-1",
+            creatorWallet,
+            sponsorWallet,
+            deadlineUnix: "1900000000",
+            track1BaseUsdc: "100",
+            track2MetricType: Track2MetricType.VIEWS,
+            track2TargetValue: "1000",
+            track2MinAchievementBps: 5000,
+            track2UsdcDeposited: "200",
+            track3UsdcDeposited: "0",
+            track3DelayDays: 0,
+          },
+        } as any,
+        response as any
+      );
+
+      expect(response.statusCode).to.equal(403);
+      expect(response.body.error.code).to.equal("SPONSOR_KYB_NOT_APPROVED");
+      expect(manifestLookupReached).to.equal(false);
+    } finally {
+      config.s1.mockApiEnabled = originalS1MockApiEnabled;
+      prismaAny.sponsorProfile.findUnique = originalSponsorFindUnique;
+      prismaAny.contentManifest.findUnique = originalManifestFindUnique;
+    }
+  });
+
   it("reuses an active built bundle", () => {
     const reusable = isBundleReusable({
       status: BundleStatus.BUILT,

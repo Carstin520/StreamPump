@@ -52,7 +52,6 @@ import {
 import { prisma } from "../services/prisma";
 import { getAnchorService } from "../services/AnchorService";
 import { getSponsorProfileByWallet } from "../services/sponsorProfile";
-import { config } from "../../config/default";
 
 const getRequesterWallet = (req: Request): string => requireSessionWallet(req);
 const MAX_SIGNED_BIGINT_NONCE = (1n << 63n) - 1n;
@@ -120,15 +119,7 @@ export const createProposalIntent = withController(
     }
 
     const sponsorProfile = await getSponsorProfileByWallet(sponsorWallet);
-    if (!sponsorProfile && !config.s1.mockApiEnabled) {
-      throw new HttpError(
-        403,
-        "SPONSOR_KYB_NOT_APPROVED",
-        "sponsor KYB profile must be approved before creating production proposal intents"
-      );
-    }
-
-    if (sponsorProfile && sponsorProfile.status !== SponsorVerificationStatus.APPROVED) {
+    if (!sponsorProfile || sponsorProfile.status !== SponsorVerificationStatus.APPROVED) {
       throw new HttpError(
         403,
         "SPONSOR_KYB_NOT_APPROVED",
