@@ -83,13 +83,13 @@ StreamPump/
 | Auth | Wallet adapters (Phantom, Solflare), Web3Auth, email OTP, wallet challenge |
 | Database | PostgreSQL (Neon for production, local Postgres for dev) |
 | Deployment | Vercel (frontend), Render (backend), Neon (DB), Cloudflare R2, Mux |
-| Testing | ts-mocha + Chai (backend + Anchor tests) |
+| Testing | ts-mocha + Chai 6 (backend + Anchor tests) |
 | Program ID | `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp` |
 
 ## Branch Model
 
-- **`main`**: Frozen hackathon submission branch. **Never modify `main`.**
-- **`codex/post-deadline-phase-0`**: Active development branch. All work happens here.
+- **`main`**: Canonical post-hackathon branch. Hackathon judging is complete, so this branch is no longer frozen. Keep it release-ready and merge only reviewed, verified work.
+- **`codex/post-deadline-phase-0`**: Long-lived integration/governance branch for post-deadline development and Codex submission-rule hardening. Keep it in sync with `main` before opening or updating PRs.
 
 ## Build, Test, and Run
 
@@ -409,12 +409,12 @@ MUX_WEBHOOK_SECRET=...
 
 ### Demo Backend Defaults (conservative)
 
-These should stay off for public demos. Enable preview social auth only for explicitly labeled local/demo recordings.
+These are recommended overrides for local dev and demo recordings, not the shipped code defaults. Most flags default to `false` in `backend/config/default.ts` and `.env.example`. Enable preview social auth only for explicitly labeled local/demo recordings.
 
 ```
 AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false
 AUTH_ALLOW_LEGACY_WALLET_HEADER=false
-INDEXER_ENABLED=true
+INDEXER_ENABLED=true   # code default is false; enable to keep projections synced
 MUX_RECONCILIATION_ENABLED=false
 MUX_RECONCILIATION_RUN_ON_BOOT=false
 ORACLE_SCHEDULER_ENABLED=false
@@ -485,8 +485,8 @@ Use this order when no narrower user instruction overrides it:
 
 ### Git
 
-- **Never modify `main`.** It is the frozen hackathon submission branch.
-- Work on `codex/post-deadline-phase-0` only.
+- `main` is no longer frozen after hackathon review. Treat it as the canonical release branch and keep it deployable.
+- Use `codex/post-deadline-phase-0` as the long-lived integration/governance branch; keep it synced with `main` before PR merge work.
 - Treat uncommitted changes as user-owned. Do not revert, delete, or overwrite them unless the user explicitly asks.
 - **Protected files** — do not stage, commit, delete, or rewrite:
   - `backend/package-lock.json`

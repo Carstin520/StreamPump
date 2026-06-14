@@ -49,12 +49,12 @@ cd /tmp/streampump-backend-deps
 npx prisma generate --schema prisma/schema.prisma
 ```
 
-Backend demo defaults should be conservative:
+Backend demo defaults should be conservative. These are recommended overrides; code defaults are `false` unless noted:
 
 ```bash
 AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false
 AUTH_ALLOW_LEGACY_WALLET_HEADER=false
-INDEXER_ENABLED=true
+INDEXER_ENABLED=true   # code default is false; enable to keep projections synced
 MUX_RECONCILIATION_ENABLED=false
 MUX_RECONCILIATION_RUN_ON_BOOT=false
 ORACLE_SCHEDULER_ENABLED=false

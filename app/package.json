@@ -2,11 +2,14 @@
   "name": "streampump-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "start": "NEXT_TELEMETRY_DISABLED=1 next start",
-    "lint": "next lint"
+    "lint": "eslint src next.config.js --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

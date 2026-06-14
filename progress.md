@@ -1,3 +1,64 @@
+# StreamPump Progress Review - 2026-06-14 Vercel Build Recovery And Branch Unfreeze
+
+## Scope
+- This review covers the Vercel deployment recovery after the failed Next 16 toolchain attempt and the merge-conflict policy update after hackathon judging ended.
+- The material current change is restoring the app to the Vercel-compatible Next 15 / React 18 / Tailwind 3 / TypeScript 5 toolchain, pinning Vercel Node to 22.x, cleaning the deprecated `next lint` script, and documenting that `main` is no longer frozen.
+- The `codex/post-deadline-phase-0` branch remains the long-lived integration/governance branch for post-deadline work and submission-rule hardening.
+
+## Completed Work
+- Restored frontend deployment compatibility.
+  - `app/package.json` now uses Next 15.5.18, React/React DOM 18.3.1, Tailwind 3.4.17, TypeScript 5.7.3, ESLint 8.57.1, and `engines.node: 22.x`.
+  - `app/package-lock.json` matches the restored toolchain.
+  - The inert `app/middleware.ts` shim remains deleted so Vercel does not create a no-op middleware/proxy output.
+- Cleaned lint behavior.
+  - `npm run lint --prefix app` now runs the ESLint CLI directly instead of deprecated `next lint`.
+  - The legacy `.eslintrc.json` configuration remains the active Next 15 lint config.
+- Kept stale detached helpers deleted during conflict resolution.
+  - `app/src/hooks/useProgram.ts` and `app/src/lib/api/content.ts` remain deleted because current HEAD has no active references.
+- Updated branch policy.
+  - `main` is no longer frozen after hackathon judging.
+  - `codex/post-deadline-phase-0` remains the integration/governance branch and should be kept synced with `main` before PR merge work.
+
+## Not Completed Or Blocked
+- No production readiness promotion was made.
+- The remaining Vercel warnings are not ESLint failures: Node 22 intentionally overrides the project setting, and the Solana wallet adapter dependency chain still emits npm peer-dependency warnings.
+- Production promotion still needs deployed Render/Neon/R2/Mux smoke, operator visibility, and Track3 merchant/reconciliation integration.
+
+## Backend Alignment
+- Backend product behavior is unchanged by the Vercel recovery.
+- The conflict resolution kept the current stricter sponsor KYB behavior in `backend/src/controllers/proposalIntentController.ts`.
+
+## Frontend Alignment
+- Frontend runtime/tooling is aligned to the deployed Vercel-compatible Next 15 stack.
+- Removed Next 16/Tailwind 4 documentation claims have been corrected.
+
+## Chain Alignment
+- No Anchor program source change is part of this follow-up.
+
+## Documentation Alignment
+- `AGENTS.md`, `CLAUDE.md`, and `docs/streamPump-long-term-roadmap.md` now reflect the post-review branch policy and current deployed frontend stack.
+- Product boundaries are unchanged: `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth.
+
+## Implemented And Verified
+- Implemented paths include:
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `app/package.json`
+  - `app/package-lock.json`
+  - `backend/src/controllers/proposalIntentController.ts`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `package.json`
+  - `progress.md`
+- Resolved merge-conflict deletions include:
+  - `app/middleware.ts`
+  - `app/src/hooks/useProgram.ts`
+  - `app/src/lib/api/content.ts`
+- Verification already completed for the Vercel recovery:
+  - `npm run lint --prefix app` passed.
+  - `npm run build --prefix app` passed.
+  - Vercel deployment `dpl_EJaWdxv2VLE8g2b41cpZNUy1d2JF` reached `READY`.
+  - Authenticated Vercel fetch of `/explore` returned HTTP 200.
+
 # StreamPump Progress Review - 2026-06-09 Local Startup And Test Harness Follow-Up
 
 ## Scope
