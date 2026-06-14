@@ -51,7 +51,7 @@ StreamPump/
 │   ├── prisma/schema.prisma   # Database schema (Postgres)
 │   ├── scripts/               # Backend utility scripts
 │   └── tests/                 # Backend service tests (ts-mocha)
-├── app/                       # Next.js 15 frontend
+├── app/                       # Next.js 16 frontend
 │   └── src/
 │       ├── pages/             # File-based routing (Pages Router)
 │       ├── components/        # React components
@@ -77,13 +77,13 @@ StreamPump/
 | --- | --- |
 | Solana program | Rust + Anchor 0.32, Solana CLI 2.3.0, Token-2022 (NonTransferable mint) |
 | Backend | Express 4, TypeScript 5, Prisma 6 ORM, PostgreSQL |
-| Frontend | Next.js 15 (Pages Router), React 18, Tailwind CSS 3, TypeScript 5 |
+| Frontend | Next.js 16 (Pages Router), React 19, Tailwind CSS 4, TypeScript 6 |
 | Object storage | Cloudflare R2 (via AWS SDK S3 client) |
 | Video processing | Mux (upload, webhook, reconciliation, HLS playback) |
 | Auth | Wallet adapters (Phantom, Solflare), Web3Auth, email OTP, wallet challenge |
 | Database | PostgreSQL (Neon for production, local Postgres for dev) |
 | Deployment | Vercel (frontend), Render (backend), Neon (DB), Cloudflare R2, Mux |
-| Testing | ts-mocha + Chai (backend + Anchor tests) |
+| Testing | ts-mocha + Chai 6 (backend + Anchor tests) |
 | Program ID | `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp` |
 
 ## Branch Model
@@ -341,7 +341,7 @@ Custom in-app i18n (not next-intl). `I18nProvider` + `useI18n()` with `zh` | `en
 
 ### Styling
 
-Tailwind CSS 3 utilities + custom glass/liquid design system in `globals.css` (CSS variables, `liquid-glass-shell`, `glass-button-primary`, gradient backgrounds, CJK-friendly font stack). Not a component library.
+Tailwind CSS 4 utilities + custom glass/liquid design system in `globals.css` (CSS variables, `liquid-glass-shell`, `glass-button-primary`, gradient backgrounds, CJK-friendly font stack). Not a component library.
 
 ## Frontend Routes
 
@@ -409,12 +409,12 @@ MUX_WEBHOOK_SECRET=...
 
 ### Demo Backend Defaults (conservative)
 
-These should stay off for public demos. Enable preview social auth only for explicitly labeled local/demo recordings.
+These are recommended overrides for local dev and demo recordings, not the shipped code defaults. Most flags default to `false` in `backend/config/default.ts` and `.env.example`. Enable preview social auth only for explicitly labeled local/demo recordings.
 
 ```
 AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false
 AUTH_ALLOW_LEGACY_WALLET_HEADER=false
-INDEXER_ENABLED=true
+INDEXER_ENABLED=true   # code default is false; enable to keep projections synced
 MUX_RECONCILIATION_ENABLED=false
 MUX_RECONCILIATION_RUN_ON_BOOT=false
 ORACLE_SCHEDULER_ENABLED=false
