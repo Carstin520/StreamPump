@@ -1,80 +1,63 @@
-# StreamPump Progress Review - 2026-06-14 Toolchain Modernization And Legacy Cleanup
+# StreamPump Progress Review - 2026-06-14 Vercel Build Recovery And Branch Unfreeze
 
 ## Scope
-- This review covers material working-tree changes after the latest existing `progress.md` entry for 2026-06-09 local startup and test harness follow-up.
-- Comparison evidence is the current uncommitted diff against `f57f174`, with `git log -n 20` confirming no newer local commit after the previously recorded point.
-- The material current change is local toolchain modernization and dead-code cleanup: Next/React/Tailwind/TypeScript/ESLint package updates, backend Chai 6 test compatibility, removal of detached legacy frontend/backend helpers, and a small React 19 typing fix in onboarding.
-- No protected files were edited.
+- This review covers the Vercel deployment recovery after the failed Next 16 toolchain attempt and the merge-conflict policy update after hackathon judging ended.
+- The material current change is restoring the app to the Vercel-compatible Next 15 / React 18 / Tailwind 3 / TypeScript 5 toolchain, pinning Vercel Node to 22.x, cleaning the deprecated `next lint` script, and documenting that `main` is no longer frozen.
+- The `codex/post-deadline-phase-0` branch remains the long-lived integration/governance branch for post-deadline work and submission-rule hardening.
 
 ## Completed Work
-- Updated frontend app tooling.
-  - Next moved from 15.5.18 to 16.2.7, React/React DOM from 18.3.1 to 19.2.7, Tailwind from 3.4.17 to 4.3.0, TypeScript from 5.7.3 to 6.0.3, and ESLint from 8 to 9.
-  - `app/postcss.config.js` now uses `@tailwindcss/postcss`.
-  - `app/eslint.config.mjs` replaces the removed `next lint` path with `eslint .` plus the existing Next core-web-vitals rule set and local rule exceptions.
-  - `app/next-env.d.ts` now imports generated route types in the form expected by the updated Next toolchain.
-- Updated backend test harness compatibility.
-  - Root `test:backend` now runs ts-mocha through `ts-node/register` with a Chai compatibility import.
-  - `backend/tests/chai-cjs-compat.mjs` bridges Chai 6 ESM loading for backend tests still transpiled as CommonJS.
-- Removed detached legacy helpers from active source.
-  - Deleted unused frontend helpers: `app/src/hooks/useBondingCurve.ts`, `app/src/hooks/useProgram.ts`, `app/src/lib/api/content.ts`, and `app/src/lib/mock-data.ts`.
-  - Deleted old backend oracle/settlement scaffolds: `backend/src/oracle/buildOracleSettlementPayload.ts` and `backend/src/services/solanaSettlement.ts`.
-  - Reference search found no active source references to those removed modules; only generated `backend/dist` output and an old frontend planning doc still mention them.
-- Fixed a React 19 typing issue in `/onboarding` by making the animation frame ref explicitly nullable and resetting it on cleanup.
+- Restored frontend deployment compatibility.
+  - `app/package.json` now uses Next 15.5.18, React/React DOM 18.3.1, Tailwind 3.4.17, TypeScript 5.7.3, ESLint 8.57.1, and `engines.node: 22.x`.
+  - `app/package-lock.json` matches the restored toolchain.
+  - The inert `app/middleware.ts` shim remains deleted so Vercel does not create a no-op middleware/proxy output.
+- Cleaned lint behavior.
+  - `npm run lint --prefix app` now runs the ESLint CLI directly instead of deprecated `next lint`.
+  - The legacy `.eslintrc.json` configuration remains the active Next 15 lint config.
+- Kept stale detached helpers deleted during conflict resolution.
+  - `app/src/hooks/useProgram.ts` and `app/src/lib/api/content.ts` remain deleted because current HEAD has no active references.
+- Updated branch policy.
+  - `main` is no longer frozen after hackathon judging.
+  - `codex/post-deadline-phase-0` remains the integration/governance branch and should be kept synced with `main` before PR merge work.
 
 ## Not Completed Or Blocked
 - No production readiness promotion was made.
-- No route/API product behavior, campaign economics, Solana program semantics, SPUMP transferability, or settlement truth model was changed.
-- Browser smoke was not run by this recorder pass.
-- The first sandboxed `npm run build --prefix app` attempt failed with a Turbopack internal error caused by sandbox-denied process/port binding while processing wallet-adapter CSS; rerunning the same build outside the sandbox passed.
-- Production promotion remains blocked on deployed Vercel/Render/Neon/R2/Mux smoke, operator visibility, and Track3 merchant/reconciliation integration.
+- The remaining Vercel warnings are not ESLint failures: Node 22 intentionally overrides the project setting, and the Solana wallet adapter dependency chain still emits npm peer-dependency warnings.
+- Production promotion still needs deployed Render/Neon/R2/Mux smoke, operator visibility, and Track3 merchant/reconciliation integration.
 
 ## Backend Alignment
-- Backend source behavior is unchanged except removal of detached legacy settlement scaffolds.
-- Backend tests now pass with Chai 6 through the compatibility loader.
+- Backend product behavior is unchanged by the Vercel recovery.
+- The conflict resolution kept the current stricter sponsor KYB behavior in `backend/src/controllers/proposalIntentController.ts`.
 
 ## Frontend Alignment
-- Frontend runtime/tooling is aligned to the updated Next/React/Tailwind/TypeScript stack.
-- `/onboarding` received a typing-safe animation frame cleanup change only; no user-facing readiness label or production claim was changed.
+- Frontend runtime/tooling is aligned to the deployed Vercel-compatible Next 15 stack.
+- Removed Next 16/Tailwind 4 documentation claims have been corrected.
 
 ## Chain Alignment
 - No Anchor program source change is part of this follow-up.
-- Deleted backend settlement scaffolds were legacy helper code, not active Anchor instruction handlers or transaction builders.
 
 ## Documentation Alignment
-- `docs/streamPump-long-term-roadmap.md` was updated with a matching progress ledger row.
+- `AGENTS.md`, `CLAUDE.md`, and `docs/streamPump-long-term-roadmap.md` now reflect the post-review branch policy and current deployed frontend stack.
 - Product boundaries are unchanged: `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth.
 
 ## Implemented And Verified
-- Implemented paths observed in the current working-tree diff include:
+- Implemented paths include:
+  - `AGENTS.md`
+  - `CLAUDE.md`
   - `app/package.json`
   - `app/package-lock.json`
-  - `app/eslint.config.mjs`
-  - `app/postcss.config.js`
-  - `app/next-env.d.ts`
-  - `app/tsconfig.json`
-  - `app/src/pages/onboarding.tsx`
-  - `backend/tests/chai-cjs-compat.mjs`
+  - `backend/src/controllers/proposalIntentController.ts`
+  - `docs/streamPump-long-term-roadmap.md`
   - `package.json`
-  - `package-lock.json`
-  - `yarn.lock`
-- Removed paths observed in the current working-tree diff include:
-  - `app/src/hooks/useBondingCurve.ts`
+  - `progress.md`
+- Resolved merge-conflict deletions include:
+  - `app/middleware.ts`
   - `app/src/hooks/useProgram.ts`
   - `app/src/lib/api/content.ts`
-  - `app/src/lib/mock-data.ts`
-  - `backend/src/oracle/buildOracleSettlementPayload.ts`
-  - `backend/src/services/solanaSettlement.ts`
-- Recorder verification:
-  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
-  - `git status --short` showed uncommitted app/backend/package changes and no protected files.
-  - `git log --oneline --decorate -n 20` showed `f57f174` as the latest local commit.
-  - `git diff --stat --find-renames` identified 15 changed tracked files plus untracked `app/eslint.config.mjs` and `backend/tests/chai-cjs-compat.mjs`.
-  - Reference search for removed helpers found no active source references.
-  - `git diff --check` passed before documentation edits.
-  - `npm run build --prefix backend` passed.
-  - `npm run test:backend` passed with 67 tests.
+- Verification already completed for the Vercel recovery:
   - `npm run lint --prefix app` passed.
-  - `npm run build --prefix app` failed inside the sandbox with a Turbopack port-binding permission error, then passed when rerun outside the sandbox.
+  - `npm run build --prefix app` passed.
+  - Vercel deployment `dpl_EJaWdxv2VLE8g2b41cpZNUy1d2JF` reached `READY`.
+  - Authenticated Vercel fetch of `/explore` returned HTTP 200.
 
 # StreamPump Progress Review - 2026-06-09 Local Startup And Test Harness Follow-Up
 

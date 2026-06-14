@@ -51,7 +51,7 @@ StreamPump/
 │   ├── prisma/schema.prisma   # Database schema (Postgres)
 │   ├── scripts/               # Backend utility scripts
 │   └── tests/                 # Backend service tests (ts-mocha)
-├── app/                       # Next.js 16 frontend
+├── app/                       # Next.js 15 frontend
 │   └── src/
 │       ├── pages/             # File-based routing (Pages Router)
 │       ├── components/        # React components
@@ -77,7 +77,7 @@ StreamPump/
 | --- | --- |
 | Solana program | Rust + Anchor 0.32, Solana CLI 2.3.0, Token-2022 (NonTransferable mint) |
 | Backend | Express 4, TypeScript 5, Prisma 6 ORM, PostgreSQL |
-| Frontend | Next.js 16 (Pages Router), React 19, Tailwind CSS 4, TypeScript 6 |
+| Frontend | Next.js 15 (Pages Router), React 18, Tailwind CSS 3, TypeScript 5 |
 | Object storage | Cloudflare R2 (via AWS SDK S3 client) |
 | Video processing | Mux (upload, webhook, reconciliation, HLS playback) |
 | Auth | Wallet adapters (Phantom, Solflare), Web3Auth, email OTP, wallet challenge |
@@ -88,8 +88,8 @@ StreamPump/
 
 ## Branch Model
 
-- **`main`**: Frozen hackathon submission branch. **Never modify `main`.**
-- **`codex/post-deadline-phase-0`**: Active development branch. All work happens here.
+- **`main`**: Canonical post-hackathon branch. Hackathon judging is complete, so this branch is no longer frozen. Keep it release-ready and merge only reviewed, verified work.
+- **`codex/post-deadline-phase-0`**: Long-lived integration/governance branch for post-deadline development and Codex submission-rule hardening. Keep it in sync with `main` before opening or updating PRs.
 
 ## Build, Test, and Run
 
@@ -341,7 +341,7 @@ Custom in-app i18n (not next-intl). `I18nProvider` + `useI18n()` with `zh` | `en
 
 ### Styling
 
-Tailwind CSS 4 utilities + custom glass/liquid design system in `globals.css` (CSS variables, `liquid-glass-shell`, `glass-button-primary`, gradient backgrounds, CJK-friendly font stack). Not a component library.
+Tailwind CSS 3 utilities + custom glass/liquid design system in `globals.css` (CSS variables, `liquid-glass-shell`, `glass-button-primary`, gradient backgrounds, CJK-friendly font stack). Not a component library.
 
 ## Frontend Routes
 
@@ -485,8 +485,8 @@ Use this order when no narrower user instruction overrides it:
 
 ### Git
 
-- **Never modify `main`.** It is the frozen hackathon submission branch.
-- Work on `codex/post-deadline-phase-0` only.
+- `main` is no longer frozen after hackathon review. Treat it as the canonical release branch and keep it deployable.
+- Use `codex/post-deadline-phase-0` as the long-lived integration/governance branch; keep it synced with `main` before PR merge work.
 - Treat uncommitted changes as user-owned. Do not revert, delete, or overwrite them unless the user explicitly asks.
 - **Protected files** — do not stage, commit, delete, or rewrite:
   - `backend/package-lock.json`
