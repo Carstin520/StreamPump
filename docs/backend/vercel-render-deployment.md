@@ -133,6 +133,26 @@ npm run start
 - `AUTH_CHALLENGE_TTL_SECONDS=600`
 - `AUTH_SESSION_TTL_SECONDS=604800`
 - `AUTH_ALLOW_LEGACY_WALLET_HEADER=false`
+- `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false`
+- `MANAGED_WALLET_ENCRYPTION_KEY=...`
+  - 生产必填，必须是 64 位 hex（32 bytes）。
+  - 本地生成命令：
+    ```bash
+    openssl rand -hex 32
+    ```
+  - 只粘贴到 Render Environment，不能写进 Git、文档、截图或日志。
+- `EMAIL_DELIVERY_MODE=resend`
+  - `NODE_ENV=production` 下不能使用 `console`。
+- `EMAIL_FROM=StreamPump <login@yourdomain.com>`
+- `RESEND_API_KEY=...`
+
+如果 Render runtime log 出现：
+
+```text
+Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars
+```
+
+说明 build 已经成功，失败发生在 `npm run start` 的生产配置校验阶段。处理方式是给同一个 Render backend service 增加 `MANAGED_WALLET_ENCRYPTION_KEY`，值必须是 `openssl rand -hex 32` 生成的 64 位 hex，然后重新部署。不要为了让服务启动而删除这条校验；生产 email/provider identity 会分配托管钱包，托管钱包私钥必须用这个 key 加密。
 
 #### Database
 - `DATABASE_URL`

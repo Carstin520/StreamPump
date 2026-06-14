@@ -140,7 +140,9 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
   }
 
   if (!/^[0-9a-fA-F]{64}$/.test(runtimeConfig.managedWallet.encryptionKey)) {
-    failures.push("MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars");
+    failures.push(
+      "MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars; generate with `openssl rand -hex 32` and store it in Render Environment or a secret manager"
+    );
   }
 
   if (failures.length > 0) {

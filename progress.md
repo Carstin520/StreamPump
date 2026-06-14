@@ -1,3 +1,23 @@
+# StreamPump Progress Review - 2026-06-15 Render Runtime Env Hardening
+
+## Scope
+- This review covers the Render backend deployment failure where build and Prisma pre-deploy passed, but `npm run start` exited in production config validation.
+- Root cause: the Render backend service is missing `MANAGED_WALLET_ENCRYPTION_KEY`, which must be a 64-character hex string used for AES-256-GCM managed-wallet secret encryption.
+
+## Completed Work
+- Added `MANAGED_WALLET_ENCRYPTION_KEY` to `backend/.env.example` as a production P0 variable with generation guidance.
+- Updated `docs/backend/vercel-render-deployment.md` with the Render-specific fix: generate with `openssl rand -hex 32`, set only in Render Environment or a secret manager, then redeploy.
+- Made the backend production config error message actionable while preserving the startup guard.
+
+## Not Completed Or Blocked
+- The real secret was not generated into code, logs, or docs.
+- The Render service still needs the environment variable set in Render itself before the current deployment can stay up.
+- No product readiness promotion was made.
+
+## Verification
+- `npm run build --prefix backend` passed.
+- A production config-load smoke passed locally using a dummy 64-hex local key.
+
 # StreamPump Progress Review - 2026-06-14 Vercel Build Recovery And Branch Unfreeze
 
 ## Scope
