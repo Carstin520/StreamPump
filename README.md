@@ -77,8 +77,8 @@ StreamPump is built on four convictions that avoid every one of these traps:
 
 | Conviction | What it means |
 |---|---|
-| 🎥 **Content is the asset** | Videos and posts retain audiences — meme coins and NFTs only attract speculators |
-| 🔒 **`SPUMP` is utility-only** | Non-transferable Token-2022; never listed on DEX/CEX; you earn **USDC** through participation, not trading |
+| 🎥 **Content is the asset** | Videos and posts retain audiences — meme coins and NFTs only attract speculators. We don't claim to own or tokenize content; the chain holds a creator-signed publication timestamp + attribution that routes revenue, while content stays on the creator's own platforms |
+| 🔒 **`SPUMP` is utility-only** | Non-transferable Token-2022; never listed on DEX/CEX. Backing is skin in the game **priced in time and attention, not money** — non-transferability is the mechanism that makes it a credible conviction signal, not a compromise |
 | 💼 **Sponsors are marketing spenders** | Campaign budgets, not speculative capital — a far healthier funding source |
 | ⚙️ **Automated by design** | No bloated team or extractive tokenomics; service fees + small USDC tx fees keep the lights on |
 
@@ -151,6 +151,12 @@ wallet session
   → per-track settlement
 ```
 
+### Loyalty & Fan Badges (design)
+
+> 🧭 **Design / planned — not implemented yet.** Spec: [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
+
+A loyalty layer sits on top of S1/S2 to make early-fan status concrete and to give `SPUMP` always-available sinks. Each fan holds a per-creator **soulbound Fan Badge** that levels up from following duration plus engagement, with a permanent **Founding Backer #N** rank for early-cohort backers. `SPUMP` is positioned as conviction/voice — not money — so non-transferability is a feature: because it can only be earned over time, spending it is a credible signal of real conviction. Badge tier claims, cheers, content boosts, and perk unlocks burn `SPUMP`, decoupling its usefulness from "is there a creator worth backing right now," and per-creator S1 daily caps scale with badge tier so loyalty (not capital) earns backing priority.
+
 ---
 
 ## 🏗 How It Works
@@ -211,6 +217,10 @@ StreamPump is a serious prototype with a **verified end-to-end production corrid
 | **Operator tooling** | `OPERATOR_REQUIRED` | Internal routes exist; no dashboards yet |
 
 > ⚠️ The Anchor program is **not audited**. Do not deploy with real funds. The new chain guards and reward behavior require program deployment before they are live on-chain.
+
+### Compliance & token posture (design in progress)
+
+`SPUMP` is a non-transferable utility/consumption unit with no monetary value and no expectation of profit. To keep backing a costly conviction signal **without** it being an investment contract, the backer USDC mechanism is being recharacterized from a *pro-rata share of the buyout* (which current on-chain code still implements) into a **capped, platform-funded discovery/loyalty reward that does not scale with `SPUMP` staked** — with permanent founding status, not USDC, as the headline reward. Public, real-money launch is gated on this redesign plus geofencing, KYC for USDC-receiving users, an Anchor audit, and a legal token-classification opinion. See [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md). Until then, treat all USDC reward flows as demo/seeded only.
 
 For the full picture see [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) (canonical roadmap + progress ledger) and [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md).
 
@@ -382,6 +392,7 @@ Near-term priorities:
 - Productize the S1 buyout formation UI after the controlled S1 demo path stabilizes.
 - Complete S2 endorsement claim UX and the fan reward ledger.
 - Add operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
+- Build the loyalty/Fan Badge layer and `SPUMP` sinks (cheer, boost, tier claims) — see [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
 - Run a broader security review before any real-money deployment.
 
 ---
@@ -392,6 +403,9 @@ Near-term priorities:
 - [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) — canonical roadmap + progress ledger
 - [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) — post-hackathon readiness boundary
 - [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) — S1 economics and guardrails
+- [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md) — loyalty/Fan Badge layer and SPUMP sinks (design)
+- [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md) — securities posture and SPUMP value model (design)
+- [docs/protocol/content-attribution-and-anchoring.md](docs/protocol/content-attribution-and-anchoring.md) — honest content anchor model: attribution, not ownership (design)
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md) — DB-first launch contract
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md) — backend environment and vendor setup
 - [docs/frontend/design.md](docs/frontend/design.md) — frontend design system

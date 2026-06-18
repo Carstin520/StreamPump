@@ -77,8 +77,8 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 
 | 信念 | 含义 |
 |---|---|
-| 🎥 **内容才是资产** | 视频和帖子能长期留住受众——meme 币和 NFT 只吸引投机者 |
-| 🔒 **`SPUMP` 仅作工具** | 非转让的 Token-2022；永不上 DEX/CEX；你通过参与赚 **USDC**，而非交易 token |
+| 🎥 **内容才是资产** | 视频和帖子能长期留住受众——meme 币和 NFT 只吸引投机者。我们不主张拥有、也不把内容代币化；链上只存一条创作者签名的发布时间戳 + 归属记录用于分配收益，内容仍留在创作者自己的平台上 |
+| 🔒 **`SPUMP` 仅作工具** | 非转让的 Token-2022；永不上 DEX/CEX。backing 是**用时间和注意力计价、而非用钱**的 skin in the game——不可转让正是让它成为可信信念信号的机制，而非妥协 |
 | 💼 **赞助方是营销支出方** | 投放的是活动预算而非投机资本——这是更健康的资金来源 |
 | ⚙️ **天然自动化** | 不靠臃肿团队或榨取式 tokenomics；靠服务费 + 小额 USDC 交易费维持运转 |
 
@@ -151,6 +151,12 @@ sell return = effective_k / 2 * (S^2 - (S - dS)^2)
   → 分轨结算
 ```
 
+### 忠诚度与粉丝牌（设计）
+
+> 🧭 **设计 / 规划中——尚未实现。** 规范见 [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md)。
+
+在 S1/S2 之上叠加一个忠诚度层，把"早期粉丝"身份做成具体可见的东西，并为 `SPUMP` 提供随时可用的消耗汇。每个粉丝对每个创作者持有一枚**灵魂绑定的粉丝牌**，按关注时长加互动升级，早期 cohort 支持者获得永久的**创始粉 #N** 排名。`SPUMP` 被定位为信念/声音——而非钱——因此不可转让是优点：正因为它只能靠时间赚取，花掉它才是真实信念的可信信号。粉丝牌升级、打赏（cheer）、内容助推（boost）和功能解锁都会 burn `SPUMP`，让它的用处不再取决于"当下有没有值得 back 的创作者"；同时每个创作者的 S1 每日上限随粉丝牌等级缩放，让忠诚度（而非资金量）赢得 backing 优先权。
+
 ---
 
 ## 🏗 工作原理
@@ -211,6 +217,10 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 | **运营工具** | `OPERATOR_REQUIRED` | 内部路由已具备；尚无后台面板 |
 
 > ⚠️ Anchor 程序**未经审计**，请勿用于真实资金。新的链上护栏和奖励逻辑需要先部署程序才能在链上生效。
+
+### 合规与代币定性（设计推进中）
+
+`SPUMP` 是非转让的效用/消耗单位，**无货币价值、无利润预期**。为了让 backing 保持为有代价的信念信号、同时**不**构成投资合同，backer 的 USDC 机制正在从"按持仓比例分买断款"（当前链上代码仍是这样实现的）重新定性为**有上限、由平台出资、且不随 staked `SPUMP` 数量缩放的发现/忠诚奖励**——以永久的创始身份、而非 USDC 作为主奖励。面向公众的真实资金上线，门槛包括：这套重设计、地域限制、对收 USDC 用户的 KYC、一次 Anchor 审计，以及一份法律代币定性意见书。详见 [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md)。在此之前，所有 USDC 奖励流都应视为仅 demo/种子用途。
 
 完整情况见 [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md)（权威路线图 + 进度账本）与 [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md)。
 
@@ -382,6 +392,7 @@ cd backend && npm run prisma:migrate:deploy
 - 在受控 S1 demo 路径稳定后，产品化 S1 买断形成 UI。
 - 完成 S2 背书领取体验和粉丝奖励账本。
 - 为 oracle、风控审核、对账和结算监控添加运营后台。
+- 构建忠诚度/粉丝牌层与 `SPUMP` 消耗汇（打赏、助推、等级领取）——见 [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md)。
 - 在任何真实资金部署前进行更全面的安全审查。
 
 ---
@@ -392,6 +403,9 @@ cd backend && npm run prisma:migrate:deploy
 - [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) — 权威路线图 + 进度账本
 - [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) — 黑客松后 readiness 边界
 - [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) — S1 经济模型与护栏
+- [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md) — 忠诚度/粉丝牌层与 SPUMP 消耗汇（设计）
+- [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md) — 证券合规定性与 SPUMP 价值模型（设计）
+- [docs/protocol/content-attribution-and-anchoring.md](docs/protocol/content-attribution-and-anchoring.md) — 诚实的内容锚定模型：归属而非所有权（设计）
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md) — DB-first 发起合同
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md) — 后端环境与供应商配置
 - [docs/frontend/design.md](docs/frontend/design.md) — 前端设计体系
