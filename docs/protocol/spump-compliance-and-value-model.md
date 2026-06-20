@@ -10,7 +10,7 @@ This document answers two high-priority feasibility blockers, which are the same
 1. Securities / Howey risk. The structure "burn SPUMP to back a creator early -> receive USDC proportional to your position when a sponsor buys the creator out" closely resembles an investment contract. Non-transferability of SPUMP is a mitigating factor, not an exemption — regulators look at economic substance, not token mechanics.
 2. SPUMP has a de facto USD price. Because "burn SPUMP -> possibly receive USDC" holds and the payout is proportional to the amount staked, users can compute `E[USDC | 1 SPUMP]`. That makes daily emission feel like money printing and lets SPUMP whales dominate reward pools despite per-user caps.
 
-Read with `docs/protocol/s1-market-design.md` (current S1 economics) and `docs/protocol/fan-loyalty-and-spump-economy.md` (the loyalty/sink layer that this posture depends on).
+Read with `docs/protocol/s1-market-design.md` (current S1 economics) and `docs/protocol/fan-loyalty-and-spump-economy.md` (the loyalty/sink layer that this posture depends on). The weighted-influence/leveling design in `docs/protocol/user-influence-and-leveling.md` depends on this firewall too: user standing may move discovery/traffic freely but must never multiply a financial claim, and may reach creator valuation only as bounded, oracle-mediated evidence.
 
 ## The Single Root Cause
 

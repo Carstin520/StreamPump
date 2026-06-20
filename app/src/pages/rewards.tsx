@@ -8,6 +8,9 @@ import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
 import { buildClaimDailySpumpTransaction } from "@/lib/api/s1";
 import { useI18n } from "@/lib/i18n";
 
+const SCOUT_TIER_LABEL = "Scout";
+const SCOUT_TIER_ZH = "星探";
+
 const MISSIONS = [
   { name: "Complete Profile", emoji: "👤", spump: 20_000, xp: 20, done: true },
   { name: "First S1 Buy", emoji: "💎", spump: 50_000, xp: 30, done: false },
@@ -35,7 +38,7 @@ function fmt(n: number) {
 }
 
 export default function RewardsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [claimed, setClaimed] = useState(false);
   const flow = useS1TransactionFlow();
   const managedWallet = useManagedWallet();
@@ -108,7 +111,15 @@ export default function RewardsPage() {
                     {CURRENT_LEVEL}
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-white">Level {CURRENT_LEVEL}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-white">Level {CURRENT_LEVEL}</p>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[#67b8ff]/20 bg-[#67b8ff]/8 px-2 py-0.5">
+                        <span className="text-[9px] font-medium text-[#8ec8ff]">{locale === "zh" ? SCOUT_TIER_ZH : SCOUT_TIER_LABEL}</span>
+                        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1 py-px text-[7px] font-semibold uppercase tracking-[0.08em] text-[#f3c66e]">
+                          Mock
+                        </span>
+                      </span>
+                    </div>
                     <p className="text-[10px] text-[#8ea0ba]">{fmt(totalXP)} / {fmt(LEVEL_XP)} XP</p>
                   </div>
                 </div>

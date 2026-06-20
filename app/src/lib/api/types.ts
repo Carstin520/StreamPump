@@ -364,6 +364,17 @@ export type ActivitySidebarHighlightRecord = {
   statusLabel: string;
 };
 
+export type ScoutTier = "PASSERBY" | "OBSERVER" | "SCOUT" | "GOLD_SCOUT";
+
+export type InfluenceRecord = {
+  level: number;
+  scoutTier: ScoutTier;
+  scoutTierLabel: { en: string; zh: string };
+  influenceWeightPreview: number;
+  readiness: "MOCK_PREVIEW";
+  source: string;
+};
+
 export type UserNoteRecord = {
   id: string;
   sourcePostId?: string;

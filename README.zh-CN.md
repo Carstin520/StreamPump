@@ -157,6 +157,14 @@ sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 
 在 S1/S2 之上叠加一个忠诚度层，把"早期粉丝"身份做成具体可见的东西，并为 `SPUMP` 提供随时可用的消耗汇。每个粉丝对每个创作者持有一枚**灵魂绑定的粉丝牌**，按关注时长加互动升级，早期 cohort 支持者获得永久的**创始粉 #N** 排名。`SPUMP` 被定位为信念/声音——而非钱——因此不可转让是优点：正因为它只能靠时间赚取，花掉它才是真实信念的可信信号。粉丝牌升级、打赏（cheer）、内容助推（boost）和功能解锁都会 burn `SPUMP`，让它的用处不再取决于"当下有没有值得 back 的创作者"；同时每个创作者的 S1 每日上限随粉丝牌等级缩放，让忠诚度（而非资金量）赢得 backing 优先权。
 
+### 平台等级与星探影响力（设计）
+
+> 🧭 **设计 / 规划中——Phase 1 只读骨架已落地（MOCK_PREVIEW）。** 规范见 [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md)。
+
+用户拥有两个维度的身份：**等级（Lv0–Lv6）**——B 站式的资历/信任进度，以及在你早期发现的创作者真的成长后才赚到的**星探称号徽章**（路人 → 观察者 → 星探 → 金牌伯乐）。表层只展示**一个主数字（等级）+ 一个靠结果赚来的称号（星探）**——不会出现两条竞争的经验条。
+
+高身份用户的点赞、打赏、背书会分配**更多发现流量**、对创作者动量贡献更大。关键在于——影响力是**声望/发现货币，而非金融货币**：加权可以自由地推动流量、排名和一个展示用的动量分数，但只能作为**有上限、经预言机中介的"证据"**影响创作者*估值*，绝不直接乘到价格、领取额或 USDC 上。权重是次线性且封顶的，所有人都有一个完整的基础权重起点，身份不可转让也不可用钱购买——既让策展经济保持正当（而非寡头化），也与合规防火墙一致。
+
 ---
 
 ## 🏗 工作原理
@@ -406,6 +414,7 @@ cd backend && npm run prisma:migrate:deploy
 - [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md) — 忠诚度/粉丝牌层与 SPUMP 消耗汇（设计）
 - [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md) — 证券合规定性与 SPUMP 价值模型（设计）
 - [docs/protocol/content-attribution-and-anchoring.md](docs/protocol/content-attribution-and-anchoring.md) — 诚实的内容锚定模型：归属而非所有权（设计）
+- [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md) — 平台等级与星探影响力：命名定稿 + Phase 1 只读骨架（设计）
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md) — DB-first 发起合同
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md) — 后端环境与供应商配置
 - [docs/frontend/design.md](docs/frontend/design.md) — 前端设计体系

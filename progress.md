@@ -1,3 +1,127 @@
+# StreamPump Progress Review - 2026-06-19 Product Boundary And Compliance Design
+
+## Scope
+- This review covers material documentation/design changes after the latest recorded 2026-06-15 Render runtime env hardening entry.
+- Comparison evidence is local commit range `aaf95db..84b0100` on `codex/post-deadline-phase-0`.
+- The material current change is narrative and protocol-design alignment around content attribution, SPUMP compliance posture, and the planned fan loyalty/sink economy.
+- The working tree was clean before this recorder edit. No protected files were edited.
+
+## Completed Work
+- Reframed content anchoring as honest attribution instead of ownership.
+  - Added `docs/protocol/content-attribution-and-anchoring.md`.
+  - Clarified that `ContentHashAnchor` is a creator-signed publication timestamp and integrity fingerprint for an external URL.
+  - Explicitly stated it does not prove originality, ownership, exclusive rights, anti-copy protection, or live-content integrity by itself.
+  - Added the same non-ownership stance to `pitch/script.md` and README framing.
+- Added a SPUMP compliance and value-model design proposal.
+  - Added `docs/protocol/spump-compliance-and-value-model.md`.
+  - Identified the current pro-rata SPUMP-to-USDC paths as a securities/implicit-price risk.
+  - Specified a design-only direction: decouple USDC rewards from stake size, make status and loyalty the primary reward, add caps, geofencing/KYC/disclosures, and require legal sign-off before public real-money launch.
+- Added the planned fan loyalty and SPUMP sink layer.
+  - Added `docs/protocol/fan-loyalty-and-spump-economy.md`.
+  - Proposed Fan Badges, following-duration tiers, Founding Backer rank, cheer/boost/perk sinks, and loyalty-gated S1 backing capacity.
+  - Labeled the mechanics as design/proposal only and `NOT_STARTED` until implemented with code, tests, and verification.
+- Aligned English and Chinese README status/framing with the new design docs.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The new loyalty, compliance, reward, geofencing, KYC, disclosure, and settlement-redesign mechanics are design only and remain `NOT_STARTED`.
+- Current on-chain S1 buyout and S2 endorsement reward paths still use pro-rata USDC distribution and must not be represented as redesigned behavior.
+- Public real-money launch remains blocked on legal token-classification advice, first-launch jurisdiction decisions, and an Anchor audit for any settlement-math redesign.
+- Content originality strengthening remains future work: cross-platform publication verification first, then optional C2PA or a real fingerprint provider.
+
+## Backend Alignment
+- No backend route, service, Prisma schema, or migration change is part of this recorded range.
+- Future backend work called out by the design docs includes KYC/geofence gates, follow/badge projections, SPUMP sink ledgers, and public attribution/badge surfaces.
+
+## Frontend Alignment
+- No frontend route implementation changed in this recorded range.
+- README/pitch copy now avoids implying content ownership and frames loyalty/status mechanics as planned rather than shipped.
+
+## Chain Alignment
+- No Anchor program source change is part of this recorded range.
+- Existing financial semantics are unchanged: `claim_s1_buyout_usdc` and Track 2 endorsement reward logic still need separate audited redesign work before any compliance promotion.
+- Existing content anchoring remains an attestation primitive; no PDA seed, program ID, or on-chain ownership claim changed.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` already contains matching 2026-06-19 progress ledger rows for the content attribution reframe and the SPUMP compliance/loyalty design work.
+- Product boundaries are unchanged: `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `aaf95db..84b0100`:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `docs/protocol/content-attribution-and-anchoring.md`
+  - `docs/protocol/fan-loyalty-and-spump-economy.md`
+  - `docs/protocol/spump-compliance-and-value-model.md`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `pitch/script.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed a clean working tree before this entry was added.
+  - `git diff --stat --find-renames aaf95db..HEAD` identified 7 changed files after the previous progress entry.
+  - `git diff --name-only aaf95db..HEAD -- backend/package-lock.json pitch/colosseum-submission.md pitch/demo-youtube-description.md` returned no protected-file changes.
+  - App, backend, and Anchor builds/tests were not rerun because this was a documentation/design recording pass.
+
+# StreamPump Progress Review - 2026-06-19 Narrative Boundary And Design Spec Alignment
+
+## Scope
+- This review covers the committed docs-only change after the latest recorded `progress.md` entry for 2026-06-15 Render runtime env hardening.
+- Comparison evidence is local commit range `1437fbc..84b0100`.
+- The material current change is design and narrative hardening: explicit content-attribution boundaries, explicit `SPUMP` compliance/value-model design posture, and a planned loyalty / Fan Badge layer with additional non-monetary `SPUMP` sinks.
+- No frontend, backend, Prisma, or Anchor source path changed in this recorded range.
+
+## Completed Work
+- Added an honest content-anchor design spec.
+  - `docs/protocol/content-attribution-and-anchoring.md` now defines `ContentHashAnchor` as a creator-signed publication timestamp and integrity fingerprint, not ownership, copyright, originality proof, or anti-copy protection.
+  - `pitch/script.md` Slide 4 and both README variants now state the same non-ownership boundary explicitly.
+- Added a design-only `SPUMP` compliance and value-model spec.
+  - `docs/protocol/spump-compliance-and-value-model.md` records that the current pro-rata `SPUMP` -> USDC reward path remains a public-launch blocker and specifies a capped, non-stake-proportional redesign direction.
+  - `README.md` and `README.zh-CN.md` now label this as design in progress rather than shipped product behavior.
+- Added a design-only loyalty / Fan Badge spec.
+  - `docs/protocol/fan-loyalty-and-spump-economy.md` defines planned Fan Badge status, `SPUMP` sink actions, and loyalty-gated S1 participation rules as `NOT_STARTED`.
+- Kept the canonical roadmap aligned.
+  - `docs/streamPump-long-term-roadmap.md` already contains matching 2026-06-19 ledger rows, so this recorder pass did not need an additional roadmap edit.
+
+## Not Completed Or Blocked
+- No readiness promotion was made; the new loyalty/compliance mechanics remain design only and should be treated as `NOT_STARTED`.
+- Current on-chain financial semantics are unchanged.
+  - `claim_s1_buyout_usdc` and Track 2 fan reward flows still implement the existing stake-proportional reward model and must remain demo/seeded only for public-readiness claims.
+- Public or real-money launch remains blocked on legal token-classification review, jurisdiction/KYC decisions, and an Anchor audit of any settlement-math redesign.
+
+## Backend Alignment
+- No backend route, controller, service, schema, or deployment behavior changed in this commit range.
+
+## Frontend Alignment
+- No frontend route wiring or readiness label changed.
+- README copy now more explicitly distinguishes shipped product behavior from design-only loyalty/compliance plans.
+
+## Chain Alignment
+- No Anchor instruction, PDA, program ID, or settlement math changed in this recorded range.
+- The new protocol docs are design references only; they do not change current Solana truth.
+
+## Documentation Alignment
+- Added protocol design references for:
+  - honest content attribution/anchoring,
+  - loyalty/Fan Badge mechanics and `SPUMP` sinks,
+  - `SPUMP` compliance posture and value-model redesign.
+- Product boundaries remain explicit: `SPUMP` stays non-transferable, creators keep content on their own platforms, DB workflow state remains product truth, and financial settlement remains Solana/Anchor truth until redesigned and redeployed.
+
+## Implemented And Verified
+- Implemented paths in commit range `1437fbc..84b0100`:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `docs/protocol/content-attribution-and-anchoring.md`
+  - `docs/protocol/fan-loyalty-and-spump-economy.md`
+  - `docs/protocol/spump-compliance-and-value-model.md`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `pitch/script.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` was clean before this recorder edit.
+  - `git log --oneline --decorate -n 12` showed new committed head `84b0100` after the previously recorded `1437fbc`.
+  - `git diff --stat --find-renames 1437fbc..HEAD` identified 7 documentation-only file changes.
+  - `git diff --check` should remain the only required verification for this recorder update.
+
 # StreamPump Progress Review - 2026-06-15 Render Runtime Env Hardening
 
 ## Scope

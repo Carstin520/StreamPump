@@ -157,6 +157,14 @@ wallet session
 
 A loyalty layer sits on top of S1/S2 to make early-fan status concrete and to give `SPUMP` always-available sinks. Each fan holds a per-creator **soulbound Fan Badge** that levels up from following duration plus engagement, with a permanent **Founding Backer #N** rank for early-cohort backers. `SPUMP` is positioned as conviction/voice — not money — so non-transferability is a feature: because it can only be earned over time, spending it is a credible signal of real conviction. Badge tier claims, cheers, content boosts, and perk unlocks burn `SPUMP`, decoupling its usefulness from "is there a creator worth backing right now," and per-creator S1 daily caps scale with badge tier so loyalty (not capital) earns backing priority.
 
+### Platform Level & Scout Influence (design)
+
+> 🧭 **Design / planned — phase 1 read-only skeleton (MOCK_PREVIEW).** Spec: [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md).
+
+Users earn two axes of standing: **Level (Lv0–Lv6)** — the Bilibili-familiar seniority/trust grind, and a **Scout title badge** (Passerby → Observer → Scout → Gold Scout / 路人 → 观察者 → 星探 → 金牌伯乐) earned when creators you discovered early actually grow. Users see **one primary number (Level) + one earned title (Scout)** — never two competing XP bars.
+
+Higher-standing users' likes, cheers, and endorsements allocate **more discovery traffic** and contribute more to a creator's momentum. Critically, influence is a **reputation/discovery currency, not a financial one** — weighting moves traffic, ranking, and a displayed momentum score freely, but can reach creator *valuation* only as bounded, oracle-mediated evidence (never a direct multiplier on price, claims, or USDC). Weight is sublinear and capped, everyone starts at a full base, and standing is non-transferable and unbuyable — keeping the curation economy legitimate rather than oligarchic, and consistent with the compliance firewall.
+
 ---
 
 ## 🏗 How It Works
@@ -406,6 +414,7 @@ Near-term priorities:
 - [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md) — loyalty/Fan Badge layer and SPUMP sinks (design)
 - [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md) — securities posture and SPUMP value model (design)
 - [docs/protocol/content-attribution-and-anchoring.md](docs/protocol/content-attribution-and-anchoring.md) — honest content anchor model: attribution, not ownership (design)
+- [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md) — platform level & Scout influence: naming final + phase 1 read-only skeleton (design)
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md) — DB-first launch contract
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md) — backend environment and vendor setup
 - [docs/frontend/design.md](docs/frontend/design.md) — frontend design system

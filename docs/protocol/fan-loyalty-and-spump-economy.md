@@ -10,7 +10,7 @@ It exists to answer two product problems:
 1. The "early discovery bragging right" is currently invisible and its payoff is delayed and uncertain, so it does not drive the user/creator flywheel.
 2. SPUMP has weak, narrow sinks. If S1 has no graduation-worthy creator to back, SPUMP accumulates with nowhere to go, which makes users devalue it and depresses retention. When a good creator finally appears, hoarded SPUMP floods in and daily caps make it feel unfair.
 
-Read with `docs/protocol/s1-market-design.md` (S1 economics) and `pitch/script.md` (product boundary). This layer is also the load-bearing mechanism for `docs/protocol/spump-compliance-and-value-model.md`: by making most SPUMP demand pure non-monetary utility, and by making status (not proportional USDC) the headline reward for backing, the loyalty layer is what lets SPUMP avoid an implicit USD price and lets backing avoid an investment-contract characterization.
+Read with `docs/protocol/s1-market-design.md` (S1 economics) and `pitch/script.md` (product boundary). This layer is also the load-bearing mechanism for `docs/protocol/spump-compliance-and-value-model.md`: by making most SPUMP demand pure non-monetary utility, and by making status (not proportional USDC) the headline reward for backing, the loyalty layer is what lets SPUMP avoid an implicit USD price and lets backing avoid an investment-contract characterization. The per-creator loyalty here is complemented by platform-wide standing and weighted influence in `docs/protocol/user-influence-and-leveling.md` (FanBadge = conviction toward one creator; Influence Weight = the platform's trust in your judgment overall).
 
 ## Design Principle: SPUMP Is Conviction, Not Money
 
