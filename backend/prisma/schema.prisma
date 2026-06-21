@@ -206,6 +206,9 @@ model Proposal {
   track2SettledAt             DateTime?
   track2InitialFanPool        BigInt              @default(0)
   track2InitialSpumpStaked    BigInt              @default(0)
+  track2RewardCapUsdc         BigInt              @default(0)
+  track2ResidualTo            Int                 @default(1)
+  track2RewardModelSnapshot   Int                 @default(0)
   track3UsdcDeposited         BigInt
   track3CpsPayout             BigInt?
   track3DelayDays             Int
@@ -270,6 +273,10 @@ model S2EndorsementPositionProjection {
   partialUnstakeCount  Int       @default(0)
   claimedStatus        Boolean   @default(false)
   estimatedUsdcReward  BigInt    @default(0)
+  rewardCapUsdc        BigInt    @default(0)
+  rewardCapped         Boolean   @default(false)
+  fanPoolRemaining     BigInt    @default(0)
+  residualTransferred  BigInt    @default(0)
   lastEventSignature   String?
   lastEventAt          DateTime?
   createdAt            DateTime  @default(now())
@@ -529,6 +536,9 @@ model CreatorMarketProjection {
   nextPriceSpump          BigInt             @default(0)
   supporterPoolSpump      BigInt             @default(0)
   holderCount             Int                @default(0)
+  s1EligibleHolderCount   Int                @default(0)
+  s1EarlyHolderCount      Int                @default(0)
+  s1RegularHolderCount    Int                @default(0)
   graduationProgressBps   Int                @default(0)
   activeCampaignCount     Int                @default(0)
   latestBuyoutOfferUsdc   BigInt?
@@ -554,6 +564,10 @@ model S1PositionProjection {
   earlyCohortBalance     BigInt    @default(0)
   spumpCostBasis         BigInt    @default(0)
   estimatedClaimableUsdc BigInt?
+  discoveryRewardClaimed Boolean   @default(false)
+  lastDiscoveryRewardUsdc BigInt   @default(0)
+  discoveryRewardCapped  Boolean   @default(false)
+  discoveryRewardEligible Boolean  @default(false)
   lastEventSignature     String?
   lastEventAt            DateTime?
   createdAt              DateTime  @default(now())
@@ -597,6 +611,21 @@ model S1BuyoutProjection {
   usdcDeposited                     BigInt                 @default(0)
   claimableUsdcRemaining            BigInt                 @default(0)
   claimableS1SupplyRemaining        BigInt                 @default(0)
+  creatorPayoutUsdc                 BigInt                 @default(0)
+  discoveryPoolUsdc                 BigInt                 @default(0)
+  discoveryPoolRemaining            BigInt                 @default(0)
+  eligibleHolderCount               Int                    @default(0)
+  earlyHolderCount                  Int                    @default(0)
+  regularHolderCount                Int                    @default(0)
+  rewardModelSnapshot               Int                    @default(1)
+  residualToSnapshot                Int                    @default(0)
+  discoveryRewardCapUsdc            BigInt                 @default(0)
+  statusThankyouUsdc                BigInt                 @default(0)
+  creatorPaid                       Boolean                @default(false)
+  graduatedAt                       DateTime?
+  residualSweptAt                   DateTime?
+  residualSwept                     Boolean                @default(false)
+  vaultClosed                       Boolean                @default(false)
   earlyClaimableUsdcRemaining       BigInt                 @default(0)
   earlyClaimableS1SupplyRemaining   BigInt                 @default(0)
   regularClaimableUsdcRemaining     BigInt                 @default(0)

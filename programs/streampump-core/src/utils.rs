@@ -4,8 +4,9 @@ use solana_keccak_hasher::hash as keccak_hash;
 use crate::{
     errors::StreamPumpError,
     state::{
-        CreatorProfile, OrganizationType, DEFAULT_S1_RATING_BPS, USER_ROLE_CREATOR,
-        USER_ROLE_MCN_OPERATOR, USER_ROLE_SPONSOR_OPERATOR, VALID_USER_ROLE_MASK,
+        CreatorProfile, OrganizationType, ResidualDestination, S1BuyoutRewardModel,
+        DEFAULT_S1_RATING_BPS, USER_ROLE_CREATOR, USER_ROLE_MCN_OPERATOR,
+        USER_ROLE_SPONSOR_OPERATOR, VALID_USER_ROLE_MASK,
     },
 };
 
@@ -43,6 +44,186 @@ pub fn checked_add(left: u64, right: u64) -> Result<u64> {
 pub fn checked_sub(left: u64, right: u64) -> Result<u64> {
     left.checked_sub(right)
         .ok_or_else(|| error!(StreamPumpError::MathOverflow))
+}
+
+fn checked_inc_u32(value: u32) -> Result<u32> {
+    value
+        .checked_add(1)
+        .ok_or_else(|| error!(StreamPumpError::MathOverflow))
+}
+
+fn checked_dec_u32(value: u32) -> Result<u32> {
+    value
+        .checked_sub(1)
+        .ok_or_else(|| error!(StreamPumpError::HolderCounterUnderflow))
+}
+
+fn holder_bucket(balance: u64, early_balance: u64) -> Option<bool> {
+    if balance == 0 {
+        None
+    } else {
+        Some(std::cmp::min(early_balance, balance) > 0)
+    }
+}
+
+fn increment_holder_bucket(creator_profile: &mut CreatorProfile, is_early: bool) -> Result<()> {
+    creator_profile.s1_eligible_holder_count =
+        checked_inc_u32(creator_profile.s1_eligible_holder_count)?;
+    if is_early {
+        creator_profile.s1_early_holder_count =
+            checked_inc_u32(creator_profile.s1_early_holder_count)?;
+    } else {
+        creator_profile.s1_regular_holder_count =
+            checked_inc_u32(creator_profile.s1_regular_holder_count)?;
+    }
+    Ok(())
+}
+
+fn decrement_holder_bucket(creator_profile: &mut CreatorProfile, is_early: bool) -> Result<()> {
+    creator_profile.s1_eligible_holder_count =
+        checked_dec_u32(creator_profile.s1_eligible_holder_count)?;
+    if is_early {
+        creator_profile.s1_early_holder_count =
+            checked_dec_u32(creator_profile.s1_early_holder_count)?;
+    } else {
+        creator_profile.s1_regular_holder_count =
+            checked_dec_u32(creator_profile.s1_regular_holder_count)?;
+    }
+    Ok(())
+}
+
+pub fn apply_s1_holder_counter_delta(
+    creator_profile: &mut CreatorProfile,
+    pre_balance: u64,
+    pre_early_balance: u64,
+    post_balance: u64,
+    post_early_balance: u64,
+) -> Result<()> {
+    let pre_bucket = holder_bucket(pre_balance, pre_early_balance);
+    let post_bucket = holder_bucket(post_balance, post_early_balance);
+
+    match (pre_bucket, post_bucket) {
+        (None, None) => {}
+        (None, Some(post_is_early)) => increment_holder_bucket(creator_profile, post_is_early)?,
+        (Some(pre_is_early), None) => decrement_holder_bucket(creator_profile, pre_is_early)?,
+        (Some(pre_is_early), Some(post_is_early)) if pre_is_early != post_is_early => {
+            if pre_is_early {
+                creator_profile.s1_early_holder_count =
+                    checked_dec_u32(creator_profile.s1_early_holder_count)?;
+                creator_profile.s1_regular_holder_count =
+                    checked_inc_u32(creator_profile.s1_regular_holder_count)?;
+            } else {
+                creator_profile.s1_regular_holder_count =
+                    checked_dec_u32(creator_profile.s1_regular_holder_count)?;
+                creator_profile.s1_early_holder_count =
+                    checked_inc_u32(creator_profile.s1_early_holder_count)?;
+            }
+        }
+        (Some(_), Some(_)) => {}
+    }
+
+    Ok(())
+}
+
+pub fn validate_reward_model(model: u8) -> Result<()> {
+    require!(
+        model == S1BuyoutRewardModel::FlatEqual as u8
+            || model == S1BuyoutRewardModel::EarlinessTiered as u8
+            || model == S1BuyoutRewardModel::StatusPrimary as u8,
+        StreamPumpError::InvalidRewardModel
+    );
+    Ok(())
+}
+
+pub fn validate_residual_destination(destination: u8) -> Result<()> {
+    require!(
+        destination == ResidualDestination::Creator as u8
+            || destination == ResidualDestination::Sponsor as u8,
+        StreamPumpError::InvalidResidualDestination
+    );
+    Ok(())
+}
+
+fn min_u64_from_u128(value: u128, cap: u64) -> Result<(u64, bool)> {
+    let value_u64 = u64::try_from(value).map_err(|_| error!(StreamPumpError::MathOverflow))?;
+    Ok((std::cmp::min(value_u64, cap), value_u64 > cap))
+}
+
+pub fn calculate_s1_discovery_reward(
+    reward_model: u8,
+    discovery_pool_remaining: u64,
+    eligible_holder_count: u32,
+    early_holder_count: u32,
+    regular_holder_count: u32,
+    is_early_holder: bool,
+    reward_cap_usdc: u64,
+    status_thankyou_usdc: u64,
+) -> Result<(u64, bool)> {
+    validate_reward_model(reward_model)?;
+    require!(reward_cap_usdc > 0, StreamPumpError::RewardCapZero);
+    if discovery_pool_remaining == 0 || eligible_holder_count == 0 {
+        return Ok((0, false));
+    }
+
+    let unit = if reward_model == S1BuyoutRewardModel::StatusPrimary as u8 {
+        status_thankyou_usdc
+    } else if reward_model == S1BuyoutRewardModel::FlatEqual as u8 {
+        let unit = (discovery_pool_remaining as u128)
+            .checked_div(eligible_holder_count as u128)
+            .ok_or(StreamPumpError::MathOverflow)?;
+        u64::try_from(unit).map_err(|_| error!(StreamPumpError::MathOverflow))?
+    } else {
+        let early_weight = 2_u128;
+        let regular_weight = 1_u128;
+        let early_count = early_holder_count as u128;
+        let regular_count = regular_holder_count as u128;
+        let weighted_count = early_count
+            .checked_mul(early_weight)
+            .ok_or(StreamPumpError::MathOverflow)?
+            .checked_add(
+                regular_count
+                    .checked_mul(regular_weight)
+                    .ok_or(StreamPumpError::MathOverflow)?,
+            )
+            .ok_or(StreamPumpError::MathOverflow)?;
+        if weighted_count == 0 {
+            0
+        } else {
+            let claimant_weight = if is_early_holder {
+                early_weight
+            } else {
+                regular_weight
+            };
+            let unit = (discovery_pool_remaining as u128)
+                .checked_mul(claimant_weight)
+                .ok_or(StreamPumpError::MathOverflow)?
+                .checked_div(weighted_count)
+                .ok_or(StreamPumpError::MathOverflow)?;
+            u64::try_from(unit).map_err(|_| error!(StreamPumpError::MathOverflow))?
+        }
+    };
+
+    let (capped_unit, capped_by_cap) = min_u64_from_u128(unit as u128, reward_cap_usdc)?;
+    let payout = std::cmp::min(capped_unit, discovery_pool_remaining);
+    Ok((payout, capped_by_cap || capped_unit > discovery_pool_remaining))
+}
+
+pub fn calculate_flat_reward(
+    pool_remaining: u64,
+    unsettled_count: u32,
+    reward_cap_usdc: u64,
+) -> Result<(u64, bool)> {
+    require!(reward_cap_usdc > 0, StreamPumpError::RewardCapZero);
+    if pool_remaining == 0 || unsettled_count == 0 {
+        return Ok((0, false));
+    }
+
+    let unit = (pool_remaining as u128)
+        .checked_div(unsettled_count as u128)
+        .ok_or(StreamPumpError::MathOverflow)?;
+    let (capped_unit, capped_by_cap) = min_u64_from_u128(unit, reward_cap_usdc)?;
+    let payout = std::cmp::min(capped_unit, pool_remaining);
+    Ok((payout, capped_by_cap || capped_unit > pool_remaining))
 }
 
 /// Compute Keccak-256 hash digest of input bytes, returning a 32-byte array.

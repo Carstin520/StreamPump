@@ -203,7 +203,7 @@ const SummaryPanel = ({ persona }: { persona: WorkspacePersona }) => {
     },
     {
       icon: <EarningsIcon className="h-4 w-4" />,
-      label: "可领取收益",
+      label: "可领取结算",
       value: claimableValue(persona),
       hint: "USDC + SPUMP",
       accent: "#ffb38a",
@@ -221,7 +221,7 @@ const SummaryPanel = ({ persona }: { persona: WorkspacePersona }) => {
     <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.94)_0%,rgba(8,12,20,0.94)_100%)] p-4">
       <div className="mb-3">
         <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Snapshot</p>
-        <h2 className="mt-1 text-lg font-semibold text-white">合作与收益摘要</h2>
+        <h2 className="mt-1 text-lg font-semibold text-white">合作与结算摘要</h2>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {tiles.map((tile) => (

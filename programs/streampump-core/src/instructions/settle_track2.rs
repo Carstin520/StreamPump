@@ -1,12 +1,12 @@
 // EN: Oracle-driven settlement for S2 Track 2 (Performance + Fans).
-//     Track 2 uses a cliff + pro-rata model:
+//     Track 2 uses a cliff + capped flat fan-reward model:
 //     - If achievement < cliff: sponsor gets 100% refund, creator/fans get 0.
 //     - If achievement >= cliff: unachieved budget refunded to sponsor,
 //       achieved budget split 80% creator / 20% fan reward pool.
 //     Fan reward pool remains in proposal vault for `claim_endorsement`.
 //
 // ZH: S2 Track2（效果池 + 粉丝）预言机结算。
-//     Track2 使用 Cliff + 按比例模型：
+//     Track2 使用 Cliff + 封顶定额粉丝奖励模型：
 //     - 达成率低于门槛：Sponsor 全额退款，Creator/粉丝本轨收益为 0。
 //     - 达成率达到门槛：未达成预算退 Sponsor，达成预算按 80/20 分给
 //       Creator 和粉丝奖励池。
@@ -17,8 +17,8 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use crate::{
     errors::StreamPumpError,
     events::Track2Settled,
-    state::{CreatorProfile, Proposal, ProposalStatus, ProtocolConfig},
-    utils::{amount_from_bps, checked_sub},
+    state::{CreatorProfile, Proposal, ProposalStatus, ProtocolConfig, S1BuyoutRewardModel},
+    utils::{amount_from_bps, checked_sub, validate_residual_destination},
 };
 
 /// EN: Creator payout ratio on achieved Track 2 budget (80%).
@@ -111,6 +111,11 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
         proposal.track2_target_value > 0,
         StreamPumpError::InvalidAmount
     );
+    require!(
+        ctx.accounts.protocol_config.track2_reward_cap_usdc > 0,
+        StreamPumpError::RewardCapZero
+    );
+    validate_residual_destination(ctx.accounts.protocol_config.track2_residual_to)?;
 
     let sponsor = proposal
         .sponsor
@@ -170,6 +175,9 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
         proposal.track2_unsettled_spump = proposal.total_spump_staked;
         proposal.track2_initial_fan_pool = 0;
         proposal.track2_initial_spump_staked = proposal.total_spump_staked;
+        proposal.track2_reward_cap_usdc = ctx.accounts.protocol_config.track2_reward_cap_usdc;
+        proposal.track2_residual_to = ctx.accounts.protocol_config.track2_residual_to;
+        proposal.track2_reward_model_snapshot = S1BuyoutRewardModel::FlatEqual as u8;
         proposal.status = ProposalStatus::Resolved_Fail;
     } else {
         let actual_capped = std::cmp::min(args.actual_value, target);
@@ -237,12 +245,18 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
             proposal.track2_unsettled_spump = 0;
             proposal.track2_initial_fan_pool = 0;
             proposal.track2_initial_spump_staked = 0;
+            proposal.track2_reward_cap_usdc = ctx.accounts.protocol_config.track2_reward_cap_usdc;
+            proposal.track2_residual_to = ctx.accounts.protocol_config.track2_residual_to;
+            proposal.track2_reward_model_snapshot = S1BuyoutRewardModel::FlatEqual as u8;
         } else {
             proposal.track2_usdc_deposited = fan_pool;
             proposal.track2_unsettled_endorser_count = proposal.track2_endorser_count;
             proposal.track2_unsettled_spump = proposal.total_spump_staked;
             proposal.track2_initial_fan_pool = fan_pool;
             proposal.track2_initial_spump_staked = proposal.total_spump_staked;
+            proposal.track2_reward_cap_usdc = ctx.accounts.protocol_config.track2_reward_cap_usdc;
+            proposal.track2_residual_to = ctx.accounts.protocol_config.track2_residual_to;
+            proposal.track2_reward_model_snapshot = S1BuyoutRewardModel::FlatEqual as u8;
             fan_pool_remaining = fan_pool;
         }
         proposal.status = ProposalStatus::Resolved_Success;
@@ -262,6 +276,10 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
         fan_pool_remaining,
         initial_fan_pool: proposal.track2_initial_fan_pool,
         initial_spump_staked: proposal.track2_initial_spump_staked,
+        reward_model: proposal.track2_reward_model_snapshot,
+        reward_cap_usdc: proposal.track2_reward_cap_usdc,
+        residual_to: proposal.track2_residual_to,
+        endorser_count: proposal.track2_endorser_count,
         status: proposal.status as u8,
         settled_at: proposal.track2_settled_at,
     });

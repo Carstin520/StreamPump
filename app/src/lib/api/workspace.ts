@@ -175,6 +175,9 @@ export type ProposalDetailRecord = {
   track2SettledAt: string | null;
   track2InitialFanPool?: string;
   track2InitialSpumpStaked?: string;
+  track2RewardCapUsdc?: string;
+  track2ResidualTo?: number;
+  track2RewardModelSnapshot?: number;
   track3UsdcDeposited?: string;
   track3CpsPayout?: string | null;
   track3DelayDays?: number;
@@ -231,6 +234,9 @@ export type PublicCampaignProofResponse = {
     track2SettledAt: string | null;
     track2InitialFanPool: string;
     track2InitialSpumpStaked: string;
+    track2RewardCapUsdc: string;
+    track2ResidualTo: number;
+    track2RewardModelSnapshot: number;
     track3UsdcDeposited: string;
     track3CpsPayout: string | null;
     track3DelayDays: number;
@@ -259,6 +265,10 @@ export type PublicCampaignProofResponse = {
     endorserCount: number;
     totalStakedSpump: string;
     estimatedUsdcReward: string;
+    rewardCapUsdc?: string;
+    rewardCapped?: boolean;
+    fanPoolRemaining?: string;
+    residualTransferred?: string;
   };
   createdAt: string;
   updatedAt: string;

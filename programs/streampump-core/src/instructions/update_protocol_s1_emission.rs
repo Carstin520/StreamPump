@@ -10,6 +10,7 @@ use crate::{
         DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD, DEFAULT_S1_MIN_USER_XP,
         DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
     },
+    utils::{validate_residual_destination, validate_reward_model},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -22,6 +23,15 @@ pub struct UpdateProtocolS1EmissionArgs {
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
     pub s1_rage_quit_window_seconds: i64,
+    pub s1_buyout_creator_share_bps: u16,
+    pub s1_buyout_reward_model: u8,
+    pub s1_discovery_reward_cap_usdc: u64,
+    pub s1_status_thankyou_usdc: u64,
+    pub s1_buyout_residual_to: u8,
+    pub s1_discovery_min_hold_seconds: i64,
+    pub s1_discovery_claim_window_seconds: i64,
+    pub track2_reward_cap_usdc: u64,
+    pub track2_residual_to: u8,
 }
 
 #[derive(Accounts)]
@@ -58,6 +68,17 @@ pub(crate) fn handler(
             && args.s1_rage_quit_window_seconds <= DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS,
         StreamPumpError::InvalidS1GuardConfig
     );
+    validate_reward_model(args.s1_buyout_reward_model)?;
+    validate_residual_destination(args.s1_buyout_residual_to)?;
+    validate_residual_destination(args.track2_residual_to)?;
+    require!(
+        args.s1_buyout_creator_share_bps <= 10_000
+            && args.s1_discovery_reward_cap_usdc > 0
+            && args.track2_reward_cap_usdc > 0
+            && args.s1_discovery_min_hold_seconds >= 0
+            && args.s1_discovery_claim_window_seconds > 0,
+        StreamPumpError::InvalidS1GuardConfig
+    );
 
     let config = &mut ctx.accounts.protocol_config;
     config.daily_spump_emission_multiplier_bps = args.daily_spump_emission_multiplier_bps;
@@ -68,6 +89,15 @@ pub(crate) fn handler(
     config.s1_early_cohort_supply_threshold = args.s1_early_cohort_supply_threshold;
     config.s1_early_cohort_buyout_cap_bps = args.s1_early_cohort_buyout_cap_bps;
     config.s1_rage_quit_window_seconds = args.s1_rage_quit_window_seconds;
+    config.s1_buyout_creator_share_bps = args.s1_buyout_creator_share_bps;
+    config.s1_buyout_reward_model = args.s1_buyout_reward_model;
+    config.s1_discovery_reward_cap_usdc = args.s1_discovery_reward_cap_usdc;
+    config.s1_status_thankyou_usdc = args.s1_status_thankyou_usdc;
+    config.s1_buyout_residual_to = args.s1_buyout_residual_to;
+    config.s1_discovery_min_hold_seconds = args.s1_discovery_min_hold_seconds;
+    config.s1_discovery_claim_window_seconds = args.s1_discovery_claim_window_seconds;
+    config.track2_reward_cap_usdc = args.track2_reward_cap_usdc;
+    config.track2_residual_to = args.track2_residual_to;
 
     emit!(ProtocolS1EmissionUpdated {
         admin: ctx.accounts.admin.key(),
@@ -79,6 +109,15 @@ pub(crate) fn handler(
         s1_early_cohort_supply_threshold: config.s1_early_cohort_supply_threshold,
         s1_early_cohort_buyout_cap_bps: config.s1_early_cohort_buyout_cap_bps,
         s1_rage_quit_window_seconds: config.s1_rage_quit_window_seconds,
+        s1_buyout_creator_share_bps: config.s1_buyout_creator_share_bps,
+        s1_buyout_reward_model: config.s1_buyout_reward_model,
+        s1_discovery_reward_cap_usdc: config.s1_discovery_reward_cap_usdc,
+        s1_status_thankyou_usdc: config.s1_status_thankyou_usdc,
+        s1_buyout_residual_to: config.s1_buyout_residual_to,
+        s1_discovery_min_hold_seconds: config.s1_discovery_min_hold_seconds,
+        s1_discovery_claim_window_seconds: config.s1_discovery_claim_window_seconds,
+        track2_reward_cap_usdc: config.track2_reward_cap_usdc,
+        track2_residual_to: config.track2_residual_to,
     });
 
     Ok(())

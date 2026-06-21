@@ -21,6 +21,12 @@ pub const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD: u64 = 500;
 pub const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS: u16 = 2_000;
 pub const DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS: i64 = 48 * 3_600;
 pub const DEFAULT_MAX_ENDORSEMENT_HARD_CEILING: u64 = 1_000_000_000;
+pub const DEFAULT_S1_BUYOUT_CREATOR_SHARE_BPS: u16 = 8_000;
+pub const DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC: u64 = 100_000_000;
+pub const DEFAULT_S1_STATUS_THANKYOU_USDC: u64 = 10_000_000;
+pub const DEFAULT_S1_DISCOVERY_MIN_HOLD_SECONDS: i64 = 0;
+pub const DEFAULT_S1_DISCOVERY_CLAIM_WINDOW_SECONDS: i64 = 2_592_000;
+pub const DEFAULT_TRACK2_REWARD_CAP_USDC: u64 = 100_000_000;
 pub const USER_ROLE_FAN: u16 = 1 << 0;
 pub const USER_ROLE_CREATOR: u16 = 1 << 1;
 pub const USER_ROLE_SPONSOR_OPERATOR: u16 = 1 << 2;
@@ -38,6 +44,30 @@ pub enum ProposalStatus {
     Resolved_Fail = 3,
     Cancelled = 4,
     Voided = 5,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum S1BuyoutRewardModel {
+    FlatEqual = 0,
+    EarlinessTiered = 1,
+    StatusPrimary = 2,
+}
+
+impl S1BuyoutRewardModel {
+    pub const DEFAULT: u8 = S1BuyoutRewardModel::EarlinessTiered as u8;
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ResidualDestination {
+    Creator = 0,
+    Sponsor = 1,
+}
+
+impl ResidualDestination {
+    pub const S1_DEFAULT: u8 = ResidualDestination::Creator as u8;
+    pub const TRACK2_DEFAULT: u8 = ResidualDestination::Sponsor as u8;
 }
 
 #[allow(non_camel_case_types)]
@@ -143,6 +173,24 @@ pub struct ProtocolConfig {
     pub max_endorsement_hard_ceiling: u64,
     /// Maximum endorsement per user as basis points of proposal's max_endorsement_spump (e.g. 2000 = 20%).
     pub max_endorsement_per_user_bps: u16,
+    /// S1 buyout USDC share paid directly to the creator at graduation.
+    pub s1_buyout_creator_share_bps: u16,
+    /// S1 discovery reward model: 0=FlatEqual, 1=EarlinessTiered, 2=StatusPrimary.
+    pub s1_buyout_reward_model: u8,
+    /// Maximum S1 discovery reward any one backer can receive, in raw USDC units.
+    pub s1_discovery_reward_cap_usdc: u64,
+    /// Fixed thank-you amount for StatusPrimary model, in raw USDC units.
+    pub s1_status_thankyou_usdc: u64,
+    /// Destination for unclaimed S1 discovery-pool residual: 0=creator, 1=sponsor.
+    pub s1_buyout_residual_to: u8,
+    /// Minimum seconds a backer must hold before qualifying for discovery reward.
+    pub s1_discovery_min_hold_seconds: i64,
+    /// Seconds after graduation before oracle/admin may sweep unclaimed discovery rewards.
+    pub s1_discovery_claim_window_seconds: i64,
+    /// Maximum Track2 fan reward any one endorser can receive, in raw USDC units.
+    pub track2_reward_cap_usdc: u64,
+    /// Destination for unclaimed Track2 fan-pool residual: 0=creator, 1=sponsor.
+    pub track2_residual_to: u8,
     pub bump: u8,
 }
 
@@ -173,6 +221,15 @@ impl ProtocolConfig {
         + 8
         + 8
         + 2
+        + 2
+        + 1
+        + 8
+        + 8
+        + 1
+        + 8
+        + 8
+        + 8
+        + 1
         + 1;
 }
 
@@ -187,6 +244,12 @@ pub struct CreatorProfile {
     pub s1_supply: u64,
     /// Portion of current S1 supply bought before the configured early-cohort threshold.
     pub s1_early_cohort_supply: u64,
+    /// Chain-maintained count of S1 positions with internal_token_balance > 0.
+    pub s1_eligible_holder_count: u32,
+    /// Chain-maintained count of eligible positions with any early-cohort balance.
+    pub s1_early_holder_count: u32,
+    /// Chain-maintained count of eligible positions without early-cohort balance.
+    pub s1_regular_holder_count: u32,
     /// Creator quality/momentum multiplier in basis points. 10_000 = 1.0x.
     pub s1_rating_bps: u16,
     /// Supply target used by read models to estimate graduation/buyout progress.
@@ -215,6 +278,9 @@ impl CreatorProfile {
         + 1
         + 8
         + 8
+        + 4
+        + 4
+        + 4
         + 2
         + 8
         + 2
@@ -299,6 +365,12 @@ pub struct Proposal {
     pub track2_initial_fan_pool: u64,
     /// Immutable SPUMP stake snapshot fixed at settlement time.
     pub track2_initial_spump_staked: u64,
+    /// Immutable per-user Track2 fan reward cap snapshot fixed at settlement time.
+    pub track2_reward_cap_usdc: u64,
+    /// Residual destination snapshot for remaining Track2 fan-pool USDC.
+    pub track2_residual_to: u8,
+    /// Track2 fan reward model snapshot; v1 uses FlatEqual.
+    pub track2_reward_model_snapshot: u8,
 
     // Track 3: CPS Sales (Creator Only)
     pub track3_usdc_deposited: u64,
@@ -338,6 +410,9 @@ impl Proposal {
         + 8
         + 8
         + 8
+        + 8
+        + 1
+        + 1
         + 9
         + 2
         + 8
@@ -385,6 +460,32 @@ pub struct S1BuyoutState {
     pub creator: Pubkey,
     pub winning_sponsor: Option<Pubkey>,
     pub usdc_deposited: u64,
+    /// USDC paid directly to the creator when graduation executes.
+    pub creator_payout_usdc: u64,
+    /// Total capped discovery reward pool reserved for qualified backers.
+    pub discovery_pool_usdc: u64,
+    /// Remaining discovery-pool USDC after capped, non-proportional claims.
+    pub discovery_pool_remaining: u64,
+    /// Remaining qualified backer count; this is a holder count, not stake/supply.
+    pub eligible_holder_count: u32,
+    /// Remaining qualified early-cohort holder count.
+    pub early_holder_count: u32,
+    /// Remaining qualified regular holder count.
+    pub regular_holder_count: u32,
+    /// Reward model snapshotted at acceptance/graduation.
+    pub reward_model_snapshot: u8,
+    /// Residual destination snapshotted for this buyout: 0=creator, 1=sponsor.
+    pub residual_to_snapshot: u8,
+    /// Per-user discovery reward cap snapshotted for this buyout.
+    pub discovery_reward_cap_usdc_snapshot: u64,
+    /// StatusPrimary thank-you amount snapshotted for this buyout.
+    pub status_thankyou_usdc_snapshot: u64,
+    /// Minimum hold duration snapshotted for this buyout.
+    pub discovery_min_hold_seconds_snapshot: i64,
+    /// True once the creator's direct USDC payout has been transferred.
+    pub creator_paid: bool,
+    /// Graduation timestamp used to enforce the discovery reward claim window.
+    pub graduated_at: i64,
     /// Remaining USDC claimable by S1 holders after graduation.
     pub claimable_usdc_remaining: u64,
     /// Remaining virtual S1 supply still entitled to the buyout proceeds.
@@ -398,7 +499,30 @@ pub struct S1BuyoutState {
 }
 
 impl S1BuyoutState {
-    pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1;
+    pub const INIT_SPACE: usize = 32
+        + 33
+        + 8
+        + 8
+        + 8
+        + 8
+        + 4
+        + 4
+        + 4
+        + 1
+        + 1
+        + 8
+        + 8
+        + 8
+        + 1
+        + 8
+        + 8
+        + 8
+        + 8
+        + 8
+        + 8
+        + 8
+        + 8
+        + 1;
 }
 
 #[account]

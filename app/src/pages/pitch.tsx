@@ -92,7 +92,7 @@ const slides: Slide[] = [
   {
     id: "creator-pain",
     eyebrow: "Creator Pain",
-    title: "Creators have content demand, but weak capital and weak price discovery.",
+    title: "Creators have content demand, but weak sponsorship routing.",
     body:
       "Early creators hit cold-start walls. Mature creators lose margin to agencies and platforms. Everyone guesses which topic will work before spending time making it.",
     tone: "pain",
@@ -129,7 +129,7 @@ const slides: Slide[] = [
       },
       {
         title: "Weak content value",
-        body: "Rewarding views does not automatically produce better posts, stronger fans, or sponsor ROI.",
+        body: "Rewarding views does not automatically produce better posts, stronger fans, or sponsor proof.",
       },
       {
         title: "Storage realism",
@@ -142,7 +142,7 @@ const slides: Slide[] = [
   {
     id: "insight",
     eyebrow: "Core Insight",
-    title: "Content is the real digital asset. Sponsor budgets are the sustainable yield source.",
+    title: "Content is the real digital asset. Sponsor budgets are the sustainable funding source.",
     body:
       "Videos and posts retain users. Sponsor dollars fund marketing outcomes. Fans help discover momentum early, then share in USDC when that momentum becomes commercial demand.",
     tone: "product",
@@ -171,7 +171,7 @@ const slides: Slide[] = [
   {
     id: "season-one",
     eyebrow: "Season 1",
-    title: "Fans discover creator momentum before the sponsorship market prices it.",
+    title: "Fans discover creator momentum before sponsorship demand confirms it.",
     body:
       "Fans spend non-transferable SPUMP into internal creator positions. A rating-adjusted bonding curve makes support legible while keeping the market inside the product.",
     tone: "product",
@@ -193,7 +193,7 @@ const slides: Slide[] = [
     eyebrow: "S1 Buyout",
     title: "When a creator graduates, sponsor demand converts fan conviction into USDC.",
     body:
-      "Sponsors submit buyout offers. The creator accepts one. Fans get a 48-hour zero-tax rage quit window, then claim USDC pro-rata after graduation.",
+      "Sponsors submit buyout offers. The creator accepts one. Fans get a 48-hour zero-tax rage quit window, then eligible backers claim capped discovery rewards after graduation.",
     tone: "product",
     points: [
       {

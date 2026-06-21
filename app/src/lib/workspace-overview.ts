@@ -145,7 +145,7 @@ const buildActions = (
       {
         iconName: "sparkles",
         title: "Buyout flow brief",
-        subtitle: "Understand rage-quit window & supporter payouts",
+        subtitle: "Understand rage-quit window & supporter discovery rewards",
         ctaLabel: "Read brief",
         disabled: true,
         workflowState: "blocked",

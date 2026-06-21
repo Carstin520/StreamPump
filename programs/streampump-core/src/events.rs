@@ -66,6 +66,7 @@ pub struct S1BuyoutOfferAccepted {
     pub s1_buyout_state: Pubkey,
     pub sponsor: Pubkey,
     pub usdc_amount: u64,
+    pub reward_model_snapshot: u8,
     pub rage_quit_deadline: i64,
     pub status: u8,
 }
@@ -143,6 +144,15 @@ pub struct ProtocolS1EmissionUpdated {
     pub s1_early_cohort_supply_threshold: u64,
     pub s1_early_cohort_buyout_cap_bps: u16,
     pub s1_rage_quit_window_seconds: i64,
+    pub s1_buyout_creator_share_bps: u16,
+    pub s1_buyout_reward_model: u8,
+    pub s1_discovery_reward_cap_usdc: u64,
+    pub s1_status_thankyou_usdc: u64,
+    pub s1_buyout_residual_to: u8,
+    pub s1_discovery_min_hold_seconds: i64,
+    pub s1_discovery_claim_window_seconds: i64,
+    pub track2_reward_cap_usdc: u64,
+    pub track2_residual_to: u8,
 }
 
 #[event]
@@ -151,6 +161,15 @@ pub struct S1Graduated {
     pub creator: Pubkey,
     pub s1_buyout_state: Pubkey,
     pub winning_sponsor: Pubkey,
+    pub creator_payout_usdc: u64,
+    pub discovery_pool_usdc: u64,
+    pub discovery_pool_remaining: u64,
+    pub eligible_holder_count: u32,
+    pub early_holder_count: u32,
+    pub regular_holder_count: u32,
+    pub reward_model_snapshot: u8,
+    pub residual_to: u8,
+    pub graduated_at: i64,
     pub claimable_usdc_remaining: u64,
     pub claimable_s1_supply_remaining: u64,
     pub early_claimable_usdc_remaining: u64,
@@ -168,12 +187,27 @@ pub struct S1BuyoutUsdcClaimed {
     pub s1_user_position: Pubkey,
     pub s1_buyout_state: Pubkey,
     pub usdc_amount: u64,
-    pub remaining_usdc: u64,
-    pub remaining_supply: u64,
-    pub early_claimable_usdc_remaining: u64,
-    pub early_claimable_s1_supply_remaining: u64,
-    pub regular_claimable_usdc_remaining: u64,
-    pub regular_claimable_s1_supply_remaining: u64,
+    pub reward_model: u8,
+    pub capped: bool,
+    pub eligible: bool,
+    pub discovery_pool_remaining: u64,
+    pub eligible_holder_count: u32,
+    pub early_holder_count: u32,
+    pub regular_holder_count: u32,
+    pub residual_transferred: u64,
+    pub residual_to: u8,
+    pub vault_closed: bool,
+}
+
+#[event]
+pub struct S1BuyoutResidualSwept {
+    pub creator_profile: Pubkey,
+    pub s1_buyout_state: Pubkey,
+    pub buyout_offer: Pubkey,
+    pub residual_amount: u64,
+    pub residual_to: u8,
+    pub swept_by: Pubkey,
+    pub closed: bool,
 }
 
 #[event]
@@ -216,6 +250,12 @@ pub struct EndorsementSettled {
     pub staked_amount: u64,
     pub spump_refund: u64,
     pub usdc_reward: u64,
+    pub reward_model: u8,
+    pub reward_cap_usdc: u64,
+    pub capped: bool,
+    pub fan_pool_remaining: u64,
+    pub residual_transferred: u64,
+    pub residual_to: u8,
     pub status: u8,
     pub claimed: bool,
 }
@@ -232,6 +272,10 @@ pub struct Track2Settled {
     pub fan_pool_remaining: u64,
     pub initial_fan_pool: u64,
     pub initial_spump_staked: u64,
+    pub reward_model: u8,
+    pub reward_cap_usdc: u64,
+    pub residual_to: u8,
+    pub endorser_count: u32,
     pub status: u8,
     pub settled_at: i64,
 }

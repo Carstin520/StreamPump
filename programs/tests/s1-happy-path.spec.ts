@@ -23,6 +23,12 @@ const USER_ROLE_FAN = 1 << 0;
 const REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 1);
 const PRODUCTION_RAGE_QUIT_SECONDS = 48 * 3_600;
 const TEST_RAGE_QUIT_SECONDS = 2;
+const S1_REWARD_MODEL_EARLINESS_TIERED = 1;
+const RESIDUAL_TO_CREATOR = 0;
+const RESIDUAL_TO_SPONSOR = 1;
+const DEFAULT_REWARD_CAP_USDC = 100_000_000;
+const CAPPED_DISCOVERY_REWARD_USDC = 50_000_000;
+const DEFAULT_STATUS_THANKYOU_USDC = 10_000_000;
 
 const deriveUserProfile = (ctx: TestContext, user: PublicKey): PublicKey =>
   PublicKey.findProgramAddressSync(
@@ -61,7 +67,11 @@ const fundSigner = async (ctx: TestContext, signer: Keypair): Promise<void> => {
   await sendAndConfirmTransaction(ctx.connection, tx, [ctx.payer]);
 };
 
-const setS1RageQuitWindow = async (ctx: TestContext, seconds: number): Promise<void> => {
+const setS1RageQuitWindow = async (
+  ctx: TestContext,
+  seconds: number,
+  rewardCapUsdc = DEFAULT_REWARD_CAP_USDC
+): Promise<void> => {
   await ctx.program.methods
     .updateProtocolS1Emission({
       dailySpumpEmissionMultiplierBps: 50_000,
@@ -72,6 +82,15 @@ const setS1RageQuitWindow = async (ctx: TestContext, seconds: number): Promise<v
       s1EarlyCohortSupplyThreshold: ctx.bn(500),
       s1EarlyCohortBuyoutCapBps: 2_000,
       s1RageQuitWindowSeconds: ctx.bn(seconds),
+      s1BuyoutCreatorShareBps: 8_000,
+      s1BuyoutRewardModel: S1_REWARD_MODEL_EARLINESS_TIERED,
+      s1DiscoveryRewardCapUsdc: ctx.bn(rewardCapUsdc),
+      s1StatusThankyouUsdc: ctx.bn(DEFAULT_STATUS_THANKYOU_USDC),
+      s1BuyoutResidualTo: RESIDUAL_TO_CREATOR,
+      s1DiscoveryMinHoldSeconds: ctx.bn(0),
+      s1DiscoveryClaimWindowSeconds: ctx.bn(30 * 24 * 3_600),
+      track2RewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+      track2ResidualTo: RESIDUAL_TO_SPONSOR,
     })
     .accounts({
       admin: ctx.payer.publicKey,
@@ -89,8 +108,8 @@ describe("streampump-core S1 happy path", function () {
     ctx = await getTestContext();
   });
 
-  it("graduates an S1 creator through buyout and lets early and regular holders claim USDC", async () => {
-    await setS1RageQuitWindow(ctx, TEST_RAGE_QUIT_SECONDS);
+  it("graduates an S1 creator through buyout and pays capped non-proportional discovery rewards", async () => {
+    await setS1RageQuitWindow(ctx, TEST_RAGE_QUIT_SECONDS, CAPPED_DISCOVERY_REWARD_USDC);
 
     try {
       const creator = Keypair.generate();
@@ -150,7 +169,7 @@ describe("streampump-core S1 happy path", function () {
         .rpc();
 
       const fans = await Promise.all(
-        Array.from({ length: 21 }, async () => {
+        Array.from({ length: 2 }, async () => {
           const fan = Keypair.generate();
           await fundSigner(ctx, fan);
           const userProfile = deriveUserProfile(ctx, fan.publicKey);
@@ -212,9 +231,11 @@ describe("streampump-core S1 happy path", function () {
         })
       );
 
-      for (const fan of fans) {
+      const buyAmounts = [10, 40];
+      for (let index = 0; index < fans.length; index += 1) {
+        const fan = fans[index];
         await ctx.program.methods
-          .buyS1Token({ amount: ctx.bn(25) })
+          .buyS1Token({ amount: ctx.bn(buyAmounts[index]) })
           .accounts({
             user: fan.fan.publicKey,
             protocolConfig: ctx.protocolConfig,
@@ -232,8 +253,11 @@ describe("streampump-core S1 happy path", function () {
       }
 
       let creatorAfterBuys = await ctx.program.account.creatorProfile.fetch(creatorProfile);
-      expect(creatorAfterBuys.s1Supply.toString()).to.equal("525");
-      expect(creatorAfterBuys.s1EarlyCohortSupply.toString()).to.equal("500");
+      expect(creatorAfterBuys.s1Supply.toString()).to.equal("50");
+      expect(creatorAfterBuys.s1EarlyCohortSupply.toString()).to.equal("50");
+      expect(creatorAfterBuys.s1EligibleHolderCount).to.equal(2);
+      expect(creatorAfterBuys.s1EarlyHolderCount).to.equal(2);
+      expect(creatorAfterBuys.s1RegularHolderCount).to.equal(0);
 
       await ctx.program.methods
         .initS1Buyout()
@@ -287,15 +311,20 @@ describe("streampump-core S1 happy path", function () {
       await ctx.program.methods
         .executeS1Graduation()
         .accounts({
-          executor: fans[0].fan.publicKey,
+          executor: ctx.oracle.publicKey,
           protocolConfig: ctx.protocolConfig,
           creatorProfile,
           s1BuyoutState,
+          buyoutOffer,
+          offerUsdcVault,
+          creatorUsdcAta,
           creatorRevenueSpumpAta: creatorSpumpAta,
           spumpMint: ctx.spumpMint,
+          usdcMint: ctx.usdcMint,
           spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([fans[0].fan])
+        .signers([ctx.oracle])
         .rpc();
 
       const graduatedCreator = await ctx.program.account.creatorProfile.fetch(creatorProfile);
@@ -303,11 +332,14 @@ describe("streampump-core S1 happy path", function () {
       expect(graduatedCreator.level).to.be.greaterThanOrEqual(2);
 
       const graduatedBuyout = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
-      expect(graduatedBuyout.claimableUsdcRemaining.toString()).to.equal("1000000000");
-      expect(graduatedBuyout.earlyClaimableUsdcRemaining.toString()).to.equal("200000000");
-      expect(graduatedBuyout.earlyClaimableS1SupplyRemaining.toString()).to.equal("500");
-      expect(graduatedBuyout.regularClaimableUsdcRemaining.toString()).to.equal("800000000");
-      expect(graduatedBuyout.regularClaimableS1SupplyRemaining.toString()).to.equal("25");
+      expect(graduatedBuyout.creatorPayoutUsdc.toString()).to.equal("800000000");
+      expect(graduatedBuyout.discoveryPoolUsdc.toString()).to.equal("200000000");
+      expect(graduatedBuyout.discoveryPoolRemaining.toString()).to.equal("200000000");
+      expect(graduatedBuyout.eligibleHolderCount).to.equal(2);
+      expect(graduatedBuyout.earlyHolderCount).to.equal(2);
+      expect(graduatedBuyout.regularHolderCount).to.equal(0);
+      const creatorUsdcAfterGraduation = await getAccount(ctx.connection, creatorUsdcAta);
+      expect(creatorUsdcAfterGraduation.amount.toString()).to.equal("800000000");
 
       const earlyFan = fans[0];
       await ctx.program.methods
@@ -320,7 +352,10 @@ describe("streampump-core S1 happy path", function () {
           s1UserPosition: earlyFan.s1Position,
           buyoutOffer,
           offerUsdcVault,
+          creatorUsdcAta,
           userUsdcAta: earlyFan.usdcAta,
+          sponsorUsdcAta,
+          sponsor: sponsor.publicKey,
           usdcMint: ctx.usdcMint,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
@@ -328,34 +363,43 @@ describe("streampump-core S1 happy path", function () {
         .rpc();
 
       const earlyFanUsdc = await getAccount(ctx.connection, earlyFan.usdcAta);
-      expect(earlyFanUsdc.amount.toString()).to.equal("10000000");
+      expect(earlyFanUsdc.amount.toString()).to.equal("50000000");
       const earlyPosition = await ctx.program.account.s1UserPosition.fetch(earlyFan.s1Position);
       expect(earlyPosition.internalTokenBalance.toString()).to.equal("0");
 
-      const regularFan = fans[20];
+      const secondEarlyFan = fans[1];
       await ctx.program.methods
         .claimS1BuyoutUsdc()
         .accounts({
-          user: regularFan.fan.publicKey,
+          user: secondEarlyFan.fan.publicKey,
           protocolConfig: ctx.protocolConfig,
           creatorProfile,
           s1BuyoutState,
-          s1UserPosition: regularFan.s1Position,
+          s1UserPosition: secondEarlyFan.s1Position,
           buyoutOffer,
           offerUsdcVault,
-          userUsdcAta: regularFan.usdcAta,
+          creatorUsdcAta,
+          userUsdcAta: secondEarlyFan.usdcAta,
+          sponsorUsdcAta,
+          sponsor: sponsor.publicKey,
           usdcMint: ctx.usdcMint,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([regularFan.fan])
+        .signers([secondEarlyFan.fan])
         .rpc();
 
-      const regularFanUsdc = await getAccount(ctx.connection, regularFan.usdcAta);
-      expect(regularFanUsdc.amount.toString()).to.equal("800000000");
-      const regularPosition = await ctx.program.account.s1UserPosition.fetch(
-        regularFan.s1Position
+      const secondEarlyFanUsdc = await getAccount(ctx.connection, secondEarlyFan.usdcAta);
+      expect(secondEarlyFanUsdc.amount.toString()).to.equal(earlyFanUsdc.amount.toString());
+      const secondEarlyPosition = await ctx.program.account.s1UserPosition.fetch(
+        secondEarlyFan.s1Position
       );
-      expect(regularPosition.internalTokenBalance.toString()).to.equal("0");
+      expect(secondEarlyPosition.internalTokenBalance.toString()).to.equal("0");
+      const creatorUsdcAfterResidual = await getAccount(ctx.connection, creatorUsdcAta);
+      expect(creatorUsdcAfterResidual.amount.toString()).to.equal("900000000");
+      const buyoutAfterResidual = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
+      expect(buyoutAfterResidual.discoveryPoolRemaining.toString()).to.equal("0");
+      const closedVaultInfo = await ctx.connection.getAccountInfo(offerUsdcVault);
+      expect(closedVaultInfo).to.equal(null);
     } finally {
       await setS1RageQuitWindow(ctx, PRODUCTION_RAGE_QUIT_SECONDS);
     }

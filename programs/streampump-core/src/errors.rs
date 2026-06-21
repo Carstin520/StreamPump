@@ -140,4 +140,34 @@ pub enum StreamPumpError {
     EndorsementPerUserCapExceeded,
     #[msg("Creator account is suspended")]
     CreatorSuspended,
+    #[msg("Discovery reward pool has no USDC remaining")]
+    DiscoveryPoolExhausted,
+    #[msg("Reward cap must be greater than zero")]
+    RewardCapZero,
+    #[msg("User is not eligible for discovery reward")]
+    IneligibleForDiscoveryReward,
+    #[msg("Invalid reward model")]
+    InvalidRewardModel,
+    #[msg("Minimum hold duration has not been met")]
+    HoldDurationNotMet,
+    #[msg("Creator buyout payout has already been paid")]
+    CreatorAlreadyPaid,
+    #[msg("Invalid residual destination")]
+    InvalidResidualDestination,
+    #[msg("Invalid holder count snapshot")]
+    InvalidHolderCountSnapshot,
+    #[msg("S1 holder counter underflow")]
+    HolderCounterUnderflow,
+    #[msg("Discovery reward claim window is still open")]
+    ClaimWindowStillOpen,
+    #[msg("S1 buyout residual has already been swept")]
+    BuyoutResidualAlreadySwept,
+    #[msg("Legacy creator profile has already been migrated")]
+    LegacyCreatorProfileAlreadyMigrated,
+    #[msg("Invalid legacy creator profile account")]
+    InvalidLegacyCreatorProfile,
+    #[msg("Legacy S1 buyout state has already been migrated")]
+    LegacyS1BuyoutStateAlreadyMigrated,
+    #[msg("Invalid legacy S1 buyout state account")]
+    InvalidLegacyS1BuyoutState,
 }

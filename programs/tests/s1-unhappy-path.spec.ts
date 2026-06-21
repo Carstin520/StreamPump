@@ -20,6 +20,19 @@ import { getTestContext, type TestContext } from "./helpers/test_context";
 
 const USER_ROLE_FAN = 1 << 0;
 const REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 1);
+const DEFAULT_REWARD_CAP_USDC = 100_000_000;
+
+const defaultRewardConfigArgs = (ctx: TestContext) => ({
+  s1BuyoutCreatorShareBps: 8_000,
+  s1BuyoutRewardModel: 1,
+  s1DiscoveryRewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+  s1StatusThankyouUsdc: ctx.bn(10_000_000),
+  s1BuyoutResidualTo: 0,
+  s1DiscoveryMinHoldSeconds: ctx.bn(0),
+  s1DiscoveryClaimWindowSeconds: ctx.bn(30 * 24 * 3_600),
+  track2RewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+  track2ResidualTo: 1,
+});
 
 const deriveUserProfile = (ctx: TestContext, user: PublicKey): PublicKey =>
   PublicKey.findProgramAddressSync(
@@ -451,6 +464,7 @@ describe("streampump-core S1 unhappy paths", function () {
             s1EarlyCohortSupplyThreshold: ctx.bn(500),
             s1EarlyCohortBuyoutCapBps: 2_000,
             s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
+            ...defaultRewardConfigArgs(ctx),
           })
           .accounts({ admin: ctx.payer.publicKey, protocolConfig: ctx.protocolConfig })
           .rpc(),
@@ -468,6 +482,7 @@ describe("streampump-core S1 unhappy paths", function () {
             s1EarlyCohortSupplyThreshold: ctx.bn(500),
             s1EarlyCohortBuyoutCapBps: 2_000,
             s1RageQuitWindowSeconds: ctx.bn(48 * 3_600 + 1),
+            ...defaultRewardConfigArgs(ctx),
           })
           .accounts({ admin: ctx.payer.publicKey, protocolConfig: ctx.protocolConfig })
           .rpc(),

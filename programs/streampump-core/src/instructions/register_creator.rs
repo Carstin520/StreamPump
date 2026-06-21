@@ -65,6 +65,9 @@ pub(crate) fn handler(ctx: Context<RegisterCreator>, args: RegisterCreatorArgs) 
         profile.status = CreatorStatus::S1_Active;
         profile.s1_supply = 0;
         profile.s1_early_cohort_supply = 0;
+        profile.s1_eligible_holder_count = 0;
+        profile.s1_early_holder_count = 0;
+        profile.s1_regular_holder_count = 0;
         profile.s1_rating_bps = DEFAULT_S1_RATING_BPS;
         profile.s1_graduation_target_supply = ctx
             .accounts
