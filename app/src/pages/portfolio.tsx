@@ -147,7 +147,7 @@ function MetricsStrip({ portfolio }: { portfolio: S1PortfolioResponse }) {
     { label: "Positions", value: String(portfolio.positions.length), color: "text-white" },
     { label: "S1 balance", value: formatS1Amount(String(totalS1)), color: "text-white" },
     { label: "Claim queue", value: String(claimableCount), color: claimableCount > 0 ? "text-[#65ecaf]" : "text-white" },
-    { label: "Total claimable", value: formatUsdcAmount(String(totalClaimable)), color: "text-[#65ecaf]" },
+    { label: "Capped rewards", value: formatUsdcAmount(String(totalClaimable)), color: "text-[#65ecaf]" },
   ];
 
   return (
@@ -178,6 +178,16 @@ function PositionRow({
   const { locale } = useI18n();
   const name = displayPortfolioCreatorName(position, locale);
   const claimable = hasClaimableUsdc(position.estimatedClaimableUsdc);
+  const hasPositionBalance = Number(position.internalTokenBalance || 0) > 0;
+  const ineligible = position.discoveryRewardEligible === false && hasPositionBalance;
+  const claimed = Boolean(position.discoveryRewardClaimed);
+  const rewardState = claimed
+    ? { label: "Reward status", value: "Claimed", color: "text-[#8ea0ba]" }
+    : ineligible
+      ? { label: "Reward status", value: "Not eligible", color: "text-[#f3c66e]" }
+      : claimable
+        ? { label: "Reward status", value: "Ready", color: "text-[#65ecaf]" }
+        : { label: "Reward status", value: "No reward", color: "text-[#8ea0ba]" };
 
   return (
     <div className="rounded-[14px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4">
@@ -196,8 +206,9 @@ function PositionRow({
           <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
         </div>
         <MetricCell label="S1" value={formatS1Amount(position.internalTokenBalance)} />
-        <MetricCell label="Cost basis" value={formatSpump(position.spumpCostBasis)} />
-        <MetricCell label="Claimable" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
+        <MetricCell label="SPUMP used" value={formatSpump(position.spumpCostBasis)} />
+        <MetricCell label="Discovery reward" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
+        <MetricCell label={rewardState.label} value={rewardState.value} color={rewardState.color} />
         <MetricCell label="Updated" value={new Date(position.updatedAt).toLocaleDateString()} />
         <div className="flex items-center gap-2">
           <Link
@@ -212,10 +223,10 @@ function PositionRow({
           >
             Buyout
           </Link>
-          {claimable && claimsEnabled ? (
+          {claimable && claimsEnabled && !ineligible ? (
             <ClaimButton creatorWallet={position.creatorWallet} onRefresh={onRefresh} />
           ) : null}
-          {claimable && !claimsEnabled ? <DisabledClaimPill /> : null}
+          {claimable && (!claimsEnabled || ineligible) ? <DisabledClaimPill label={ineligible ? "Not eligible" : undefined} /> : null}
         </div>
       </div>
 
@@ -237,8 +248,9 @@ function PositionRow({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <MobileMetric label="S1" value={formatS1Amount(position.internalTokenBalance)} />
-          <MobileMetric label="Cost basis" value={formatSpump(position.spumpCostBasis)} />
-          <MobileMetric label="Claimable" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
+          <MobileMetric label="SPUMP used" value={formatSpump(position.spumpCostBasis)} />
+          <MobileMetric label="Discovery reward" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
+          <MobileMetric label={rewardState.label} value={rewardState.value} color={rewardState.color} />
           <MobileMetric label="Updated" value={new Date(position.updatedAt).toLocaleDateString()} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -254,20 +266,20 @@ function PositionRow({
           >
             Buyout
           </Link>
-          {claimable && claimsEnabled ? (
+          {claimable && claimsEnabled && !ineligible ? (
             <ClaimButton creatorWallet={position.creatorWallet} onRefresh={onRefresh} />
           ) : null}
-          {claimable && !claimsEnabled ? <DisabledClaimPill /> : null}
+          {claimable && (!claimsEnabled || ineligible) ? <DisabledClaimPill label={ineligible ? "Not eligible" : undefined} /> : null}
         </div>
       </div>
     </div>
   );
 }
 
-function DisabledClaimPill() {
+function DisabledClaimPill({ label = "Demo only" }: { label?: string }) {
   return (
     <span className="rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-1.5 text-[10px] font-semibold text-[#f3c66e]">
-      Demo only
+      {label}
     </span>
   );
 }
@@ -353,13 +365,19 @@ function ClaimQueue({
   portfolio: S1PortfolioResponse;
 }) {
   const { locale } = useI18n();
-  const claimable = portfolio.positions.filter((p) => hasClaimableUsdc(p.estimatedClaimableUsdc));
+  const claimable = portfolio.positions.filter((p) =>
+    hasClaimableUsdc(p.estimatedClaimableUsdc) && p.discoveryRewardEligible !== false,
+  );
+  const ineligible = portfolio.positions.filter((p) =>
+    p.discoveryRewardEligible === false && Number(p.internalTokenBalance || 0) > 0,
+  );
+  const claimed = portfolio.positions.filter((p) => p.discoveryRewardClaimed);
   const totalUsdc = claimable.reduce((s, p) => s + Number(p.estimatedClaimableUsdc || 0), 0);
 
-  if (claimable.length === 0) {
+  if (claimable.length === 0 && ineligible.length === 0 && claimed.length === 0) {
     return (
       <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-6 text-center text-xs text-[#8ea0ba]">
-        No claimable S1 buyout positions for this wallet.
+        No capped S1 discovery rewards ready for this wallet.
       </div>
     );
   }
@@ -368,16 +386,16 @@ function ClaimQueue({
     <div className="space-y-3">
       {!claimsEnabled ? (
         <div className="rounded-[12px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-2 text-[11px] leading-5 text-[#f3c66e]">
-          Local demo sessions show claim eligibility only. A real claim requires a matching wallet session, backend builder, wallet signature, and synchronized S1 projection.
+          Local demo sessions show discovery-reward eligibility only. A real claim requires a matching wallet session, backend builder, wallet signature, and synchronized S1 projection.
         </div>
       ) : null}
 
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] uppercase tracking-[0.14em] text-[#5a6d87]">
-          {claimable.length} position{claimable.length > 1 ? "s" : ""} ready
+          {claimable.length} ready · {ineligible.length} ineligible · {claimed.length} claimed
         </span>
         <span className="text-[12px] font-semibold text-[#65ecaf]">
-          Total: {formatUsdcAmount(String(totalUsdc))}
+          Total capped rewards: {formatUsdcAmount(String(totalUsdc))}
         </span>
       </div>
 
@@ -410,6 +428,46 @@ function ClaimQueue({
           </div>
         ))}
       </div>
+
+      {ineligible.length > 0 ? (
+        <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/45 p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+            Not eligible in current snapshot
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {ineligible.map((pos) => (
+              <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={pos.positionPda}>
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {displayPortfolioCreatorName(pos, locale)}
+                </p>
+                <p className="mt-1 text-[10px] leading-4 text-[#f3c66e]">
+                  This row is not counted in the discovery reward snapshot. The position is not cleared by an ineligible claim attempt.
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {claimed.length > 0 ? (
+        <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">
+            Already finalized
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {claimed.map((pos) => (
+              <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={pos.positionPda}>
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {displayPortfolioCreatorName(pos, locale)}
+                </p>
+                <p className="mt-1 text-[10px] text-[#8ea0ba]">
+                  Final discovery reward: {formatUsdcAmount(pos.lastDiscoveryRewardUsdc ?? "0")}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -555,7 +613,7 @@ function S2EndorsementRow({
         </div>
         <MetricCell label="Staked SPUMP" value={stakedSpump} />
         <MetricCell
-          label={status === "RESOLVED_SUCCESS" ? "USDC Reward" : "USDC Est."}
+          label={status === "RESOLVED_SUCCESS" ? "Capped reward" : "Reward est."}
           value={rewardUsdc}
           color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
         />
@@ -614,7 +672,7 @@ function S2EndorsementRow({
         <div className="grid grid-cols-2 gap-2">
           <MobileMetric label="Staked SPUMP" value={stakedSpump} />
           <MobileMetric
-            label={status === "RESOLVED_SUCCESS" ? "USDC Reward" : "USDC Est."}
+            label={status === "RESOLVED_SUCCESS" ? "Capped reward" : "Reward est."}
             value={rewardUsdc}
             color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
           />

@@ -28,6 +28,14 @@ pub mod streampump_core {
         instructions::migrate_legacy_protocol_config::handler(ctx, args)
     }
 
+    pub fn migrate_legacy_creator_profile(ctx: Context<MigrateLegacyCreatorProfile>) -> Result<()> {
+        instructions::migrate_legacy_creator_profile::handler(ctx)
+    }
+
+    pub fn migrate_legacy_s1_buyout_state(ctx: Context<MigrateLegacyS1BuyoutState>) -> Result<()> {
+        instructions::migrate_legacy_s1_buyout_state::handler(ctx)
+    }
+
     pub fn update_protocol_s1_emission(
         ctx: Context<UpdateProtocolS1Emission>,
         args: UpdateProtocolS1EmissionArgs,
@@ -105,6 +113,10 @@ pub mod streampump_core {
 
     pub fn claim_s1_buyout_usdc(ctx: Context<ClaimS1BuyoutUsdc>) -> Result<()> {
         instructions::claim_s1_buyout_usdc::handler(ctx)
+    }
+
+    pub fn sweep_s1_buyout_residual(ctx: Context<SweepS1BuyoutResidual>) -> Result<()> {
+        instructions::sweep_s1_buyout_residual::handler(ctx)
     }
 
     pub fn create_proposal(ctx: Context<CreateProposal>, args: CreateProposalArgs) -> Result<()> {

@@ -67,6 +67,9 @@ export type S1MarketProfileResponse = {
     nextPriceSpump: string;
     supporterPoolSpump: string;
     holderCount: number;
+    s1EligibleHolderCount?: number;
+    s1EarlyHolderCount?: number;
+    s1RegularHolderCount?: number;
     graduationProgressBps: number;
     activeCampaignCount: number;
     latestBuyoutOfferUsdc: string | null;
@@ -84,6 +87,21 @@ export type S1MarketProfileResponse = {
     latestOfferPda: string | null;
     latestOfferUsdc: string | null;
     usdcDeposited: string | null;
+    creatorPayoutUsdc?: string | null;
+    discoveryPoolUsdc?: string | null;
+    discoveryPoolRemaining?: string | null;
+    eligibleHolderCount?: number;
+    earlyHolderCount?: number;
+    regularHolderCount?: number;
+    rewardModelSnapshot?: number;
+    residualToSnapshot?: number;
+    discoveryRewardCapUsdc?: string | null;
+    statusThankyouUsdc?: string | null;
+    creatorPaid?: boolean;
+    graduatedAt?: string | null;
+    residualSweptAt?: string | null;
+    residualSwept?: boolean;
+    vaultClosed?: boolean;
     claimableUsdcRemaining: string | null;
     claimableS1SupplyRemaining: string | null;
     earlyClaimableUsdcRemaining: string | null;
@@ -113,6 +131,10 @@ export type S1PortfolioResponse = {
     earlyCohortBalance: string;
     spumpCostBasis: string;
     estimatedClaimableUsdc: string | null;
+    discoveryRewardClaimed?: boolean;
+    lastDiscoveryRewardUsdc?: string;
+    discoveryRewardCapped?: boolean;
+    discoveryRewardEligible?: boolean;
     updatedAt: string;
   }>;
   s2Endorsements?: Array<{
@@ -125,6 +147,10 @@ export type S1PortfolioResponse = {
     stakedSpumpAmount: string;
     claimedStatus: boolean;
     estimatedUsdcReward: string;
+    rewardCapUsdc?: string;
+    rewardCapped?: boolean;
+    fanPoolRemaining?: string;
+    residualTransferred?: string;
     updatedAt: string;
   }>;
 };
@@ -201,6 +227,15 @@ export const buildS1ClaimUsdcTransaction = (
   input: { creatorWallet: string; sponsorWallet: string },
 ) =>
   apiClient.post<S1BuildTransactionResponse>("/s1/buyout/claim-usdc/build", {
+    token,
+    body: input,
+  });
+
+export const buildS1SweepBuyoutResidualTransaction = (
+  token: string,
+  input: { creatorWallet: string },
+) =>
+  apiClient.post<S1BuildTransactionResponse>("/s1/buyout/sweep-residual/build", {
     token,
     body: input,
   });

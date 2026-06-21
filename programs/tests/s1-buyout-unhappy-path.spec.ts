@@ -23,6 +23,12 @@ const USER_ROLE_FAN = 1 << 0;
 const REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 9);
 const PRODUCTION_RAGE_QUIT_SECONDS = 48 * 3_600;
 const TEST_RAGE_QUIT_SECONDS = 2;
+const S1_REWARD_MODEL_EARLINESS_TIERED = 1;
+const S1_REWARD_MODEL_STATUS_PRIMARY = 2;
+const RESIDUAL_TO_CREATOR = 0;
+const RESIDUAL_TO_SPONSOR = 1;
+const DEFAULT_REWARD_CAP_USDC = 100_000_000;
+const DEFAULT_STATUS_THANKYOU_USDC = 10_000_000;
 
 const deriveUserProfile = (ctx: TestContext, user: PublicKey): PublicKey =>
   PublicKey.findProgramAddressSync(
@@ -64,7 +70,11 @@ const fundSigner = async (ctx: TestContext, signer: Keypair, sol = 2): Promise<v
   );
 };
 
-const setS1RageQuitWindow = async (ctx: TestContext, seconds: number): Promise<void> => {
+const setS1RageQuitWindow = async (
+  ctx: TestContext,
+  seconds: number,
+  claimWindowSeconds = 30 * 24 * 3_600
+): Promise<void> => {
   await ctx.program.methods
     .updateProtocolS1Emission({
       dailySpumpEmissionMultiplierBps: 50_000,
@@ -75,6 +85,15 @@ const setS1RageQuitWindow = async (ctx: TestContext, seconds: number): Promise<v
       s1EarlyCohortSupplyThreshold: ctx.bn(500),
       s1EarlyCohortBuyoutCapBps: 2_000,
       s1RageQuitWindowSeconds: ctx.bn(seconds),
+      s1BuyoutCreatorShareBps: 8_000,
+      s1BuyoutRewardModel: S1_REWARD_MODEL_EARLINESS_TIERED,
+      s1DiscoveryRewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+      s1StatusThankyouUsdc: ctx.bn(DEFAULT_STATUS_THANKYOU_USDC),
+      s1BuyoutResidualTo: RESIDUAL_TO_CREATOR,
+      s1DiscoveryMinHoldSeconds: ctx.bn(0),
+      s1DiscoveryClaimWindowSeconds: ctx.bn(claimWindowSeconds),
+      track2RewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+      track2ResidualTo: RESIDUAL_TO_SPONSOR,
     })
     .accounts({ admin: ctx.payer.publicKey, protocolConfig: ctx.protocolConfig })
     .rpc();
@@ -199,6 +218,93 @@ const buyS1 = async (
     .signers([ctx.fanA])
     .rpc();
   return position;
+};
+
+const buyS1ForFreshFan = async (
+  ctx: TestContext,
+  creatorProfile: PublicKey,
+  amount: number
+): Promise<{
+  fan: Keypair;
+  userProfile: PublicKey;
+  spumpAta: PublicKey;
+  usdcAta: PublicKey;
+  position: PublicKey;
+}> => {
+  const fan = Keypair.generate();
+  await fundSigner(ctx, fan);
+  const userProfile = deriveUserProfile(ctx, fan.publicKey);
+  const spumpAta = await createAssociatedTokenAccount(
+    ctx.connection,
+    ctx.payer,
+    ctx.spumpMint,
+    fan.publicKey,
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
+  const usdcAta = await createAssociatedTokenAccount(
+    ctx.connection,
+    ctx.payer,
+    ctx.usdcMint,
+    fan.publicKey,
+    undefined,
+    TOKEN_PROGRAM_ID
+  );
+  await ctx.program.methods
+    .registerUser({ roleFlags: USER_ROLE_FAN })
+    .accounts({
+      authority: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan])
+    .rpc();
+
+  const reportId = Array.from(Keypair.generate().publicKey.toBytes());
+  await ctx.program.methods
+    .claimEngagementReward({
+      missionType: { completeProfile: {} },
+      rewardAmount: ctx.bn(20_000_000),
+      xpGain: ctx.bn(20),
+      newLevel: null,
+      reportId,
+      reportDigest: REPORT_DIGEST,
+      observedAt: ctx.bn(ctx.nowTs() - 5),
+    })
+    .accounts({
+      user: fan.publicKey,
+      oracle: ctx.oracle.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      rewardReceipt: deriveUserRewardReceipt(ctx, userProfile, reportId),
+      userSpumpAta: spumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan, ctx.oracle])
+    .rpc();
+
+  const position = deriveS1Position(ctx, fan.publicKey, creatorProfile);
+  await ctx.program.methods
+    .buyS1Token({ amount: ctx.bn(amount) })
+    .accounts({
+      user: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      creatorProfile,
+      s1UserPosition: position,
+      userSpumpAta: spumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .signers([fan])
+    .rpc();
+
+  return { fan, userProfile, spumpAta, usdcAta, position };
 };
 
 const openAuction = async (
@@ -381,11 +487,12 @@ describe("streampump-core S1 buyout unhappy paths", function () {
   it("rejects invalid accept, rage quit, graduation, claim, cancel, and reclaim states", async () => {
     await setS1RageQuitWindow(ctx, TEST_RAGE_QUIT_SECONDS);
     try {
-      const { creator, creatorProfile, creatorSpumpAta } = await registerCreator(
+      const { creator, creatorProfile, creatorUsdcAta, creatorSpumpAta } = await registerCreator(
         ctx,
         "buyout_state"
       );
       const position = await buyS1(ctx, creatorProfile, 25);
+      await buyS1ForFreshFan(ctx, creatorProfile, 1);
 
       await ctx.expectAnchorError(
         () =>
@@ -513,7 +620,7 @@ describe("streampump-core S1 buyout unhappy paths", function () {
 
       const creatorAfterRageQuit = await ctx.program.account.creatorProfile.fetch(creatorProfile);
       const positionAfterRageQuit = await ctx.program.account.s1UserPosition.fetch(position);
-      expect(creatorAfterRageQuit.s1Supply.toString()).to.equal("20");
+      expect(creatorAfterRageQuit.s1Supply.toString()).to.equal("21");
       expect(positionAfterRageQuit.internalTokenBalance.toString()).to.equal("20");
 
       await ctx.expectAnchorError(
@@ -521,15 +628,20 @@ describe("streampump-core S1 buyout unhappy paths", function () {
           ctx.program.methods
             .executeS1Graduation()
             .accounts({
-              executor: ctx.fanA.publicKey,
+              executor: ctx.oracle.publicKey,
               protocolConfig: ctx.protocolConfig,
               creatorProfile,
               s1BuyoutState,
+              buyoutOffer: winner.buyoutOffer,
+              offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
               creatorRevenueSpumpAta: creatorSpumpAta,
               spumpMint: ctx.spumpMint,
+              usdcMint: ctx.usdcMint,
               spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+              tokenProgram: TOKEN_PROGRAM_ID,
             })
-            .signers([ctx.fanA])
+            .signers([ctx.oracle])
             .rpc(),
         "RageQuitWindowStillOpen"
       );
@@ -545,7 +657,10 @@ describe("streampump-core S1 buyout unhappy paths", function () {
               s1UserPosition: position,
               buyoutOffer: winner.buyoutOffer,
               offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
               userUsdcAta: ctx.fanAUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
               usdcMint: ctx.usdcMint,
               tokenProgram: TOKEN_PROGRAM_ID,
             })
@@ -576,18 +691,46 @@ describe("streampump-core S1 buyout unhappy paths", function () {
         "RageQuitWindowNotActive"
       );
 
+      await ctx.expectAnchorError(
+        () =>
+          ctx.program.methods
+            .executeS1Graduation()
+            .accounts({
+              executor: ctx.fanA.publicKey,
+              protocolConfig: ctx.protocolConfig,
+              creatorProfile,
+              s1BuyoutState,
+              buyoutOffer: winner.buyoutOffer,
+              offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
+              creatorRevenueSpumpAta: creatorSpumpAta,
+              spumpMint: ctx.spumpMint,
+              usdcMint: ctx.usdcMint,
+              spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([ctx.fanA])
+            .rpc(),
+        "Unauthorized"
+      );
+
       await ctx.program.methods
         .executeS1Graduation()
         .accounts({
-          executor: ctx.fanA.publicKey,
+          executor: ctx.oracle.publicKey,
           protocolConfig: ctx.protocolConfig,
           creatorProfile,
           s1BuyoutState,
+          buyoutOffer: winner.buyoutOffer,
+          offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
           creatorRevenueSpumpAta: creatorSpumpAta,
           spumpMint: ctx.spumpMint,
+          usdcMint: ctx.usdcMint,
           spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([ctx.fanA])
+        .signers([ctx.oracle])
         .rpc();
 
       await ctx.expectAnchorError(
@@ -602,7 +745,10 @@ describe("streampump-core S1 buyout unhappy paths", function () {
               s1UserPosition: position,
               buyoutOffer: loser.buyoutOffer,
               offerUsdcVault: loser.offerUsdcVault,
+              creatorUsdcAta,
               userUsdcAta: ctx.fanAUsdcAta,
+              sponsorUsdcAta: ctx.sponsorAUsdcAta,
+              sponsor: ctx.sponsorA.publicKey,
               usdcMint: ctx.usdcMint,
               tokenProgram: TOKEN_PROGRAM_ID,
             })
@@ -640,7 +786,10 @@ describe("streampump-core S1 buyout unhappy paths", function () {
           s1UserPosition: position,
           buyoutOffer: winner.buyoutOffer,
           offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
           userUsdcAta: ctx.fanAUsdcAta,
+          sponsorUsdcAta: ctx.sponsorBUsdcAta,
+          sponsor: ctx.sponsorB.publicKey,
           usdcMint: ctx.usdcMint,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
@@ -659,7 +808,10 @@ describe("streampump-core S1 buyout unhappy paths", function () {
               s1UserPosition: position,
               buyoutOffer: winner.buyoutOffer,
               offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
               userUsdcAta: ctx.fanAUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
               usdcMint: ctx.usdcMint,
               tokenProgram: TOKEN_PROGRAM_ID,
             })
@@ -691,11 +843,254 @@ describe("streampump-core S1 buyout unhappy paths", function () {
               s1UserPosition: emptyPosition,
               buyoutOffer: winner.buyoutOffer,
               offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
               userUsdcAta: emptyUserUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
               usdcMint: ctx.usdcMint,
               tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([emptyUser])
+            .rpc(),
+        "AccountNotInitialized"
+      );
+    } finally {
+      await setS1RageQuitWindow(ctx, PRODUCTION_RAGE_QUIT_SECONDS);
+    }
+  });
+
+  it("allows eligible zero-amount discovery reward finalization without paying USDC", async () => {
+    try {
+      await ctx.program.methods
+        .updateProtocolS1Emission({
+          dailySpumpEmissionMultiplierBps: 50_000,
+          newUserEmissionBps: 2_500,
+          newUserEmissionWindowSeconds: ctx.bn(7 * 24 * 3_600),
+          s1MinUserXp: ctx.bn(10),
+          maxS1DailyBuySpump: ctx.bn(15_000_000),
+          s1EarlyCohortSupplyThreshold: ctx.bn(500),
+          s1EarlyCohortBuyoutCapBps: 2_000,
+          s1RageQuitWindowSeconds: ctx.bn(TEST_RAGE_QUIT_SECONDS),
+          s1BuyoutCreatorShareBps: 8_000,
+          s1BuyoutRewardModel: S1_REWARD_MODEL_STATUS_PRIMARY,
+          s1DiscoveryRewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+          s1StatusThankyouUsdc: ctx.bn(0),
+          s1BuyoutResidualTo: RESIDUAL_TO_CREATOR,
+          s1DiscoveryMinHoldSeconds: ctx.bn(0),
+          s1DiscoveryClaimWindowSeconds: ctx.bn(30 * 24 * 3_600),
+          track2RewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+          track2ResidualTo: RESIDUAL_TO_SPONSOR,
+        })
+        .accounts({ admin: ctx.payer.publicKey, protocolConfig: ctx.protocolConfig })
+        .rpc();
+
+      const { creator, creatorProfile, creatorUsdcAta, creatorSpumpAta } = await registerCreator(
+        ctx,
+        "buyout_zero_reward"
+      );
+      const position = await buyS1(ctx, creatorProfile, 25);
+      await openAuction(ctx, creator, creatorProfile);
+      const winner = await submitOffer(ctx, creatorProfile, ctx.sponsorB, ctx.sponsorBUsdcAta, 1_000_000);
+      const s1BuyoutState = await acceptOffer(
+        ctx,
+        creator,
+        creatorProfile,
+        winner.buyoutOffer,
+        winner.offerUsdcVault
+      );
+      const acceptedBuyout = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
+      await ctx.waitUntilDeadline(acceptedBuyout.rageQuitDeadline);
+
+      await ctx.program.methods
+        .executeS1Graduation()
+        .accounts({
+          executor: ctx.oracle.publicKey,
+          protocolConfig: ctx.protocolConfig,
+          creatorProfile,
+          s1BuyoutState,
+          buyoutOffer: winner.buyoutOffer,
+          offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
+          creatorRevenueSpumpAta: creatorSpumpAta,
+          spumpMint: ctx.spumpMint,
+          usdcMint: ctx.usdcMint,
+          spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([ctx.oracle])
+        .rpc();
+
+      const userUsdcBefore = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
+      await ctx.program.methods
+        .claimS1BuyoutUsdc()
+        .accounts({
+          user: ctx.fanA.publicKey,
+          protocolConfig: ctx.protocolConfig,
+          creatorProfile,
+          s1BuyoutState,
+          s1UserPosition: position,
+          buyoutOffer: winner.buyoutOffer,
+          offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
+          userUsdcAta: ctx.fanAUsdcAta,
+          sponsorUsdcAta: ctx.sponsorBUsdcAta,
+          sponsor: ctx.sponsorB.publicKey,
+          usdcMint: ctx.usdcMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([ctx.fanA])
+        .rpc();
+
+      const userUsdcAfter = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
+      expect(userUsdcAfter).to.equal(userUsdcBefore);
+      const positionAfter = await ctx.program.account.s1UserPosition.fetch(position);
+      expect(positionAfter.internalTokenBalance.toString()).to.equal("0");
+      const creatorUsdcAfter = await getAccount(ctx.connection, creatorUsdcAta);
+      expect(creatorUsdcAfter.amount.toString()).to.equal("1000000");
+      expect(await ctx.connection.getAccountInfo(winner.offerUsdcVault)).to.equal(null);
+    } finally {
+      await setS1RageQuitWindow(ctx, PRODUCTION_RAGE_QUIT_SECONDS);
+    }
+  });
+
+  it("sweeps residual only after the discovery claim window and closes the vault", async () => {
+    try {
+      await setS1RageQuitWindow(ctx, TEST_RAGE_QUIT_SECONDS, 2);
+      const { creator, creatorProfile, creatorUsdcAta, creatorSpumpAta } = await registerCreator(
+        ctx,
+        "buyout_sweep"
+      );
+      await buyS1(ctx, creatorProfile, 25);
+
+      await openAuction(ctx, creator, creatorProfile);
+      const winner = await submitOffer(ctx, creatorProfile, ctx.sponsorB, ctx.sponsorBUsdcAta, 1_000_000);
+      const s1BuyoutState = await acceptOffer(
+        ctx,
+        creator,
+        creatorProfile,
+        winner.buyoutOffer,
+        winner.offerUsdcVault
+      );
+      const acceptedBuyout = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
+      await ctx.waitUntilDeadline(acceptedBuyout.rageQuitDeadline);
+
+      await ctx.program.methods
+        .executeS1Graduation()
+        .accounts({
+          executor: ctx.oracle.publicKey,
+          protocolConfig: ctx.protocolConfig,
+          creatorProfile,
+          s1BuyoutState,
+          buyoutOffer: winner.buyoutOffer,
+          offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
+          creatorRevenueSpumpAta: creatorSpumpAta,
+          spumpMint: ctx.spumpMint,
+          usdcMint: ctx.usdcMint,
+          spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([ctx.oracle])
+        .rpc();
+
+      let graduatedBuyout = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
+      expect(graduatedBuyout.eligibleHolderCount).to.equal(1);
+      expect(graduatedBuyout.discoveryPoolRemaining.toString()).to.equal("200000");
+
+      await ctx.expectAnchorError(
+        () =>
+          ctx.program.methods
+            .sweepS1BuyoutResidual()
+            .accounts({
+              sweeper: ctx.oracle.publicKey,
+              protocolConfig: ctx.protocolConfig,
+              creatorProfile,
+              s1BuyoutState,
+              buyoutOffer: winner.buyoutOffer,
+              offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
+              usdcMint: ctx.usdcMint,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([ctx.oracle])
+            .rpc(),
+        "ClaimWindowStillOpen"
+      );
+
+      await ctx.waitUntilDeadline(graduatedBuyout.graduatedAt.add(ctx.bn(2)));
+
+      await ctx.expectAnchorError(
+        () =>
+          ctx.program.methods
+            .sweepS1BuyoutResidual()
+            .accounts({
+              sweeper: ctx.fanA.publicKey,
+              protocolConfig: ctx.protocolConfig,
+              creatorProfile,
+              s1BuyoutState,
+              buyoutOffer: winner.buyoutOffer,
+              offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
+              usdcMint: ctx.usdcMint,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([ctx.fanA])
+            .rpc(),
+        "Unauthorized"
+      );
+
+      const sponsorLamportsBefore = await ctx.connection.getBalance(ctx.sponsorB.publicKey);
+      await ctx.program.methods
+        .sweepS1BuyoutResidual()
+        .accounts({
+          sweeper: ctx.oracle.publicKey,
+          protocolConfig: ctx.protocolConfig,
+          creatorProfile,
+          s1BuyoutState,
+          buyoutOffer: winner.buyoutOffer,
+          offerUsdcVault: winner.offerUsdcVault,
+          creatorUsdcAta,
+          sponsorUsdcAta: ctx.sponsorBUsdcAta,
+          sponsor: ctx.sponsorB.publicKey,
+          usdcMint: ctx.usdcMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([ctx.oracle])
+        .rpc();
+
+      const creatorUsdcAfterSweep = await getAccount(ctx.connection, creatorUsdcAta);
+      expect(creatorUsdcAfterSweep.amount.toString()).to.equal("1000000");
+      const sponsorLamportsAfter = await ctx.connection.getBalance(ctx.sponsorB.publicKey);
+      expect(sponsorLamportsAfter).to.be.greaterThan(sponsorLamportsBefore);
+      graduatedBuyout = await ctx.program.account.s1BuyoutState.fetch(s1BuyoutState);
+      expect(graduatedBuyout.discoveryPoolRemaining.toString()).to.equal("0");
+      expect(graduatedBuyout.eligibleHolderCount).to.equal(0);
+      expect(graduatedBuyout.earlyHolderCount).to.equal(0);
+      expect(graduatedBuyout.regularHolderCount).to.equal(0);
+      expect(await ctx.connection.getAccountInfo(winner.offerUsdcVault)).to.equal(null);
+
+      await ctx.expectAnchorError(
+        () =>
+          ctx.program.methods
+            .sweepS1BuyoutResidual()
+            .accounts({
+              sweeper: ctx.oracle.publicKey,
+              protocolConfig: ctx.protocolConfig,
+              creatorProfile,
+              s1BuyoutState,
+              buyoutOffer: winner.buyoutOffer,
+              offerUsdcVault: winner.offerUsdcVault,
+              creatorUsdcAta,
+              sponsorUsdcAta: ctx.sponsorBUsdcAta,
+              sponsor: ctx.sponsorB.publicKey,
+              usdcMint: ctx.usdcMint,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .signers([ctx.oracle])
             .rpc(),
         "AccountNotInitialized"
       );

@@ -65,6 +65,7 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
   ProtocolS1EmissionUpdated: "update_protocol_s1_emission",
   S1Graduated: "execute_s1_graduation",
   S1BuyoutUsdcClaimed: "claim_s1_buyout_usdc",
+  S1BuyoutResidualSwept: "sweep_s1_buyout_residual",
   Track1Settled: "settle_track1_base",
   EndorsementCreated: "endorse_proposal",
   Track2Settled: "settle_track2",

@@ -71,6 +71,9 @@ describe("S1 market projection happy path", () => {
       status: "S1_ACTIVE",
       s1Supply: 0n,
       s1EarlyCohortSupply: 0n,
+      s1EligibleHolderCount: 0,
+      s1EarlyHolderCount: 0,
+      s1RegularHolderCount: 0,
       s1RatingBps: 10_000,
       s1GraduationTargetSupply: 2_500n,
       pendingS1RatingBps: 0,
@@ -88,12 +91,23 @@ describe("S1 market projection happy path", () => {
       creatorProfile: new PublicKey(creatorProfilePda),
       winningSponsor: sponsor,
       usdcDeposited: 1_000_000_000n,
-      claimableUsdcRemaining: 1_000_000_000n,
-      claimableS1SupplyRemaining: 525n,
-      earlyClaimableUsdcRemaining: 200_000_000n,
-      earlyClaimableS1SupplyRemaining: 500n,
-      regularClaimableUsdcRemaining: 800_000_000n,
-      regularClaimableS1SupplyRemaining: 25n,
+      claimableUsdcRemaining: 200_000_000n,
+      claimableS1SupplyRemaining: 21n,
+      creatorPayoutUsdc: 800_000_000n,
+      discoveryPoolUsdc: 200_000_000n,
+      discoveryPoolRemaining: 200_000_000n,
+      eligibleHolderCount: 21,
+      earlyHolderCount: 20,
+      regularHolderCount: 1,
+      rewardModelSnapshot: 1,
+      residualToSnapshot: 0,
+      discoveryRewardCapUsdc: 100_000_000n,
+      statusThankyouUsdc: 10_000_000n,
+      creatorPaid: true,
+      earlyClaimableUsdcRemaining: 0n,
+      earlyClaimableS1SupplyRemaining: 20n,
+      regularClaimableUsdcRemaining: 0n,
+      regularClaimableS1SupplyRemaining: 1n,
       rageQuitDeadlineUnix: 1_700_000_100n,
       bump: 1,
     };
@@ -116,6 +130,14 @@ describe("S1 market projection happy path", () => {
         s1EarlyCohortSupplyThreshold: 500n,
         s1EarlyCohortBuyoutCapBps: 2_000,
         s1RageQuitWindowSeconds: 172_800,
+        s1BuyoutCreatorShareBps: 8_000,
+        s1BuyoutRewardModel: 1,
+        s1DiscoveryRewardCapUsdc: 100_000_000n,
+        s1StatusThankyouUsdc: 10_000_000n,
+        s1BuyoutResidualTo: 0,
+        s1DiscoveryMinHoldSeconds: 0,
+        track2RewardCapUsdc: 100_000_000n,
+        track2ResidualTo: 1,
       }),
     });
     restoreAnchor = () => {
@@ -148,6 +170,16 @@ describe("S1 market projection happy path", () => {
             record.internalTokenBalance > 0n
         ).length,
       upsert: async (args: any) => upsertRecord(s1PositionProjection, args.where.positionPda, args),
+      updateMany: async (args: any) => {
+        let count = 0;
+        for (const [key, record] of s1PositionProjection.entries()) {
+          if (record.positionPda === args.where.positionPda) {
+            s1PositionProjection.set(key, { ...record, ...args.data, updatedAt: new Date() });
+            count += 1;
+          }
+        }
+        return { count };
+      },
       findMany: async () => [...s1PositionProjection.values()],
     };
     prismaAny.s1BuyoutProjection = {
@@ -203,12 +235,15 @@ describe("S1 market projection happy path", () => {
   it("projects S1 discovery through buyout, graduation, and claim", async () => {
     onChainCreator.s1Supply = 525n;
     onChainCreator.s1EarlyCohortSupply = 500n;
+    onChainCreator.s1EligibleHolderCount = 21;
+    onChainCreator.s1EarlyHolderCount = 20;
+    onChainCreator.s1RegularHolderCount = 1;
     for (let index = 0; index < positionPdas.length; index += 1) {
       onChainPositions.set(positionPdas[index], {
         user: userWallets[index],
         creatorProfile: new PublicKey(creatorProfilePda),
-        internalTokenBalance: 25n,
-        earlyCohortBalance: index < 20 ? 25n : 0n,
+        internalTokenBalance: index === 1 ? 50n : 25n,
+        earlyCohortBalance: index < 20 ? (index === 1 ? 50n : 25n) : 0n,
         spumpCostBasis: 1_000_000n,
         firstBoughtAtUnix: 1_700_000_000n,
         lastBuyDay: 19_675n,
@@ -231,6 +266,9 @@ describe("S1 market projection happy path", () => {
     expect(discovery.stage).to.equal(MarketCreatorStage.S1_DISCOVERY);
     expect(discovery.s1Supply).to.equal(525n);
     expect(discovery.holderCount).to.equal(21);
+    expect(discovery.s1EligibleHolderCount).to.equal(21);
+    expect(discovery.s1EarlyHolderCount).to.equal(20);
+    expect(discovery.s1RegularHolderCount).to.equal(1);
     expect(discovery.metadataJson.s1RatingBps).to.equal(10_000);
     expect(discovery.metadataJson.s1GraduationTargetSupply).to.equal("2500");
     expect(discovery.metadataJson.maxS1DailyBuySpump).to.equal("15000000");
@@ -316,12 +354,20 @@ describe("S1 market projection happy path", () => {
         creatorProfile: creatorProfilePda,
         s1BuyoutState: buyoutStatePda,
         creator: creator.toBase58(),
-        claimableUsdcRemaining: "1000000000",
-        claimableS1SupplyRemaining: "525",
-        earlyClaimableUsdcRemaining: "200000000",
-        earlyClaimableS1SupplyRemaining: "500",
-        regularClaimableUsdcRemaining: "800000000",
-        regularClaimableS1SupplyRemaining: "25",
+        creatorPayoutUsdc: "800000000",
+        discoveryPoolUsdc: "200000000",
+        discoveryPoolRemaining: "200000000",
+        eligibleHolderCount: 21,
+        earlyHolderCount: 20,
+        regularHolderCount: 1,
+        rewardModelSnapshot: 1,
+        residualTo: 0,
+        claimableUsdcRemaining: "200000000",
+        claimableS1SupplyRemaining: "21",
+        earlyClaimableUsdcRemaining: "0",
+        earlyClaimableS1SupplyRemaining: "20",
+        regularClaimableUsdcRemaining: "0",
+        regularClaimableS1SupplyRemaining: "1",
       },
     });
     expect(creatorMarketProjection.get(creatorProfilePda).stage).to.equal(
@@ -339,20 +385,58 @@ describe("S1 market projection happy path", () => {
     expect(s1BuyoutProjection.get(creatorProfilePda).acceptedOfferUsdc).to.equal(
       1_000_000_000n
     );
-    expect(s1BuyoutProjection.get(creatorProfilePda).earlyClaimableUsdcRemaining).to.equal(
+    expect(s1BuyoutProjection.get(creatorProfilePda).creatorPayoutUsdc).to.equal(
+      800_000_000n
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).discoveryPoolRemaining).to.equal(
       200_000_000n
     );
+    expect(s1BuyoutProjection.get(creatorProfilePda).eligibleHolderCount).to.equal(21);
+    expect(s1BuyoutProjection.get(creatorProfilePda).earlyHolderCount).to.equal(20);
     expect(s1BuyoutProjection.get(creatorProfilePda).regularClaimableS1SupplyRemaining).to.equal(
-      25n
+      1n
     );
     expect(buyoutStateFetchCount).to.equal(0);
 
-    onChainBuyoutState.claimableUsdcRemaining = 990_000_000n;
-    onChainBuyoutState.claimableS1SupplyRemaining = 500n;
-    onChainBuyoutState.earlyClaimableUsdcRemaining = 190_000_000n;
-    onChainBuyoutState.earlyClaimableS1SupplyRemaining = 475n;
-    onChainBuyoutState.regularClaimableUsdcRemaining = 800_000_000n;
-    onChainBuyoutState.regularClaimableS1SupplyRemaining = 25n;
+    await syncMarketProjectionFromChainInstruction({
+      signature: "refresh-position-0-after-graduation",
+      instructionName: "buy_s1_token",
+      proposalPda: null,
+      entityPda: creatorProfilePda,
+      payload: {
+        creatorProfile: creatorProfilePda,
+        s1UserPosition: positionPdas[0],
+      },
+    });
+    await syncMarketProjectionFromChainInstruction({
+      signature: "refresh-position-1-after-graduation",
+      instructionName: "buy_s1_token",
+      proposalPda: null,
+      entityPda: creatorProfilePda,
+      payload: {
+        creatorProfile: creatorProfilePda,
+        s1UserPosition: positionPdas[1],
+      },
+    });
+    expect(s1PositionProjection.get(positionPdas[0]).internalTokenBalance).to.equal(25n);
+    expect(s1PositionProjection.get(positionPdas[1]).internalTokenBalance).to.equal(50n);
+    expect(s1PositionProjection.get(positionPdas[0]).estimatedClaimableUsdc).to.equal(
+      9_756_097n
+    );
+    expect(s1PositionProjection.get(positionPdas[1]).estimatedClaimableUsdc).to.equal(
+      9_756_097n
+    );
+
+    onChainBuyoutState.claimableUsdcRemaining = 190_243_903n;
+    onChainBuyoutState.claimableS1SupplyRemaining = 20n;
+    onChainBuyoutState.discoveryPoolRemaining = 190_243_903n;
+    onChainBuyoutState.eligibleHolderCount = 20;
+    onChainBuyoutState.earlyHolderCount = 19;
+    onChainBuyoutState.regularHolderCount = 1;
+    onChainBuyoutState.earlyClaimableUsdcRemaining = 0n;
+    onChainBuyoutState.earlyClaimableS1SupplyRemaining = 19n;
+    onChainBuyoutState.regularClaimableUsdcRemaining = 0n;
+    onChainBuyoutState.regularClaimableS1SupplyRemaining = 1n;
     buyoutStateFetchCount = 0;
     const claimedPosition = onChainPositions.get(positionPdas[0]);
     claimedPosition.internalTokenBalance = 0n;
@@ -368,23 +452,39 @@ describe("S1 market projection happy path", () => {
         creatorProfile: creatorProfilePda,
         s1UserPosition: positionPdas[0],
         s1BuyoutState: buyoutStatePda,
-        remainingUsdc: "990000000",
-        remainingSupply: "500",
-        earlyClaimableUsdcRemaining: "190000000",
-        earlyClaimableS1SupplyRemaining: "475",
-        regularClaimableUsdcRemaining: "800000000",
-        regularClaimableS1SupplyRemaining: "25",
+        usdcAmount: "9756097",
+        rewardModel: 1,
+        capped: false,
+        eligible: true,
+        discoveryPoolRemaining: "190243903",
+        eligibleHolderCount: 20,
+        earlyHolderCount: 19,
+        regularHolderCount: 1,
+        residualTransferred: "0",
+        residualTo: 0,
+        remainingUsdc: "190243903",
+        remainingSupply: "20",
+        earlyClaimableUsdcRemaining: "0",
+        earlyClaimableS1SupplyRemaining: "19",
+        regularClaimableUsdcRemaining: "0",
+        regularClaimableS1SupplyRemaining: "1",
       },
     });
 
     const claimedProjection = s1PositionProjection.get(positionPdas[0]);
     expect(claimedProjection.internalTokenBalance).to.equal(0n);
     expect(claimedProjection.estimatedClaimableUsdc).to.equal(0n);
+    expect(claimedProjection.discoveryRewardClaimed).to.equal(true);
+    expect(claimedProjection.lastDiscoveryRewardUsdc).to.equal(9_756_097n);
     expect(s1BuyoutProjection.get(creatorProfilePda).claimableUsdcRemaining).to.equal(
-      990_000_000n
+      190_243_903n
     );
+    expect(s1BuyoutProjection.get(creatorProfilePda).discoveryPoolRemaining).to.equal(
+      190_243_903n
+    );
+    expect(s1BuyoutProjection.get(creatorProfilePda).eligibleHolderCount).to.equal(20);
     expect(s1BuyoutProjection.get(creatorProfilePda).earlyClaimableS1SupplyRemaining).to.equal(
-      475n
+      19n
     );
     expect(buyoutStateFetchCount).to.equal(0);
   });

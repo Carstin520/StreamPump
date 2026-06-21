@@ -1,7 +1,7 @@
 # SPUMP Compliance Posture and Value Model (Design)
 
-Status: DESIGN / PROPOSAL — not implemented on-chain or in the DB yet. Treat every mechanic below as `NOT_STARTED`.
-Last updated: 2026-06-19
+Status: CODE-IMPLEMENTED SEMANTICS / NOT LEGAL-CLEARED / NOT AUDITED / NOT DEPLOYED. The capped, decoupled reward mechanics now exist in local code, tests, projections, and UI copy, but product readiness must remain `NOT_STARTED` / `MOCK_PREVIEW` until legal, audit, migration, deployment, and wallet-smoke gates are cleared.
+Last updated: 2026-06-21
 
 > Not legal advice. This is a product-design and risk-reduction proposal written by the engineering team. The securities characterization of SPUMP and of backer USDC rewards must be confirmed by qualified counsel before any public, real-money launch. This document defines the design changes that make a defensible characterization *possible*, and the legal steps that are still required.
 
@@ -38,7 +38,7 @@ This redesign honors that exactly. It changes only the **reward** side, never th
 
 So backing remains a costly, credible conviction signal, but it is no longer an investment contract.
 
-## Howey Analysis — Current Structure (Risk)
+## Howey Analysis — Pre-Redesign Structure (Risk)
 
 | Prong | Current S1 buyout path | Assessment |
 |---|---|---|
@@ -47,9 +47,9 @@ So backing remains a costly, credible conviction signal, but it is no longer an 
 | Expectation of profit | Backers claim USDC pro-rata at buyout; upside scales with stake | Satisfied — this is the core problem |
 | From efforts of others | Returns depend on creator growth + sponsor buyout decision | Satisfied |
 
-Current code reference: `claim_s1_buyout_usdc` distributes strictly pro-rata to position size (with an early/regular cohort split); S2 `settle_track2` + `claim_endorsement` pay the 20% performance pool pro-rata to endorsement size. Both are proportional-return structures today.
+Historical code reference: the pre-redesign `claim_s1_buyout_usdc` distributed buyout USDC pro-rata to position size, and S2 `claim_endorsement` paid the Track2 fan pool pro-rata to endorsement size. That proportional-return structure is the risk this redesign removes at the code level.
 
-Conclusion: under current mechanics, the backer/endorser flows have a high investment-contract risk profile. This must be addressed before serving real public users.
+Conclusion: under the pre-redesign mechanics, the backer/endorser flows had a high investment-contract risk profile. The code-level redesign removes the proportional path, but legal clearance is still required before serving real public users.
 
 ## The Fix — Four Layers of Defense in Depth
 
@@ -59,7 +59,7 @@ No single change is a silver bullet. Securities posture is defended in depth, wi
 
 This is the layer that makes the other three credible. Change what actually happens, not just what it is called.
 
-1. Decouple reward from stake size. Backer USDC is no longer a pro-rata slice of the buyout. Options (see "Mechanism Options" below): equal/flat discovery reward among qualifying early backers, or a reward tiered by participation quality and recency (loyalty badge tier, how early) with a hard per-user cap — never scaled by SPUMP amount.
+1. Decouple reward from stake size. Backer USDC is no longer a pro-rata slice of the buyout. The code now supports `FlatEqual`, `EarlinessTiered`, and `StatusPrimary` reward models, with `EarlinessTiered` as the default. Unit rewards are based on holder counts/tier counts and caps, never scaled by SPUMP amount.
 2. SPUMP is consumed, not invested. Frame and implement SPUMP spend as non-refundable consumption of earned attention. De-emphasize the "sell your S1 position back for SPUMP" mental model that makes a position feel like a tradable, priced asset; treat selling as "unbacking," and keep the dynamic exit friction.
 3. Cap and bound the upside. Hard per-user USDC caps. Bounded, predictable rewards read as rebate/cashback; uncapped proportional upside reads as yield. Refunds (e.g. failed-campaign endorsement) return only the user's own consumed principal, never a profit.
 
@@ -98,27 +98,32 @@ Whale concern: once endorsement/discovery rewards are capped per user and decoup
 
 ## Mechanism Options (to decide with counsel)
 
-S1 buyout backer reward — replace pro-rata split with one of:
+S1 buyout backer reward — supported code paths:
 
-- Option A (flat discovery reward): qualifying early backers split a capped, platform/sponsor-funded discovery pool in equal shares (or shares that depend only on how early they were, not on SPUMP amount). Simplest "not proportional to investment" story.
-- Option B (loyalty-tiered reward): reward determined by fan-badge tier and recency, hard-capped per user, independent of SPUMP staked. Ties into the loyalty layer; rewards genuine fans over capital.
-- Option C (status-primary): buyout USDC is the creator's commercial proceeds; backers receive permanent founding status plus a small fixed "thank-you" reward. Strongest compliance posture; relies on status being the real prize.
+- Option A / `FlatEqual`: qualifying backers split a capped discovery pool in equal shares. Simplest "not proportional to investment" story.
+- Option B / `EarlinessTiered`: default code path. Reward is determined by early/regular holder counts and fixed weights, hard-capped per user, independent of SPUMP staked.
+- Option C / `StatusPrimary`: buyout USDC is mainly the creator's commercial proceeds; backers receive permanent founding status plus a small fixed "thank-you" reward. Strongest compliance posture; relies on status being the real prize.
 
-The buyout USDC that currently flows to backers would instead largely flow to the creator (it is the creator's deal), with a bounded, separately-funded reward pool for early supporters. This is a financial-semantics change and is audit-sensitive.
+The buyout USDC that previously flowed mostly to backers now largely flows to the creator (it is the creator's deal), with a bounded reward pool for early supporters. This is a financial-semantics change and is audit-sensitive.
 
 S2 endorsement (Track 2 fan pool):
 
 - Keep endorsement as a costly support signal, but cap the per-user USDC reward and decouple it from endorsement size, or convert part of the fan share into non-USDC rewards (badge XP, status, perks). Failed-campaign refunds remain principal-only.
 
-## Required Code Changes (Specification Only — Not Executed Here)
+## Code Implementation Status
 
-These are audit-sensitive financial-semantics changes. They are intentionally NOT implemented in this pass. They require counsel sign-off, an Anchor audit, and full test rewrites (per repo rules: do not change financial semantics casually).
+These are audit-sensitive financial-semantics changes. They are implemented in local code and tests, but that does not mean SPUMP is legally cleared, production-ready, or deployable.
 
-- `claim_s1_buyout_usdc`: replace strict pro-rata distribution with the chosen capped/decoupled reward model; redirect the bulk of buyout USDC to the creator; add per-user reward caps in `ProtocolConfig`.
-- `settle_track2` / `claim_endorsement`: cap per-user fan-pool reward and decouple from endorsement size.
-- `sell_s1_token`: re-frame as "unbacking"; evaluate whether return mechanics should change to reduce "tradable position" perception.
-- Add KYC/geofence gating at the API layer for USDC-receiving actions.
-- Update all Anchor and backend tests for the new settlement math; update `docs/protocol/s1-market-design.md` parameters.
+- `ProtocolConfig`, `S1BuyoutState`, and `Proposal` now carry reward-model, cap, residual-destination, creator-share, and holder-count snapshots.
+- `CreatorProfile` now carries chain-maintained S1 eligible/early/regular holder counters for new S1 cycles. `buy_s1_token`, `sell_s1_token`, and `rage_quit_s1` update those counters by bucket diff; graduation reads the counters from chain state instead of trusting user-supplied counts.
+- `execute_s1_graduation` is currently restricted to `oracle_authority`, sends the configured creator share from the accepted offer vault to the creator payout ATA, and leaves only the discovery pool for backers.
+- `claim_s1_buyout_usdc` now functions as a discovery-reward claim: it uses model/count/cap snapshots and does not multiply by `internal_token_balance`. Ineligible callers are rejected without clearing their S1 position; only counted eligible holders may finalize, including legitimate zero-USDC model outcomes.
+- S1 buyout vault liveness now has two paths: normal final-claim close, or admin/oracle `sweep_s1_buyout_residual` after the configured claim window. Swept unclaimed rewards expire; residual is routed by the snapshotted residual destination and vault rent is returned to the sponsor.
+- `settle_track2` / `claim_endorsement` now use capped flat Track2 fan rewards instead of stake-proportional USDC rewards. Failed/cancelled/voided principal-return behavior remains separate.
+- Backend projections and frontend copy now expose capped reward state and avoid showing proportional S1/S2 USDC estimates.
+- `sell_s1_token` math is intentionally unchanged in this task; user-facing language should call it "unbacking." Whether it should become full consumption remains a separate legal/business decision.
+
+Still not implemented in this pass: KYC/geofence gating for USDC-receiving actions, production migrations, program deployment, legal sign-off, external audit, wallet-backed devnet smoke, and a one-time backfill for pre-counter in-flight S1 buyouts.
 
 ## Howey Analysis — After Redesign (Defensible)
 
@@ -151,5 +156,8 @@ Blockers (stop-and-report per repo policy):
 
 - Which mechanism option (A/B/C) for the S1 buyout reward.
 - Per-user USDC reward caps and the size/funding source of the discovery reward pool.
+- Whether `execute_s1_graduation` and residual sweep should remain oracle/admin-only after audit, or whether graduation can become permissionless again once counters are proven.
+- Whether 30 days is the right default for `s1_discovery_claim_window_seconds`.
+- Whether residual and vault rent should keep routing to the current default destinations (residual by snapshot, rent to sponsor) across all jurisdictions.
 - Whether to keep any SPUMP return on S1 "unbacking", or move to full-consumption.
 - First-launch jurisdiction and KYC depth for USDC-receiving users.

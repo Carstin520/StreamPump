@@ -171,12 +171,31 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
     items.push({ label: "USDC deposited", value: formatUsdcAmount(buyout.usdcDeposited), color: "text-[#67b8ff]" });
   }
 
-  if (buyout.claimableUsdcRemaining) {
-    items.push({ label: "Claimable USDC", value: formatUsdcAmount(buyout.claimableUsdcRemaining), color: "text-[#65ecaf]" });
+  if (buyout.creatorPayoutUsdc) {
+    items.push({ label: "Creator payout", value: formatUsdcAmount(buyout.creatorPayoutUsdc), color: "text-[#65ecaf]" });
   }
 
-  if (buyout.claimableS1SupplyRemaining) {
-    items.push({ label: "Claimable S1 supply", value: formatS1Amount(buyout.claimableS1SupplyRemaining) });
+  const discoveryPool = buyout.discoveryPoolRemaining ?? buyout.claimableUsdcRemaining;
+  if (discoveryPool) {
+    items.push({ label: "Discovery pool left", value: formatUsdcAmount(discoveryPool), color: "text-[#67b8ff]" });
+  }
+
+  if (typeof buyout.eligibleHolderCount === "number") {
+    items.push({ label: "Eligible backers", value: String(buyout.eligibleHolderCount) });
+  } else if (buyout.claimableS1SupplyRemaining) {
+    items.push({ label: "Eligible snapshot", value: formatS1Amount(buyout.claimableS1SupplyRemaining) });
+  }
+
+  if (buyout.graduatedAt) {
+    items.push({ label: "Graduated", value: new Date(buyout.graduatedAt).toLocaleDateString() });
+  }
+
+  if (buyout.residualSwept) {
+    items.push({ label: "Residual", value: "Swept", color: "text-[#f3b33e]" });
+  }
+
+  if (buyout.vaultClosed) {
+    items.push({ label: "Vault", value: "Closed", color: "text-[#f3b33e]" });
   }
 
   if (items.length === 0) return null;
@@ -191,6 +210,52 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
       ))}
     </div>
   );
+}
+
+function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["buyout"] }) {
+  if (!buyout) return null;
+
+  if (buyout.residualSwept) {
+    return (
+      <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+          Discovery reward window swept
+        </p>
+        <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
+          The unclaimed discovery pool has been swept by an authorized operator
+          {buyout.residualSweptAt ? ` on ${new Date(buyout.residualSweptAt).toLocaleString()}` : ""}. Later claims are no longer expected to succeed because the vault is closed or emptied.
+        </p>
+      </section>
+    );
+  }
+
+  if (buyout.vaultClosed) {
+    return (
+      <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+          Buyout vault closed
+        </p>
+        <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
+          The buyout vault no longer holds USDC. Portfolio rows may still show historical reward state until projections finish syncing.
+        </p>
+      </section>
+    );
+  }
+
+  if (buyout.graduatedAt) {
+    return (
+      <section className="rounded-[14px] border border-[#67b8ff]/15 bg-[#0d1b2a]/45 px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
+          Discovery claim window
+        </p>
+        <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
+          This buyout graduated on {new Date(buyout.graduatedAt).toLocaleString()}. The reward estimate is capped and eligibility-based; the claim window can be swept after the configured protocol window by oracle/admin only.
+        </p>
+      </section>
+    );
+  }
+
+  return null;
 }
 
 function DiscoveryProgressCard({ profile }: { profile: S1MarketProfileResponse }) {
@@ -423,10 +488,10 @@ function RageQuitPanel({
                 留守毕业
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
-                预计可获得 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 现金分红（估算）
+                预计可领取 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 发现奖励（封顶估算）
               </p>
               <p className="mt-2 border-t border-white/[0.06] pt-2 text-[10px] leading-4 text-[#8ea0ba]">
-                注意：分红数额为基于当前池的实时 Pro-rata 估算值，由于其他持有人 Rage Quit 退出导致份额变化，或链上舍入精度影响，最终领取数额以实际链上结算为准。
+                注意：发现奖励按合格人数与档位估算，并受单用户上限约束；S1 数量不会按比例放大 USDC 领取额。最终领取额以实际链上结算为准。
               </p>
             </div>
           </div>
@@ -510,21 +575,27 @@ function RageQuitPanel({
 function ClaimPanel({
   claimableUsdc,
   creatorWallet,
+  discoveryRewardEligible,
   isDemoRoute,
   onDemoClaim,
   onRefresh,
   positionBalance,
+  residualSwept,
   sessionWallet,
   sponsorWallet,
+  vaultClosed,
 }: {
   claimableUsdc: string | null;
   creatorWallet: string;
+  discoveryRewardEligible?: boolean;
   isDemoRoute?: boolean;
   onDemoClaim?: () => void;
   onRefresh: () => Promise<void>;
   positionBalance: string;
+  residualSwept?: boolean;
   sessionWallet: string | null;
   sponsorWallet: string | null;
+  vaultClosed?: boolean;
 }) {
   const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
@@ -535,8 +606,27 @@ function ClaimPanel({
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
   const signedIn = Boolean(sessionToken && !isLocalDemoSession && sessionWallet && wallet.connected && !walletMismatch);
-  const hasClaimable = hasClaimableUsdc(claimableUsdc) && Number(positionBalance || 0) > 0;
-  const canClaim = isDemoRoute ? Boolean(sponsorWallet && hasClaimable) : Boolean(signedIn && sponsorWallet && hasClaimable);
+  const hasPosition = Number(positionBalance || 0) > 0;
+  const hasPositiveReward = hasClaimableUsdc(claimableUsdc);
+  const hasOpenVault = !residualSwept && !vaultClosed;
+  const canFinalizeZeroReward = discoveryRewardEligible === true && !hasPositiveReward;
+  const eligiblePosition = hasPosition && discoveryRewardEligible !== false;
+  const canClaim = isDemoRoute
+    ? Boolean(sponsorWallet && hasOpenVault && eligiblePosition && (hasPositiveReward || canFinalizeZeroReward))
+    : Boolean(signedIn && sponsorWallet && hasOpenVault && eligiblePosition && (hasPositiveReward || canFinalizeZeroReward));
+  const claimStatus = residualSwept
+    ? "Window swept; later claims are expected to fail"
+    : vaultClosed
+      ? "Vault closed"
+      : discoveryRewardEligible === false
+        ? "Not eligible for discovery reward"
+        : !hasPosition
+          ? "No active eligible position"
+          : canClaim
+            ? canFinalizeZeroReward
+              ? "Eligible zero-amount finalize"
+              : "Ready to claim capped reward"
+            : "Watch only";
 
   const execute = useCallback(async () => {
     if (!sponsorWallet) return;
@@ -561,7 +651,7 @@ function ClaimPanel({
 
   return (
     <div className="rounded-[14px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 p-5">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim USDC</h3>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim Discovery Reward</h3>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
@@ -569,14 +659,14 @@ function ClaimPanel({
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatS1Amount(positionBalance)} S1</p>
         </div>
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-[#67b8ff]">Claimable</p>
+          <p className="text-[9px] uppercase tracking-[0.14em] text-[#67b8ff]">Discovery reward</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatUsdcAmount(claimableUsdc)}</p>
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-white/[0.04] bg-white/[0.015] px-3 py-2.5">
         <div className="min-w-0">
-          <p className="text-[10px] text-[#8ea0ba]">{canClaim ? "Ready to claim" : "Watch only"}</p>
+          <p className="text-[10px] text-[#8ea0ba]">{claimStatus}</p>
           <p className="mt-0.5 font-mono text-[11px] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
         </div>
         {isDemoRoute ? (
@@ -586,7 +676,13 @@ function ClaimPanel({
             onClick={demoFlow.begin}
             type="button"
           >
-            {demoBusy ? "Previewing..." : demoFlow.state.status === "success" ? "Preview claimed" : "Preview Claim"}
+            {demoBusy
+              ? "Previewing..."
+              : demoFlow.state.status === "success"
+                ? "Preview finalized"
+                : canFinalizeZeroReward
+                  ? "Preview Finalize"
+                  : "Preview Claim"}
           </button>
         ) : signedIn ? (
           <button
@@ -595,7 +691,7 @@ function ClaimPanel({
             onClick={() => void execute()}
             type="button"
           >
-            {busy ? "Processing..." : "Claim"}
+            {busy ? "Processing..." : canFinalizeZeroReward ? "Finalize" : "Claim"}
           </button>
         ) : (
           <div className="space-y-2">
@@ -616,7 +712,7 @@ function ClaimPanel({
         <DemoActionStatusCard
           amountLabel={formatUsdcAmount(claimableUsdc)}
           confirmLabel="Confirm preview claim"
-          description="Confirm this local preview. The claimable balance clears locally, but no claim builder, wallet signature, USDC transfer, or Solana transaction is used."
+          description="Confirm this local preview. The capped discovery reward clears locally, but no claim builder, wallet signature, USDC transfer, or Solana transaction is used."
           onCancel={demoFlow.reset}
           onConfirm={executeDemoClaim}
           onRetry={demoFlow.retry}
@@ -629,6 +725,7 @@ function ClaimPanel({
       <div className="mt-3">
         <S1TransactionDrawer
           actionLabel="Claim USDC"
+          amountLabel={canFinalizeZeroReward ? "0 USDC" : formatUsdcAmount(claimableUsdc)}
           flow={flow.state}
           onClose={flow.reset}
           onRetry={canClaim ? () => void execute() : undefined}
@@ -763,11 +860,10 @@ function BuyoutPage() {
       const spumpReturned = currentPrice > 0 ? amount * (currentPrice / 1_000_000_000) : 0;
       const currentPositionBalance = Math.max(0, Number(position?.internalTokenBalance || 0));
       const nextPositionBalance = Math.max(0, currentPositionBalance - amount);
-      const retainedPositionRatio = currentPositionBalance > 0 ? nextPositionBalance / currentPositionBalance : 0;
       const currentPositionClaimable = Number(
         position?.estimatedClaimableUsdc ?? profile?.buyout?.claimableUsdcRemaining ?? 0,
       );
-      const nextPositionClaimable = Math.round(currentPositionClaimable * retainedPositionRatio);
+      const nextPositionClaimable = nextPositionBalance > 0 ? currentPositionClaimable : 0;
       const spumpReturnedLabel = spumpReturned >= 1_000_000
         ? `${(spumpReturned / 1_000_000).toFixed(1)}M`
         : spumpReturned >= 1_000
@@ -801,8 +897,6 @@ function BuyoutPage() {
         if (!current?.buyout) return current;
         const totalSupply = Number(current.buyout.claimableS1SupplyRemaining || 0);
         const nextSupply = Math.max(0, totalSupply - amount);
-        const supplyRatio = totalSupply > 0 ? nextSupply / totalSupply : 0;
-        const totalClaimable = Number(current.buyout.claimableUsdcRemaining || 0);
         return {
           ...current,
           creator: {
@@ -812,9 +906,9 @@ function BuyoutPage() {
           buyout: {
             ...current.buyout,
             claimableS1SupplyRemaining: String(Math.round(nextSupply)),
-            claimableUsdcRemaining: String(
-              currentPositionBalance > 0 ? nextPositionClaimable : Math.round(totalClaimable * supplyRatio),
-            ),
+            claimableUsdcRemaining: current.buyout.claimableUsdcRemaining,
+            discoveryPoolRemaining:
+              current.buyout.discoveryPoolRemaining ?? current.buyout.claimableUsdcRemaining,
           },
         };
       });
@@ -843,7 +937,7 @@ function BuyoutPage() {
         ),
       };
     });
-    setDemoSummary(`Preview claimed ${claimedLabel}; local claimable balance cleared.`);
+    setDemoSummary(`Preview claimed ${claimedLabel}; local capped discovery reward cleared.`);
   }, [creatorWallet, position?.estimatedClaimableUsdc]);
 
   if (!creatorId || loading) {
@@ -926,6 +1020,7 @@ function BuyoutPage() {
 
           {/* Buyout metrics */}
           <BuyoutMetrics buyout={profile.buyout} phase={phase} />
+          <BuyoutLifecycleNotice buyout={profile.buyout} />
 
           {/* No buyout state */}
           {phase === "none" ? (
@@ -981,12 +1076,15 @@ function BuyoutPage() {
                   <ClaimPanel
                     claimableUsdc={position?.estimatedClaimableUsdc ?? null}
                     creatorWallet={profile.creator.creatorWallet}
+                    discoveryRewardEligible={position?.discoveryRewardEligible}
                     isDemoRoute={isDemoRoute}
                     onDemoClaim={handleDemoClaim}
                     onRefresh={refresh}
                     positionBalance={positionBalance}
+                    residualSwept={Boolean(profile.buyout?.residualSwept)}
                     sessionWallet={sessionWallet}
                     sponsorWallet={profile.buyout?.winningSponsorWallet ?? null}
+                    vaultClosed={Boolean(profile.buyout?.vaultClosed)}
                   />
                 ) : null}
 
@@ -1002,7 +1100,12 @@ function BuyoutPage() {
                   <p className="mt-1 text-lg font-bold text-white">{formatS1Amount(positionBalance)} S1</p>
                   {position?.estimatedClaimableUsdc && hasClaimableUsdc(position.estimatedClaimableUsdc) ? (
                     <p className="mt-0.5 text-[11px] text-[#65ecaf]">
-                      Claimable: {formatUsdcAmount(position.estimatedClaimableUsdc)}
+                      Discovery reward: {formatUsdcAmount(position.estimatedClaimableUsdc)}
+                    </p>
+                  ) : null}
+                  {position?.discoveryRewardEligible === false ? (
+                    <p className="mt-0.5 text-[11px] text-[#f3c66e]">
+                      Not eligible for this discovery reward snapshot.
                     </p>
                   ) : null}
                 </div>

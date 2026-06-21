@@ -156,6 +156,31 @@ const deriveCommonPdas = (params: {
   };
 };
 
+const assertSessionWalletIsS1GraduationExecutor = async (wallet: string) => {
+  const protocolConfig = await getAnchorService().fetchProtocolS1Config();
+  if (wallet !== protocolConfig.oracleAuthority.toBase58()) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "S1 graduation can only be built for the protocol oracle authority"
+    );
+  }
+};
+
+const assertSessionWalletCanSweepS1Residual = async (wallet: string) => {
+  const protocolConfig = await getAnchorService().fetchProtocolS1Config();
+  if (
+    wallet !== protocolConfig.oracleAuthority.toBase58() &&
+    wallet !== protocolConfig.admin.toBase58()
+  ) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "S1 buyout residual sweep can only be built for the protocol oracle or admin"
+    );
+  }
+};
+
 const buildResponse = async (params: {
   action: string;
   payerWallet: string;
@@ -596,6 +621,7 @@ export const buildExecuteS1GraduationTransaction = withController(
   async (req, res) => {
     const executorWallet = requireSessionWallet(req);
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
+    await assertSessionWalletIsS1GraduationExecutor(executorWallet);
 
     ok(
       res,
@@ -607,7 +633,36 @@ export const buildExecuteS1GraduationTransaction = withController(
           executorWallet,
           creatorWallet,
         }),
-        derived: deriveCommonPdas({ userWallet: executorWallet, creatorWallet }),
+        derived: {
+          ...deriveCommonPdas({ userWallet: executorWallet, creatorWallet }),
+          holderCountsSource: "creator_profile_chain_counters",
+        },
+      })
+    );
+  }
+);
+
+export const buildSweepS1BuyoutResidualTransaction = withController(
+  "BUILD_S1_SWEEP_BUYOUT_RESIDUAL_TRANSACTION_FAILED",
+  async (req, res) => {
+    const sweeperWallet = requireSessionWallet(req);
+    const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
+    await assertSessionWalletCanSweepS1Residual(sweeperWallet);
+
+    ok(
+      res,
+      await buildResponse({
+        action: "SWEEP_S1_BUYOUT_RESIDUAL",
+        payerWallet: sweeperWallet,
+        requiredSigners: [sweeperWallet],
+        instruction: getAnchorService().buildSweepS1BuyoutResidualInstruction({
+          sweeperWallet,
+          creatorWallet,
+        }),
+        derived: {
+          ...deriveCommonPdas({ userWallet: sweeperWallet, creatorWallet }),
+          claimWindowSource: "protocol_config_snapshot",
+        },
       })
     );
   }
