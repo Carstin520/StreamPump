@@ -7,7 +7,7 @@ use crate::{
     errors::StreamPumpError,
     events::S1BuyoutOfferAccepted,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutOffer, S1BuyoutState},
-    utils::activate_pending_s1_rating,
+    utils::{activate_pending_s1_rating, validate_residual_destination, validate_reward_model},
 };
 
 #[derive(Accounts)]
@@ -76,6 +76,14 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
         ctx.accounts.offer_usdc_vault.amount >= buyout_offer.usdc_amount,
         StreamPumpError::InsufficientBuyoutUsdcLiquidity
     );
+    validate_reward_model(ctx.accounts.protocol_config.s1_buyout_reward_model)?;
+    validate_residual_destination(ctx.accounts.protocol_config.s1_buyout_residual_to)?;
+    require!(
+        ctx.accounts.protocol_config.s1_buyout_creator_share_bps <= 10_000
+            && ctx.accounts.protocol_config.s1_discovery_reward_cap_usdc > 0
+            && ctx.accounts.protocol_config.s1_discovery_min_hold_seconds >= 0,
+        StreamPumpError::InvalidS1GuardConfig
+    );
 
     let rage_quit_deadline = now
         .checked_add(ctx.accounts.protocol_config.s1_rage_quit_window_seconds)
@@ -85,6 +93,22 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
     buyout_state.creator = creator_profile.key();
     buyout_state.winning_sponsor = Some(buyout_offer.sponsor);
     buyout_state.usdc_deposited = buyout_offer.usdc_amount;
+    buyout_state.creator_payout_usdc = 0;
+    buyout_state.discovery_pool_usdc = 0;
+    buyout_state.discovery_pool_remaining = 0;
+    buyout_state.eligible_holder_count = 0;
+    buyout_state.early_holder_count = 0;
+    buyout_state.regular_holder_count = 0;
+    buyout_state.reward_model_snapshot = ctx.accounts.protocol_config.s1_buyout_reward_model;
+    buyout_state.residual_to_snapshot = ctx.accounts.protocol_config.s1_buyout_residual_to;
+    buyout_state.discovery_reward_cap_usdc_snapshot =
+        ctx.accounts.protocol_config.s1_discovery_reward_cap_usdc;
+    buyout_state.status_thankyou_usdc_snapshot =
+        ctx.accounts.protocol_config.s1_status_thankyou_usdc;
+    buyout_state.discovery_min_hold_seconds_snapshot =
+        ctx.accounts.protocol_config.s1_discovery_min_hold_seconds;
+    buyout_state.creator_paid = false;
+    buyout_state.graduated_at = 0;
     buyout_state.claimable_usdc_remaining = 0;
     buyout_state.claimable_s1_supply_remaining = 0;
     buyout_state.early_claimable_usdc_remaining = 0;
@@ -104,6 +128,7 @@ pub(crate) fn handler(ctx: Context<AcceptBuyoutOffer>) -> Result<()> {
         s1_buyout_state: buyout_state.key(),
         sponsor: buyout_offer.sponsor,
         usdc_amount: buyout_offer.usdc_amount,
+        reward_model_snapshot: buyout_state.reward_model_snapshot,
         rage_quit_deadline: buyout_state.rage_quit_deadline,
         status: creator_profile.status as u8,
     });

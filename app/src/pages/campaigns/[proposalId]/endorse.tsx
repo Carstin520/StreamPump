@@ -151,6 +151,9 @@ export default function EndorsePage() {
   const fanPoolShare = campaign
     ? parseAmount(campaign.budgetTracks.track2InitialFanPool, 0) || track2Budget * 0.2
     : FAN_POOL_SHARE;
+  const track2RewardCap = campaign
+    ? parseAmount(campaign.budgetTracks.track2RewardCapUsdc, 100_000_000) || 100_000_000
+    : 100_000_000;
   const track2Current = campaign
     ? parseAmount(campaign.budgetTracks.track2ActualValue, TRACK2_CURRENT)
     : TRACK2_CURRENT;
@@ -166,8 +169,11 @@ export default function EndorsePage() {
   const totalEndorsed = campaign
     ? parseAmount(campaign.endorsementSummary?.totalStakedSpump, 0)
     : endorsers.reduce((s, e) => s + e.amount, 0);
-  const projectedEndorsed = totalEndorsed + stakeAmount;
-  const successUsdc = projectedEndorsed > 0 ? (stakeAmount / projectedEndorsed) * fanPoolShare : 0;
+  const projectedEndorserCount = Math.max(
+    1,
+    (campaign?.endorsementSummary?.endorserCount ?? endorsers.length) + 1,
+  );
+  const successUsdc = Math.min(fanPoolShare / projectedEndorserCount, track2RewardCap);
   const failLoss = 0;
   const cancelVoidLoss = stakeAmount * 0.05;
   const cancelVoidRefund = stakeAmount - cancelVoidLoss;
@@ -524,7 +530,7 @@ export default function EndorsePage() {
                       +{formatCampaignUsdValue(successUsdc)}
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      USDC share
+                      Capped reward
                     </p>
                   </div>
                 </div>
@@ -564,7 +570,7 @@ export default function EndorsePage() {
                       $0
                     </p>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      USDC share
+                      Capped reward
                     </p>
                   </div>
                 </div>
@@ -769,7 +775,7 @@ export default function EndorsePage() {
                     <span className="text-sm font-semibold text-white">{compactNumber(Number(userEndorsement.stakedSpumpAmount))} SPUMP</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#8ea0ba]">Estimated reward</span>
+                    <span className="text-xs text-[#8ea0ba]">Capped reward estimate</span>
                     <span className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAtomic(Number(userEndorsement.estimatedUsdcReward))}</span>
                   </div>
                   <div className="flex items-center justify-between">

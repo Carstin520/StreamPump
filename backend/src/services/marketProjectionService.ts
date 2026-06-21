@@ -21,6 +21,12 @@ import { prisma } from "./prisma";
 const S1_BONDING_CURVE_K = 1_000n;
 const DEFAULT_S1_RATING_BPS = 10_000n;
 const DEFAULT_GRADUATION_SUPPLY_TARGET = 2_500n;
+const S1_REWARD_MODEL_FLAT_EQUAL = 0;
+const S1_REWARD_MODEL_EARLINESS_TIERED = 1;
+const S1_REWARD_MODEL_STATUS_PRIMARY = 2;
+const DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC = 100_000_000n;
+const DEFAULT_S1_STATUS_THANKYOU_USDC = 10_000_000n;
+const DEFAULT_TRACK2_REWARD_CAP_USDC = 100_000_000n;
 
 type ChainProjectionEvent = {
   signature: string;
@@ -98,6 +104,19 @@ const readBigIntAlias = (
   for (const key of keys) {
     const value = readBigInt(record, key);
     if (value !== null) return value;
+  }
+
+  return null;
+};
+
+const readIntAlias = (record: Record<string, unknown>, ...keys: string[]): number | null => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isInteger(value)) return value;
+    if (typeof value === "bigint") return Number(value);
+    if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
+      return Number.parseInt(value.trim(), 10);
+    }
   }
 
   return null;
@@ -183,6 +202,13 @@ type ProjectedPositionForClaim = {
 type ProjectedBuyoutPools = {
   status: BuyoutProjectionStatus;
   claimableS1SupplyRemaining: bigint;
+  discoveryPoolRemaining?: bigint | null;
+  eligibleHolderCount?: number | null;
+  earlyHolderCount?: number | null;
+  regularHolderCount?: number | null;
+  rewardModelSnapshot?: number | null;
+  discoveryRewardCapUsdc?: bigint | null;
+  statusThankyouUsdc?: bigint | null;
   earlyClaimableUsdcRemaining: bigint;
   earlyClaimableS1SupplyRemaining: bigint;
   regularClaimableUsdcRemaining: bigint;
@@ -198,62 +224,95 @@ const calculateEstimatedClaimableUsdc = (
   }
 
   try {
-    if (buyout.claimableS1SupplyRemaining <= 0n || position.internalTokenBalance <= 0n) {
+    if (position.internalTokenBalance <= 0n) {
       return 0n;
     }
 
-    const safeShare = (balance: bigint, usdcRemaining: bigint, supplyRemaining: bigint) => {
-      if (balance <= 0n || usdcRemaining <= 0n || supplyRemaining <= 0n) {
+    const poolRemaining =
+      buyout.discoveryPoolRemaining && buyout.discoveryPoolRemaining > 0n
+        ? buyout.discoveryPoolRemaining
+        : 0n;
+    const eligibleHolderCount = Math.max(0, buyout.eligibleHolderCount ?? 0);
+    if (poolRemaining <= 0n || eligibleHolderCount <= 0) {
+      return 0n;
+    }
+
+    const rewardCap =
+      buyout.discoveryRewardCapUsdc && buyout.discoveryRewardCapUsdc > 0n
+        ? buyout.discoveryRewardCapUsdc
+        : DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC;
+    const statusThankyou =
+      buyout.statusThankyouUsdc && buyout.statusThankyouUsdc > 0n
+        ? buyout.statusThankyouUsdc
+        : DEFAULT_S1_STATUS_THANKYOU_USDC;
+    const rewardModel = buyout.rewardModelSnapshot ?? S1_REWARD_MODEL_EARLINESS_TIERED;
+    const isEarlyHolder = Boolean(position.earlyCohortBalance && position.earlyCohortBalance > 0n);
+    const earlyHolderCount = Math.max(0, buyout.earlyHolderCount ?? 0);
+    const regularHolderCount = Math.max(0, buyout.regularHolderCount ?? 0);
+    const rewardUnit = (() => {
+      if (rewardModel === S1_REWARD_MODEL_STATUS_PRIMARY) {
+        return statusThankyou;
+      }
+      if (rewardModel === S1_REWARD_MODEL_FLAT_EQUAL) {
+        return poolRemaining / BigInt(eligibleHolderCount);
+      }
+      if (rewardModel !== S1_REWARD_MODEL_EARLINESS_TIERED) {
         return 0n;
       }
-      return (balance * usdcRemaining) / supplyRemaining;
-    };
-    const earlyBalance =
-      position.earlyCohortBalance && position.earlyCohortBalance > 0n
-        ? position.earlyCohortBalance
-        : 0n;
-    const normalizedEarlyBalance =
-      earlyBalance > position.internalTokenBalance ? position.internalTokenBalance : earlyBalance;
-    const regularBalance = position.internalTokenBalance - normalizedEarlyBalance;
-    const earlyShare = safeShare(
-      normalizedEarlyBalance,
-      buyout.earlyClaimableUsdcRemaining,
-      buyout.earlyClaimableS1SupplyRemaining
-    );
-    const regularShare = safeShare(
-      regularBalance,
-      buyout.regularClaimableUsdcRemaining,
-      buyout.regularClaimableS1SupplyRemaining
-    );
 
-    return earlyShare + regularShare;
+      const earlyWeight = 2n;
+      const regularWeight = 1n;
+      const weightedCount =
+        BigInt(earlyHolderCount) * earlyWeight + BigInt(regularHolderCount) * regularWeight;
+      if (weightedCount <= 0n) {
+        return 0n;
+      }
+      const selectedCount = isEarlyHolder ? earlyHolderCount : regularHolderCount;
+      if (selectedCount <= 0) {
+        return 0n;
+      }
+
+      const claimantWeight = isEarlyHolder ? earlyWeight : regularWeight;
+      return (poolRemaining * claimantWeight) / weightedCount;
+    })();
+
+    const cappedUnit = rewardUnit > rewardCap ? rewardCap : rewardUnit;
+    return cappedUnit > poolRemaining ? poolRemaining : cappedUnit;
   } catch {
     return 0n;
   }
 };
 
-const calculateEstimatedS2Reward = (
-  stakedSpumpAmount: bigint,
-  initialFanPool: bigint | null | undefined,
-  initialSpumpStaked: bigint | null | undefined
-): bigint => {
+const calculateFlatCappedReward = (
+  poolRemaining: bigint | null | undefined,
+  unsettledCount: number | null | undefined,
+  rewardCap: bigint | null | undefined
+): { amount: bigint; capped: boolean } => {
   try {
-    const fanPool = initialFanPool && initialFanPool > 0n ? initialFanPool : 0n;
-    const spumpStaked = initialSpumpStaked && initialSpumpStaked > 0n ? initialSpumpStaked : 0n;
-    if (stakedSpumpAmount <= 0n || fanPool <= 0n || spumpStaked <= 0n) {
-      return 0n;
+    const pool = poolRemaining && poolRemaining > 0n ? poolRemaining : 0n;
+    const count = unsettledCount && unsettledCount > 0 ? unsettledCount : 0;
+    const cap = rewardCap && rewardCap > 0n ? rewardCap : DEFAULT_TRACK2_REWARD_CAP_USDC;
+    if (pool <= 0n || count <= 0) {
+      return { amount: 0n, capped: false };
     }
 
-    return (stakedSpumpAmount * fanPool) / spumpStaked;
+    const unit = pool / BigInt(count);
+    const cappedUnit = unit > cap ? cap : unit;
+    const amount = cappedUnit > pool ? pool : cappedUnit;
+    return {
+      amount,
+      capped: unit > cap || cappedUnit > pool,
+    };
   } catch {
-    return 0n;
+    return { amount: 0n, capped: false };
   }
 };
 
 const updateS2EndorsementEstimatesForProposal = async (
   proposalPda: string,
-  initialFanPool: bigint,
-  initialSpumpStaked: bigint,
+  fanPoolRemaining: bigint,
+  endorserCount: number,
+  rewardCapUsdc: bigint,
   event: { signature?: string; observedAt?: Date } = {}
 ) => {
   const positions = await prisma.s2EndorsementPositionProjection.findMany({
@@ -262,17 +321,22 @@ const updateS2EndorsementEstimatesForProposal = async (
       claimedStatus: false,
     },
   });
+  const unsettledCount = endorserCount > 0 ? endorserCount : positions.length;
+  const reward = calculateFlatCappedReward(
+    fanPoolRemaining,
+    unsettledCount,
+    rewardCapUsdc
+  );
 
   await Promise.all(
     positions.map((position) =>
       prisma.s2EndorsementPositionProjection.update({
         where: { positionPda: position.positionPda },
         data: {
-          estimatedUsdcReward: calculateEstimatedS2Reward(
-            position.stakedSpumpAmount,
-            initialFanPool,
-            initialSpumpStaked
-          ),
+          estimatedUsdcReward: reward.amount,
+          rewardCapUsdc,
+          rewardCapped: reward.capped,
+          fanPoolRemaining,
           lastEventSignature: event.signature ?? position.lastEventSignature,
           lastEventAt: event.observedAt ?? position.lastEventAt,
         },
@@ -288,6 +352,18 @@ type S1GraduatedBuyoutProjectionPatch = {
   acceptedOfferPda: string | null;
   acceptedOfferUsdc: bigint | null;
   usdcDeposited: bigint | null;
+  creatorPayoutUsdc: bigint | null;
+  discoveryPoolUsdc: bigint | null;
+  discoveryPoolRemaining: bigint | null;
+  eligibleHolderCount: number | null;
+  earlyHolderCount: number | null;
+  regularHolderCount: number | null;
+  rewardModelSnapshot: number | null;
+  residualToSnapshot: number | null;
+  discoveryRewardCapUsdc: bigint | null;
+  statusThankyouUsdc: bigint | null;
+  creatorPaid: boolean | null;
+  graduatedAt: Date | null;
   claimableUsdcRemaining: bigint | null;
   claimableS1SupplyRemaining: bigint | null;
   earlyClaimableUsdcRemaining: bigint | null;
@@ -319,6 +395,15 @@ const resolveGraduatedBuyoutProjectionPatch = async (
     eventData,
     "regularClaimableS1SupplyRemaining"
   );
+  const eventCreatorPayoutUsdc = readBigIntAlias(eventData, "creatorPayoutUsdc");
+  const eventDiscoveryPoolUsdc = readBigIntAlias(eventData, "discoveryPoolUsdc");
+  const eventDiscoveryPoolRemaining = readBigIntAlias(eventData, "discoveryPoolRemaining");
+  const eventEligibleHolderCount = readIntAlias(eventData, "eligibleHolderCount");
+  const eventEarlyHolderCount = readIntAlias(eventData, "earlyHolderCount");
+  const eventRegularHolderCount = readIntAlias(eventData, "regularHolderCount");
+  const eventRewardModelSnapshot = readIntAlias(eventData, "rewardModelSnapshot", "rewardModel");
+  const eventResidualTo = readIntAlias(eventData, "residualTo", "residualToSnapshot");
+  const eventGraduatedAt = readBigInt(eventData, "graduatedAt");
   const hasEventPoolSnapshot =
     eventClaimableUsdcRemaining !== null &&
     eventClaimableS1SupplyRemaining !== null &&
@@ -366,6 +451,63 @@ const resolveGraduatedBuyoutProjectionPatch = async (
       existing?.usdcDeposited ??
       acceptedOfferUsdc ??
       null,
+    creatorPayoutUsdc:
+      eventCreatorPayoutUsdc ??
+      onChain?.creatorPayoutUsdc ??
+      existing?.creatorPayoutUsdc ??
+      null,
+    discoveryPoolUsdc:
+      eventDiscoveryPoolUsdc ??
+      onChain?.discoveryPoolUsdc ??
+      existing?.discoveryPoolUsdc ??
+      null,
+    discoveryPoolRemaining:
+      eventDiscoveryPoolRemaining ??
+      onChain?.discoveryPoolRemaining ??
+      existing?.discoveryPoolRemaining ??
+      eventClaimableUsdcRemaining ??
+      null,
+    eligibleHolderCount:
+      eventEligibleHolderCount ??
+      onChain?.eligibleHolderCount ??
+      existing?.eligibleHolderCount ??
+      null,
+    earlyHolderCount:
+      eventEarlyHolderCount ??
+      onChain?.earlyHolderCount ??
+      existing?.earlyHolderCount ??
+      null,
+    regularHolderCount:
+      eventRegularHolderCount ??
+      onChain?.regularHolderCount ??
+      existing?.regularHolderCount ??
+      null,
+    rewardModelSnapshot:
+      eventRewardModelSnapshot ??
+      onChain?.rewardModelSnapshot ??
+      existing?.rewardModelSnapshot ??
+      S1_REWARD_MODEL_EARLINESS_TIERED,
+    residualToSnapshot:
+      eventResidualTo ??
+      onChain?.residualToSnapshot ??
+      existing?.residualToSnapshot ??
+      0,
+    discoveryRewardCapUsdc:
+      onChain?.discoveryRewardCapUsdc ??
+      existing?.discoveryRewardCapUsdc ??
+      DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+    statusThankyouUsdc:
+      onChain?.statusThankyouUsdc ??
+      existing?.statusThankyouUsdc ??
+      DEFAULT_S1_STATUS_THANKYOU_USDC,
+    creatorPaid:
+      onChain?.creatorPaid ??
+      existing?.creatorPaid ??
+      (eventCreatorPayoutUsdc !== null ? true : null),
+    graduatedAt:
+      unixSecondsToDate(eventGraduatedAt ?? onChain?.graduatedAtUnix ?? null) ??
+      existing?.graduatedAt ??
+      null,
     claimableUsdcRemaining:
       eventClaimableUsdcRemaining ??
       onChain?.claimableUsdcRemaining ??
@@ -410,7 +552,7 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
   }
 
   const creatorWallet = creator.authority.toBase58();
-  const [holderCount, activeCampaignCount, latestOffer, buyout, protocolS1Config] = await Promise.all([
+  const [projectedPositionHolderCount, activeCampaignCount, latestOffer, buyout, protocolS1Config] = await Promise.all([
     prisma.s1PositionProjection.count({
       where: {
         creatorProfilePda,
@@ -450,9 +592,15 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
   );
   const currentPriceSpump = calculateBuyCost(creator.s1Supply, 1n, creator.s1RatingBps);
   const supporterPoolSpump = calculateFullCurveValue(creator.s1Supply, creator.s1RatingBps);
+  const holderCount = creator.s1EligibleHolderCount;
   const creatorMomentumMetadata = {
     s1RatingBps: creator.s1RatingBps,
     s1EarlyCohortSupply: creator.s1EarlyCohortSupply.toString(),
+    s1EligibleHolderCount: creator.s1EligibleHolderCount,
+    s1EarlyHolderCount: creator.s1EarlyHolderCount,
+    s1RegularHolderCount: creator.s1RegularHolderCount,
+    projectedPositionHolderCount,
+    holderCountSource: "creator_profile_chain_counter",
     s1GraduationTargetSupply: creator.s1GraduationTargetSupply.toString(),
     pendingS1RatingBps: creator.pendingS1RatingBps,
     pendingS1GraduationTargetSupply: creator.pendingS1GraduationTargetSupply.toString(),
@@ -467,6 +615,14 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
     s1EarlyCohortSupplyThreshold: protocolS1Config.s1EarlyCohortSupplyThreshold.toString(),
     s1EarlyCohortBuyoutCapBps: protocolS1Config.s1EarlyCohortBuyoutCapBps,
     s1RageQuitWindowSeconds: protocolS1Config.s1RageQuitWindowSeconds,
+    s1BuyoutCreatorShareBps: protocolS1Config.s1BuyoutCreatorShareBps,
+    s1BuyoutRewardModel: protocolS1Config.s1BuyoutRewardModel,
+    s1DiscoveryRewardCapUsdc: protocolS1Config.s1DiscoveryRewardCapUsdc?.toString(),
+    s1StatusThankyouUsdc: protocolS1Config.s1StatusThankyouUsdc?.toString(),
+    s1BuyoutResidualTo: protocolS1Config.s1BuyoutResidualTo,
+    s1DiscoveryMinHoldSeconds: protocolS1Config.s1DiscoveryMinHoldSeconds,
+    track2RewardCapUsdc: protocolS1Config.track2RewardCapUsdc?.toString(),
+    track2ResidualTo: protocolS1Config.track2ResidualTo,
   };
 
   return prisma.creatorMarketProjection.upsert({
@@ -483,6 +639,9 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
       nextPriceSpump: currentPriceSpump,
       supporterPoolSpump,
       holderCount,
+      s1EligibleHolderCount: creator.s1EligibleHolderCount,
+      s1EarlyHolderCount: creator.s1EarlyHolderCount,
+      s1RegularHolderCount: creator.s1RegularHolderCount,
       graduationProgressBps: calculateGraduationProgressBps(
         creator.s1Supply,
         creator.s1GraduationTargetSupply
@@ -506,6 +665,9 @@ export const refreshCreatorMarketProjectionByProfilePda = async (
       nextPriceSpump: currentPriceSpump,
       supporterPoolSpump,
       holderCount,
+      s1EligibleHolderCount: creator.s1EligibleHolderCount,
+      s1EarlyHolderCount: creator.s1EarlyHolderCount,
+      s1RegularHolderCount: creator.s1RegularHolderCount,
       graduationProgressBps: calculateGraduationProgressBps(
         creator.s1Supply,
         creator.s1GraduationTargetSupply
@@ -767,6 +929,9 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     const buyoutStatePda = readString(eventData, "s1BuyoutState");
     const sponsorWallet = readString(eventData, "sponsor");
     const usdcAmount = readBigInt(eventData, "usdcAmount");
+    const rewardModelSnapshot =
+      readIntAlias(eventData, "rewardModelSnapshot", "rewardModel") ??
+      S1_REWARD_MODEL_EARLINESS_TIERED;
     if (!creatorProfilePda || !buyoutOfferPda || !buyoutStatePda || !sponsorWallet) return;
 
     await prisma.s1BuyoutOfferProjection.updateMany({
@@ -788,6 +953,7 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         acceptedOfferPda: buyoutOfferPda,
         acceptedOfferUsdc: usdcAmount,
         usdcDeposited: usdcAmount ?? 0n,
+        rewardModelSnapshot,
         rageQuitDeadlineAt: unixSecondsToDate(readBigInt(eventData, "rageQuitDeadline")),
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
@@ -801,6 +967,7 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         acceptedOfferPda: buyoutOfferPda,
         acceptedOfferUsdc: usdcAmount,
         usdcDeposited: usdcAmount ?? 0n,
+        rewardModelSnapshot,
         rageQuitDeadlineAt: unixSecondsToDate(readBigInt(eventData, "rageQuitDeadline")),
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
@@ -867,6 +1034,17 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         usdcDeposited: 0n,
         claimableUsdcRemaining: 0n,
         claimableS1SupplyRemaining: 0n,
+        creatorPayoutUsdc: 0n,
+        discoveryPoolUsdc: 0n,
+        discoveryPoolRemaining: 0n,
+        eligibleHolderCount: 0,
+        earlyHolderCount: 0,
+        regularHolderCount: 0,
+        rewardModelSnapshot: S1_REWARD_MODEL_EARLINESS_TIERED,
+        residualToSnapshot: 0,
+        discoveryRewardCapUsdc: DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+        statusThankyouUsdc: DEFAULT_S1_STATUS_THANKYOU_USDC,
+        creatorPaid: false,
         earlyClaimableUsdcRemaining: 0n,
         earlyClaimableS1SupplyRemaining: 0n,
         regularClaimableUsdcRemaining: 0n,
@@ -881,6 +1059,17 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         usdcDeposited: 0n,
         claimableUsdcRemaining: 0n,
         claimableS1SupplyRemaining: 0n,
+        creatorPayoutUsdc: 0n,
+        discoveryPoolUsdc: 0n,
+        discoveryPoolRemaining: 0n,
+        eligibleHolderCount: 0,
+        earlyHolderCount: 0,
+        regularHolderCount: 0,
+        rewardModelSnapshot: S1_REWARD_MODEL_EARLINESS_TIERED,
+        residualToSnapshot: 0,
+        discoveryRewardCapUsdc: DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+        statusThankyouUsdc: DEFAULT_S1_STATUS_THANKYOU_USDC,
+        creatorPaid: false,
         earlyClaimableUsdcRemaining: 0n,
         earlyClaimableS1SupplyRemaining: 0n,
         regularClaimableUsdcRemaining: 0n,
@@ -925,6 +1114,18 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
           acceptedOfferPda: graduatedPatch.acceptedOfferPda,
           acceptedOfferUsdc: graduatedPatch.acceptedOfferUsdc,
           usdcDeposited: graduatedPatch.usdcDeposited,
+          creatorPayoutUsdc: graduatedPatch.creatorPayoutUsdc,
+          discoveryPoolUsdc: graduatedPatch.discoveryPoolUsdc,
+          discoveryPoolRemaining: graduatedPatch.discoveryPoolRemaining,
+          eligibleHolderCount: graduatedPatch.eligibleHolderCount,
+          earlyHolderCount: graduatedPatch.earlyHolderCount,
+          regularHolderCount: graduatedPatch.regularHolderCount,
+          rewardModelSnapshot: graduatedPatch.rewardModelSnapshot,
+          residualToSnapshot: graduatedPatch.residualToSnapshot,
+          discoveryRewardCapUsdc: graduatedPatch.discoveryRewardCapUsdc,
+          statusThankyouUsdc: graduatedPatch.statusThankyouUsdc,
+          creatorPaid: graduatedPatch.creatorPaid,
+          graduatedAt: graduatedPatch.graduatedAt,
           claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining,
           claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining,
           earlyClaimableUsdcRemaining: graduatedPatch.earlyClaimableUsdcRemaining,
@@ -945,6 +1146,21 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         acceptedOfferPda: graduatedPatch.acceptedOfferPda,
         acceptedOfferUsdc: graduatedPatch.acceptedOfferUsdc,
         usdcDeposited: graduatedPatch.usdcDeposited ?? 0n,
+        creatorPayoutUsdc: graduatedPatch.creatorPayoutUsdc ?? 0n,
+        discoveryPoolUsdc: graduatedPatch.discoveryPoolUsdc ?? 0n,
+        discoveryPoolRemaining: graduatedPatch.discoveryPoolRemaining ?? 0n,
+        eligibleHolderCount: graduatedPatch.eligibleHolderCount ?? 0,
+        earlyHolderCount: graduatedPatch.earlyHolderCount ?? 0,
+        regularHolderCount: graduatedPatch.regularHolderCount ?? 0,
+        rewardModelSnapshot:
+          graduatedPatch.rewardModelSnapshot ?? S1_REWARD_MODEL_EARLINESS_TIERED,
+        residualToSnapshot: graduatedPatch.residualToSnapshot ?? 0,
+        discoveryRewardCapUsdc:
+          graduatedPatch.discoveryRewardCapUsdc ?? DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+        statusThankyouUsdc:
+          graduatedPatch.statusThankyouUsdc ?? DEFAULT_S1_STATUS_THANKYOU_USDC,
+        creatorPaid: graduatedPatch.creatorPaid ?? false,
+        graduatedAt: graduatedPatch.graduatedAt,
         claimableUsdcRemaining: graduatedPatch.claimableUsdcRemaining ?? 0n,
         claimableS1SupplyRemaining: graduatedPatch.claimableS1SupplyRemaining ?? 0n,
         earlyClaimableUsdcRemaining: graduatedPatch.earlyClaimableUsdcRemaining ?? 0n,
@@ -993,6 +1209,20 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         eventData,
         "regularClaimableS1SupplyRemaining"
       );
+      const eventDiscoveryPoolRemaining = readBigIntAlias(
+        eventData,
+        "discoveryPoolRemaining",
+        "poolRemaining"
+      );
+      const eventEligibleHolderCount = readIntAlias(eventData, "eligibleHolderCount");
+      const eventEarlyHolderCount = readIntAlias(eventData, "earlyHolderCount");
+      const eventRegularHolderCount = readIntAlias(eventData, "regularHolderCount");
+      const eventRewardModel = readIntAlias(eventData, "rewardModel", "rewardModelSnapshot");
+      const eventResidualTo = readIntAlias(eventData, "residualTo", "residualToSnapshot");
+      const eventVaultClosed = Boolean(eventData.vaultClosed ?? false);
+      const usdcAmount = readBigIntAlias(eventData, "usdcAmount", "rewardAmount") ?? 0n;
+      const rewardCapped = Boolean(eventData.capped ?? false);
+      const rewardEligible = Boolean(eventData.eligible ?? usdcAmount > 0n);
       const hasEventPoolSnapshot =
         eventClaimableUsdcRemaining !== null &&
         eventClaimableS1SupplyRemaining !== null &&
@@ -1010,6 +1240,19 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
           eventClaimableUsdcRemaining ?? onChain?.claimableUsdcRemaining ?? null,
         claimableS1SupplyRemaining:
           eventClaimableS1SupplyRemaining ?? onChain?.claimableS1SupplyRemaining ?? null,
+        discoveryPoolRemaining:
+          eventDiscoveryPoolRemaining ?? onChain?.discoveryPoolRemaining ?? null,
+        eligibleHolderCount:
+          eventEligibleHolderCount ?? onChain?.eligibleHolderCount ?? null,
+        earlyHolderCount:
+          eventEarlyHolderCount ?? onChain?.earlyHolderCount ?? null,
+        regularHolderCount:
+          eventRegularHolderCount ?? onChain?.regularHolderCount ?? null,
+        rewardModelSnapshot:
+          eventRewardModel ?? onChain?.rewardModelSnapshot ?? null,
+        residualToSnapshot:
+          eventResidualTo ?? onChain?.residualToSnapshot ?? null,
+        vaultClosed: eventVaultClosed ? true : null,
         earlyClaimableUsdcRemaining:
           eventEarlyClaimableUsdcRemaining ?? onChain?.earlyClaimableUsdcRemaining ?? null,
         earlyClaimableS1SupplyRemaining:
@@ -1036,6 +1279,23 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
             eventClaimableUsdcRemaining ?? onChain?.claimableUsdcRemaining ?? 0n,
           claimableS1SupplyRemaining:
             eventClaimableS1SupplyRemaining ?? onChain?.claimableS1SupplyRemaining ?? 0n,
+          discoveryPoolRemaining:
+            eventDiscoveryPoolRemaining ?? onChain?.discoveryPoolRemaining ?? 0n,
+          eligibleHolderCount:
+            eventEligibleHolderCount ?? onChain?.eligibleHolderCount ?? 0,
+          earlyHolderCount:
+            eventEarlyHolderCount ?? onChain?.earlyHolderCount ?? 0,
+          regularHolderCount:
+            eventRegularHolderCount ?? onChain?.regularHolderCount ?? 0,
+          rewardModelSnapshot:
+            eventRewardModel ?? onChain?.rewardModelSnapshot ?? S1_REWARD_MODEL_EARLINESS_TIERED,
+          residualToSnapshot:
+            eventResidualTo ?? onChain?.residualToSnapshot ?? 0,
+          vaultClosed: eventVaultClosed,
+          discoveryRewardCapUsdc:
+            onChain?.discoveryRewardCapUsdc ?? DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+          statusThankyouUsdc:
+            onChain?.statusThankyouUsdc ?? DEFAULT_S1_STATUS_THANKYOU_USDC,
           earlyClaimableUsdcRemaining:
             eventEarlyClaimableUsdcRemaining ?? onChain?.earlyClaimableUsdcRemaining ?? 0n,
           earlyClaimableS1SupplyRemaining:
@@ -1050,8 +1310,90 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
           lastEventAt: observedAt,
         },
       });
+      if (positionPda) {
+        await prisma.s1PositionProjection.updateMany({
+          where: { positionPda },
+          data: {
+            discoveryRewardClaimed: true,
+            lastDiscoveryRewardUsdc: usdcAmount,
+            discoveryRewardCapped: rewardCapped,
+            discoveryRewardEligible: rewardEligible,
+            estimatedClaimableUsdc: 0n,
+            lastEventSignature: params.signature,
+            lastEventAt: observedAt,
+          },
+        });
+      }
       await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
     }
+    return;
+  }
+
+  if (params.instructionName === "sweep_s1_buyout_residual") {
+    const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
+    if (!creatorProfilePda) return;
+    const buyoutStatePda = readString(eventData, "s1BuyoutState");
+    const residualTo = readIntAlias(eventData, "residualTo", "residualToSnapshot");
+    const closed = Boolean(eventData.closed ?? true);
+
+    await prisma.s1BuyoutProjection.upsert({
+      where: { creatorProfilePda },
+      update: {
+        ...compactNullablePatch({
+          buyoutStatePda,
+          residualToSnapshot: residualTo,
+        }),
+        discoveryPoolRemaining: 0n,
+        claimableUsdcRemaining: 0n,
+        claimableS1SupplyRemaining: 0n,
+        earlyClaimableUsdcRemaining: 0n,
+        earlyClaimableS1SupplyRemaining: 0n,
+        regularClaimableUsdcRemaining: 0n,
+        regularClaimableS1SupplyRemaining: 0n,
+        eligibleHolderCount: 0,
+        earlyHolderCount: 0,
+        regularHolderCount: 0,
+        residualSwept: true,
+        residualSweptAt: observedAt,
+        vaultClosed: closed,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+      create: {
+        creatorProfilePda,
+        buyoutStatePda,
+        status: BuyoutProjectionStatus.GRADUATED,
+        discoveryPoolRemaining: 0n,
+        claimableUsdcRemaining: 0n,
+        claimableS1SupplyRemaining: 0n,
+        earlyClaimableUsdcRemaining: 0n,
+        earlyClaimableS1SupplyRemaining: 0n,
+        regularClaimableUsdcRemaining: 0n,
+        regularClaimableS1SupplyRemaining: 0n,
+        eligibleHolderCount: 0,
+        earlyHolderCount: 0,
+        regularHolderCount: 0,
+        residualToSnapshot: residualTo ?? 0,
+        residualSwept: true,
+        residualSweptAt: observedAt,
+        vaultClosed: closed,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+    await prisma.s1PositionProjection.updateMany({
+      where: {
+        creatorProfilePda,
+        discoveryRewardClaimed: false,
+      },
+      data: {
+        estimatedClaimableUsdc: 0n,
+        discoveryRewardEligible: false,
+        lastEventSignature: params.signature,
+        lastEventAt: observedAt,
+      },
+    });
+    await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
     return;
   }
 
@@ -1078,9 +1420,15 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       where: { proposalPda },
       select: {
         track2InitialFanPool: true,
-        track2InitialSpumpStaked: true,
+        track2RewardCapUsdc: true,
+        endorserCount: true,
       },
     });
+    const estimatedReward = calculateFlatCappedReward(
+      proposal?.track2InitialFanPool,
+      proposal?.endorserCount,
+      proposal?.track2RewardCapUsdc
+    );
 
     await prisma.s2EndorsementPositionProjection.upsert({
       where: { positionPda },
@@ -1089,11 +1437,13 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         proposalPda,
         stakedSpumpAmount: nextStakedAmount,
         claimedStatus: false,
-        estimatedUsdcReward: calculateEstimatedS2Reward(
-          nextStakedAmount,
-          proposal?.track2InitialFanPool,
-          proposal?.track2InitialSpumpStaked
-        ),
+        estimatedUsdcReward: estimatedReward.amount,
+        rewardCapUsdc:
+          proposal?.track2RewardCapUsdc && proposal.track2RewardCapUsdc > 0n
+            ? proposal.track2RewardCapUsdc
+            : DEFAULT_TRACK2_REWARD_CAP_USDC,
+        rewardCapped: estimatedReward.capped,
+        fanPoolRemaining: proposal?.track2InitialFanPool ?? 0n,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -1103,11 +1453,13 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         proposalPda,
         stakedSpumpAmount: amount,
         claimedStatus: false,
-        estimatedUsdcReward: calculateEstimatedS2Reward(
-          amount,
-          proposal?.track2InitialFanPool,
-          proposal?.track2InitialSpumpStaked
-        ),
+        estimatedUsdcReward: estimatedReward.amount,
+        rewardCapUsdc:
+          proposal?.track2RewardCapUsdc && proposal.track2RewardCapUsdc > 0n
+            ? proposal.track2RewardCapUsdc
+            : DEFAULT_TRACK2_REWARD_CAP_USDC,
+        rewardCapped: estimatedReward.capped,
+        fanPoolRemaining: proposal?.track2InitialFanPool ?? 0n,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -1136,20 +1488,42 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
       "track2InitialFanPool",
       "fanPoolRemaining"
     ) ?? 0n;
+    const fanPoolRemaining = readBigIntAlias(
+      eventData,
+      "fanPoolRemaining",
+      "track2UsdcDeposited"
+    ) ?? initialFanPool;
     const initialSpumpStaked = readBigIntAlias(
       eventData,
       "initialSpumpStaked",
       "track2InitialSpumpStaked"
     ) ?? 0n;
+    const rewardCapUsdc =
+      readBigIntAlias(eventData, "rewardCapUsdc", "track2RewardCapUsdc") ??
+      DEFAULT_TRACK2_REWARD_CAP_USDC;
+    const residualTo = readIntAlias(eventData, "residualTo", "track2ResidualTo") ?? 1;
+    const rewardModel =
+      readIntAlias(eventData, "rewardModel", "track2RewardModelSnapshot") ?? 0;
+    const endorserCount = readIntAlias(eventData, "endorserCount", "track2EndorserCount") ?? 0;
 
     await prisma.proposal.updateMany({
       where: { proposalPda },
       data: {
         track2InitialFanPool: initialFanPool,
         track2InitialSpumpStaked: initialSpumpStaked,
+        track2UsdcDeposited: fanPoolRemaining,
+        track2RewardCapUsdc: rewardCapUsdc,
+        track2ResidualTo: residualTo,
+        track2RewardModelSnapshot: rewardModel,
       },
     });
-    await updateS2EndorsementEstimatesForProposal(proposalPda, initialFanPool, initialSpumpStaked, event);
+    await updateS2EndorsementEstimatesForProposal(
+      proposalPda,
+      fanPoolRemaining,
+      endorserCount,
+      rewardCapUsdc,
+      event
+    );
     await refreshProposalProofStatus(proposalPda, params.signature);
     return;
   }
@@ -1159,6 +1533,12 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     const userWallet = readString(eventData, "user");
     const stakedAmount = readBigInt(eventData, "stakedAmount");
     const usdcReward = readBigInt(eventData, "usdcReward") ?? 0n;
+    const rewardCapUsdc =
+      readBigIntAlias(eventData, "rewardCapUsdc", "track2RewardCapUsdc") ??
+      DEFAULT_TRACK2_REWARD_CAP_USDC;
+    const rewardCapped = Boolean(eventData.capped ?? false);
+    const fanPoolRemaining = readBigIntAlias(eventData, "fanPoolRemaining") ?? 0n;
+    const residualTransferred = readBigIntAlias(eventData, "residualTransferred") ?? 0n;
     let positionPda = readString(eventData, "endorsementPosition");
     if (!positionPda && userWallet && proposalPda) {
       positionPda = getAnchorService()
@@ -1175,6 +1555,10 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         ...(stakedAmount === null ? {} : { stakedSpumpAmount: stakedAmount }),
         claimedStatus: true,
         estimatedUsdcReward: usdcReward,
+        rewardCapUsdc,
+        rewardCapped,
+        fanPoolRemaining,
+        residualTransferred,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -1185,6 +1569,10 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
         stakedSpumpAmount: stakedAmount ?? 0n,
         claimedStatus: true,
         estimatedUsdcReward: usdcReward,
+        rewardCapUsdc,
+        rewardCapped,
+        fanPoolRemaining,
+        residualTransferred,
         lastEventSignature: params.signature,
         lastEventAt: observedAt,
       },
@@ -1195,7 +1583,10 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
     });
     await prisma.proposal.updateMany({
       where: { proposalPda },
-      data: { claimedEndorserCount: claimedCount },
+      data: {
+        claimedEndorserCount: claimedCount,
+        track2UsdcDeposited: fanPoolRemaining,
+      },
     });
 
     await refreshProposalProofStatus(proposalPda, params.signature);
@@ -1221,6 +1612,9 @@ export const serializeCreatorMarketProjection = (
   nextPriceSpump: creator.nextPriceSpump.toString(),
   supporterPoolSpump: creator.supporterPoolSpump.toString(),
   holderCount: creator.holderCount,
+  s1EligibleHolderCount: creator.s1EligibleHolderCount,
+  s1EarlyHolderCount: creator.s1EarlyHolderCount,
+  s1RegularHolderCount: creator.s1RegularHolderCount,
   graduationProgressBps: creator.graduationProgressBps,
   metadata: creator.metadataJson,
   activeCampaignCount: creator.activeCampaignCount,
@@ -1340,6 +1734,21 @@ export const getCreatorMarketProjection = async (creatorWalletOrProfilePda: stri
           latestOfferPda: buyout.latestOfferPda,
           latestOfferUsdc: serializeBigInt(buyout.latestOfferUsdc),
           usdcDeposited: buyout.usdcDeposited.toString(),
+          creatorPayoutUsdc: buyout.creatorPayoutUsdc.toString(),
+          discoveryPoolUsdc: buyout.discoveryPoolUsdc.toString(),
+          discoveryPoolRemaining: buyout.discoveryPoolRemaining.toString(),
+          eligibleHolderCount: buyout.eligibleHolderCount,
+          earlyHolderCount: buyout.earlyHolderCount,
+          regularHolderCount: buyout.regularHolderCount,
+          rewardModelSnapshot: buyout.rewardModelSnapshot,
+          residualToSnapshot: buyout.residualToSnapshot,
+          discoveryRewardCapUsdc: buyout.discoveryRewardCapUsdc.toString(),
+          statusThankyouUsdc: buyout.statusThankyouUsdc.toString(),
+          creatorPaid: buyout.creatorPaid,
+          graduatedAt: buyout.graduatedAt?.toISOString() ?? null,
+          residualSweptAt: buyout.residualSweptAt?.toISOString() ?? null,
+          residualSwept: buyout.residualSwept,
+          vaultClosed: buyout.vaultClosed,
           claimableUsdcRemaining: buyout.claimableUsdcRemaining.toString(),
           claimableS1SupplyRemaining: buyout.claimableS1SupplyRemaining.toString(),
           earlyClaimableUsdcRemaining: buyout.earlyClaimableUsdcRemaining.toString(),
@@ -1404,6 +1813,18 @@ export const reconcileGraduatedS1BuyoutProjection = async (
         acceptedOfferPda: patch.acceptedOfferPda,
         acceptedOfferUsdc: patch.acceptedOfferUsdc,
         usdcDeposited: patch.usdcDeposited,
+        creatorPayoutUsdc: patch.creatorPayoutUsdc,
+        discoveryPoolUsdc: patch.discoveryPoolUsdc,
+        discoveryPoolRemaining: patch.discoveryPoolRemaining,
+        eligibleHolderCount: patch.eligibleHolderCount,
+        earlyHolderCount: patch.earlyHolderCount,
+        regularHolderCount: patch.regularHolderCount,
+        rewardModelSnapshot: patch.rewardModelSnapshot,
+        residualToSnapshot: patch.residualToSnapshot,
+        discoveryRewardCapUsdc: patch.discoveryRewardCapUsdc,
+        statusThankyouUsdc: patch.statusThankyouUsdc,
+        creatorPaid: patch.creatorPaid,
+        graduatedAt: patch.graduatedAt,
         claimableUsdcRemaining: patch.claimableUsdcRemaining,
         claimableS1SupplyRemaining: patch.claimableS1SupplyRemaining,
         earlyClaimableUsdcRemaining: patch.earlyClaimableUsdcRemaining,
@@ -1483,6 +1904,10 @@ export const getPortfolioProjection = async (userWallet: string) => {
         earlyCohortBalance: position.earlyCohortBalance.toString(),
         spumpCostBasis: position.spumpCostBasis.toString(),
         estimatedClaimableUsdc: serializeBigInt(estimatedClaimableUsdc),
+        discoveryRewardClaimed: position.discoveryRewardClaimed,
+        lastDiscoveryRewardUsdc: position.lastDiscoveryRewardUsdc.toString(),
+        discoveryRewardCapped: position.discoveryRewardCapped,
+        discoveryRewardEligible: position.discoveryRewardEligible,
         updatedAt: position.updatedAt.toISOString(),
       };
     }),
@@ -1498,6 +1923,10 @@ export const getPortfolioProjection = async (userWallet: string) => {
         stakedSpumpAmount: position.stakedSpumpAmount.toString(),
         claimedStatus: position.claimedStatus,
         estimatedUsdcReward: position.estimatedUsdcReward.toString(),
+        rewardCapUsdc: position.rewardCapUsdc.toString(),
+        rewardCapped: position.rewardCapped,
+        fanPoolRemaining: position.fanPoolRemaining.toString(),
+        residualTransferred: position.residualTransferred.toString(),
         updatedAt: position.updatedAt.toISOString(),
       };
     }),
@@ -1573,6 +2002,9 @@ export const serializePublicCampaignProof = (
     track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
     track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
     track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
+    track2RewardCapUsdc: (proposal.track2RewardCapUsdc ?? 0n).toString(),
+    track2ResidualTo: proposal.track2ResidualTo ?? 1,
+    track2RewardModelSnapshot: proposal.track2RewardModelSnapshot ?? 0,
     track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
     track3CpsPayout: serializeBigInt(proposal.track3CpsPayout),
     track3DelayDays: proposal.track3DelayDays,

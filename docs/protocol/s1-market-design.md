@@ -87,7 +87,7 @@ With `base_k = 1,000` and default rating:
 447 / 2,500 ~= 17.9%
 ```
 
-In a `10,000 USDC` buyout, the first 10 supporters collectively have an upper-bound claim near `1,790 USDC` if nobody exits and later supply reaches the target. This is close to the desired `15%-20%` early-supporter upside, while still leaving most buyout value for broader supporters.
+Under the capped discovery-reward model, graduation target still controls creator-momentum pacing, but it no longer determines a pro-rata USDC claim. A larger S1 balance can affect whether the user remains a backer, but it must not scale the user's USDC reward. Buyout USDC now primarily belongs to the creator, with only a bounded discovery pool available to eligible backers.
 
 For stronger or later-stage creators, the oracle should raise `s1_graduation_target_supply`:
 
@@ -103,14 +103,14 @@ Current guardrails:
 
 - `SPUMP` is non-transferable.
 - S1 creator positions are virtual and non-transferable.
-- Buy burns `SPUMP`; sell mints back through the protocol PDA.
+- Buy burns `SPUMP`; sell remains mathematically unchanged in this phase and should be presented as "unbacking" in user-facing copy.
 - Sell has dynamic exit tax while creator is `S1_Active`.
 - Buyout acceptance stops normal S1 buy/sell and opens only a 48-hour rage-quit window.
 - S1 buy requires a registered user profile with fan role and minimum activity score.
 - Each user has a per-creator daily S1 buy budget cap denominated in burned `SPUMP`, not virtual shares.
 - New user daily `SPUMP` emission is lower during the new-account window.
 - Rating updates are oracle-signed, daily-limited, capped by max daily delta, and delayed before they affect price.
-- Early cohort buyout claims are split into a separate pool capped by protocol bps.
+- Backer buyout rewards are capped per user and decoupled from S1 balance size. Early cohort status can affect the fixed unit amount, but no reward formula may multiply by `internal_token_balance`.
 
 Default anti-arbitrage parameters:
 
@@ -120,6 +120,13 @@ max_s1_daily_buy_spump = 15,000,000 base units = 15 SPUMP
 s1_early_cohort_supply_threshold = 500
 s1_early_cohort_buyout_cap_bps = 2,000
 s1_rage_quit_window_seconds = 172,800
+s1_buyout_creator_share_bps = 8,000
+s1_buyout_reward_model = EarlinessTiered
+s1_discovery_reward_cap_usdc = 100,000,000 raw USDC
+s1_status_thankyou_usdc = 10,000,000 raw USDC
+s1_buyout_residual_to = Creator
+s1_discovery_min_hold_seconds = 0
+s1_discovery_claim_window_seconds = 2,592,000
 ```
 
 ## S1 Buyout Lifecycle
@@ -140,15 +147,48 @@ S2_Active
 S1 positions cleared as holders claim
 ```
 
-During `S1_Auction_Pending`, normal S1 buy/sell is blocked. During `S1_Execution_Pending`, normal buy/sell remains blocked and holders can only use `rage_quit_s1` before the configured deadline. After graduation, holders claim USDC against the accepted offer vault and their virtual S1 positions are zeroed.
+During `S1_Auction_Pending`, normal S1 buy/sell is blocked. During `S1_Execution_Pending`, normal buy/sell remains blocked and holders can only use `rage_quit_s1` before the configured deadline. After graduation, holders may claim a capped discovery reward against the accepted offer vault and their virtual S1 positions are zeroed. The instruction name `claim_s1_buyout_usdc` is retained for IDL/client compatibility, but the product meaning is "claim discovery reward," not "claim buyout share."
 
-The buyout split is bucketed at graduation:
+Graduation is currently oracle-gated even though the holder counts are now maintained on-chain. `execute_s1_graduation` requires the caller to be `ProtocolConfig.oracle_authority`, reads holder counts from `CreatorProfile`, and no longer accepts an external holder-count argument. The oracle constraint is a conservative transition guard; whether to restore permissionless cranking after audit is an explicit open decision.
+
+S1 holder counts are chain-maintained true values for new S1 cycles:
 
 ```text
-early_supply = min(creator.s1_early_cohort_supply, creator.s1_supply)
-early_pool = min(natural pro-rata, buyout_amount * early_cap_bps / 10_000)
-regular_pool = buyout_amount - early_pool
+eligible holder <=> S1UserPosition.internal_token_balance > 0
+early holder <=> min(early_cohort_balance, internal_token_balance) > 0
+regular holder <=> eligible and not early
 ```
+
+`CreatorProfile` stores `s1_eligible_holder_count`, `s1_early_holder_count`, and `s1_regular_holder_count`. `buy_s1_token`, `sell_s1_token`, and `rage_quit_s1` update these counters by diffing the user's pre-change and post-change bucket. Counter underflow is a hard error, not a saturating correction.
+
+Migration caveat: legacy `CreatorProfile` accounts receive zeroed holder counters during realloc migration because the historical holder distribution cannot be reconstructed from the profile account alone. Any pre-migration, not-yet-graduated buyout must either stay on the temporary oracle-snapshot path or be handled by a one-time backfill script that scans all `S1UserPosition` accounts and writes the reconstructed counts before graduation. New S1 cycles created after the counter migration use the chain counters as the source of truth.
+
+The buyout split is snapshotted at graduation:
+
+```text
+creator_payout_usdc = buyout_amount * s1_buyout_creator_share_bps / 10_000
+discovery_pool_usdc = buyout_amount - creator_payout_usdc
+discovery_pool_remaining = discovery_pool_usdc
+```
+
+Reward models are stored as a chain enum snapshot so later config changes do not alter accepted buyouts:
+
+| Model | Meaning |
+| --- | --- |
+| `FlatEqual` | Every eligible backer receives `min(pool_remaining / eligible_holder_count, cap)`. |
+| `EarlinessTiered` | Eligible early backers and regular backers receive fixed unit amounts based on tier counts and weights, not on S1 balance size. Current code uses early weight `2` and regular weight `1`, then applies the per-user cap. |
+| `StatusPrimary` | Backers primarily receive founding-supporter status; USDC is limited to `min(s1_status_thankyou_usdc, cap, pool_remaining)`. |
+
+Residual USDC exists because capped, decoupled rewards may leave pool dust or unused budget. `s1_buyout_residual_to` controls whether the remaining pool returns to the creator or sponsor. It must never be redistributed pro-rata to backers.
+
+Residual and vault liveness:
+
+- Normal close path: when the last counted claimant finalizes, residual USDC is sent to the snapshotted residual destination, `discovery_pool_remaining` reaches zero, and the accepted offer vault is closed. Vault rent is returned to the sponsor, matching the offer funding/rent payer flow.
+- Claim window: `s1_discovery_claim_window_seconds` defaults to 30 days from `graduated_at`.
+- Sweep path: after the claim window, `sweep_s1_buyout_residual` may be called only by `oracle_authority` or `admin`. It sends all remaining vault USDC to the snapshotted residual destination, zeroes the remaining holder counts/pool, closes the vault, and emits `S1BuyoutResidualSwept`.
+- Post-sweep: unclaimed discovery rewards are expired. Later claims are expected to fail because the vault is closed or empty.
+
+Ineligible claim attempts are explicit errors. A caller outside the counted holder set, a user with no S1 balance, or a user who fails the hold-duration gate must not have their `S1UserPosition` cleared. The only zero-USDC path that may clear a position is a counted, eligible holder whose configured model legitimately yields `0` reward, such as `StatusPrimary` with zero thank-you amount.
 
 The creator also receives a SPUMP graduation bonus equal to 50% of the full S1 curve sell return at the final supply. The other 50% is not minted.
 
@@ -156,17 +196,17 @@ The creator also receives a SPUMP graduation bonus equal to 50% of the full S1 c
 
 The fixed localnet acceptance path is `npm run test:s1:happy` with a local validator running the current `streampump_core.so`.
 
-The test uses a short `2` second rage-quit window and restores the production `48h` value afterward. It creates an isolated creator, sponsor, and `21` fans:
+The test uses a short `2` second rage-quit window and restores the production `48h` value afterward. It creates an isolated creator, sponsor, and fans with unequal S1 balances to prove the USDC reward is not balance-proportional:
 
 ```text
-21 fans * 25 S1 shares = 525 total supply
-early cohort threshold = 500 shares
 buyout offer = 1,000 USDC raw amount = 1,000,000,000
-early pool = 200,000,000
-regular pool = 800,000,000
+creator share = 800,000,000
+discovery pool = 200,000,000
+eligible snapshot in test = 2 early holders
+per-user cap in test = 50,000,000
 ```
 
-Acceptance requires the creator to reach `S2_Active`, level `>= 2`, one early holder to claim `10,000,000` raw USDC, one regular holder to claim `800,000,000` raw USDC, and both claimant positions to be zeroed.
+Acceptance requires the creator to reach `S2_Active`, level `>= 2`, the creator to receive the configured creator share at graduation, the two on-chain-counted early holders with different S1 balances to receive equal capped discovery rewards, residual USDC to flow to the configured destination, the vault to close after the final counted claim, and claimant positions to be zeroed. Ineligible claim attempts are rejected and do not clear positions.
 
 ## Readiness Scope
 
@@ -175,7 +215,6 @@ This S1 work is protocol and backend readiness. The live trading UI should still
 Recommended next additions:
 
 - Frontend display of rating provenance and next update time.
-- S1 buyout read model showing early-supporter concentration before creator accepts an offer.
-- Add a `rage_quit_s1` event and backend projection branch so read models reflect rage-quit exits before graduation.
-- Add market projection handling for cancelled and reclaimed buyout offers.
-- Add early/regular buyout bucket fields to the backend projection if the frontend needs to display claim pool breakdowns directly.
+- Backfill tooling for pre-counter, in-flight S1 buyouts before `execute_s1_graduation`.
+- Wallet-backed devnet smoke for graduation, capped discovery reward claim, residual transfer, and projection reconciliation.
+- Legal/audit review of the remaining open question: whether S1 unbacking should continue returning SPUMP or become full consumption in a later task.

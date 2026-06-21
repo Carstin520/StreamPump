@@ -23,7 +23,7 @@ use crate::{
     errors::StreamPumpError,
     events::S1RageQuit,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1BuyoutState, S1UserPosition},
-    utils::{calculate_sell_return_with_rating, checked_sub},
+    utils::{apply_s1_holder_counter_delta, calculate_sell_return_with_rating, checked_sub},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -141,6 +141,7 @@ pub(crate) fn handler(ctx: Context<RageQuitS1>, args: RageQuitS1Args) -> Result<
     let creator_profile = &mut ctx.accounts.creator_profile;
 
     let balance_before = position.internal_token_balance;
+    let early_balance_before = position.early_cohort_balance;
     let cost_basis_before = position.spump_cost_basis;
     let released_cost_basis = if args.amount == balance_before {
         cost_basis_before
@@ -164,6 +165,13 @@ pub(crate) fn handler(ctx: Context<RageQuitS1>, args: RageQuitS1Args) -> Result<
     creator_profile.s1_early_cohort_supply = checked_sub(
         creator_profile.s1_early_cohort_supply,
         early_balance_reduction,
+    )?;
+    apply_s1_holder_counter_delta(
+        creator_profile,
+        balance_before,
+        early_balance_before,
+        position.internal_token_balance,
+        position.early_cohort_balance,
     )?;
     creator_profile.updated_at = now;
 

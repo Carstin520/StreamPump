@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { startTransition, useMemo, useState } from "react";
 
+import { InfluenceChip } from "@/components/shared/InfluenceChip";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
-import { CurrentUserRecord, PostRecord, UserNoteRecord } from "@/lib/api/types";
+import { CurrentUserRecord, InfluenceRecord, PostRecord, UserNoteRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 import { EXPLORE_PATH } from "@/lib/routes";
 import { compactNumber } from "@/lib/mocks/utils";
@@ -12,10 +13,12 @@ type MeTab = "saved" | "history" | "likes" | "about";
 
 export const MeSurface = ({
   currentUser,
+  influence,
   posts,
   savedPosts,
 }: {
   currentUser: CurrentUserRecord;
+  influence: InfluenceRecord | null;
   posts: PostRecord[];
   savedPosts: UserNoteRecord[];
 }) => {
@@ -46,7 +49,7 @@ export const MeSurface = ({
 
   return (
     <div className="mx-auto max-w-[960px] space-y-4 py-3">
-      <ProfileHeader currentUser={currentUser} />
+      <ProfileHeader currentUser={currentUser} influence={influence} />
 
       <div className="flex items-center gap-1 border-b border-white/[0.06]">
         {tabs.map((tab) => (
@@ -81,7 +84,7 @@ export const MeSurface = ({
 
 /* ──────────────────────────────  Profile header  ────────────────────────────── */
 
-const ProfileHeader = ({ currentUser }: { currentUser: CurrentUserRecord }) => {
+const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRecord; influence: InfluenceRecord | null }) => {
   const { t } = useI18n();
   const truncatedWallet = currentUser.primaryWallet
     ? `${currentUser.primaryWallet.slice(0, 4)}...${currentUser.primaryWallet.slice(-4)}`
@@ -114,6 +117,7 @@ const ProfileHeader = ({ currentUser }: { currentUser: CurrentUserRecord }) => {
           <div className="min-w-0 flex-1 pb-0.5">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-bold tracking-[-0.03em] text-white sm:text-2xl">{currentUser.name}</h1>
+              {influence ? <InfluenceChip influence={influence} /> : null}
               {currentUser.sessionMode ? (
                 <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
                   {currentUser.sessionMode}

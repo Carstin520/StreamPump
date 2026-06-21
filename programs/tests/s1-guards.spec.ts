@@ -19,6 +19,19 @@ import { getTestContext, type TestContext } from "./helpers/test_context";
 
 const USER_ROLE_FAN = 1 << 0;
 const NONZERO_REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 1);
+const DEFAULT_REWARD_CAP_USDC = 100_000_000;
+
+const defaultRewardConfigArgs = (ctx: TestContext) => ({
+  s1BuyoutCreatorShareBps: 8_000,
+  s1BuyoutRewardModel: 1,
+  s1DiscoveryRewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+  s1StatusThankyouUsdc: ctx.bn(10_000_000),
+  s1BuyoutResidualTo: 0,
+  s1DiscoveryMinHoldSeconds: ctx.bn(0),
+  s1DiscoveryClaimWindowSeconds: ctx.bn(30 * 24 * 3_600),
+  track2RewardCapUsdc: ctx.bn(DEFAULT_REWARD_CAP_USDC),
+  track2ResidualTo: 1,
+});
 
 const deriveUserProfile = (ctx: TestContext, user: PublicKey): PublicKey =>
   PublicKey.findProgramAddressSync(
@@ -150,6 +163,61 @@ const prepareFan = async (ctx: TestContext): Promise<PublicKey> => {
   return userProfile;
 };
 
+const prepareFreshFan = async (
+  ctx: TestContext,
+  rewardAmount = 20_000_000
+): Promise<{ fan: Keypair; userProfile: PublicKey; spumpAta: PublicKey }> => {
+  const fan = Keypair.generate();
+  await fundSigner(ctx, fan);
+  const userProfile = deriveUserProfile(ctx, fan.publicKey);
+  const spumpAta = await createAssociatedTokenAccount(
+    ctx.connection,
+    ctx.payer,
+    ctx.spumpMint,
+    fan.publicKey,
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
+
+  await ctx.program.methods
+    .registerUser({ roleFlags: USER_ROLE_FAN })
+    .accounts({
+      authority: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan])
+    .rpc();
+
+  const reportId = Array.from(Keypair.generate().publicKey.toBytes());
+  await ctx.program.methods
+    .claimEngagementReward({
+      missionType: { completeProfile: {} },
+      rewardAmount: ctx.bn(rewardAmount),
+      xpGain: ctx.bn(20),
+      newLevel: null,
+      reportId,
+      reportDigest: NONZERO_REPORT_DIGEST,
+      observedAt: ctx.bn(ctx.nowTs() - 5),
+    })
+    .accounts({
+      user: fan.publicKey,
+      oracle: ctx.oracle.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      rewardReceipt: deriveUserRewardReceipt(ctx, userProfile, reportId),
+      userSpumpAta: spumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan, ctx.oracle])
+    .rpc();
+
+  return { fan, userProfile, spumpAta };
+};
+
 describe("streampump-core S1 guards", function () {
   this.timeout(300_000);
 
@@ -231,6 +299,134 @@ describe("streampump-core S1 guards", function () {
           .rpc(),
       "InsufficientUserActivityScore"
     );
+  });
+
+  it("maintains S1 holder counters across first buy, repeat buy, bucket migration, and full sell", async () => {
+    await ctx.program.methods
+      .updateProtocolS1Emission({
+        dailySpumpEmissionMultiplierBps: 50_000,
+        newUserEmissionBps: 2_500,
+        newUserEmissionWindowSeconds: ctx.bn(7 * 24 * 3_600),
+        s1MinUserXp: ctx.bn(10),
+        maxS1DailyBuySpump: ctx.bn(1_000_000_000),
+        s1EarlyCohortSupplyThreshold: ctx.bn(500),
+        s1EarlyCohortBuyoutCapBps: 2_000,
+        s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
+        ...defaultRewardConfigArgs(ctx),
+      })
+      .accounts({
+        admin: ctx.payer.publicKey,
+        protocolConfig: ctx.protocolConfig,
+      })
+      .rpc();
+
+    const { creator, creatorProfile } = await createS1Creator(ctx, "s1_holder_counter_guard");
+    const creatorSpumpAta = await createAssociatedTokenAccount(
+      ctx.connection,
+      ctx.payer,
+      ctx.spumpMint,
+      creator.publicKey,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+    const { fan, userProfile, spumpAta } = await prepareFreshFan(ctx, 1_000_000_000);
+    const s1UserPosition = deriveS1Position(ctx, fan.publicKey, creatorProfile);
+
+    const buyAccounts = {
+      user: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      creatorProfile,
+      s1UserPosition,
+      userSpumpAta: spumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    };
+    const sellAccounts = {
+      user: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      creatorProfile,
+      s1UserPosition,
+      userSpumpAta: spumpAta,
+      creatorRevenueSpumpAta: creatorSpumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+    };
+
+    await ctx.program.methods
+      .buyS1Token({ amount: ctx.bn(600) })
+      .accounts(buyAccounts)
+      .signers([fan])
+      .rpc();
+
+    let creatorAfter = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfter.s1EligibleHolderCount).to.equal(1);
+    expect(creatorAfter.s1EarlyHolderCount).to.equal(1);
+    expect(creatorAfter.s1RegularHolderCount).to.equal(0);
+
+    await ctx.program.methods
+      .buyS1Token({ amount: ctx.bn(1) })
+      .accounts(buyAccounts)
+      .signers([fan])
+      .rpc();
+
+    creatorAfter = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfter.s1EligibleHolderCount).to.equal(1);
+    expect(creatorAfter.s1EarlyHolderCount).to.equal(1);
+    expect(creatorAfter.s1RegularHolderCount).to.equal(0);
+
+    await ctx.program.methods
+      .sellS1Token({ amount: ctx.bn(500) })
+      .accounts(sellAccounts)
+      .signers([fan])
+      .rpc();
+
+    creatorAfter = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfter.s1EligibleHolderCount).to.equal(1);
+    expect(creatorAfter.s1EarlyHolderCount).to.equal(0);
+    expect(creatorAfter.s1RegularHolderCount).to.equal(1);
+
+    await ctx.program.methods
+      .sellS1Token({ amount: ctx.bn(50) })
+      .accounts(sellAccounts)
+      .signers([fan])
+      .rpc();
+
+    creatorAfter = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfter.s1EligibleHolderCount).to.equal(1);
+    expect(creatorAfter.s1EarlyHolderCount).to.equal(0);
+    expect(creatorAfter.s1RegularHolderCount).to.equal(1);
+
+    await ctx.program.methods
+      .sellS1Token({ amount: ctx.bn(51) })
+      .accounts(sellAccounts)
+      .signers([fan])
+      .rpc();
+
+    creatorAfter = await ctx.program.account.creatorProfile.fetch(creatorProfile);
+    expect(creatorAfter.s1EligibleHolderCount).to.equal(0);
+    expect(creatorAfter.s1EarlyHolderCount).to.equal(0);
+    expect(creatorAfter.s1RegularHolderCount).to.equal(0);
+
+    await ctx.program.methods
+      .updateProtocolS1Emission({
+        dailySpumpEmissionMultiplierBps: 50_000,
+        newUserEmissionBps: 2_500,
+        newUserEmissionWindowSeconds: ctx.bn(7 * 24 * 3_600),
+        s1MinUserXp: ctx.bn(10),
+        maxS1DailyBuySpump: ctx.bn(15_000_000),
+        s1EarlyCohortSupplyThreshold: ctx.bn(500),
+        s1EarlyCohortBuyoutCapBps: 2_000,
+        s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
+        ...defaultRewardConfigArgs(ctx),
+      })
+      .accounts({
+        admin: ctx.payer.publicKey,
+        protocolConfig: ctx.protocolConfig,
+      })
+      .rpc();
   });
 
   it("caps each user creator pair by daily SPUMP budget instead of share amount", async () => {
@@ -688,6 +884,7 @@ describe("streampump-core S1 guards", function () {
             s1EarlyCohortSupplyThreshold: ctx.bn(500),
             s1EarlyCohortBuyoutCapBps: 2_000,
             s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
+            ...defaultRewardConfigArgs(ctx),
           })
           .accounts({
             admin: ctx.fanA.publicKey,
@@ -708,6 +905,7 @@ describe("streampump-core S1 guards", function () {
         s1EarlyCohortSupplyThreshold: ctx.bn(500),
         s1EarlyCohortBuyoutCapBps: 2_000,
         s1RageQuitWindowSeconds: ctx.bn(48 * 3_600),
+        ...defaultRewardConfigArgs(ctx),
       })
       .accounts({
         admin: ctx.payer.publicKey,

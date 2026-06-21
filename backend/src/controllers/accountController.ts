@@ -16,6 +16,7 @@ import {
   updateAccountProfile,
 } from "../services/accountProfile";
 import { findAuthIdentityByWallet } from "../services/auth";
+import { buildInfluenceSnapshot } from "../services/influenceService";
 
 const parseAccountRole = (value: unknown): AccountRole => {
   const role = String(value ?? "").trim().toUpperCase();
@@ -88,6 +89,16 @@ export const getAccountMe = async (req: Request, res: Response) => {
     }
   } catch (error) {
     handleControllerError(res, error, "GET_ACCOUNT_ME_FAILED");
+  }
+};
+
+export const getAccountInfluence = async (req: Request, res: Response) => {
+  try {
+    requireSessionWallet(req);
+    const PREVIEW_LEVEL = 3;
+    ok(res, buildInfluenceSnapshot(PREVIEW_LEVEL));
+  } catch (error) {
+    handleControllerError(res, error, "GET_ACCOUNT_INFLUENCE_FAILED");
   }
 };
 

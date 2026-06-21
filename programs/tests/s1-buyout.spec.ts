@@ -120,15 +120,20 @@ describe("streampump-core S1 buyout", function () {
         ctx.program.methods
           .executeS1Graduation()
           .accounts({
-            executor: ctx.fanA.publicKey,
+            executor: ctx.oracle.publicKey,
             protocolConfig: ctx.protocolConfig,
             creatorProfile,
             s1BuyoutState,
+            buyoutOffer,
+            offerUsdcVault,
+            creatorUsdcAta: ctx.creatorS1UsdcAta,
             creatorRevenueSpumpAta: ctx.creatorS1SpumpAta,
             spumpMint: ctx.spumpMint,
+            usdcMint: ctx.usdcMint,
             spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
           })
-          .signers([ctx.fanA])
+          .signers([ctx.oracle])
           .rpc(),
       "RageQuitWindowStillOpen"
     );

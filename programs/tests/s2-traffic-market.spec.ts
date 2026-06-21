@@ -30,9 +30,112 @@
  */
 
 import { expect } from "chai";
-import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { SystemProgram } from "@solana/web3.js";
+import {
+  createAssociatedTokenAccount,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
 import { getTestContext, type TestContext } from "./helpers/test_context";
+
+const USER_ROLE_FAN = 1 << 0;
+const REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 41);
+
+const deriveUserProfile = (ctx: TestContext, user: PublicKey): PublicKey =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("user_profile"), user.toBuffer()],
+    ctx.program.programId
+  )[0];
+
+const deriveUserRewardReceipt = (
+  ctx: TestContext,
+  userProfile: PublicKey,
+  reportId: number[]
+): PublicKey =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("user_reward_receipt"), userProfile.toBuffer(), Buffer.from(reportId)],
+    ctx.program.programId
+  )[0];
+
+const createFundedFan = async (
+  ctx: TestContext,
+  spumpRewardAmount: bigint
+): Promise<{ fan: Keypair; spumpAta: PublicKey; usdcAta: PublicKey }> => {
+  const fan = Keypair.generate();
+  await sendAndConfirmTransaction(
+    ctx.connection,
+    new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: ctx.payer.publicKey,
+        toPubkey: fan.publicKey,
+        lamports: LAMPORTS_PER_SOL,
+      })
+    ),
+    [ctx.payer]
+  );
+  const spumpAta = await createAssociatedTokenAccount(
+    ctx.connection,
+    ctx.payer,
+    ctx.spumpMint,
+    fan.publicKey,
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
+  const usdcAta = await createAssociatedTokenAccount(
+    ctx.connection,
+    ctx.payer,
+    ctx.usdcMint,
+    fan.publicKey,
+    undefined,
+    TOKEN_PROGRAM_ID
+  );
+  const userProfile = deriveUserProfile(ctx, fan.publicKey);
+
+  await ctx.program.methods
+    .registerUser({ roleFlags: USER_ROLE_FAN })
+    .accounts({
+      authority: fan.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan])
+    .rpc();
+
+  const reportId = Array.from(Keypair.generate().publicKey.toBytes());
+  await ctx.program.methods
+    .claimEngagementReward({
+      missionType: { completeProfile: {} },
+      rewardAmount: ctx.bn(spumpRewardAmount),
+      xpGain: ctx.bn(10),
+      newLevel: null,
+      reportId,
+      reportDigest: REPORT_DIGEST,
+      observedAt: ctx.bn(ctx.nowTs() - 5),
+    })
+    .accounts({
+      user: fan.publicKey,
+      oracle: ctx.oracle.publicKey,
+      protocolConfig: ctx.protocolConfig,
+      userProfile,
+      rewardReceipt: deriveUserRewardReceipt(ctx, userProfile, reportId),
+      userSpumpAta: spumpAta,
+      spumpMint: ctx.spumpMint,
+      spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([fan, ctx.oracle])
+    .rpc();
+
+  return { fan, spumpAta, usdcAta };
+};
 
 describe("streampump-core S2 traffic market", function () {
   // Allow up to 5 minutes (tests involve waiting for deadlines)
@@ -232,11 +335,14 @@ describe("streampump-core S2 traffic market", function () {
         user: ctx.fanA.publicKey,
         protocolConfig: ctx.protocolConfig,
         proposal,
+        creatorProfile,
         endorsementPosition,
         userSpumpAta: ctx.fanASpumpAta,
         spumpMint: ctx.spumpMint,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
         userUsdcAta: ctx.fanAUsdcAta,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -259,6 +365,134 @@ describe("streampump-core S2 traffic market", function () {
       endorsementPosition
     );
     expect(positionAfterClaim.claimed).to.equal(true);
+  });
+
+  it("pays equal capped Track2 rewards to unequal stake endorsers and refunds residual to sponsor", async () => {
+    const track1Base = 1_000n;
+    const track2Budget = 2_000_000_000n;
+    const track3Budget = 0n;
+    const track2Target = 1_000n;
+    const fanAStake = 100_000n;
+    const fanBStake = 300_000n;
+
+    const fanB = await createFundedFan(ctx, 1_000_000n);
+    const { creatorProfile, proposal, proposalUsdcVault, deadline } =
+      await ctx.createFundedProposal({
+        creator: ctx.creatorS2,
+        sponsor: ctx.sponsorA,
+        track1Base,
+        track2Amount: track2Budget,
+        track3Amount: track3Budget,
+        track2Target,
+        track2MinAchievementBps: 5_000,
+      });
+
+    const fanAPosition = ctx.deriveEndorsementPosition(ctx.fanA.publicKey, proposal);
+    const fanBPosition = ctx.deriveEndorsementPosition(fanB.fan.publicKey, proposal);
+
+    await ctx.program.methods
+      .endorseProposal({ amount: ctx.bn(fanAStake) })
+      .accounts({
+        user: ctx.fanA.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        endorsementPosition: fanAPosition,
+        userSpumpAta: ctx.fanASpumpAta,
+        spumpMint: ctx.spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([ctx.fanA])
+      .rpc();
+
+    await ctx.program.methods
+      .endorseProposal({ amount: ctx.bn(fanBStake) })
+      .accounts({
+        user: fanB.fan.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        endorsementPosition: fanBPosition,
+        userSpumpAta: fanB.spumpAta,
+        spumpMint: ctx.spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([fanB.fan])
+      .rpc();
+
+    await ctx.waitUntilDeadline(deadline);
+
+    const sponsorBeforeClaims = await ctx.tokenAmount(ctx.sponsorAUsdcAta, TOKEN_PROGRAM_ID);
+    await ctx.program.methods
+      .settleTrack2({ actualValue: ctx.bn(track2Target) })
+      .accounts({
+        oracle: ctx.oracle.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        proposalUsdcVault,
+        creatorProfile,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([ctx.oracle])
+      .rpc();
+
+    const proposalAfterSettle = await ctx.program.account.proposal.fetch(proposal);
+    expect(proposalAfterSettle.track2InitialFanPool.toString()).to.equal("400000000");
+    expect(proposalAfterSettle.track2RewardCapUsdc.toString()).to.equal("100000000");
+    expect(proposalAfterSettle.track2UnsettledEndorserCount).to.equal(2);
+
+    const fanAUsdcBefore = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
+    const fanBUsdcBefore = await ctx.tokenAmount(fanB.usdcAta, TOKEN_PROGRAM_ID);
+
+    await ctx.program.methods
+      .claimEndorsement()
+      .accounts({
+        user: ctx.fanA.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        creatorProfile,
+        endorsementPosition: fanAPosition,
+        userSpumpAta: ctx.fanASpumpAta,
+        spumpMint: ctx.spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        userUsdcAta: ctx.fanAUsdcAta,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
+        proposalUsdcVault,
+        usdcTokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    await ctx.program.methods
+      .claimEndorsement()
+      .accounts({
+        user: fanB.fan.publicKey,
+        protocolConfig: ctx.protocolConfig,
+        proposal,
+        creatorProfile,
+        endorsementPosition: fanBPosition,
+        userSpumpAta: fanB.spumpAta,
+        spumpMint: ctx.spumpMint,
+        spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
+        userUsdcAta: fanB.usdcAta,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
+        proposalUsdcVault,
+        usdcTokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const fanAUsdcAfter = await ctx.tokenAmount(ctx.fanAUsdcAta, TOKEN_PROGRAM_ID);
+    const fanBUsdcAfter = await ctx.tokenAmount(fanB.usdcAta, TOKEN_PROGRAM_ID);
+    const sponsorAfterClaims = await ctx.tokenAmount(ctx.sponsorAUsdcAta, TOKEN_PROGRAM_ID);
+    const proposalAfterClaims = await ctx.program.account.proposal.fetch(proposal);
+
+    expect(fanAUsdcAfter - fanAUsdcBefore).to.equal(100_000_000n);
+    expect(fanBUsdcAfter - fanBUsdcBefore).to.equal(100_000_000n);
+    expect(sponsorAfterClaims - sponsorBeforeClaims).to.equal(200_000_000n);
+    expect(proposalAfterClaims.track2UsdcDeposited.toString()).to.equal("0");
   });
 
   // =====================================================================
@@ -361,11 +595,14 @@ describe("streampump-core S2 traffic market", function () {
         user: ctx.fanA.publicKey,
         protocolConfig: ctx.protocolConfig,
         proposal,
+        creatorProfile,
         endorsementPosition,
         userSpumpAta: ctx.fanASpumpAta,
         spumpMint: ctx.spumpMint,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
         userUsdcAta: ctx.fanAUsdcAta,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -553,7 +790,7 @@ describe("streampump-core S2 traffic market", function () {
     const track2Target = 1_000n;
     const stakeAmount = 90_000n;        // Fan stakes 90,000 SPUMP / 粉丝质押 90,000 SPUMP
 
-    const { proposal, proposalUsdcVault, deadline } = await ctx.createFundedProposal({
+    const { creatorProfile, proposal, proposalUsdcVault, deadline } = await ctx.createFundedProposal({
       creator: ctx.creatorS2,
       sponsor: ctx.sponsorA,
       track1Base,
@@ -626,11 +863,14 @@ describe("streampump-core S2 traffic market", function () {
         user: ctx.fanA.publicKey,
         protocolConfig: ctx.protocolConfig,
         proposal,
+        creatorProfile,
         endorsementPosition,
         userSpumpAta: ctx.fanASpumpAta,
         spumpMint: ctx.spumpMint,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
         userUsdcAta: ctx.fanAUsdcAta,
+        creatorUsdcAta: ctx.creatorS2UsdcAta,
+        sponsorUsdcAta: ctx.sponsorAUsdcAta,
         proposalUsdcVault,
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })

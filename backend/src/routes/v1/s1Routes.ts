@@ -14,6 +14,7 @@ import {
   buildReclaimBuyoutOfferTransaction,
   buildRegisterUserTransaction,
   buildSellS1Transaction,
+  buildSweepS1BuyoutResidualTransaction,
   buildSubmitBuyoutOfferTransaction,
   getS1TransactionStatus,
   managedWalletExecute,
@@ -37,6 +38,7 @@ router.post("/buyout/reclaim/build", requireSessionAuth, buildReclaimBuyoutOffer
 router.post("/buyout/abort/build", requireSessionAuth, buildAbortS1BuyoutTransaction);
 router.post("/buyout/graduation/build", requireSessionAuth, buildExecuteS1GraduationTransaction);
 router.post("/buyout/claim-usdc/build", requireSessionAuth, buildClaimS1BuyoutUsdcTransaction);
+router.post("/buyout/sweep-residual/build", requireSessionAuth, buildSweepS1BuyoutResidualTransaction);
 router.post("/managed/execute", requireSessionAuth, managedWalletExecute);
 router.post("/transactions/submit", requireSessionAuth, submitS1Transaction);
 router.get("/transactions/:signature/status", requireSessionAuth, getS1TransactionStatus);

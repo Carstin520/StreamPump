@@ -30,7 +30,8 @@ use crate::{
     events::S1TokenSold,
     state::{CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition},
     utils::{
-        activate_pending_s1_rating, amount_from_bps, calculate_sell_return_with_rating, checked_sub,
+        activate_pending_s1_rating, amount_from_bps, apply_s1_holder_counter_delta,
+        calculate_sell_return_with_rating, checked_sub,
     },
 };
 
@@ -229,6 +230,7 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     let creator_profile = &mut ctx.accounts.creator_profile;
 
     let balance_before = position.internal_token_balance;
+    let early_balance_before = position.early_cohort_balance;
     let cost_basis_before = position.spump_cost_basis;
     let released_cost_basis = if args.amount == balance_before {
         cost_basis_before
@@ -252,6 +254,13 @@ pub(crate) fn handler(ctx: Context<SellS1Token>, args: SellS1TokenArgs) -> Resul
     creator_profile.s1_early_cohort_supply = checked_sub(
         creator_profile.s1_early_cohort_supply,
         early_balance_reduction,
+    )?;
+    apply_s1_holder_counter_delta(
+        creator_profile,
+        balance_before,
+        early_balance_before,
+        position.internal_token_balance,
+        position.early_cohort_balance,
     )?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 

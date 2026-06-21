@@ -55,6 +55,9 @@ export interface OnChainProposalState {
   track2SettledAtUnix: bigint;
   track2InitialFanPool: bigint;
   track2InitialSpumpStaked: bigint;
+  track2RewardCapUsdc: bigint;
+  track2ResidualTo: number;
+  track2RewardModelSnapshot: number;
   track3UsdcDeposited: bigint;
   track3CpsPayout: bigint | null;
   track3DelayDays: number;
@@ -74,6 +77,9 @@ export interface OnChainCreatorProfileState {
   status: "S1_ACTIVE" | "S1_AUCTION_PENDING" | "S1_EXECUTION_PENDING" | "S2_ACTIVE" | "SUSPENDED";
   s1Supply: bigint;
   s1EarlyCohortSupply: bigint;
+  s1EligibleHolderCount: number;
+  s1EarlyHolderCount: number;
+  s1RegularHolderCount: number;
   s1RatingBps: number;
   s1GraduationTargetSupply: bigint;
   pendingS1RatingBps: number;
@@ -94,11 +100,23 @@ export interface OnChainS1BuyoutState {
   usdcDeposited: bigint;
   claimableUsdcRemaining: bigint;
   claimableS1SupplyRemaining: bigint;
+  creatorPayoutUsdc: bigint;
+  discoveryPoolUsdc: bigint;
+  discoveryPoolRemaining: bigint;
+  eligibleHolderCount: number;
+  earlyHolderCount: number;
+  regularHolderCount: number;
+  rewardModelSnapshot: number;
+  residualToSnapshot: number;
+  discoveryRewardCapUsdc: bigint;
+  statusThankyouUsdc: bigint;
+  creatorPaid: boolean;
   earlyClaimableUsdcRemaining: bigint;
   earlyClaimableS1SupplyRemaining: bigint;
   regularClaimableUsdcRemaining: bigint;
   regularClaimableS1SupplyRemaining: bigint;
   rageQuitDeadlineUnix: bigint;
+  graduatedAtUnix: bigint;
   bump: number;
 }
 
@@ -136,6 +154,15 @@ type ProtocolConfigAccount = {
   s1EarlyCohortSupplyThreshold?: BN | bigint | number;
   s1EarlyCohortBuyoutCapBps?: number;
   s1RageQuitWindowSeconds?: BN | bigint | number;
+  s1BuyoutCreatorShareBps?: number;
+  s1BuyoutRewardModel?: number;
+  s1DiscoveryRewardCapUsdc?: BN | bigint | number;
+  s1StatusThankyouUsdc?: BN | bigint | number;
+  s1BuyoutResidualTo?: number;
+  s1DiscoveryMinHoldSeconds?: BN | bigint | number;
+  s1DiscoveryClaimWindowSeconds?: BN | bigint | number;
+  track2RewardCapUsdc?: BN | bigint | number;
+  track2ResidualTo?: number;
   minCreatorRatingBps?: number;
   maxCreatorRatingBps?: number;
   maxCreatorRatingDailyDeltaBps?: number;
@@ -151,6 +178,9 @@ type CreatorProfileAccount = {
   status: unknown;
   s1Supply: BN | bigint | number;
   s1EarlyCohortSupply?: BN | bigint | number;
+  s1EligibleHolderCount?: number;
+  s1EarlyHolderCount?: number;
+  s1RegularHolderCount?: number;
   s1RatingBps?: number;
   s1GraduationTargetSupply?: BN | bigint | number;
   pendingS1RatingBps?: number;
@@ -171,11 +201,23 @@ type S1BuyoutStateAccount = {
   usdcDeposited: BN | bigint | number;
   claimableUsdcRemaining: BN | bigint | number;
   claimableS1SupplyRemaining: BN | bigint | number;
+  creatorPayoutUsdc?: BN | bigint | number;
+  discoveryPoolUsdc?: BN | bigint | number;
+  discoveryPoolRemaining?: BN | bigint | number;
+  eligibleHolderCount?: number;
+  earlyHolderCount?: number;
+  regularHolderCount?: number;
+  rewardModelSnapshot?: number;
+  residualToSnapshot?: number;
+  discoveryRewardCapUsdcSnapshot?: BN | bigint | number;
+  statusThankyouUsdcSnapshot?: BN | bigint | number;
+  creatorPaid?: boolean;
   earlyClaimableUsdcRemaining?: BN | bigint | number;
   earlyClaimableS1SupplyRemaining?: BN | bigint | number;
   regularClaimableUsdcRemaining?: BN | bigint | number;
   regularClaimableS1SupplyRemaining?: BN | bigint | number;
   rageQuitDeadline: BN | bigint | number;
+  graduatedAt?: BN | bigint | number;
   bump: number;
 };
 
@@ -218,10 +260,20 @@ export type UpdateProtocolS1EmissionParams = {
   s1EarlyCohortSupplyThreshold: bigint;
   s1EarlyCohortBuyoutCapBps: number;
   s1RageQuitWindowSeconds: number;
+  s1BuyoutCreatorShareBps?: number;
+  s1BuyoutRewardModel?: number;
+  s1DiscoveryRewardCapUsdc?: bigint;
+  s1StatusThankyouUsdc?: bigint;
+  s1BuyoutResidualTo?: number;
+  s1DiscoveryMinHoldSeconds?: number;
+  s1DiscoveryClaimWindowSeconds?: number;
+  track2RewardCapUsdc?: bigint;
+  track2ResidualTo?: number;
 };
 
 export type ProtocolS1ConfigState = UpdateProtocolS1EmissionParams & {
   admin: PublicKey;
+  oracleAuthority: PublicKey;
 };
 
 export type UserMissionTypeName =
@@ -690,6 +742,9 @@ export class AnchorService {
       status: mapCreatorStatus(creator.status),
       s1Supply: toBigInt(creator.s1Supply),
       s1EarlyCohortSupply: toBigInt(creator.s1EarlyCohortSupply),
+      s1EligibleHolderCount: Number(creator.s1EligibleHolderCount ?? 0),
+      s1EarlyHolderCount: Number(creator.s1EarlyHolderCount ?? 0),
+      s1RegularHolderCount: Number(creator.s1RegularHolderCount ?? 0),
       s1RatingBps: Number(creator.s1RatingBps ?? 10_000),
       s1GraduationTargetSupply: toBigInt(creator.s1GraduationTargetSupply ?? 2_500),
       pendingS1RatingBps: Number(creator.pendingS1RatingBps ?? 0),
@@ -727,11 +782,23 @@ export class AnchorService {
       usdcDeposited: toBigInt(buyout.usdcDeposited),
       claimableUsdcRemaining: toBigInt(buyout.claimableUsdcRemaining),
       claimableS1SupplyRemaining: toBigInt(buyout.claimableS1SupplyRemaining),
+      creatorPayoutUsdc: toBigInt(buyout.creatorPayoutUsdc),
+      discoveryPoolUsdc: toBigInt(buyout.discoveryPoolUsdc),
+      discoveryPoolRemaining: toBigInt(buyout.discoveryPoolRemaining),
+      eligibleHolderCount: Number(buyout.eligibleHolderCount ?? 0),
+      earlyHolderCount: Number(buyout.earlyHolderCount ?? 0),
+      regularHolderCount: Number(buyout.regularHolderCount ?? 0),
+      rewardModelSnapshot: Number(buyout.rewardModelSnapshot ?? 1),
+      residualToSnapshot: Number(buyout.residualToSnapshot ?? 0),
+      discoveryRewardCapUsdc: toBigInt(buyout.discoveryRewardCapUsdcSnapshot),
+      statusThankyouUsdc: toBigInt(buyout.statusThankyouUsdcSnapshot),
+      creatorPaid: Boolean(buyout.creatorPaid ?? false),
       earlyClaimableUsdcRemaining: toBigInt(buyout.earlyClaimableUsdcRemaining),
       earlyClaimableS1SupplyRemaining: toBigInt(buyout.earlyClaimableS1SupplyRemaining),
       regularClaimableUsdcRemaining: toBigInt(buyout.regularClaimableUsdcRemaining),
       regularClaimableS1SupplyRemaining: toBigInt(buyout.regularClaimableS1SupplyRemaining),
       rageQuitDeadlineUnix: toBigInt(buyout.rageQuitDeadline),
+      graduatedAtUnix: toBigInt(buyout.graduatedAt),
       bump: Number(buyout.bump ?? 0),
     };
   }
@@ -788,6 +855,7 @@ export class AnchorService {
 
     return {
       admin: account.admin,
+      oracleAuthority: account.oracleAuthority,
       dailySpumpEmissionMultiplierBps: Number(account.dailySpumpEmissionMultiplierBps ?? 10_000),
       newUserEmissionBps: Number(account.newUserEmissionBps ?? 10_000),
       newUserEmissionWindowSeconds: Number(toBigInt(account.newUserEmissionWindowSeconds)),
@@ -796,6 +864,16 @@ export class AnchorService {
       s1EarlyCohortSupplyThreshold: toBigInt(account.s1EarlyCohortSupplyThreshold),
       s1EarlyCohortBuyoutCapBps: Number(account.s1EarlyCohortBuyoutCapBps ?? 0),
       s1RageQuitWindowSeconds: Number(toBigInt(account.s1RageQuitWindowSeconds)),
+      s1BuyoutCreatorShareBps: Number(account.s1BuyoutCreatorShareBps ?? 8_000),
+      s1BuyoutRewardModel: Number(account.s1BuyoutRewardModel ?? 1),
+      s1DiscoveryRewardCapUsdc: toBigInt(account.s1DiscoveryRewardCapUsdc) || 100_000_000n,
+      s1StatusThankyouUsdc: toBigInt(account.s1StatusThankyouUsdc) || 10_000_000n,
+      s1BuyoutResidualTo: Number(account.s1BuyoutResidualTo ?? 0),
+      s1DiscoveryMinHoldSeconds: Number(toBigInt(account.s1DiscoveryMinHoldSeconds)),
+      s1DiscoveryClaimWindowSeconds:
+        Number(toBigInt(account.s1DiscoveryClaimWindowSeconds)) || 2_592_000,
+      track2RewardCapUsdc: toBigInt(account.track2RewardCapUsdc) || 100_000_000n,
+      track2ResidualTo: Number(account.track2ResidualTo ?? 1),
     };
   }
 
@@ -838,6 +916,10 @@ export class AnchorService {
     const { pda: protocolConfigPda, account: protocolConfig } =
       await this.fetchProtocolConfigState();
     this.assertProtocolAdminMatches(protocolConfig);
+    const currentS1DiscoveryCap = toBigInt(protocolConfig.s1DiscoveryRewardCapUsdc);
+    const currentS1StatusThankyou = toBigInt(protocolConfig.s1StatusThankyouUsdc);
+    const currentS1ClaimWindow = Number(toBigInt(protocolConfig.s1DiscoveryClaimWindowSeconds));
+    const currentTrack2Cap = toBigInt(protocolConfig.track2RewardCapUsdc);
 
     const signature = (await this.withRpcTimeout(
       (this.program.methods as any)
@@ -852,6 +934,42 @@ export class AnchorService {
           ),
           s1EarlyCohortBuyoutCapBps: params.s1EarlyCohortBuyoutCapBps,
           s1RageQuitWindowSeconds: new BN(String(params.s1RageQuitWindowSeconds)),
+          s1BuyoutCreatorShareBps:
+            params.s1BuyoutCreatorShareBps ??
+            Number(protocolConfig.s1BuyoutCreatorShareBps ?? 8_000),
+          s1BuyoutRewardModel:
+            params.s1BuyoutRewardModel ??
+            Number(protocolConfig.s1BuyoutRewardModel ?? 1),
+          s1DiscoveryRewardCapUsdc: new BN(
+            (params.s1DiscoveryRewardCapUsdc ??
+              (currentS1DiscoveryCap > 0n ? currentS1DiscoveryCap : 100_000_000n)).toString()
+          ),
+          s1StatusThankyouUsdc: new BN(
+            (params.s1StatusThankyouUsdc ??
+              (currentS1StatusThankyou > 0n ? currentS1StatusThankyou : 10_000_000n)).toString()
+          ),
+          s1BuyoutResidualTo:
+            params.s1BuyoutResidualTo ??
+            Number(protocolConfig.s1BuyoutResidualTo ?? 0),
+          s1DiscoveryMinHoldSeconds: new BN(
+            String(
+              params.s1DiscoveryMinHoldSeconds ??
+                Number(toBigInt(protocolConfig.s1DiscoveryMinHoldSeconds))
+            )
+          ),
+          s1DiscoveryClaimWindowSeconds: new BN(
+            String(
+              params.s1DiscoveryClaimWindowSeconds ??
+                (currentS1ClaimWindow > 0 ? currentS1ClaimWindow : 2_592_000)
+            )
+          ),
+          track2RewardCapUsdc: new BN(
+            (params.track2RewardCapUsdc ??
+              (currentTrack2Cap > 0n ? currentTrack2Cap : 100_000_000n)).toString()
+          ),
+          track2ResidualTo:
+            params.track2ResidualTo ??
+            Number(protocolConfig.track2ResidualTo ?? 1),
         })
         .accounts({
           admin: this.protocolAdmin.publicKey,
@@ -895,6 +1013,9 @@ export class AnchorService {
         track2SettledAtUnix: toBigInt(proposal.track2SettledAt),
         track2InitialFanPool: toBigInt(proposal.track2InitialFanPool),
         track2InitialSpumpStaked: toBigInt(proposal.track2InitialSpumpStaked),
+        track2RewardCapUsdc: toBigInt(proposal.track2RewardCapUsdc),
+        track2ResidualTo: Number(proposal.track2ResidualTo ?? 1),
+        track2RewardModelSnapshot: Number(proposal.track2RewardModelSnapshot ?? 0),
         track3UsdcDeposited: toBigInt(proposal.track3UsdcDeposited),
         track3CpsPayout:
           proposal.track3CpsPayout === null || proposal.track3CpsPayout === undefined
@@ -1232,6 +1353,15 @@ export class AnchorService {
     const proposal = new PublicKey(params.proposalPda);
     const spumpMint = protocolConfig.spumpMint as PublicKey;
     const usdcMint = protocolConfig.usdcMint as PublicKey;
+    const proposalState = await this.fetchProposalState(proposal);
+    if (!proposalState?.sponsor) {
+      throw new Error("Proposal sponsor is required to claim endorsement reward");
+    }
+    const creatorProfile = this.deriveCreatorProfilePda(proposalState.creator);
+    const creator = await this.fetchCreatorProfileByPda(creatorProfile);
+    if (!creator) {
+      throw new Error(`Creator profile not found: ${creatorProfile.toBase58()}`);
+    }
 
     return (this.program.methods as any)
       .claimEndorsement()
@@ -1239,6 +1369,7 @@ export class AnchorService {
         user,
         protocolConfig: this.deriveProtocolConfigPda(),
         proposal,
+        creatorProfile,
         endorsementPosition: this.deriveEndorsementPositionPda(user, proposal),
         userSpumpAta: getAssociatedTokenAddressSync(
           spumpMint,
@@ -1249,6 +1380,8 @@ export class AnchorService {
         spumpMint,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
         userUsdcAta: getAssociatedTokenAddressSync(usdcMint, user),
+        creatorUsdcAta: creator.payoutUsdcAta,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, proposalState.sponsor),
         proposalUsdcVault: this.deriveProposalUsdcVaultPda(proposal),
         usdcTokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -1593,6 +1726,17 @@ export class AnchorService {
     const creator = new PublicKey(params.creatorWallet);
     const creatorProfile = this.deriveCreatorProfilePda(creator);
     const spumpMint = protocolConfig.spumpMint as PublicKey;
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+    const creatorState = await this.fetchCreatorProfileByPda(creatorProfile);
+    if (!creatorState) {
+      throw new Error(`Creator profile not found: ${creatorProfile.toBase58()}`);
+    }
+    const s1BuyoutState = this.deriveS1BuyoutStatePda(creatorProfile);
+    const buyoutState = await this.fetchS1BuyoutStateByPda(s1BuyoutState);
+    if (!buyoutState?.winningSponsor) {
+      throw new Error(`S1 buyout state has no winning sponsor: ${s1BuyoutState.toBase58()}`);
+    }
+    const buyoutOffer = this.deriveBuyoutOfferPda(buyoutState.winningSponsor, creatorProfile);
 
     return (this.program.methods as any)
       .executeS1Graduation()
@@ -1600,14 +1744,19 @@ export class AnchorService {
         executor,
         protocolConfig: this.deriveProtocolConfigPda(),
         creatorProfile,
-        s1BuyoutState: this.deriveS1BuyoutStatePda(creatorProfile),
+        s1BuyoutState,
+        buyoutOffer,
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        creatorUsdcAta: creatorState.payoutUsdcAta,
         creatorRevenueSpumpAta: getAssociatedTokenAddressSync(
           spumpMint,
           creator,
           false,
           TOKEN_2022_PROGRAM_ID
         ),
+        usdcMint,
         spumpMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
       })
       .instruction();
@@ -1625,6 +1774,10 @@ export class AnchorService {
     const creatorProfile = this.deriveCreatorProfilePda(creator);
     const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
     const usdcMint = protocolConfig.usdcMint as PublicKey;
+    const creatorState = await this.fetchCreatorProfileByPda(creatorProfile);
+    if (!creatorState) {
+      throw new Error(`Creator profile not found: ${creatorProfile.toBase58()}`);
+    }
 
     return (this.program.methods as any)
       .claimS1BuyoutUsdc()
@@ -1637,6 +1790,48 @@ export class AnchorService {
         buyoutOffer,
         offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
         userUsdcAta: getAssociatedTokenAddressSync(usdcMint, user),
+        creatorUsdcAta: creatorState.payoutUsdcAta,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        sponsor,
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+  }
+
+  async buildSweepS1BuyoutResidualInstruction(params: {
+    sweeperWallet: string;
+    creatorWallet: string;
+  }): Promise<TransactionInstruction> {
+    const protocolConfig = await this.fetchProtocolConfigAccount();
+    const sweeper = new PublicKey(params.sweeperWallet);
+    const creator = new PublicKey(params.creatorWallet);
+    const creatorProfile = this.deriveCreatorProfilePda(creator);
+    const usdcMint = protocolConfig.usdcMint as PublicKey;
+    const creatorState = await this.fetchCreatorProfileByPda(creatorProfile);
+    if (!creatorState) {
+      throw new Error(`Creator profile not found: ${creatorProfile.toBase58()}`);
+    }
+    const s1BuyoutState = this.deriveS1BuyoutStatePda(creatorProfile);
+    const buyoutState = await this.fetchS1BuyoutStateByPda(s1BuyoutState);
+    if (!buyoutState?.winningSponsor) {
+      throw new Error(`S1 buyout state has no winning sponsor: ${s1BuyoutState.toBase58()}`);
+    }
+    const sponsor = buyoutState.winningSponsor;
+    const buyoutOffer = this.deriveBuyoutOfferPda(sponsor, creatorProfile);
+
+    return (this.program.methods as any)
+      .sweepS1BuyoutResidual()
+      .accounts({
+        sweeper,
+        protocolConfig: this.deriveProtocolConfigPda(),
+        creatorProfile,
+        s1BuyoutState,
+        buyoutOffer,
+        offerUsdcVault: this.deriveOfferUsdcVaultPda(buyoutOffer),
+        creatorUsdcAta: creatorState.payoutUsdcAta,
+        sponsorUsdcAta: getAssociatedTokenAddressSync(usdcMint, sponsor),
+        sponsor,
         usdcMint,
         tokenProgram: TOKEN_PROGRAM_ID,
       })

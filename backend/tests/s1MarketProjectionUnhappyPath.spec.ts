@@ -68,6 +68,9 @@ describe("S1 market projection unhappy path events", () => {
       status: "S1_EXECUTION_PENDING",
       s1Supply: 20n,
       s1EarlyCohortSupply: 20n,
+      s1EligibleHolderCount: 1,
+      s1EarlyHolderCount: 1,
+      s1RegularHolderCount: 0,
       s1RatingBps: 10_000,
       s1GraduationTargetSupply: 2_500n,
       pendingS1RatingBps: 0,
@@ -325,6 +328,9 @@ describe("S1 market projection unhappy path events", () => {
     expect(creatorMarket.stage).to.equal(MarketCreatorStage.S1_BUYOUT);
     expect(creatorMarket.s1Supply).to.equal(20n);
     expect(creatorMarket.holderCount).to.equal(1);
+    expect(creatorMarket.s1EligibleHolderCount).to.equal(1);
+    expect(creatorMarket.s1EarlyHolderCount).to.equal(1);
+    expect(creatorMarket.s1RegularHolderCount).to.equal(0);
     expect(creatorMarket.lastEventSignature).to.equal("rage-quit-sig");
   });
 

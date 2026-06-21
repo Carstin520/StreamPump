@@ -15,6 +15,10 @@ use crate::{
     errors::StreamPumpError,
     state::{
         ProtocolConfig, DEFAULT_MAX_ENDORSEMENT_HARD_CEILING, DEFAULT_MAX_S1_DAILY_BUY_SPUMP,
+        DEFAULT_S1_BUYOUT_CREATOR_SHARE_BPS, DEFAULT_S1_DISCOVERY_MIN_HOLD_SECONDS,
+        DEFAULT_S1_DISCOVERY_CLAIM_WINDOW_SECONDS, DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC,
+        DEFAULT_S1_STATUS_THANKYOU_USDC, DEFAULT_TRACK2_REWARD_CAP_USDC, ResidualDestination,
+        S1BuyoutRewardModel,
         DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS, DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD,
         DEFAULT_S1_GRADUATION_TARGET_SUPPLY, DEFAULT_S1_MIN_USER_XP,
         DEFAULT_S1_RAGE_QUIT_WINDOW_SECONDS, DEFAULT_S1_RATING_BPS,
@@ -180,6 +184,15 @@ pub(crate) fn handler(
     config.s2_min_valid_views = args.s2_min_valid_views;
     config.max_endorsement_hard_ceiling = DEFAULT_MAX_ENDORSEMENT_HARD_CEILING;
     config.max_endorsement_per_user_bps = args.max_endorsement_per_user_bps;
+    config.s1_buyout_creator_share_bps = DEFAULT_S1_BUYOUT_CREATOR_SHARE_BPS;
+    config.s1_buyout_reward_model = S1BuyoutRewardModel::DEFAULT;
+    config.s1_discovery_reward_cap_usdc = DEFAULT_S1_DISCOVERY_REWARD_CAP_USDC;
+    config.s1_status_thankyou_usdc = DEFAULT_S1_STATUS_THANKYOU_USDC;
+    config.s1_buyout_residual_to = ResidualDestination::S1_DEFAULT;
+    config.s1_discovery_min_hold_seconds = DEFAULT_S1_DISCOVERY_MIN_HOLD_SECONDS;
+    config.s1_discovery_claim_window_seconds = DEFAULT_S1_DISCOVERY_CLAIM_WINDOW_SECONDS;
+    config.track2_reward_cap_usdc = DEFAULT_TRACK2_REWARD_CAP_USDC;
+    config.track2_residual_to = ResidualDestination::TRACK2_DEFAULT;
     config.bump = ctx.bumps.protocol_config;
 
     Ok(())

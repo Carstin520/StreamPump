@@ -13,7 +13,7 @@ export const portfolioHoldings: PortfolioHoldingRecord[] = [
     tokenCount: 154,
     avgEntryUsd: 2.64,
     unrealizedChangePct: 18.4,
-    note: "Buyout already accepted. This holding is about claim visibility and supporter payout timing.",
+    note: "Buyout already accepted. This holding is about claim visibility and capped discovery reward timing.",
     currentPriceUsd: 3.24,
     trend: [2.72, 2.84, 2.76, 2.91, 3.03, 3.14, 3.2, 3.24],
   },
@@ -116,4 +116,3 @@ export const portfolioActions: PortfolioActionRecord[] = [
     tone: "neutral",
   },
 ];
-

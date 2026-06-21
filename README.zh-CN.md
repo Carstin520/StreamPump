@@ -4,11 +4,11 @@
     <strong>面向创作者赞助的 Web2.5 信任层——把内容创作、创作者势能、粉丝参与和赞助预算，放进同一个产品闭环，并在 Solana 上结算。</strong>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/Built_on-Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana">
-    <img src="https://img.shields.io/badge/Anchor-0.32-512BD4?style=for-the-badge" alt="Anchor">
-    <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js">
-    <img src="https://img.shields.io/badge/TypeScript-5-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit" alt="Last Commit">
+    <img src="https://img.shields.io/badge/Built_on-Solana-de402a?style=for-the-badge&logo=solana&logoColor=white&labelColor=0a1018" alt="Solana">
+    <img src="https://img.shields.io/badge/Anchor-0.32-1b2740?style=for-the-badge&labelColor=0a1018" alt="Anchor">
+    <img src="https://img.shields.io/badge/Next.js-15-1b2740?style=for-the-badge&logo=nextdotjs&logoColor=white&labelColor=0a1018" alt="Next.js">
+    <img src="https://img.shields.io/badge/TypeScript-5-1b2740?style=for-the-badge&logo=typescript&logoColor=white&labelColor=0a1018" alt="TypeScript">
+    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit&color=de402a&labelColor=0a1018" alt="Last Commit">
   </p>
   <p align="center">
     <a href="README.md">🇬🇧 English README</a>
@@ -48,7 +48,7 @@
 它**不是** fan token 赌场，**不是**传统 influencer CRM，也**不是** view-to-earn 刷量农场。它是三方之间缺失的那一层——**信任层**：
 
 - **创作者**：先从粉丝处获得冷启动资金，再毕业进入结构化赞助，既有保底报酬，也有表现激励。
-- **粉丝 / 支持者**：用非转让的 `SPUMP` 早期支持创作者；当赞助方买断你看好的创作者时，你赚到真实的 **USDC**——而不是靠二级市场投机。
+- **粉丝 / 支持者**：用非转让的 `SPUMP` 早期支持创作者；当你 back 的创作者毕业时，获得永久创始身份，外加一份**有上限、由赞助方出资的发现奖励**——而不是按持仓比例的回报，也不是二级市场投机。
 - **赞助方**：无需中介代理，直接触达创作者，通过三条灵活的 USDC 预算轨道投放，并拿到可验证的链上活动凭证。
 
 ```text
@@ -77,8 +77,8 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 
 | 信念 | 含义 |
 |---|---|
-| 🎥 **内容才是资产** | 视频和帖子能长期留住受众——meme 币和 NFT 只吸引投机者 |
-| 🔒 **`SPUMP` 仅作工具** | 非转让的 Token-2022；永不上 DEX/CEX；你通过参与赚 **USDC**，而非交易 token |
+| 🎥 **内容才是资产** | 视频和帖子能长期留住受众——meme 币和 NFT 只吸引投机者。我们不主张拥有、也不把内容代币化；链上只存一条创作者签名的发布时间戳 + 归属记录用于分配收益，内容仍留在创作者自己的平台上 |
+| 🔒 **`SPUMP` 仅作工具** | 非转让的 Token-2022；永不上 DEX/CEX。backing 是**用时间和注意力计价、而非用钱**的 skin in the game——不可转让正是让它成为可信信念信号的机制，而非妥协 |
 | 💼 **赞助方是营销支出方** | 投放的是活动预算而非投机资本——这是更健康的资金来源 |
 | ⚙️ **天然自动化** | 不靠臃肿团队或榨取式 tokenomics；靠服务费 + 小额 USDC 交易费维持运转 |
 
@@ -89,9 +89,9 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 | 能力 | 说明 |
 |---|---|
 | 🚀 **S1 创作者发现** | 粉丝 burn `SPUMP` 进入按评级调整的 bonding-curve 头寸，早期支持创作者 |
-| 🤝 **S1 → S2 买断桥接** | 赞助方出 USDC 买断创作者；持有者可 rage-quit 退出，或在毕业时按比例领取分成 |
+| 🤝 **S1 → S2 买断桥接** | 赞助方出 USDC 买断创作者；创作者拿大头，持有者可 rage-quit 退出，或在毕业时领取一份有上限、与持仓解耦的发现奖励 |
 | 📊 **三轨赞助** | 固定保底、表现预算、延迟 CPS——每条轨道独立链上结算 |
-| 🗳️ **粉丝背书池** | 粉丝 burn `SPUMP` 背书活动，从 Track 2 表现池按比例赚取 USDC |
+| 🗳️ **粉丝背书池** | 粉丝 burn `SPUMP` 背书活动，从 Track 2 表现池赚取一份有上限的统一（非按持仓比例）USDC 奖励 |
 | 🔗 **可验证活动凭证** | 每个活动都暴露其 PDA、交易签名、manifest hash 和内容锚定 |
 | 👛 **Web2.5 托管钱包** | 邮箱/社交登录用户获得平台代管钱包——后端签名并代付，全程零 SOL |
 | 🛡️ **反投机护栏** | 非转让 token、每日买入上限、动态退出税、延迟评级、背书上限 |
@@ -125,7 +125,7 @@ buy cost    = effective_k / 2 * ((S + dS)^2 - S^2)
 sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 ```
 
-默认评级为 `10_000`（1.0×），区间 `5_000`–`20_000`（0.5×–2.0×），带每日变动上限和延迟生效。当创作者达到临界规模，赞助方提交**买断报价**；创作者接受并经过 rage-quit 窗口后，执行**毕业**，剩余持有者按比例领取买断 USDC。
+默认评级为 `10_000`（1.0×），区间 `5_000`–`20_000`（0.5×–2.0×），带每日变动上限和延迟生效。当创作者达到临界规模，赞助方提交**买断报价**；创作者接受并经过 rage-quit 窗口后，执行**毕业**——创作者拿到买断 USDC 的大头，剩余持有者领取一份**有上限、非按比例的发现奖励**（按资格 / 早期程度 / 忠诚度，绝不随 staked SPUMP 缩放）。
 
 > 参数与反套利护栏详见 [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md)。
 
@@ -151,6 +151,20 @@ sell return = effective_k / 2 * (S^2 - (S - dS)^2)
   → 分轨结算
 ```
 
+### 忠诚度与粉丝牌（设计）
+
+> 🧭 **设计 / 规划中——尚未实现。** 规范见 [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md)。
+
+在 S1/S2 之上叠加一个忠诚度层，把"早期粉丝"身份做成具体可见的东西，并为 `SPUMP` 提供随时可用的消耗汇。每个粉丝对每个创作者持有一枚**灵魂绑定的粉丝牌**，按关注时长加互动升级，早期 cohort 支持者获得永久的**创始粉 #N** 排名。`SPUMP` 被定位为信念/声音——而非钱——因此不可转让是优点：正因为它只能靠时间赚取，花掉它才是真实信念的可信信号。粉丝牌升级、打赏（cheer）、内容助推（boost）和功能解锁都会 burn `SPUMP`，让它的用处不再取决于"当下有没有值得 back 的创作者"；同时每个创作者的 S1 每日上限随粉丝牌等级缩放，让忠诚度（而非资金量）赢得 backing 优先权。
+
+### 平台等级与星探影响力（设计）
+
+> 🧭 **设计 / 规划中——Phase 1 只读骨架已落地（MOCK_PREVIEW）。** 规范见 [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md)。
+
+用户拥有两个维度的身份：**等级（Lv0–Lv6）**——B 站式的资历/信任进度，以及在你早期发现的创作者真的成长后才赚到的**星探称号徽章**（路人 → 观察者 → 星探 → 金牌伯乐）。表层只展示**一个主数字（等级）+ 一个靠结果赚来的称号（星探）**——不会出现两条竞争的经验条。
+
+高身份用户的点赞、打赏、背书会分配**更多发现流量**、对创作者动量贡献更大。关键在于——影响力是**声望/发现货币，而非金融货币**：加权可以自由地推动流量、排名和一个展示用的动量分数，但只能作为**有上限、经预言机中介的"证据"**影响创作者*估值*，绝不直接乘到价格、领取额或 USDC 上。权重是次线性且封顶的，所有人都有一个完整的基础权重起点，身份不可转让也不可用钱购买——既让策展经济保持正当（而非寡头化），也与合规防火墙一致。
+
 ---
 
 ## 🏗 工作原理
@@ -173,7 +187,7 @@ flowchart LR
 - **工作流 DB-first：** 草稿、manifest、上传、媒体处理、proposal intent、重试、workspace 状态。
 - **资金 chain-first：** 赞助出资、proposal 创建、结算、退款、token mint/burn、不可变内容锚定。
 
-Anchor 程序提供 **32 个类型安全指令**和 **13 个 PDA 账户类型**，覆盖完整生命周期——S1 发现、S1 买断、S2 活动、三轨结算、内容锚定，以及协议/用户/组织状态。
+Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**，覆盖完整生命周期——S1 发现、S1 买断、S2 活动、三轨结算、内容锚定，以及协议/用户/组织状态。
 
 ---
 
@@ -187,7 +201,7 @@ Anchor 程序提供 **32 个类型安全指令**和 **13 个 PDA 账户类型**�
 | **不到 1 美分手续费** | 让 Track 2 微结算和 Track 3 CPS 支付在经济上可行 |
 | **Token-2022 NonTransferable** | 在协议层强制 `SPUMP` 不可转让，而非靠约定 |
 | **PDA 架构** | 配置、档案、S1 头寸、proposal、USDC vault 都是确定性、可验证的链上状态 |
-| **Anchor 框架** | 整个产品生命周期的 32 个类型安全指令集于一个程序 |
+| **Anchor 框架** | 整个产品生命周期的 35 个类型安全指令集于一个程序 |
 | **生态** | 钱包适配器、Web3Auth 社交登录、成熟 RPC，以及用于快速迭代的 devnet |
 
 ---
@@ -212,6 +226,10 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 
 > ⚠️ Anchor 程序**未经审计**，请勿用于真实资金。新的链上护栏和奖励逻辑需要先部署程序才能在链上生效。
 
+### 合规与代币定性（设计推进中）
+
+`SPUMP` 是非转让的效用/消耗单位，**无货币价值、无利润预期**。为了让 backing 保持为有代价的信念信号、同时**不**构成投资合同，backer 的 USDC 机制已从"按持仓比例分买断款"重新设计为**有上限、由赞助方出资、且不随 staked `SPUMP` 数量缩放的发现奖励**（创作者拿到买断款的大头），并以永久创始身份、而非 USDC 作为主奖励。这套重设计**已在工作分支上完成代码级实现**，且在公众真实资金上线前**仍被门控**，门槛包括：一次 Anchor 审计、一份法律代币定性意见书、程序部署、地域限制，以及对收 USDC 用户的 KYC。详见 [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md)。在这些门槛清除前，所有 USDC 奖励流都应视为仅 demo/种子用途。
+
 完整情况见 [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md)（权威路线图 + 进度账本）与 [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md)。
 
 ---
@@ -222,7 +240,7 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 |---|---|
 | `programs/streampump-core` | Anchor 程序：协议状态、S1、S1 买断、S2 三轨结算、内容锚定 |
 | `programs/tests` | 10 个 Anchor TypeScript 测试套件（happy/unhappy、guard、buyout、S2 流程） |
-| `backend` | Express v1 API、Prisma（22 模型 / 17 迁移）、R2/Mux、认证、索引、调度器、投影 |
+| `backend` | Express v1 API、Prisma（22 模型 / 19 迁移）、R2/Mux、认证、索引、调度器、投影 |
 | `app` | Next.js 15 前端：发现、创作者、资产、workspace、campaign、认证等界面 |
 | `docs` | 协议设计、后端 API 合同、前端规范、部署说明、路线图 |
 | `scripts` | devnet seed、demo、smoke、部署和 git hook 脚本 |
@@ -382,6 +400,7 @@ cd backend && npm run prisma:migrate:deploy
 - 在受控 S1 demo 路径稳定后，产品化 S1 买断形成 UI。
 - 完成 S2 背书领取体验和粉丝奖励账本。
 - 为 oracle、风控审核、对账和结算监控添加运营后台。
+- 构建忠诚度/粉丝牌层与 `SPUMP` 消耗汇（打赏、助推、等级领取）——见 [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md)。
 - 在任何真实资金部署前进行更全面的安全审查。
 
 ---
@@ -392,6 +411,10 @@ cd backend && npm run prisma:migrate:deploy
 - [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) — 权威路线图 + 进度账本
 - [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) — 黑客松后 readiness 边界
 - [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) — S1 经济模型与护栏
+- [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md) — 忠诚度/粉丝牌层与 SPUMP 消耗汇（设计）
+- [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md) — 证券合规定性与 SPUMP 价值模型（设计）
+- [docs/protocol/content-attribution-and-anchoring.md](docs/protocol/content-attribution-and-anchoring.md) — 诚实的内容锚定模型：归属而非所有权（设计）
+- [docs/protocol/user-influence-and-leveling.md](docs/protocol/user-influence-and-leveling.md) — 平台等级与星探影响力：命名定稿 + Phase 1 只读骨架（设计）
 - [docs/backend/proposal-launch-api-contract.md](docs/backend/proposal-launch-api-contract.md) — DB-first 发起合同
 - [docs/backend/env-and-vendor-guide.md](docs/backend/env-and-vendor-guide.md) — 后端环境与供应商配置
 - [docs/frontend/design.md](docs/frontend/design.md) — 前端设计体系

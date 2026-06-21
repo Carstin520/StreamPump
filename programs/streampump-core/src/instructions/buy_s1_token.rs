@@ -31,7 +31,10 @@ use crate::{
     state::{
         CreatorProfile, CreatorStatus, ProtocolConfig, S1UserPosition, UserProfile, USER_ROLE_FAN,
     },
-    utils::{activate_pending_s1_rating, calculate_buy_cost_with_rating, checked_add},
+    utils::{
+        activate_pending_s1_rating, apply_s1_holder_counter_delta,
+        calculate_buy_cost_with_rating, checked_add,
+    },
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -199,6 +202,8 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     if position.first_bought_at == 0 {
         position.first_bought_at = now;
     }
+    let pre_balance = position.internal_token_balance;
+    let pre_early_balance = position.early_cohort_balance;
     position.internal_token_balance = checked_add(position.internal_token_balance, args.amount)?;
     position.early_cohort_balance = checked_add(position.early_cohort_balance, early_amount)?;
     position.spump_cost_basis = checked_add(position.spump_cost_basis, spump_cost)?;
@@ -209,6 +214,13 @@ pub(crate) fn handler(ctx: Context<BuyS1Token>, args: BuyS1TokenArgs) -> Result<
     creator_profile.s1_supply = checked_add(creator_profile.s1_supply, args.amount)?;
     creator_profile.s1_early_cohort_supply =
         checked_add(creator_profile.s1_early_cohort_supply, early_amount)?;
+    apply_s1_holder_counter_delta(
+        creator_profile,
+        pre_balance,
+        pre_early_balance,
+        position.internal_token_balance,
+        position.early_cohort_balance,
+    )?;
     creator_profile.updated_at = Clock::get()?.unix_timestamp;
 
     emit!(S1TokenBought {

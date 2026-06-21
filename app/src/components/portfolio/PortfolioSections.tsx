@@ -59,8 +59,8 @@ export const PortfolioMetrics = ({
   waitingActionsCount: number;
 }) => (
   <section className="grid gap-4 md:grid-cols-3">
-    <MetricCard icon={<TrendUpIcon className="h-3.5 w-3.5" />} label="Active Holdings" tone="neutral" value={String(portfolioHoldings.length)} />
-    <MetricCard icon={<DotIcon className="h-2.5 w-2.5" />} label="Exposure Value" tone={exposureTone} value={formatUsd(totalExposure)} />
+    <MetricCard icon={<TrendUpIcon className="h-3.5 w-3.5" />} label="Active Backing" tone="neutral" value={String(portfolioHoldings.length)} />
+    <MetricCard icon={<DotIcon className="h-2.5 w-2.5" />} label="Support Snapshot" tone={exposureTone} value={formatUsd(totalExposure)} />
     <MetricCard icon={<ClockIcon className="h-3.5 w-3.5" />} label="Waiting Actions" tone="neutral" value={String(waitingActionsCount)} />
   </section>
 );
@@ -123,7 +123,7 @@ export const PortfolioHoldingsSection = ({
                         <p className="truncate text-base font-semibold text-white">{creator.name}</p>
                         <StagePill compact stage={creator.state} />
                       </div>
-                      <p className="mt-1 truncate text-sm text-[#8ea0ba]">{holding.tokenCount} tokens held</p>
+                      <p className="mt-1 truncate text-sm text-[#8ea0ba]">{holding.tokenCount} S1 backing units</p>
                     </div>
 
                     <div className="min-w-[92px]">
@@ -138,21 +138,21 @@ export const PortfolioHoldingsSection = ({
                     </div>
 
                     <div className="ml-auto grid grid-cols-3 gap-4 text-right md:gap-8">
-                      <HoldingMetric label="Price" value={formatUsd(currentPrice)} />
-                      <HoldingMetric label="Avg entry" value={formatUsd(holding.avgEntryUsd)} />
+                      <HoldingMetric label="Support rate" value={formatUsd(currentPrice)} />
+                      <HoldingMetric label="SPUMP used" value={formatUsd(holding.avgEntryUsd)} />
                       <HoldingMetric
                         highlight={holding.unrealizedChangePct > 0 ? "green" : holding.unrealizedChangePct < 0 ? "pink" : "neutral"}
-                        label="P/L"
+                        label="Signal delta"
                         value={`${holding.unrealizedChangePct > 0 ? "+" : ""}${holding.unrealizedChangePct.toFixed(1)}%`}
                       />
                     </div>
 
                     <div className="ml-auto flex overflow-hidden rounded-full border border-white/10">
                       <button className="cursor-not-allowed border-r border-white/10 px-4 py-2 text-sm text-[#7f90ab]" disabled type="button">
-                        Buy preview
+                        Back preview
                       </button>
                       <button className="cursor-not-allowed px-4 py-2 text-sm text-[#7f90ab]" disabled type="button">
-                        Sell preview
+                        Unback preview
                       </button>
                     </div>
                   </div>
@@ -203,7 +203,7 @@ export const ClaimQueueSection = ({
               <div className="min-w-[180px] flex-1">
                 <p className="text-sm font-semibold text-white">{creator.name}</p>
                 <p className="mt-1 text-xs text-[#8ea0ba]">
-                  {record.eligibleTokens} tokens · {formatUsd(record.expectedPriceUsd)}/token
+                  {record.eligibleTokens} backing units · capped estimate
                 </p>
               </div>
               <div className="text-right">
@@ -211,7 +211,7 @@ export const ClaimQueueSection = ({
                 <p className="mt-1 text-sm font-medium text-[#67b8ff]">{record.opensInLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Payout</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Discovery reward</p>
                 <p className="mt-1 text-sm font-medium text-white">{formatUsd(record.estimatedPayoutUsd)}</p>
               </div>
             </div>
@@ -229,12 +229,12 @@ export const ReentrySection = ({
 }) => (
   <section className="space-y-6">
     <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4 text-sm leading-7 text-[#94a5be]">
-      Re-entry shows creators you previously exited. You can buy back into any creator token at the current market price. Past performance doesn&apos;t guarantee future returns.
+      Re-entry shows creators you previously unbacked. You can support the creator again through the in-platform S1 backing flow; any USDC reward remains capped and eligibility-based.
     </div>
 
     <div>
       <h2 className="text-lg font-semibold text-white">Exited Positions</h2>
-      <p className="mt-1 text-sm text-[#8ea0ba]">Tokens you&apos;ve fully sold or claimed out of.</p>
+      <p className="mt-1 text-sm text-[#8ea0ba]">S1 backing units you&apos;ve fully unbacked or finalized.</p>
     </div>
 
     <div className="space-y-3">
@@ -256,9 +256,9 @@ export const ReentrySection = ({
               </p>
             </div>
             <div className="grid grid-cols-3 gap-4 text-right md:min-w-[320px] md:gap-8">
-              <HoldingMetric label="Exit price" value={formatUsd(record.exitPriceUsd)} />
-              <HoldingMetric label="Current" value={formatUsd(record.currentPriceUsd)} />
-              <HoldingMetric highlight="green" label="Since exit" value={`+${record.sinceExitPerformancePct.toFixed(1)}%`} />
+              <HoldingMetric label="Unback rate" value={formatUsd(record.exitPriceUsd)} />
+              <HoldingMetric label="Current signal" value={formatUsd(record.currentPriceUsd)} />
+              <HoldingMetric highlight="green" label="Since unback" value={`+${record.sinceExitPerformancePct.toFixed(1)}%`} />
             </div>
             <button
               className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-[#7f90ab]"
@@ -304,12 +304,12 @@ export const ActionFlowModal = ({
           <div className="mt-6 space-y-5">
             <p className="text-sm leading-7 text-[#c9d3e1]">
               {flowState.kind === "claim"
-                ? `This mock flow will mark ${formatUsd(flowState.record.payoutUsd)} as a submitted payout and move the window into a completed preview state.`
+                ? `This mock flow will mark ${formatUsd(flowState.record.payoutUsd)} as a submitted discovery reward and move the window into a completed preview state.`
                 : `This mock flow will stage a simulated buy-back at ${formatUsd(flowState.record.currentPriceUsd)} and add the position to your watchlist preview.`}
             </p>
             <div className="card-radius border border-white/[0.06] bg-white/[0.03] p-4 text-sm text-[#92a3bc]">
               {flowState.kind === "claim"
-                ? `${flowState.record.eligibleTokens} tokens · ${formatUsd(flowState.record.claimPriceUsd)}/token · closes ${flowState.record.closesInLabel}`
+                ? `${flowState.record.eligibleTokens} backing units · capped estimate · closes ${flowState.record.closesInLabel}`
                 : `${flowState.record.thesis} · exited at ${formatUsd(flowState.record.exitPriceUsd)} · current ${formatUsd(flowState.record.currentPriceUsd)}`}
             </div>
             <div className="flex gap-3">
@@ -331,7 +331,7 @@ export const ActionFlowModal = ({
             </div>
             <p className="mt-4 text-sm leading-7 text-[#c9d3e1]">
               {flowState.kind === "claim"
-                ? "Submitting payout preview. The interface stays intentionally lightweight, but the state transition is explicit."
+                ? "Submitting discovery-reward preview. The interface stays intentionally lightweight, but the state transition is explicit."
                 : "Staging buy-back preview. This does not alter real holdings, but it completes the prototype flow end-to-end."}
             </p>
           </div>
@@ -346,7 +346,7 @@ export const ActionFlowModal = ({
               </p>
               <p className="mt-2 text-sm leading-7 text-[#b7d9c5]">
                 {flowState.kind === "claim"
-                  ? `Estimated payout ${formatUsd(flowState.record.payoutUsd)} is now marked as submitted.`
+                  ? `Estimated discovery reward ${formatUsd(flowState.record.payoutUsd)} is now marked as submitted.`
                   : `${creator.name} is now surfaced as a re-entry watch candidate for this session.`}
               </p>
             </div>
@@ -368,14 +368,14 @@ const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => 
     <section className="liquid-glass-shell card-radius p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-[#73849f]">Exposure trend</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-[#73849f]">Support trend</p>
           <h2 className="mt-3 text-[42px] font-semibold tracking-[-0.04em] text-white lg:text-[52px]">{formatUsd(totalExposure)}</h2>
           <p className={`mt-2 text-sm ${tone === "positive" ? "text-[#65ecaf]" : "text-[#f67263]"}`}>
             {tone === "positive" ? "Portfolio trend is still climbing across the last 8 sessions." : "Portfolio trend is softening across the last 8 sessions."}
           </p>
         </div>
         <div className="liquid-card card-radius min-w-[220px] px-4 py-3 text-sm text-[#8ea0ba]">
-          Lightweight snapshots keep the trend readable instead of turning this section into a dense trading dashboard.
+        Lightweight snapshots keep the trend readable without turning this section into a trading dashboard.
         </div>
       </div>
 
@@ -419,7 +419,7 @@ const PendingClaimCard = ({
 
       <h3 className="mt-4 text-xl font-semibold text-white">{creator.name} S1 Buyout</h3>
       <p className="mt-3 text-sm leading-7 text-[#c8d3e2]">
-        Your {record.eligibleTokens} tokens are eligible for buyout at {formatUsd(record.claimPriceUsd)}/token. Claim window closes in {record.closesInLabel}.
+        Your {record.eligibleTokens} backing units are eligible for a capped discovery reward. Claim window closes in {record.closesInLabel}.
       </p>
 
       <div className="card-radius mt-5 flex items-center gap-3 border border-white/8 bg-[#111722] p-3">
@@ -430,7 +430,7 @@ const PendingClaimCard = ({
       </div>
 
       <div className="card-radius mt-4 border border-[#65ecaf]/20 bg-[linear-gradient(180deg,rgba(18,45,33,0.4)_0%,rgba(9,21,16,0.6)_100%)] px-4 py-4 text-center">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[#8df0bb]">Estimated payout</p>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-[#8df0bb]">Estimated discovery reward</p>
         <p className="mt-2 text-[32px] font-bold tracking-[-0.04em] text-[#65ecaf]">{formatUsd(record.payoutUsd)}</p>
       </div>
 
@@ -461,7 +461,7 @@ const ActiveClaimCard = ({
               <p className="text-base font-semibold text-white">{creator.name}</p>
               <StagePill compact stage={creator.state} />
             </div>
-            <p className="mt-1 text-sm text-[#8ea0ba]">{record.eligibleTokens} tokens eligible</p>
+            <p className="mt-1 text-sm text-[#8ea0ba]">{record.eligibleTokens} backing units eligible</p>
           </div>
         </div>
         <span className="rounded-full border border-[#7e5a23] bg-[#342515] px-3 py-1 text-xs font-semibold text-[#f3b33e]">
@@ -470,9 +470,9 @@ const ActiveClaimCard = ({
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <ClaimMetricCard label="Claim price" value={formatUsd(record.claimPriceUsd)} />
-        <ClaimMetricCard label="Tokens" value={String(record.eligibleTokens)} />
-        <ClaimMetricCard label="Payout" tone="positive" value={formatUsd(record.payoutUsd)} />
+        <ClaimMetricCard label="Reward model" value="Capped" />
+        <ClaimMetricCard label="Backing units" value={String(record.eligibleTokens)} />
+        <ClaimMetricCard label="Discovery reward" tone="positive" value={formatUsd(record.payoutUsd)} />
       </div>
 
       <button className={`mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 ${SECONDARY_BUTTON_CLASS}`} disabled onClick={() => undefined} type="button">

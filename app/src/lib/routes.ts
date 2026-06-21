@@ -128,7 +128,7 @@ export const primaryNavItems: RouteItem[] = [
   { href: EXPLORE_PATH, label: "发现", labelKey: "nav.explore", prefixes: [EXPLORE_PATH, "/posts"] },
   { href: ACTIVITY_PATH, label: "动态", labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
   { href: TRENDING_PATH, label: "Trending", labelKey: "nav.trending", prefixes: [TRENDING_PATH] },
-  { href: PORTFOLIO_PATH, label: "投资组合", labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
+  { href: PORTFOLIO_PATH, label: "支持组合", labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
   { href: REWARDS_PATH, label: "Rewards", labelKey: "nav.rewards", prefixes: [REWARDS_PATH] },
   { href: DEMO_PATH, label: "Demo", labelKey: "nav.demo", prefixes: [DEMO_PATH] },
 ];
@@ -163,6 +163,6 @@ export const workspaceSidebarNav: WorkspaceNavItem[] = [
   { href: WORKSPACE_BUYOUT_PATH, label: "Buyout", labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
   { href: WORKSPACE_CAMPAIGNS_PATH, label: "Campaign", labelKey: "nav.campaign", iconName: "campaign", disabled: true },
   { href: WORKSPACE_ANALYTICS_PATH, label: "数据", labelKey: "nav.analytics", iconName: "analytics", disabled: true },
-  { href: WORKSPACE_EARNINGS_PATH, label: "收益", labelKey: "nav.earnings", iconName: "earnings", disabled: true },
+  { href: WORKSPACE_EARNINGS_PATH, label: "结算", labelKey: "nav.earnings", iconName: "earnings", disabled: true },
   { href: WORKSPACE_SETTINGS_PATH, label: "设置", labelKey: "nav.settings", iconName: "settings", disabled: true },
 ];

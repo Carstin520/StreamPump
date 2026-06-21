@@ -52,7 +52,7 @@ export const creators: CreatorMarketRecord[] = [
     potentialSponsors: ["Apex Motion", "Gridline Lab", "Velocity House"],
     supporterDistributableUsd: 124000,
     buyoutOfferUsd: 850000,
-    buyoutTimeline: ["Offer opened", "Creator accepted", "Rage-quit window active", "Supporter payout pending"],
+    buyoutTimeline: ["Offer opened", "Creator accepted", "Rage-quit window active", "Discovery reward pending"],
     contentPool: ["赛道摄影日常", "F1涂装观察", "比赛集锦审美向轻科普"],
   },
   {

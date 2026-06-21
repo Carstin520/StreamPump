@@ -2,8 +2,8 @@
 // claim_endorsement.rs
 // EN: Permissionless settlement execution for an endorsement position.
 //     After Track 2 is settled, anyone can execute settlement for an endorser:
-//     - Resolved_Success: 100% SPUMP principal minted back + pro-rata share
-//       of the Track 2 fan pool (20% of achieved budget).
+//     - Resolved_Success: 100% SPUMP principal minted back + capped flat
+//       reward from the Track 2 fan pool (20% of achieved budget).
 //     - Resolved_Fail: 100% SPUMP minted back (fans not punished for underperformance).
 //     - Cancelled/Voided: 95% SPUMP minted back; 5% permanently unissued (deflation cost).
 //     - Open but expired and unfunded: 100% SPUMP principal minted back.
@@ -12,7 +12,7 @@
 //
 // ZH: 背书仓位的免签执行结算。
 //     Track2 结算完成后，任何人都可以为 Endorser 执行结算：
-//     - 成功：100% SPUMP 本金铸回 + 按比例分享 Track2 粉丝池（达成预算的 20%）。
+//     - 成功：100% SPUMP 本金铸回 + 封顶定额领取 Track2 粉丝池（达成预算的 20%）。
 //     - 失败：100% SPUMP 铸回（粉丝不因活动效果不佳而受罚）。
 //     - 取消/作废：95% SPUMP 铸回；5% 永久不铸造（取消代价通缩）。
 //     - 仍为 Open 但已过期且未获注资：100% SPUMP 本金铸回。
@@ -29,8 +29,11 @@ use anchor_spl::{
 use crate::{
     errors::StreamPumpError,
     events::EndorsementSettled,
-    state::{EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig},
-    utils::{amount_from_bps, checked_sub},
+    state::{
+        CreatorProfile, EndorsementPosition, Proposal, ProposalStatus, ProtocolConfig,
+        ResidualDestination, S1BuyoutRewardModel,
+    },
+    utils::{amount_from_bps, calculate_flat_reward, checked_sub},
 };
 
 /// EN: Slash percentage for cancelled/voided endorsements: 5% (500 bps).
@@ -58,6 +61,11 @@ pub struct ClaimEndorsement<'info> {
         bump = proposal.bump
     )]
     pub proposal: Box<Account<'info, Proposal>>,
+
+    #[account(
+        constraint = creator_profile.authority == proposal.creator @ StreamPumpError::Unauthorized
+    )]
+    pub creator_profile: Box<Account<'info, CreatorProfile>>,
 
     /// EN: User endorsement position PDA — tracks staked amount and claim status.
     /// ZH: 用户背书仓位 PDA——追踪质押金额和领取状态。
@@ -95,6 +103,20 @@ pub struct ClaimEndorsement<'info> {
         constraint = user_usdc_ata.mint == proposal_usdc_vault.mint @ StreamPumpError::InvalidMint
     )]
     pub user_usdc_ata: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = creator_usdc_ata.key() == creator_profile.payout_usdc_ata @ StreamPumpError::InvalidPayoutAccount,
+        constraint = creator_usdc_ata.owner == proposal.creator @ StreamPumpError::InvalidPayoutAccount,
+        constraint = creator_usdc_ata.mint == proposal_usdc_vault.mint @ StreamPumpError::InvalidMint
+    )]
+    pub creator_usdc_ata: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = sponsor_usdc_ata.mint == proposal_usdc_vault.mint @ StreamPumpError::InvalidMint
+    )]
+    pub sponsor_usdc_ata: Box<Account<'info, TokenAccount>>,
 
     /// EN: Proposal USDC vault PDA — holds the Track 2 fan pool after settlement.
     /// ZH: 提案 USDC 金库 PDA——结算后持有 Track2 粉丝池。
@@ -138,6 +160,11 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
     // ZH: 构造提案 PDA 签名（USDC 金库转出）和协议 PDA 签名（SPUMP 铸造）。
     let spump_refund;
     let mut usdc_reward = 0u64;
+    let mut capped = false;
+    let mut residual_transferred = 0u64;
+    let mut fan_pool_remaining = 0u64;
+    let mut reward_cap_usdc = 0u64;
+    let mut residual_to = ResidualDestination::Sponsor as u8;
     let proposal_creator = ctx.accounts.proposal.creator;
     let deadline_bytes = ctx.accounts.proposal.deadline.to_le_bytes();
     let nonce_bytes = ctx.accounts.proposal.nonce.to_le_bytes();
@@ -161,14 +188,14 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
             // ────────────────────────────────────────────────────────────────
             // EN: SUCCESS PATH:
             //     1. Mint 100% SPUMP principal back to user.
-            //     2. Calculate pro-rata USDC reward from the Track 2 fan pool:
-            //        reward = staked_amount × fan_pool / total_spump_staked
+            //     2. Calculate capped flat USDC reward from the Track 2 fan pool:
+            //        reward = min(fan_pool / unsettled_endorser_count, cap)
             //     3. Transfer USDC reward from proposal vault to user.
             //
             // ZH: 成功路径：
             //     1. 向用户铸回 100% SPUMP 本金。
-            //     2. 按比例计算 Track2 粉丝池的 USDC 奖励：
-            //        奖励 = 质押量 × 粉丝池 / 总质押量
+            //     2. 定额计算 Track2 粉丝池的 USDC 奖励：
+            //        奖励 = min(粉丝池 / 未结算人数, cap)
             //     3. 从提案金库向用户转入 USDC 奖励。
             // ────────────────────────────────────────────────────────────────
             token_interface::mint_to(
@@ -190,25 +217,17 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 proposal.track2_unsettled_endorser_count > 0,
                 StreamPumpError::InvalidAmount
             );
+            reward_cap_usdc = proposal.track2_reward_cap_usdc;
+            residual_to = proposal.track2_residual_to;
+            require!(reward_cap_usdc > 0, StreamPumpError::RewardCapZero);
 
-            usdc_reward = if proposal.track2_unsettled_endorser_count == 1 {
-                proposal.track2_usdc_deposited
-            } else if proposal.track2_initial_spump_staked == 0
-                || proposal.track2_initial_fan_pool == 0
-                || proposal.track2_usdc_deposited == 0
-            {
-                0
-            } else {
-                let numerator = (staked_amount as u128)
-                    .checked_mul(proposal.track2_initial_fan_pool as u128)
-                    .ok_or(StreamPumpError::MathOverflow)?;
-                let quotient = numerator
-                    .checked_div(proposal.track2_initial_spump_staked as u128)
-                    .ok_or(StreamPumpError::MathOverflow)?;
-                let reward =
-                    u64::try_from(quotient).map_err(|_| error!(StreamPumpError::MathOverflow))?;
-                std::cmp::min(reward, proposal.track2_usdc_deposited)
-            };
+            let reward = calculate_flat_reward(
+                proposal.track2_usdc_deposited,
+                proposal.track2_unsettled_endorser_count,
+                reward_cap_usdc,
+            )?;
+            usdc_reward = reward.0;
+            capped = reward.1;
 
             if usdc_reward > 0 {
                 token::transfer(
@@ -233,6 +252,44 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
                 .track2_unsettled_endorser_count
                 .checked_sub(1)
                 .ok_or(StreamPumpError::MathOverflow)?;
+
+            if proposal.track2_unsettled_endorser_count == 0
+                && proposal.track2_usdc_deposited > 0
+            {
+                residual_transferred = proposal.track2_usdc_deposited;
+                let sponsor = proposal
+                    .sponsor
+                    .ok_or(error!(StreamPumpError::SponsorNotSet))?;
+                let residual_destination = if proposal.track2_residual_to
+                    == ResidualDestination::Sponsor as u8
+                {
+                    require_keys_eq!(
+                        ctx.accounts.sponsor_usdc_ata.owner,
+                        sponsor,
+                        StreamPumpError::Unauthorized
+                    );
+                    ctx.accounts.sponsor_usdc_ata.to_account_info()
+                } else if proposal.track2_residual_to == ResidualDestination::Creator as u8 {
+                    ctx.accounts.creator_usdc_ata.to_account_info()
+                } else {
+                    return err!(StreamPumpError::InvalidResidualDestination);
+                };
+
+                token::transfer(
+                    CpiContext::new_with_signer(
+                        ctx.accounts.usdc_token_program.to_account_info(),
+                        Transfer {
+                            from: ctx.accounts.proposal_usdc_vault.to_account_info(),
+                            to: residual_destination,
+                            authority: proposal_account_info.clone(),
+                        },
+                        proposal_signer,
+                    ),
+                    residual_transferred,
+                )?;
+                proposal.track2_usdc_deposited = 0;
+            }
+            fan_pool_remaining = proposal.track2_usdc_deposited;
         }
         ProposalStatus::Resolved_Fail => {
             // ────────────────────────────────────────────────────────────────
@@ -341,6 +398,12 @@ pub(crate) fn handler(ctx: Context<ClaimEndorsement>) -> Result<()> {
         staked_amount,
         spump_refund,
         usdc_reward,
+        reward_model: S1BuyoutRewardModel::FlatEqual as u8,
+        reward_cap_usdc,
+        capped,
+        fan_pool_remaining,
+        residual_transferred,
+        residual_to,
         status: proposal_status as u8,
         claimed: ctx.accounts.endorsement_position.claimed,
     });

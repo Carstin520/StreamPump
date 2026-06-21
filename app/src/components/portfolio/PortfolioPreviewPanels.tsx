@@ -172,8 +172,8 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
           <span>Creator</span>
           <span className="text-right">Price</span>
           <span className="text-right">Holding</span>
-          <span className="text-right">Avg cost</span>
-          <span className="text-right">PnL</span>
+          <span className="text-right">SPUMP used</span>
+          <span className="text-right">Signal delta</span>
           <span>Graduation</span>
         </div>
         <div className="divide-y divide-white/[0.04]">

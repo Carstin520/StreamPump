@@ -50,6 +50,8 @@ So here's where we think differently. We have four core convictions that shape e
 
 **Number one**: content — videos, posts — these are the real valuable digital products. Not meme coins. Not NFTs. Those attract speculators. Content is what actually retains and grows an audience over time.
 
+And to be clear about ownership — since we just called out fake content ownership: we don't claim to own your content, we don't tokenize it, and we don't lock it to our platform. Your content stays where you publish it. What we put on-chain is narrow and honest — a creator-signed publication timestamp and an integrity fingerprint. It's not ownership and it's not anti-copy; it's a verifiable attribution record that ties a piece of content to your identity and to a campaign, so the *revenue* gets distributed to the right creator. We fix attribution and settlement, not ownership.
+
 **Number two**: our platform token, SPUMP, is utility-only. We're not listing it on any DEX or CEX. You earn USDC through in-platform participation — not by trading tokens on secondary markets.
 
 **Number three**: sponsors on our platform are marketing spenders, not investors. They're doing what they'd normally do — running campaigns, buying ad placements. That's a much healthier source of capital than speculation.

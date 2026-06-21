@@ -6,7 +6,8 @@ import { PageShell } from "@/components/layout/PageShell";
 import { MeSurface } from "@/components/me/MeSurface";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import { getAccountMe } from "@/lib/api/account";
-import { AccountMeRecord, CurrentUserRecord } from "@/lib/api/types";
+import { getAccountInfluence } from "@/lib/api/influence";
+import { AccountMeRecord, CurrentUserRecord, InfluenceRecord } from "@/lib/api/types";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -65,6 +66,7 @@ export default function MePage({
     initialPosts,
   });
   const [accountState, setAccountState] = useState<AccountState>({ kind: "checking" });
+  const [influence, setInfluence] = useState<InfluenceRecord | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +90,12 @@ export default function MePage({
           });
         }
       });
+
+    void getAccountInfluence(session.accessToken)
+      .then((data) => {
+        if (!cancelled) setInfluence(data);
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
@@ -113,6 +121,7 @@ export default function MePage({
           ) : (
             <MeSurface
               currentUser={sessionBackedUser}
+              influence={influence}
               posts={posts}
               savedPosts={currentUserSavedPosts}
             />
