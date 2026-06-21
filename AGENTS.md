@@ -156,16 +156,16 @@ npm run prisma:migrate:deploy    # Apply production migrations
 
 ## Anchor Program (On-Chain)
 
-### Instruction Set (32 instructions)
+### Instruction Set (35 instructions)
 
-**Protocol admin:**
-`initialize_protocol`, `migrate_legacy_protocol_config`, `update_protocol_s1_emission`, `emergency_void`
+**Protocol admin / migration:**
+`initialize_protocol`, `migrate_legacy_protocol_config`, `migrate_legacy_creator_profile`, `migrate_legacy_s1_buyout_state`, `update_protocol_s1_emission`, `emergency_void`
 
 **Creator lifecycle:**
 `register_creator`, `upgrade_creator`, `anchor_content_hash`, `update_creator_s1_rating`
 
 **S1 token market and buyout:**
-`buy_s1_token`, `sell_s1_token`, `init_s1_buyout`, `submit_buyout_offer`, `accept_buyout_offer`, `cancel_buyout_offer`, `reclaim_expired_buyout_offer`, `rage_quit_s1`, `execute_s1_graduation`, `claim_s1_buyout_usdc`
+`buy_s1_token`, `sell_s1_token`, `init_s1_buyout`, `submit_buyout_offer`, `accept_buyout_offer`, `abort_s1_buyout`, `cancel_buyout_offer`, `reclaim_expired_buyout_offer`, `rage_quit_s1`, `execute_s1_graduation`, `claim_s1_buyout_usdc`, `sweep_s1_buyout_residual`
 
 **S2 campaigns (3-track settlement):**
 `create_proposal`, `sponsor_fund`, `endorse_proposal`, `settle_track1_base`, `settle_track2`, `settle_track3_cps`, `claim_endorsement`, `cancel_proposal`
@@ -180,13 +180,13 @@ npm run prisma:migrate:deploy    # Apply production migrations
 | Account | Purpose |
 | --- | --- |
 | `ProtocolConfig` | Global admin, oracle, mints, tax/emission/S1/S2 params |
-| `CreatorProfile` | Creator handle, level, S1 status/supply/rating, payout ATA |
+| `CreatorProfile` | Creator handle, level, S1 status/supply/rating, payout ATA, on-chain S1 eligible/early/regular holder counters |
 | `UserProfile` | User level, roles, XP, activity score, daily claim state |
 | `ContentHashAnchor` | Canonical URL + content digest anchor per post |
 | `Proposal` | S2 campaign: Track 1/2/3 terms, funding, settlement state |
 | `EndorsementPosition` | Fan Track 2 stake per user/proposal |
 | `S1UserPosition` | Per-user S1 holdings, cost basis, daily buy limits |
-| `S1BuyoutState` | Buyout vault, claimable USDC/supply, rage-quit deadline |
+| `S1BuyoutState` | Buyout vault state, creator payout, capped discovery pool, eligible/early/regular holder counts, reward-model/residual/cap snapshots, rage-quit + graduation timestamps |
 | `S1BuyoutOffer` | Individual sponsor buyout bid |
 | `UpgradeReceipt` | Immutable creator level-upgrade audit record |
 | `UserRewardReceipt` | Immutable engagement/mission reward audit record |
@@ -195,7 +195,7 @@ npm run prisma:migrate:deploy    # Apply production migrations
 
 ### Error Enum
 
-`StreamPumpError` has 65 variants covering: general (math, auth), creator (handle, status, rating), S1 market (balance, caps, tax), S1 buyout (offer state, rage-quit window), proposals (funding, settlement, claim), content (digest mismatch, anchor), users/orgs, SPUMP mint validation, and migration.
+`StreamPumpError` has 84 variants covering: general (math, auth), creator (handle, status, rating), S1 market (balance, caps, tax), S1 buyout (offer state, rage-quit window, holder-counter underflow, discovery-reward eligibility/cap, residual sweep, claim window), proposals (funding, settlement, claim), content (digest mismatch, anchor), users/orgs, SPUMP mint validation, and migration.
 
 ## Product Layers
 
@@ -203,7 +203,7 @@ npm run prisma:migrate:deploy    # Apply production migrations
 
 Fans burn non-transferable SPUMP to back creators early. Positions are internal PDAs on a rating-adjusted quadratic bonding curve. An oracle evaluates creator momentum and adjusts ratings. Anti-speculation guardrails include: non-transferable token, daily buy caps, dynamic exit tax, delayed rating activation, and early-cohort buyout caps.
 
-When a creator reaches critical mass, sponsors submit buyout offers. After creator acceptance and a rage-quit window, graduation executes. Remaining backers claim their share of buyout USDC proportional to position size.
+When a creator reaches critical mass, sponsors submit buyout offers. After creator acceptance and a rage-quit window, graduation executes. The creator receives the majority of the buyout USDC (configurable creator share); remaining backers claim a capped, non-proportional discovery reward (by eligibility/earliness/loyalty tier, never scaled by SPUMP staked), with any residual swept to creator/sponsor and the offer vault closed. This reward-decoupling redesign is implemented on the working branch and is audit-/legal-/deploy-gated — see the compliance note in `README.md` and `docs/protocol/spump-compliance-and-value-model.md`. Do not present it as live for real funds.
 
 ### Season 2 (S2): Sponsored Campaign Market
 
@@ -422,7 +422,10 @@ ORACLE_RUN_ON_BOOT=false
 ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED=false
 ```
 
-## Current Development Status (2026-05-18)
+## Current Development Status (verified 2026-05-18 · refreshed 2026-06-21)
+
+> **Working-branch redesign (uncommitted, gated).** The S1 buyout and S2 Track-2 settlement have been redesigned so backer/endorser USDC is **capped and decoupled from stake size** (creator takes the majority of a buyout); on-chain S1 holder counters now feed an oracle-gated `execute_s1_graduation`; `sweep_s1_buyout_residual` closes the offer vault after a claim window; and ineligible discovery claims error out instead of zeroing the position. Local builds/tests pass, but this is **audit-/legal-/deploy-gated** and must not be treated as live for real funds. See `README.md` compliance note, `docs/protocol/spump-compliance-and-value-model.md`, and the roadmap progress ledger.
+
 
 ### What Is Verified and Working
 
@@ -448,7 +451,7 @@ AccountProfile migration is applied to Neon. Page-readiness audit is complete fo
 | S1 portfolio/claim | `SEEDED_DEMO` — claim from graduated buyout |
 | S1 buyout formation | `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED` — not productized in UI |
 | S2 proposal launch | `SEEDED_DEMO` — full corridor verified |
-| S2 endorsement | `MOCK_PREVIEW` — local simulator only |
+| S2 endorsement | `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` — on-chain SPUMP burn + capped flat fan reward + builders for seeded proposals |
 | Settlement Track 1/2 | `SEEDED_DEMO` — works with controlled data |
 | Settlement Track 3 | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` — no merchant integration |
 | Media publication | `BACKEND_READY_UI_GAP` — R2/Mux plumbing exists, recovery incomplete |
@@ -659,7 +662,7 @@ When blocked, continue with adjacent safe work: improve state visibility, add id
 
 ## Known Caveats
 
-- **Stale program ID in frontend**: `app/src/hooks/useProgram.ts` and `app/src/utils/solana.ts` reference `EV2frDqtvTfmshXxsNipDSEANWeZxzHEazzDu51rDzre` — the canonical program ID is `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp` (used by backend, Anchor.toml, and all on-chain tests).
+- **Program ID alignment (resolved)**: the frontend previously referenced a stale program ID; the canonical program ID `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp` (used by backend, Anchor.toml, and all on-chain tests) is now used across the app. Re-verify if `useProgram.ts` / `utils/solana.ts` are touched.
 - **No monorepo workspace tool** — three separate `npm install` targets (root, app, backend); not using Turborepo, Nx, or pnpm workspaces.
 - **macOS iCloud/Desktop path** — building under Desktop can trigger file-provider `ECANCELED` errors. Anchor build uses `/private/tmp` target dir as workaround. For serious dev, consider cloning to `~/Projects/`.
 - **Program not audited** — stated in README. Anchor instruction interface should be frozen before audit.
@@ -678,7 +681,16 @@ When blocked, continue with adjacent safe work: improve state visibility, add id
 | `20260420233500_public_feed_projection` | Public feed |
 | `20260430120000_market_read_models` | Market read models |
 | `20260509120000_email_otp_auth` | Email OTP |
-| `20260517143000_account_profile` | Account profiles (latest) |
+| `20260517143000_account_profile` | Account profiles |
+| `20260522162000_sponsor_profile_creator_auth` | Sponsor KYB + creator auth |
+| `20260523093000_s1_buyout_projection_cohort_pools` | S1 buyout cohort pools |
+| `20260523102000_buyout_offer_aborted_status` | Buyout offer aborted status |
+| `20260523185000_s2_endorsement_projection` | S2 endorsement projection |
+| `20260523210000_design_consolidation` | Proposal nonce + consolidation |
+| `20260602120000_add_proposal_nonce` | Proposal nonce |
+| `20260603100000_add_encrypted_wallet_secret` | Managed-wallet encrypted secret |
+| `20260621123000_reward_decoupling_caps` | Capped/decoupled reward fields (working branch) |
+| `20260621153000_s1_buyout_counter_sweep` | Holder counters + sweep projection (working branch, latest) |
 
 ## Documentation Index
 

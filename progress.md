@@ -1,3 +1,332 @@
+# StreamPump Progress Review - 2026-06-21 Demo Day Howey Fix Execution Prompts
+
+## Scope
+- This review covers two additional untracked demo-day execution prompt artifacts observed after the latest existing `progress.md` entry for the committed reward-semantics and S1 buyout counter/residual hardening work.
+- Comparison evidence is the current working tree on `codex/post-deadline-phase-0`: `HEAD` is `689c23c`, `progress.md` was already modified, and `demo-day/04-howey-fix-execution-prompt.md` plus `demo-day/05-howey-fix-round2-prompt.md` are untracked alongside the previously recorded demo-day package.
+- The material current change is planning/review documentation for audit-sensitive settlement redesign work, not a new route/API/chain implementation change.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added `demo-day/04-howey-fix-execution-prompt.md`, a Chinese execution prompt specifying the S1 buyout and S2 endorsement reward-semantics redesign:
+  - decouple backer/endorser USDC rewards from stake size;
+  - add capped non-proportional reward models, creator-share settlement, residual handling, protocol config snapshots, tests, and documentation requirements;
+  - preserve `SPUMP` non-transferability, existing PDA/program boundaries, and no-`LIVE` readiness discipline.
+- Added `demo-day/05-howey-fix-round2-prompt.md`, a follow-up execution prompt for S1 buyout integrity/liveness fixes:
+  - restrict graduation counting to trusted oracle/admin paths while adding chain-maintained holder counters;
+  - add claim-window residual sweep and vault close behavior;
+  - reject ineligible claims without silently clearing positions;
+  - require Anchor/backend/frontend/docs/test updates and explicit blocker reporting.
+- The prompt artifacts keep the current product boundary explicit: code-level reward redesign still requires legal token-classification review, Anchor audit, production migration approval, upgraded program deployment, wallet-level devnet smoke, and operator/audit validation before promotion.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The prompt files themselves are not implementation, smoke evidence, audit evidence, or legal sign-off.
+- The files are untracked and were not verified by a build, browser smoke, chain smoke, or external fact-refresh pass.
+- Existing public claims must still keep S1 buyout formation as `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement as mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, and Track3 CPS as `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- No frontend route, API client, readiness label, demo state, or browser-smoked UI behavior changed.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed by these prompt files.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because these prompt artifacts do not materially change product readiness, route/API behavior, smoke status, or known blockers beyond what the existing 2026-06-21 roadmap ledger rows already record.
+- Canonical readiness labels remain those in `docs/product-readiness-phase-0.md` and the roadmap ledger.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `demo-day/04-howey-fix-execution-prompt.md`
+  - `demo-day/05-howey-fix-round2-prompt.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified `progress.md` and untracked `demo-day/` before this entry was added.
+  - `git log --oneline -n 20` showed `HEAD` at `689c23c`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+
+# StreamPump Progress Review - 2026-06-21 Reward Semantics And Buyout Counter Hardening
+
+## Scope
+- This review covers the committed chain/backend/frontend follow-up after the latest existing `progress.md` entry, which recorded the same reward-model refactor while it was still uncommitted and blocked by Anchor event payload mismatches.
+- Comparison evidence is local commit range `3e2b912..689c23c` on `codex/post-deadline-phase-0`.
+- `fca19d8` lands capped, non-proportional S1/S2 reward semantics; `689c23c` hardens S1 buyout holder counters, residual sweep, and projection/UI support.
+- Current working tree before this recorder edit still had user-owned `progress.md` modifications and untracked `demo-day/` files. No protected files were edited.
+
+## Completed Work
+- Implemented S1 buyout creator-share settlement plus capped discovery rewards using flat equal, earliness-tiered, and status-primary reward models.
+- Reworked Track2 fan rewards toward capped flat reward distribution and added reward-model/residual snapshots.
+- Added legacy protocol/config projection support through Prisma migration fields, backend projection changes, and builder/service updates.
+- Hardened S1 buyout graduation and claim liveness:
+  - graduation now uses chain-maintained holder counters instead of caller-supplied counts;
+  - `buy_s1_token`, `sell_s1_token`, and `rage_quit_s1` maintain eligible/early/regular holder counters;
+  - buyout state records `graduated_at`, default claim-window behavior, final-claim vault close, ineligible-claim rejection, and zero-reward eligible finalize behavior;
+  - added authorized `sweep_s1_buyout_residual`.
+- Added backend S1 sweep/graduation builders/routes and projection handling for new buyout claim, sweep, and closed/ineligible states.
+- Updated frontend portfolio/buyout surfaces and API types/copy for capped rewards, ineligible claims, swept residuals, and closed buyout states.
+- Updated protocol docs and the canonical roadmap ledger with the current reward-semantics and buyout-counter hardening status.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The work is not legal-cleared, audited, migrated to production, deployed as an upgraded program, or wallet-smoked on devnet.
+- Remaining blockers: legal token-classification opinion, first-launch jurisdiction/KYC decisions, Anchor audit, production migration approval, upgraded program deployment, wallet-level devnet smoke, and operator/audit validation of sweep policy.
+- Known migration caveat: legacy `CreatorProfile` holder counters default to zero after migration, so pre-counter in-flight buyouts need an oracle snapshot fallback or one-time `S1UserPosition` backfill before graduation.
+- Product claims must still keep S1 buyout formation as `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement as mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, and Track3 CPS as `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Backend Alignment
+- Backend projection services, S1 action controller/routes, indexer coverage, Prisma migrations, and tests were updated to match the new reward/counter/sweep state.
+- No production migration was applied by this recorder.
+
+## Frontend Alignment
+- `/buyout/[creatorId]` and `/portfolio` can display the new capped-reward and residual-sweep states.
+- No mock or seeded surface was promoted.
+
+## Chain Alignment
+- Anchor program state, events, migration instructions, S1 buy/sell/rage-quit counter maintenance, S1 buyout claim/graduation semantics, and sweep instruction were updated.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` already contains matching 2026-06-21 progress-ledger rows for capped non-proportional rewards and S1 buyout counter/residual hardening.
+- This recorder only updated `progress.md`.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `3e2b912..689c23c` include:
+  - `programs/streampump-core/src/*`
+  - `programs/tests/s1-buyout*.spec.ts`
+  - `programs/tests/s1-guards.spec.ts`
+  - `backend/prisma/migrations/20260621123000_reward_decoupling_caps/migration.sql`
+  - `backend/prisma/migrations/20260621153000_s1_buyout_counter_sweep/migration.sql`
+  - `backend/src/controllers/s1ActionController.ts`
+  - `backend/src/routes/v1/s1Routes.ts`
+  - `backend/src/services/AnchorService.ts`
+  - `backend/src/services/marketProjectionService.ts`
+  - `backend/tests/*`
+  - `app/src/pages/buyout/[creatorId].tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/components/portfolio/PortfolioSections.tsx`
+  - `docs/protocol/s1-market-design.md`
+  - `docs/protocol/spump-compliance-and-value-model.md`
+  - `docs/streamPump-long-term-roadmap.md`
+- Verification recorded in the roadmap ledger:
+  - `cargo check`
+  - `npm run build:anchor`
+  - targeted S1/S2 Anchor specs
+  - `npm run test:chain:local` passed 22 tests
+  - `npx prisma generate`
+  - `npm run build --prefix backend`
+  - `npm run test:backend` passed 68 tests
+  - `npm run build --prefix app`
+  - `git diff --check`
+  - protected-file diff check clean
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified `progress.md` and untracked `demo-day/` before this entry was added.
+  - `git log --oneline -n 12` showed `HEAD` at `689c23c`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+
+# StreamPump Progress Review - 2026-06-21 Chain Reward-Model Refactor In Progress
+
+## Scope
+- This review covers current uncommitted Anchor program changes observed after the latest existing `progress.md` entry for the 2026-06-21 demo-day strategy package.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `3e2b912`, `progress.md` and `demo-day/` were already present from the prior recorded state, and new modified `programs/streampump-core/src/*` files are now dirty.
+- The material current change is an in-progress protocol refactor toward capped/non-proportional S1 discovery rewards and capped Track2 fan rewards.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added new protocol-level reward configuration fields and defaults:
+  - S1 buyout creator share basis points.
+  - S1 buyout reward model enum values for flat, earliness-tiered, and status-primary reward modes.
+  - S1 discovery reward cap, status thank-you amount, residual destination, and minimum hold duration.
+  - Track2 per-user reward cap and residual destination.
+- Extended protocol initialization and legacy protocol-config migration so older config accounts can be expanded with conservative default values.
+- Added validation/helper functions for reward models, residual destinations, capped S1 discovery rewards, and flat capped rewards.
+- Extended event/state surfaces for S1 buyout acceptance/graduation/claims and Track2 settlement/endorsement reward accounting.
+- Added admin update arguments and validation for the new S1/Track2 reward configuration knobs.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The Anchor SBF build is currently blocked by event payload mismatch errors in existing emitters:
+  - `claim_endorsement.rs` is missing new `EndorsementSettled` fields.
+  - `claim_s1_buyout_usdc.rs` still emits removed `S1BuyoutUsdcClaimed` fields.
+  - `execute_s1_graduation.rs` is missing new `S1Graduated` fields.
+  - `settle_track2.rs` is missing new `Track2Settled` fields.
+- The refactor does not yet prove the intended compliance/value-model redesign. Settlement math, holder eligibility snapshots, residual transfers, tests, IDL/client updates, devnet smoke, and audit review remain unfinished.
+- Existing public claims must still treat S1 buyout formation as `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement as mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS as `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Backend Alignment
+- No Express route, controller, service, Prisma schema, indexer projection, or API client contract changed in this recorded pass.
+- Backend and frontend code are not yet aligned to any new Anchor IDL or event schema from this in-progress chain refactor.
+
+## Frontend Alignment
+- No frontend route, readiness banner, transaction drawer, portfolio view, endorsement UI, or campaign proof surface changed.
+- No mock or seeded surface was promoted.
+
+## Chain Alignment
+- Anchor account/event/config structures now point toward capped reward-pool accounting instead of purely stake-proportional fan/backer rewards.
+- The program is not currently buildable with `npm run build:anchor`; this is a blocker before any chain smoke, deployment, IDL update, or readiness claim.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a matching progress-ledger row because the chain build blocker and financial-semantics refactor are material to roadmap status.
+- Product boundaries remain unchanged: DB workflow state is product truth, financial settlement is Solana/Anchor truth.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `programs/streampump-core/src/errors.rs`
+  - `programs/streampump-core/src/events.rs`
+  - `programs/streampump-core/src/instructions/accept_buyout_offer.rs`
+  - `programs/streampump-core/src/instructions/initialize_protocol.rs`
+  - `programs/streampump-core/src/instructions/migrate_legacy_protocol_config.rs`
+  - `programs/streampump-core/src/instructions/update_protocol_s1_emission.rs`
+  - `programs/streampump-core/src/state.rs`
+  - `programs/streampump-core/src/utils.rs`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified Anchor files plus existing modified `progress.md` and untracked `demo-day/`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - `cargo check` passed.
+  - `npm run build:anchor` failed with the event payload mismatch errors listed above.
+  - Protected-file diff check returned no protected-file changes.
+
+# StreamPump Progress Review - 2026-06-21 Demo Day Strategy Package
+
+## Scope
+- This review covers untracked demo-day preparation material observed after the latest existing `progress.md` entry for the 2026-06-21 influence naming and read-only preview work.
+- Comparison evidence is the current working tree on `codex/post-deadline-phase-0`: `progress.md` already had the influence entry, `HEAD` remained `3e2b912`, and `demo-day/` was untracked.
+- The material current change is a demo-day strategy package, not a route/API/chain implementation change.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added demo-day preparation documents under `demo-day/`.
+  - `01-feasibility-and-gtm.md` frames StreamPump's technical feasibility, compliance risk, token-economy constraints, and GTM wedge.
+  - `02-demo-script.md` drafts a judge-facing Solana demo narrative, live-demo path, compliance answer bank, and pre-demo checklist.
+  - `03-solana-skills-checklist.md` records a Solana/Anchor/Token-2022 learning and tooling checklist plus QuickNode/MCP notes.
+  - `StreamPump-DemoDay.pptx` is present as a deck artifact; this recorder did not parse the binary deck contents.
+- Kept the product boundary centered on creator sponsorship trust, non-transferable `SPUMP`, DB-first workflow state, and Solana/Anchor financial truth.
+- The demo-day material explicitly treats S1 buyout/pro-rata USDC distribution, program audit, oracle trust, managed-wallet custody, Track3 CPS, and GTM geography/legal review as risks or blockers rather than production-ready behavior.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The demo-day package is untracked and was not verified by a build, browser smoke, chain smoke, or external fact-refresh pass.
+- Any external market, Solana performance, fee, or competitor claims in the demo-day notes need source/date verification before public use.
+- The package does not fix product blockers: S1 buyout formation remains `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`, and real-money launch remains blocked on legal review and audit work.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed.
+
+## Frontend Alignment
+- No frontend route, API client, readiness label, demo state, or browser-smoked UI behavior changed.
+- Demo script claims should still be reconciled with the live app before use in a recording or pitch.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 creator positions remain internal virtual positions, and sponsor budgets remain marketing spend.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because this package does not materially change product readiness, route/API behavior, smoke status, or known blockers.
+- Canonical readiness labels remain those in `docs/product-readiness-phase-0.md` and the roadmap ledger.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `demo-day/01-feasibility-and-gtm.md`
+  - `demo-day/02-demo-script.md`
+  - `demo-day/03-solana-skills-checklist.md`
+  - `demo-day/StreamPump-DemoDay.pptx`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed `M progress.md` and `?? demo-day/` before this entry was added.
+  - `git log --oneline -n 12` showed `HEAD` at `3e2b912`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+
+# StreamPump Progress Review - 2026-06-21 Influence Naming And Read-Only Preview
+
+## Scope
+- This review covers the committed influence-model follow-up after the latest existing `progress.md` entry for 2026-06-19 design/narrative alignment.
+- Comparison evidence is local commit range `84b0100..3e2b912` on `codex/post-deadline-phase-0`.
+- The material current change is Phase 1 influence naming plus a read-only backend/frontend skeleton for account influence display.
+- The working tree was clean before this recorder edit. No protected files were edited.
+
+## Completed Work
+- Finalized the two-axis influence naming model.
+  - `Level (Lv0-Lv6)` is the seniority/trust axis.
+  - `Scout title badge` is the curation-reputation axis: `Passerby -> Observer -> Scout -> Gold Scout` / `路人 -> 观察者 -> 星探 -> 金牌伯乐`.
+  - The design keeps one primary number plus one earned title instead of competing XP bars.
+- Expanded `docs/protocol/user-influence-and-leveling.md`.
+  - Added presentation, learning-curve, final naming/positioning, and marketing-constraint sections.
+  - Preserved the compliance firewall: influence affects discovery/reputation, not direct USDC, claims, or price.
+- Added a backend read-only influence endpoint.
+  - `GET /api/v1/account/me/influence` is session-required.
+  - `backend/src/services/influenceService.ts` returns a `MOCK_PREVIEW` placeholder snapshot based on a fixed preview level.
+- Added frontend read-only influence display.
+  - Added `InfluenceChip`, an account influence API client, influence API types, and zh/en i18n strings.
+  - Wired the chip into `/me` profile header and `/rewards` level display.
+  - The new surface remains explicitly `MOCK_PREVIEW`.
+- Aligned English and Chinese README influence sections with the finalized naming.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The influence model is not a real curation-reputation system yet; the API returns placeholder preview data.
+- There is no outcome-based Scout scoring, slashing, weighted feed/trending ranking, creator momentum projection, or oracle-input integration in this recorded range.
+- Any future oracle-input use remains blocked on anti-fraud review and must stay bounded/oracle-mediated.
+- Influence must not directly alter USDC payouts, S1/S2 claim amounts, token price, or financial settlement.
+
+## Backend Alignment
+- Account routes now expose a session-authenticated `/api/v1/account/me/influence` read endpoint.
+- The service is intentionally a pure placeholder with `readiness: "MOCK_PREVIEW"` and a source note saying the real Scout score requires outcome data.
+- No Prisma schema, migration, storage contract, managed-wallet behavior, settlement service, or chain projection changed.
+
+## Frontend Alignment
+- `/me` can render the read-only influence chip alongside profile data.
+- `/rewards` can render the same Level + Scout presentation in the level bar.
+- Frontend API access remains centralized under `app/src/lib/api/*`.
+- Display copy and i18n preserve the boundary that influence is reach/reputation, not earnings.
+
+## Chain Alignment
+- No Anchor program, PDA, event, token, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, and financial truth remains Solana/Anchor truth.
+- The new influence skeleton does not affect creator valuation, USDC settlement, reward claims, or token movement.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` already contains a matching 2026-06-21 progress ledger row.
+- README and README.zh-CN now reference the finalized Level + Scout influence language as design/planned with Phase 1 read-only `MOCK_PREVIEW` status.
+- Product boundaries remain unchanged: DB workflow state is product truth, financial settlement is Solana/Anchor truth, and sponsors remain marketing spenders.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `84b0100..3e2b912`:
+  - `README.md`
+  - `README.zh-CN.md`
+  - `app/src/components/me/MeSurface.tsx`
+  - `app/src/components/shared/InfluenceChip.tsx`
+  - `app/src/lib/api/influence.ts`
+  - `app/src/lib/api/types.ts`
+  - `app/src/lib/i18n.tsx`
+  - `app/src/pages/me.tsx`
+  - `app/src/pages/rewards.tsx`
+  - `backend/src/controllers/accountController.ts`
+  - `backend/src/routes/v1/accountRoutes.ts`
+  - `backend/src/services/influenceService.ts`
+  - `docs/protocol/fan-loyalty-and-spump-economy.md`
+  - `docs/protocol/spump-compliance-and-value-model.md`
+  - `docs/protocol/user-influence-and-leveling.md`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `progress.md`
+- Verification already recorded in the roadmap ledger for this committed change:
+  - `npm run build --prefix backend`
+  - `npm run build --prefix app`
+  - `git diff --check`
+  - protected-file check clean
+  - no Prisma migration, no `programs/` change, no financial semantics changed
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed a clean working tree before this entry was added.
+  - `git diff --stat --find-renames 84b0100..HEAD` identified the current influence skeleton changes.
+  - `git diff --name-only HEAD -- backend/package-lock.json pitch/colosseum-submission.md pitch/demo-youtube-description.md` returned no protected-file changes.
+
 # StreamPump Progress Review - 2026-06-19 Product Boundary And Compliance Design
 
 ## Scope

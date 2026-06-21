@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StreamPump — Whitepaper · Draft v0.1</title>
+<style>
+  :root{
+    --bg-start:#090d14; --bg-end:#0a1018;
+    --surface-1:#111827; --surface-2:#161f2c; --surface-3:#1a2231;
+    --glass-fill:rgba(255,255,255,0.05); --glass-fill-strong:rgba(255,255,255,0.09);
+    --glass-line:rgba(255,255,255,0.08); --glass-line-strong:rgba(255,255,255,0.14);
+    --border-subtle:rgba(255,255,255,0.06);
+    --text-main:#f5f7fb; --text-muted:#93a2bb; --text-faint:#6c7c97;
+    --primary:#de402a; --primary-soft:rgba(222,64,42,0.16); --primary-line:rgba(222,64,42,0.34);
+    --blue:#4a6cd4; --teal:#3fb6a8;
+    --ease:cubic-bezier(0.22,1,0.36,1);
+    --radius:1.5rem; --radius-sm:0.9rem;
+    --maxw:880px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text-main); background:var(--bg-start); line-height:1.7; font-size:16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;
+    background:
+      radial-gradient(circle at top left, rgba(64,90,150,0.18), transparent 26%),
+      radial-gradient(circle at top right, rgba(34,74,140,0.14), transparent 22%),
+      radial-gradient(circle at bottom right, rgba(222,64,42,0.09), transparent 20%),
+      linear-gradient(180deg, var(--bg-start), var(--bg-end));
+  }
+  .layout{display:flex;min-height:100vh}
+
+  /* Sidebar */
+  .sidebar{
+    width:268px;flex:0 0 268px;position:sticky;top:0;height:100vh;overflow-y:auto;
+    padding:28px 20px;border-right:1px solid var(--border-subtle);
+    background:linear-gradient(180deg, rgba(18,25,37,0.6), rgba(11,16,25,0.4));
+    backdrop-filter:blur(14px);
+  }
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .brand .mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(150deg,var(--primary),#f0795f);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;box-shadow:0 8px 22px rgba(222,64,42,0.34)}
+  .brand .name{font-weight:800;font-size:18px;letter-spacing:.2px}
+  .brand .sub{font-size:11px;color:var(--text-faint);letter-spacing:.5px;text-transform:uppercase}
+  .ver{font-size:11.5px;color:var(--text-muted);margin:14px 0 20px;padding:8px 11px;border:1px solid var(--glass-line);
+    border-radius:999px;display:inline-block;background:var(--glass-fill)}
+  nav a{display:block;color:var(--text-muted);text-decoration:none;font-size:13.5px;padding:7px 12px;border-radius:10px;
+    transition:all .2s var(--ease);border:1px solid transparent}
+  nav a:hover{color:var(--text-main);background:var(--glass-fill)}
+  nav a.active{color:var(--text-main);background:var(--primary-soft);border-color:var(--primary-line)}
+  nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint);margin:16px 0 6px 12px}
+
+  /* Main */
+  main{flex:1;min-width:0;padding:0 6vw 120px;display:flex;justify-content:center}
+  .content{width:100%;max-width:var(--maxw)}
+
+  /* Hero */
+  .hero{padding:80px 0 40px}
+  .eyebrow{color:var(--primary);font-weight:700;font-size:12.5px;letter-spacing:3px;text-transform:uppercase;margin-bottom:18px}
+  .hero h1{font-size:clamp(34px,5.4vw,58px);line-height:1.05;font-weight:820;letter-spacing:-.5px;margin-bottom:22px}
+  .hero h1 .accent{background:linear-gradient(110deg,var(--primary),#f0795f 60%,#fff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .hero .lede{font-size:19px;color:var(--text-muted);max-width:680px}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .chip{font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;border:1px solid var(--glass-line);
+    background:var(--glass-fill);color:var(--text-main)}
+  .chip.red{border-color:var(--primary-line);background:var(--primary-soft)}
+
+  section{padding:46px 0;border-top:1px solid var(--border-subtle)}
+  section:first-of-type{border-top:none}
+  .sec-num{color:var(--primary);font-weight:700;font-size:13px;letter-spacing:1px}
+  h2{font-size:clamp(24px,3.2vw,32px);font-weight:780;letter-spacing:-.3px;margin:6px 0 18px}
+  h3{font-size:18px;font-weight:720;margin:26px 0 10px;color:var(--text-main)}
+  p{color:var(--text-muted);margin-bottom:14px}
+  p strong, li strong{color:var(--text-main);font-weight:680}
+  a.inline{color:#9db6f0;text-decoration:none;border-bottom:1px solid rgba(157,182,240,.3)}
+  ul,ol{color:var(--text-muted);margin:0 0 16px 2px;padding-left:20px}
+  li{margin-bottom:8px}
+
+  .card{background:linear-gradient(180deg, rgba(20,28,41,0.84), rgba(11,16,25,0.78));
+    border:1px solid var(--glass-line);border-radius:var(--radius);padding:24px 26px;margin:18px 0;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05),0 22px 60px rgba(0,0,0,0.24)}
+  .card.tight{padding:18px 20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .kpi{font-size:30px;font-weight:800;color:var(--primary);letter-spacing:-.5px}
+  .kpi-lbl{font-size:13px;color:var(--text-main);font-weight:650;margin-top:2px}
+  .kpi-src{font-size:11px;color:var(--text-faint);margin-top:3px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px;border:1px solid var(--glass-line);color:var(--text-muted);background:var(--glass-fill)}
+  .pill.designed{border-color:rgba(74,108,212,.4);color:#a9bdf2;background:rgba(74,108,212,.12)}
+  .pill.verified{border-color:rgba(63,182,168,.4);color:#7fe3d3;background:rgba(63,182,168,.12)}
+  .pill.live{border-color:var(--primary-line);color:#f0a08f;background:var(--primary-soft)}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--border-subtle);vertical-align:top}
+  th{color:var(--text-main);font-weight:680;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;background:rgba(255,255,255,0.02)}
+  td{color:var(--text-muted)}
+  td strong{color:var(--text-main)}
+
+  .callout{border-left:3px solid var(--primary);background:var(--primary-soft);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+    padding:14px 18px;margin:18px 0;color:var(--text-main);font-size:14.5px}
+  .callout.blue{border-left-color:var(--blue);background:rgba(74,108,212,.1)}
+  .callout .lbl{font-weight:750;display:block;margin-bottom:3px;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--text-faint)}
+
+  figure{margin:24px 0;text-align:center}
+  figure svg{max-width:100%;height:auto}
+  figcaption{font-size:12.5px;color:var(--text-faint);margin-top:10px}
+
+  .footer{border-top:1px solid var(--border-subtle);padding:34px 0 10px;color:var(--text-faint);font-size:12.5px}
+  .footer strong{color:var(--text-muted)}
+
+  /* SVG helpers */
+  .svg-card{fill:rgba(255,255,255,0.04);stroke:var(--glass-line);stroke-width:1}
+  .svg-card-red{fill:var(--primary-soft);stroke:var(--primary-line);stroke-width:1}
+  .svg-card-blue{fill:rgba(74,108,212,.12);stroke:rgba(74,108,212,.4);stroke-width:1}
+  .svg-card-teal{fill:rgba(63,182,168,.12);stroke:rgba(63,182,168,.4);stroke-width:1}
+  .svg-t{fill:var(--text-main);font-size:13px;font-weight:600;font-family:inherit}
+  .svg-tm{fill:var(--text-muted);font-size:11px;font-family:inherit}
+  .svg-tk{fill:var(--primary);font-size:11px;font-weight:700;font-family:inherit}
+  .svg-flow{stroke:var(--text-faint);stroke-width:1.4;fill:none;marker-end:url(#arrow)}
+  .svg-flow-red{stroke:var(--primary);stroke-width:1.6;fill:none;marker-end:url(#arrowred)}
+
+  @media(max-width:920px){
+    .sidebar{display:none}
+    main{padding:0 22px 80px}
+    .grid2,.grid3{grid-template-columns:1fr}
+    /* let wide tables scroll horizontally without cramping, keeping header/body columns aligned */
+    .content table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .content table thead,.content table tbody{display:table;width:100%;min-width:540px}
+  }
+  .mobile-bar{display:none}
+  @media(max-width:920px){
+    .mobile-bar{display:flex;position:sticky;top:0;z-index:20;align-items:center;gap:10px;
+      padding:14px 18px;background:rgba(11,16,25,0.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-subtle)}
+  }
+</style>
+</head>
+<body>
+<div class="mobile-bar">
+  <div class="brand"><div class="mark">S</div><div class="name">StreamPump</div></div>
+  <span class="ver" style="margin:0">Draft v0.1</span>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">S</div>
+      <div><div class="name">StreamPump</div><div class="sub">Whitepaper</div></div>
+    </div>
+    <div class="ver">Draft v0.1 · 2026-06-21</div>
+    <nav id="nav">
+      <div class="grp">Overview</div>
+      <a href="#abstract">Abstract</a>
+      <a href="#problem">1 · The Problem</a>
+      <a href="#convictions">2 · Design Convictions</a>
+      <a href="#protocol">3 · Protocol Overview</a>
+      <div class="grp">Markets</div>
+      <a href="#s1">4 · Season 1 — Discovery</a>
+      <a href="#buyout">5 · Buyout &amp; Graduation</a>
+      <a href="#s2">6 · Season 2 — Campaigns</a>
+      <div class="grp">Economy</div>
+      <a href="#spump">7 · SPUMP Utility Model</a>
+      <a href="#reputation">8 · Reputation &amp; Curation</a>
+      <a href="#settlement">9 · Settlement &amp; Metrics</a>
+      <div class="grp">System</div>
+      <a href="#architecture">10 · Architecture</a>
+      <a href="#compliance">11 · Compliance-aware Design</a>
+      <a href="#gtm">12 · Go-to-Market</a>
+      <div class="grp">Outlook</div>
+      <a href="#status">13 · Status &amp; Roadmap</a>
+      <a href="#risks">14 · Risks &amp; Open Problems</a>
+      <a href="#appendix">Appendix · Formulas</a>
+      <a href="#disclaimer">Disclaimer</a>
+    </nav>
+  </aside>
+
+  <main>
+  <div class="content">
+
+    <!-- HERO -->
+    <header class="hero" id="abstract">
+      <div class="eyebrow">Web2.5 · Built on Solana</div>
+      <h1>The creator-sponsorship<br><span class="accent">trust &amp; settlement layer</span></h1>
+      <p class="lede">StreamPump connects creators, fans, and sponsors in one verifiable loop: content creation → creator momentum → fan participation → sponsor USDC budgets → on-chain settlement. Product workflow is DB-first; financial truth is chain-first on Solana.</p>
+      <div class="chips">
+        <span class="chip red">SPUMP is non-transferable · never listed</span>
+        <span class="chip">Sponsors are marketing spenders, not investors</span>
+        <span class="chip">Content is the asset, not the token</span>
+      </div>
+    </header>
+
+    <section>
+      <div class="card">
+        <p style="color:var(--text-main);font-size:17px;margin-bottom:10px"><strong>Abstract</strong></p>
+        <p>The creator economy is large and growing, but the layer it still lacks is <strong>trust</strong>: brands cannot verify whether a campaign actually happened, creators are paid flat fees with no structured upside, and fans have no way to participate beyond speculation. Web3's first attempts at this problem failed structurally — they were token-first products where view-to-earn emissions were dumped on exchanges, collapsing both the token and the community.</p>
+        <p>StreamPump takes the opposite stance. Content — not a coin — is the asset. The platform token, <strong>SPUMP</strong>, is a non-transferable Token-2022 utility token that is never listed on any exchange; it is the currency of conviction, voice, and reputation, earned through participation and spent on status and discovery, never sold. Sponsors fund creators with real USDC marketing budgets and receive verifiable on-chain campaign proof. Value moves directly between the people who create content and the people who fund it, settled on Solana.</p>
+        <p>This paper describes the StreamPump protocol: its two market seasons (creator discovery and sponsored campaigns), its three-track settlement model, the SPUMP utility and reputation economy, the Web2.5 architecture, and the compliance-aware constraints that shape every economic mechanism. Some layers described here are designed and not yet fully shipped; these are labeled explicitly throughout.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <span class="pill verified">VERIFIED — runs end-to-end on devnet</span>
+          <span class="pill live">SHIPPED</span>
+          <span class="pill designed">DESIGNED / PLANNED</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1 PROBLEM -->
+    <section id="problem">
+      <div class="sec-num">01</div>
+      <h2>The Problem: a $480B market missing a trust layer</h2>
+      <p>Creator campaigns are now a core media channel, not an experiment. The demand exists — what is missing is verifiable trust between the three parties who must transact.</p>
+      <div class="grid3">
+        <div class="card tight"><div class="kpi">$480B</div><div class="kpi-lbl">Creator economy by 2027</div><div class="kpi-src">Goldman Sachs</div></div>
+        <div class="card tight"><div class="kpi">$37B</div><div class="kpi-lbl">US creator ad spend</div><div class="kpi-src">IAB, 2025</div></div>
+        <div class="card tight"><div class="kpi">73%</div><div class="kpi-lbl">Brands prefer micro / mid creators</div><div class="kpi-src">over mega-influencers</div></div>
+      </div>
+      <div class="callout"><span class="lbl">The gap is trust</span>
+        <strong>Brands</strong> need campaign proof — did it actually work? <strong>Creators</strong> need fair, structured settlement, not a flat fee. <strong>Fans</strong> need upside that isn't pure token speculation.</div>
+
+      <h3>Why SocialFi 1.0 failed — structurally</h3>
+      <p>Prior Web3 attempts at the creator economy collapsed for reasons that were structural, not cosmetic.</p>
+      <table>
+        <tr><th>Project</th><th>Collapse</th><th>Note</th></tr>
+        <tr><td><strong>friend.tech</strong></td><td>80k → &lt;10k DAU</td><td>revenue fell to ~$71; contract abandoned</td></tr>
+        <tr><td><strong>Farcaster</strong></td><td>15k → 545 new signups / mo</td><td>$150M raised, then signups cratered</td></tr>
+        <tr><td><strong>Lens</strong></td><td>37k → 142 new users / mo</td><td>a ~99.6% drop</td></tr>
+      </table>
+      <p>Three recurring failure modes explain the pattern:</p>
+      <ol>
+        <li><strong>Token-first.</strong> Teams launched coins instead of products; there was no sustainable content platform underneath.</li>
+        <li><strong>View-to-earn death spiral.</strong> Users earned a platform token, immediately sold it on a DEX, and the constant sell pressure crashed the price — then users left.</li>
+        <li><strong>Fake content ownership.</strong> Putting full content on-chain is slow and expensive, and creators do not value "data sovereignty" until their content already earns real revenue.</li>
+      </ol>
+      <p>StreamPump inverts all three: it is product-first, its token cannot be sold, and it anchors <em>attribution</em> rather than claiming ownership.</p>
+    </section>
+
+    <!-- 2 CONVICTIONS -->
+    <section id="convictions">
+      <div class="sec-num">02</div>
+      <h2>Design Convictions</h2>
+      <p>Five convictions shape every mechanism in the protocol.</p>
+      <div class="grid2">
+        <div class="card tight"><h3 style="margin-top:0">1 · Content is the asset</h3><p style="margin:0">Videos and posts retain audiences over time; meme coins and NFTs attract speculators. StreamPump does not tokenize or lock content — it anchors a creator-signed publication timestamp and an integrity fingerprint. That is <strong>attribution, not ownership</strong>: enough to route revenue to the right creator, nothing more.</p></div>
+        <div class="card tight"><h3 style="margin-top:0">2 · SPUMP is utility-only</h3><p style="margin:0">Non-transferable, never listed on any DEX or CEX. Users earn USDC through in-platform participation and sponsor-funded outcomes — never by trading a token on secondary markets.</p></div>
+        <div class="card tight"><h3 style="margin-top:0">3 · Sponsors are spenders</h3><p style="margin:0">Sponsors run marketing campaigns and pay in USDC — the same budget they already deploy elsewhere. This is a far healthier source of capital than speculation, and it is the protocol's primary inflow.</p></div>
+        <div class="card tight"><h3 style="margin-top:0">4 · Automation-first economics</h3><p style="margin:0">The protocol is highly automated. Service fees and small USDC transaction fees sustain it — no extractive token tax, no dependence on token-price appreciation.</p></div>
+      </div>
+      <div class="callout blue"><span class="lbl">5 · DB-first for workflow, chain-first for financial truth</span>
+        Drafts, uploads, content manifests, proposal intents, and retry state live in the database, where they are fast and flexible. Funding, token movement, content anchoring, settlement, and claimable value are treated as Solana truth. This single split is what separates StreamPump from a fan-token casino on one side and a slow, expensive "everything on-chain" product on the other.</div>
+      <div class="callout"><span class="lbl">Status is the headline reward; USDC is a bounded bonus</span>
+        The protocol is designed on the assumption that the durable driver of participation is <strong>status, identity, access, and curation reputation</strong> — not financial upside. Early users will include money-motivated participants, but the model does not depend on them. Any USDC a backer receives is a capped, sponsor-funded discovery reward, never a return that scales with how much they staked.</div>
+    </section>
+
+    <!-- 3 PROTOCOL OVERVIEW -->
+    <section id="protocol">
+      <div class="sec-num">03</div>
+      <h2>Protocol Overview</h2>
+      <p>StreamPump places content creation, creator momentum, fan participation, sponsor budgets, and on-chain settlement into one product loop, with three interacting roles.</p>
+
+      <figure>
+        <svg viewBox="0 0 860 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Core value loop">
+          <defs>
+            <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6c7c97"/></marker>
+            <marker id="arrowred" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#de402a"/></marker>
+          </defs>
+          <g>
+            <rect class="svg-card" x="6" y="48" width="140" height="54" rx="12"/>
+            <text class="svg-t" x="76" y="72" text-anchor="middle">Content</text>
+            <text class="svg-tm" x="76" y="89" text-anchor="middle">creators publish</text>
+          </g>
+          <line class="svg-flow" x1="150" y1="75" x2="178" y2="75"/>
+          <g>
+            <rect class="svg-card" x="180" y="48" width="150" height="54" rx="12"/>
+            <text class="svg-t" x="255" y="72" text-anchor="middle">Creator momentum</text>
+            <text class="svg-tm" x="255" y="89" text-anchor="middle">rated by oracle</text>
+          </g>
+          <line class="svg-flow" x1="334" y1="75" x2="362" y2="75"/>
+          <g>
+            <rect class="svg-card-blue" x="364" y="48" width="150" height="54" rx="12"/>
+            <text class="svg-t" x="439" y="72" text-anchor="middle">Fan participation</text>
+            <text class="svg-tm" x="439" y="89" text-anchor="middle">burn SPUMP to back</text>
+          </g>
+          <line class="svg-flow" x1="518" y1="75" x2="546" y2="75"/>
+          <g>
+            <rect class="svg-card-red" x="548" y="48" width="150" height="54" rx="12"/>
+            <text class="svg-t" x="623" y="72" text-anchor="middle">Sponsor USDC</text>
+            <text class="svg-tm" x="623" y="89" text-anchor="middle">marketing budget</text>
+          </g>
+          <line class="svg-flow-red" x1="702" y1="75" x2="730" y2="75"/>
+          <g>
+            <rect class="svg-card-teal" x="732" y="48" width="122" height="54" rx="12"/>
+            <text class="svg-t" x="793" y="72" text-anchor="middle">Settlement</text>
+            <text class="svg-tm" x="793" y="89" text-anchor="middle">on Solana</text>
+          </g>
+        </svg>
+        <figcaption>The StreamPump value loop. Workflow steps are DB-first; the final settlement is chain-first.</figcaption>
+      </figure>
+
+      <h3>Three roles, one exchange</h3>
+      <figure>
+        <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Role value exchange">
+          <g>
+            <rect class="svg-card-blue" x="40" y="22" width="170" height="58" rx="12"/>
+            <text class="svg-t" x="125" y="46" text-anchor="middle">Creator</text>
+            <text class="svg-tm" x="125" y="64" text-anchor="middle">publishes · earns payout</text>
+          </g>
+          <g>
+            <rect class="svg-card" x="295" y="86" width="170" height="58" rx="12"/>
+            <text class="svg-t" x="380" y="110" text-anchor="middle">Protocol</text>
+            <text class="svg-tm" x="380" y="128" text-anchor="middle">trust &amp; settlement layer</text>
+          </g>
+          <g>
+            <rect class="svg-card-teal" x="550" y="22" width="170" height="58" rx="12"/>
+            <text class="svg-t" x="635" y="46" text-anchor="middle">Fan / Backer</text>
+            <text class="svg-tm" x="635" y="64" text-anchor="middle">conviction · curation</text>
+          </g>
+          <g>
+            <rect class="svg-card-red" x="295" y="160" width="170" height="58" rx="12"/>
+            <text class="svg-t" x="380" y="184" text-anchor="middle">Sponsor</text>
+            <text class="svg-tm" x="380" y="202" text-anchor="middle">USDC budget · proof</text>
+          </g>
+          <line class="svg-flow" x1="210" y1="60" x2="300" y2="98"/>
+          <line class="svg-flow" x1="550" y1="60" x2="460" y2="98"/>
+          <line class="svg-flow-red" x1="380" y1="160" x2="380" y2="146"/>
+          <line class="svg-flow" x1="360" y1="86" x2="180" y2="80"/>
+          <text class="svg-tk" x="200" y="40">content</text>
+          <text class="svg-tk" x="560" y="40">SPUMP</text>
+          <text class="svg-tk" x="392" y="156">USDC</text>
+          <text class="svg-tk" x="150" y="98">payout</text>
+        </svg>
+        <figcaption>Creators contribute content; fans contribute conviction (non-transferable SPUMP) and curation; sponsors contribute USDC and receive verifiable proof. The protocol mediates and settles.</figcaption>
+      </figure>
+
+      <table>
+        <tr><th>Role</th><th>Contributes</th><th>Receives</th></tr>
+        <tr><td><strong>Creator</strong></td><td>Content, momentum</td><td>Cold-start backing, then structured sponsorship payouts (base + performance)</td></tr>
+        <tr><td><strong>Fan / Backer</strong></td><td>Non-transferable SPUMP, curation, early conviction</td><td>Permanent founding status, reputation, and a capped, sponsor-funded discovery reward</td></tr>
+        <tr><td><strong>Sponsor</strong></td><td>USDC marketing budget</td><td>Direct creator access (no agency) and verifiable on-chain campaign proof</td></tr>
+      </table>
+      <p>The protocol runs in two seasons. <strong>Season 1</strong> is the creator discovery market, where early conviction is expressed. <strong>Season 2</strong> is the sponsored campaign market, where structured commercial value flows.</p>
+    </section>
+
+    <!-- 4 SEASON 1 -->
+    <section id="s1">
+      <div class="sec-num">04</div>
+      <h2>Season 1 — Creator Discovery Market</h2>
+      <p>S1 is how early creators bootstrap commercial value. A fan burns non-transferable SPUMP and receives an <strong>internal S1 position</strong> — recorded as a program-derived account (PDA) on Solana, <em>not</em> a tradable token. There is no creator SPL token and no secondary market; an S1 position is internal protocol state.</p>
+      <p>The position price follows a <strong>rating-adjusted quadratic bonding curve</strong>. An oracle evaluates the creator's momentum — followers, views, growth velocity, and StreamPump-native engagement signals — and adjusts a rating that scales the curve. (Curve, rating, and reward formulas are in the <a class="inline" href="#appendix">appendix</a>.)</p>
+
+      <div class="callout"><span class="lbl">This is conviction-based discovery, not a fan-token market</span>
+        SPUMP is unbuyable: it can only be earned through genuine, time-based participation. Spending it to back a creator is therefore a credible costly signal of real conviction — which is exactly what makes backing a trustworthy momentum signal instead of buyable hype. The trust-layer thesis depends on SPUMP being unbuyable.</div>
+
+      <h3>Anti-speculation guardrails</h3>
+      <ul>
+        <li><strong>Non-transferable token.</strong> SPUMP is a Token-2022 mint with the NonTransferable extension — enforced at the protocol level, not by social convention.</li>
+        <li><strong>Daily buy caps.</strong> Per-user, per-creator caps prevent any single actor from flooding a curve.</li>
+        <li><strong>Dynamic exit tax.</strong> Selling ("unbacking") carries a decaying exit friction that discourages churn and front-running.</li>
+        <li><strong>Delayed rating activation.</strong> Rating changes take effect after a delay, preventing front-running of momentum updates.</li>
+        <li><strong>Early-cohort buyout cap.</strong> The share of a future buyout attributable to the earliest cohort is bounded.</li>
+        <li><strong>Loyalty-gated capacity <span class="pill designed">DESIGNED</span>.</strong> The daily backing cap scales with the fan's loyalty tier for that creator, so backing power is a function of demonstrated loyalty and time, not capital.</li>
+      </ul>
+    </section>
+
+    <!-- 5 BUYOUT -->
+    <section id="buyout">
+      <div class="sec-num">05</div>
+      <h2>S1 Buyout &amp; Graduation</h2>
+      <p>When a creator reaches critical mass, the buyout mechanism bridges S1 conviction into S2 commercial value. Sponsors submit USDC buyout offers (optionally with requirements, e.g. "the next three ad slots"); multiple sponsors can compete.</p>
+
+      <figure>
+        <svg viewBox="0 0 860 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Buyout lifecycle">
+          <g><rect class="svg-card-red" x="2" y="40" width="120" height="48" rx="11"/><text class="svg-t" x="62" y="60" text-anchor="middle">Offer</text><text class="svg-tm" x="62" y="76" text-anchor="middle">sponsor bids USDC</text></g>
+          <line class="svg-flow" x1="124" y1="64" x2="150" y2="64"/>
+          <g><rect class="svg-card" x="152" y="40" width="120" height="48" rx="11"/><text class="svg-t" x="212" y="60" text-anchor="middle">Accept</text><text class="svg-tm" x="212" y="76" text-anchor="middle">creator chooses</text></g>
+          <line class="svg-flow" x1="274" y1="64" x2="300" y2="64"/>
+          <g><rect class="svg-card" x="302" y="40" width="130" height="48" rx="11"/><text class="svg-t" x="367" y="60" text-anchor="middle">Rage-quit</text><text class="svg-tm" x="367" y="76" text-anchor="middle">backers may exit</text></g>
+          <line class="svg-flow" x1="434" y1="64" x2="460" y2="64"/>
+          <g><rect class="svg-card-teal" x="462" y="40" width="130" height="48" rx="11"/><text class="svg-t" x="527" y="60" text-anchor="middle">Graduation</text><text class="svg-tm" x="527" y="76" text-anchor="middle">creator → S2</text></g>
+          <line class="svg-flow-red" x1="594" y1="64" x2="620" y2="64"/>
+          <g><rect class="svg-card" x="622" y="40" width="130" height="48" rx="11"/><text class="svg-t" x="687" y="60" text-anchor="middle">Discovery reward</text><text class="svg-tm" x="687" y="76" text-anchor="middle">capped, to backers</text></g>
+          <line class="svg-flow" x1="754" y1="64" x2="778" y2="64"/>
+          <g><rect class="svg-card" x="780" y="40" width="78" height="48" rx="11"/><text class="svg-t" x="819" y="60" text-anchor="middle">Sweep</text><text class="svg-tm" x="819" y="76" text-anchor="middle">close vault</text></g>
+        </svg>
+        <figcaption>The buyout lifecycle. After acceptance, a rage-quit window lets backers exit at full curve price with zero exit tax — no forced lock-in. Graduation then moves the creator to S2.</figcaption>
+      </figure>
+
+      <p>Once a creator accepts, a <strong>rage-quit window</strong> opens: any backer who dislikes the deal can exit at full curve price with zero exit tax. After the window closes, graduation executes — the creator moves to S2, and the buyout USDC is distributed.</p>
+
+      <h3>Economics &amp; reward funding</h3>
+      <p>This is the part designed most carefully, because it determines whether backing reads as an investment or as a reward for an activity.</p>
+      <ul>
+        <li><strong>Source of funds.</strong> The discovery reward pool comes primarily from the <strong>sponsor's committed commercial budget</strong> (the buyout USDC) — money the sponsor was already spending on creator discovery and acquisition. Optional <strong>platform top-ups</strong> exist as an early-growth / promotion tool, but are not a core economic assumption; the protocol does not depend on subsidizing rewards.</li>
+        <li><strong>The creator gets the majority.</strong> The bulk of the buyout USDC is paid directly to the creator as commercial proceeds (a configurable creator share). It is the creator's deal.</li>
+        <li><strong>Backer reward is capped and decoupled.</strong> The remainder funds a backer discovery-reward pool that is distributed by a <strong>non-proportional</strong> rule — by eligibility, earliness, or loyalty tier — with a hard per-user cap. It is never a pro-rata slice scaled by how much SPUMP a backer staked.</li>
+        <li><strong>Status is the headline reward.</strong> The permanent "founding supporter" status and reputation are the primary payoff for early backing; USDC is a bounded bonus.</li>
+      </ul>
+      <div class="callout blue"><span class="lbl">Why the design is shaped this way</span>
+        Decoupling the reward from stake size, capping the upside, and routing the bulk to the creator are deliberate: they recharacterize the backer payout as a reward for the <em>activity of early curation</em> rather than a return on capital. See <a class="inline" href="#compliance">§11, Compliance-aware Design</a>.</div>
+    </section>
+
+    <!-- 6 SEASON 2 -->
+    <section id="s2">
+      <div class="sec-num">06</div>
+      <h2>Season 2 — Sponsored Campaign Market</h2>
+      <p>S2 is where structured commercial value flows. A sponsor funds a creator campaign through a three-track budget model that gives granular control while protecting creators and rewarding fans.</p>
+
+      <figure>
+        <svg viewBox="0 0 820 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-track settlement">
+          <g><rect class="svg-card-red" x="20" y="20" width="180" height="62" rx="12"/><text class="svg-t" x="110" y="44" text-anchor="middle">Track 1 · Base</text><text class="svg-tm" x="110" y="62" text-anchor="middle">fixed pay</text><text class="svg-tm" x="110" y="76" text-anchor="middle">unconditional</text></g>
+          <g><rect class="svg-card-blue" x="20" y="94" width="180" height="62" rx="12"/><text class="svg-t" x="110" y="118" text-anchor="middle">Track 2 · Performance</text><text class="svg-tm" x="110" y="136" text-anchor="middle">cliff threshold</text><text class="svg-tm" x="110" y="150" text-anchor="middle">80% creator / 20% fans</text></g>
+          <g><rect class="svg-card-teal" x="20" y="168" width="180" height="62" rx="12"/><text class="svg-t" x="110" y="192" text-anchor="middle">Track 3 · CPS</text><text class="svg-tm" x="110" y="210" text-anchor="middle">cost per sale</text><text class="svg-tm" x="110" y="224" text-anchor="middle">delayed settlement</text></g>
+          <line class="svg-flow-red" x1="200" y1="51" x2="300" y2="110"/>
+          <line class="svg-flow" x1="200" y1="125" x2="300" y2="125"/>
+          <line class="svg-flow" x1="200" y1="199" x2="300" y2="140"/>
+          <g><rect class="svg-card" x="302" y="98" width="150" height="54" rx="12"/><text class="svg-t" x="377" y="122" text-anchor="middle">Solana vault</text><text class="svg-tm" x="377" y="139" text-anchor="middle">USDC, PDA-owned</text></g>
+          <line class="svg-flow" x1="452" y1="125" x2="492" y2="125"/>
+          <g><rect class="svg-card" x="494" y="40" width="140" height="48" rx="11"/><text class="svg-t" x="564" y="68" text-anchor="middle">Creator payout</text></g>
+          <g><rect class="svg-card" x="494" y="102" width="140" height="48" rx="11"/><text class="svg-t" x="564" y="130" text-anchor="middle">Fan reward pool</text></g>
+          <g><rect class="svg-card" x="494" y="164" width="140" height="48" rx="11"/><text class="svg-t" x="564" y="192" text-anchor="middle">Sponsor refund</text></g>
+          <line class="svg-flow" x1="634" y1="64" x2="660" y2="64"/><line class="svg-flow" x1="634" y1="126" x2="660" y2="126"/><line class="svg-flow" x1="634" y1="188" x2="660" y2="188"/>
+          <text class="svg-tk" x="662" y="68">verifiable proof</text>
+          <text class="svg-tk" x="662" y="130">capped, flat</text>
+          <text class="svg-tk" x="662" y="192">unused budget</text>
+        </svg>
+        <figcaption>Three settlement tracks share one PDA-owned USDC vault; each settles on its own logic. Fan rewards are capped and flat, not stake-proportional.</figcaption>
+      </figure>
+
+      <table>
+        <tr><th>Track</th><th>Model</th><th>Settlement logic</th></tr>
+        <tr><td><strong>Track 1</strong></td><td>Fixed base pay</td><td>Unconditional creator payout — the "you definitely get paid" floor.</td></tr>
+        <tr><td><strong>Track 2</strong></td><td>Performance budget</td><td>Cliff threshold: below it, the sponsor is fully refunded. Above it, achieved budget splits 80% creator / 20% into a fan endorsement pool. Fans burn SPUMP to endorse; rewards are <strong>capped and flat</strong>, not stake-proportional.</td></tr>
+        <tr><td><strong>Track 3</strong> <span class="pill designed">GATED</span></td><td>CPS (cost per sale)</td><td>Sponsor pre-funds; settles after a refund window. Unused balance returns to the sponsor. Remains gated until a real merchant / reconciliation provider exists — the protocol does not fabricate sales data.</td></tr>
+      </table>
+
+      <h3>Campaign lifecycle</h3>
+      <p>Content manifest → proposal intent → creator signs → sponsor signs &amp; funds → Solana vault → per-track settlement. Each campaign produces a public, verifiable <strong>proof</strong> — proposal PDA, transaction signatures, content-anchor hash, funding and settlement state — that anyone can audit. This is the deliverable a sponsor cannot get from a Web2 agency.</p>
+    </section>
+
+    <!-- 7 SPUMP -->
+    <section id="spump">
+      <div class="sec-num">07</div>
+      <h2>SPUMP Utility Model</h2>
+      <p>SPUMP is the platform's native conviction / voice / energy currency — not "money you earned but cannot withdraw." Nobody resents being unable to sell game energy, a vote, or forum karma, because those were never money. Non-transferability is the feature: because SPUMP can only be earned through genuine participation, spending it is a credible signal.</p>
+
+      <div class="grid2">
+        <div class="card tight"><h3 style="margin-top:0">Earning <span class="pill live">PARTIAL</span></h3>
+          <ul style="margin-bottom:0"><li>Daily SPUMP claim (transaction-wired)</li><li>Engagement rewards for genuine activity</li><li>Emission decays from 10× to 1× as the network grows, keeping SPUMP scarce</li></ul></div>
+        <div class="card tight"><h3 style="margin-top:0">Hard boundaries</h3>
+          <ul style="margin-bottom:0"><li>Non-transferable (Token-2022)</li><li>No token sale, ever</li><li>Never listed on any DEX / CEX</li><li>No per-SPUMP redemption, no stake-proportional USDC claim, no yield multiplier, and no SPUMP price expectation</li></ul></div>
+      </div>
+
+      <h3>SPUMP sinks <span class="pill designed">DESIGNED</span></h3>
+      <p>Always-available sinks decouple SPUMP demand from "is there a graduation-worthy creator to back right now." Every creator a user follows becomes a place to spend SPUMP today — on voice, identity, reach, relationship, and reputation.</p>
+      <table>
+        <tr><th>Sink</th><th>Effect</th></tr>
+        <tr><td><strong>Badge tier claim / upgrade</strong></td><td>Turns earned eligibility (duration + engagement) into a visible status artifact. Time gates the floor; a SPUMP burn claims the tier.</td></tr>
+        <tr><td><strong>Cheer / 打赏</strong></td><td>A costly social signal that strengthens a creator's momentum (feeds the oracle's engagement-quality input) and anchors a milestone.</td></tr>
+        <tr><td><strong>Content boost / 助推</strong></td><td>Signal-weighted, decaying boost to feed ranking; capped to prevent pay-to-rank.</td></tr>
+        <tr><td><strong>Perk unlock</strong></td><td>Comment highlight, name color, exclusive-content gates, profile cosmetics — identity and access.</td></tr>
+        <tr><td><strong>Streak / tier protection</strong></td><td>A small burn shields a streak or tier from a single missed day (loss-aversion sink).</td></tr>
+      </table>
+      <div class="callout"><span class="lbl">The line we never cross</span>
+        SPUMP can buy <strong>voice, identity, reach, relationship, and reputation</strong>. It can never buy a <strong>yield multiple</strong>: no sink converts SPUMP to USDC, raises a USDC claim, raises a buyout share, or manufactures a SPUMP price expectation. Making most SPUMP demand non-monetary utility is also what collapses any implicit USD price for the token.</div>
+    </section>
+
+    <!-- 8 REPUTATION -->
+    <section id="reputation">
+      <div class="sec-num">08</div>
+      <h2>Platform Level &amp; Scout Reputation</h2>
+      <p><span class="pill designed">DESIGNED</span> StreamPump separates standing into two orthogonal axes, so that a user's influence reflects both seniority and the quality of their judgment.</p>
+      <div class="grid2">
+        <div class="card tight"><h3 style="margin-top:0">Level (Lv0–Lv6)</h3><p style="margin:0">A sticky measure of <strong>seniority and trust</strong> — how long and how genuinely a user has participated. It rises with honest activity and is hard to fake or buy.</p></div>
+        <div class="card tight"><h3 style="margin-top:0">Scout reputation</h3><p style="margin:0">A slashable, outcome-validated measure of <strong>curation skill</strong>: Passerby → Observer → Scout → Gold Scout (路人 → 观察者 → 星探 → 金牌伯乐). It rises when the creators you backed early actually succeed.</p></div>
+      </div>
+      <p>The two compose into a <strong>sublinear, capped Influence Weight</strong>. Higher-standing users' likes, cheers, and endorsements allocate more discovery traffic and contribute more to displayed creator momentum. Anti-plutocracy rules apply: a universal base weight, a sublinear cap, and an earliness path so newcomers can still matter.</p>
+      <div class="callout blue"><span class="lbl">The compliance firewall</span>
+        Influence is a <strong>reputation and discovery currency, never a financial one</strong>. It moves traffic, ranking, and displayed momentum freely — but it never multiplies USDC, price, or claims. It can reach a creator's valuation only as one bounded input to the oracle's existing, guarded rating path. Influence = reach + reputation, never earnings.</div>
+    </section>
+
+    <!-- 9 SETTLEMENT -->
+    <section id="settlement">
+      <div class="sec-num">09</div>
+      <h2>Settlement &amp; Metric Verification</h2>
+      <p>Financial outcomes are settled on Solana from PDA-owned vaults, idempotently. Track&nbsp;1 settles unconditionally; Track&nbsp;2 settles against a verified metric at a cliff; Track&nbsp;3 settles after a refund window against approved sales. The integrity of Track&nbsp;2/3 depends entirely on the quality of the metric source.</p>
+
+      <h3>Target metric architecture <span class="pill designed">DESIGNED — not yet integrated</span></h3>
+      <p>The protocol does not yet integrate a production metric or merchant provider; performance settlement currently runs against controlled data, and Track&nbsp;3 is gated. The intended architecture, stated plainly so the risk is not hidden:</p>
+      <ul>
+        <li><strong>Platform API / creator-connected accounts</strong> — metrics sourced from the creator's own connected platform accounts, not scraped third-party numbers.</li>
+        <li><strong>Signed metric attestations</strong> — an oracle signs an evidence digest of the metric snapshot, recorded on-chain.</li>
+        <li><strong>Fraud scoring</strong> — anomalous engagement is flagged and can hold settlement.</li>
+        <li><strong>Evidence digest + delayed settlement</strong> — settlement references a digest and occurs after a window.</li>
+        <li><strong>Dispute window</strong> — sponsors and creators can contest a settlement before it finalizes.</li>
+      </ul>
+      <p>StreamPump-native engagement (costly cheers and boosts paid in earned SPUMP) is itself a hard-to-fake signal that complements external metrics and feeds the creator-momentum rating.</p>
+    </section>
+
+    <!-- 10 ARCHITECTURE -->
+    <section id="architecture">
+      <div class="sec-num">10</div>
+      <h2>Architecture — Web2.5 by design</h2>
+      <p>StreamPump is deliberately hybrid. The single most important architectural principle — and the clearest line separating it from a fan-token product, a creator CRM, or a view-to-earn farm — is the split between workflow and financial truth.</p>
+
+      <figure>
+        <svg viewBox="0 0 800 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DB-first chain-first architecture">
+          <rect x="14" y="14" width="372" height="222" rx="16" fill="rgba(74,108,212,0.06)" stroke="rgba(74,108,212,0.3)"/>
+          <text class="svg-t" x="34" y="42" fill="#a9bdf2">Off-chain · product workflow (DB-first)</text>
+          <g>
+            <rect class="svg-card" x="34" y="58" width="156" height="40" rx="10"/><text class="svg-tm" x="112" y="83" text-anchor="middle">Next.js frontend</text>
+            <rect class="svg-card" x="206" y="58" width="160" height="40" rx="10"/><text class="svg-tm" x="286" y="83" text-anchor="middle">Express API · Prisma</text>
+            <rect class="svg-card" x="34" y="108" width="156" height="40" rx="10"/><text class="svg-tm" x="112" y="133" text-anchor="middle">Postgres</text>
+            <rect class="svg-card" x="206" y="108" width="160" height="40" rx="10"/><text class="svg-tm" x="286" y="133" text-anchor="middle">R2 media · Mux video</text>
+            <rect class="svg-card" x="34" y="158" width="332" height="40" rx="10"/><text class="svg-tm" x="200" y="183" text-anchor="middle">Oracle + indexer bridge</text>
+          </g>
+          <text class="svg-tm" x="200" y="222" text-anchor="middle">drafts · uploads · intents · retries · projections</text>
+
+          <line class="svg-flow-red" x1="386" y1="125" x2="424" y2="125"/>
+          <line class="svg-flow-red" x1="424" y1="125" x2="386" y2="125"/>
+
+          <rect x="426" y="14" width="360" height="222" rx="16" fill="rgba(222,64,42,0.06)" stroke="var(--primary-line)"/>
+          <text class="svg-t" x="446" y="42" fill="#f0a08f">On-chain · financial truth (chain-first)</text>
+          <g>
+            <rect class="svg-card-red" x="446" y="58" width="320" height="40" rx="10"/><text class="svg-tm" x="606" y="83" text-anchor="middle">Anchor program — S1 · buyout · S2 · settlement</text>
+            <rect class="svg-card-red" x="446" y="108" width="154" height="40" rx="10"/><text class="svg-tm" x="523" y="133" text-anchor="middle">SPUMP · Token-2022</text>
+            <rect class="svg-card-red" x="612" y="108" width="154" height="40" rx="10"/><text class="svg-tm" x="689" y="133" text-anchor="middle">USDC vaults (PDA)</text>
+            <rect class="svg-card-red" x="446" y="158" width="320" height="40" rx="10"/><text class="svg-tm" x="606" y="183" text-anchor="middle">All PDA state — verifiable &amp; queryable</text>
+          </g>
+          <text class="svg-tm" x="606" y="222" text-anchor="middle">funding · settlement · token ops · content anchor</text>
+        </svg>
+        <figcaption>DB-first for product workflow; chain-first for financial truth. The oracle/indexer bridge keeps DB projections reconciled with Solana state.</figcaption>
+      </figure>
+
+      <h3>Why Solana</h3>
+      <p>Each core mechanism depends on a specific Solana capability:</p>
+      <ul>
+        <li><strong>Token-2022 NonTransferable.</strong> SPUMP is soulbound at the protocol level — yet Token-2022 still permits <strong>Burn</strong>, so "burn SPUMP to back a creator" works natively, with no workaround.</li>
+        <li><strong>Low-latency confirmation &amp; low fees.</strong> Fast confirmation and low per-transaction cost make frequent settlement interactions — bonding-curve trades and Track&nbsp;2/3 micro-settlements — practical, which is impractical on a high-fee L1.</li>
+        <li><strong>PDA composability + Anchor.</strong> Protocol config, creator profiles, S1 positions, proposals, and USDC vaults are deterministic, composable on-chain accounts in a single type-safe Anchor program covering the full S1/S2 lifecycle.</li>
+      </ul>
+    </section>
+
+    <!-- 11 COMPLIANCE -->
+    <section id="compliance">
+      <div class="sec-num">11</div>
+      <h2>Compliance-aware Design</h2>
+      <p>StreamPump is <strong>designed with compliance-aware constraints</strong>. This section describes design choices intended to reduce regulatory risk; it is not a legal conclusion, and nothing here states that any token or mechanism is "compliant." Final characterization requires qualified counsel.</p>
+      <p>The central concern is that a structure of the form "spend a cost-bearing input to back a creator early, then receive USDC scaled by how much you staked when a sponsor buys them out" resembles an investment contract. The protocol's economic design deliberately breaks that pattern, in depth:</p>
+      <ul>
+        <li><strong>Economic substance first.</strong> Backer USDC is decoupled from stake size and hard-capped per user. More SPUMP backed never buys more USDC. The bulk of buyout USDC goes to the creator; the backer portion is a capped, sponsor-funded discovery reward for the <em>activity</em> of early curation — the same category as a rebate or finder's reward, not a return on capital.</li>
+        <li><strong>Token framing.</strong> SPUMP is a non-transferable consumption unit with no sale and no listing. Most SPUMP demand is non-monetary utility (cheer, boost, badges), which collapses any implicit USD price.</li>
+        <li><strong>Access controls.</strong> Initial rollout is geofenced, with KYC for users who can receive USDC and KYB for sponsors.</li>
+        <li><strong>The influence firewall.</strong> Reputation and influence move discovery and reach freely but never multiply a financial claim.</li>
+        <li><strong>Narrative discipline.</strong> Product and docs avoid "investment," "ROI," "yield," "returns," and SPUMP price charts; rewards are described as discovery / loyalty / supporter rewards.</li>
+      </ul>
+      <div class="callout"><span class="lbl">Standing blockers before any real-money launch</span>
+        A token-classification legal opinion, a first-launch jurisdiction decision, and an independent audit of the settlement program are required and cannot be self-certified by the team. The reward-decoupling redesign described above is implemented at the code level and remains gated behind these reviews.</div>
+    </section>
+
+    <!-- 12 GTM -->
+    <section id="gtm">
+      <div class="sec-num">12</div>
+      <h2>Go-to-Market</h2>
+      <p>StreamPump is a three-sided market — creators, fans, sponsors — so cold-start sequencing matters more than any single feature. The strategy is to make one narrow corridor real before widening.</p>
+      <ul>
+        <li><strong>Creator-first supply.</strong> Initial rollout prioritizes a narrow creator vertical where conviction-based discovery is natural, building a credible supply of creators and verifiable campaign case studies before scaling demand.</li>
+        <li><strong>Sponsors that fit early.</strong> The earliest sponsors are likely crypto-native or innovation-friendly brands comfortable with on-chain settlement and verifiable proof.</li>
+        <li><strong>Jurisdiction selection.</strong> Rollout favors jurisdictions where the compliance-aware reward design can be validated before broader expansion.</li>
+      </ul>
+      <div class="callout"><span class="lbl">The honest GTM risk: sponsor adoption</span>
+        Convincing mainstream brands to fund on-chain campaigns is the hardest part of this model, and the paper does not pretend otherwise. The mitigation is <strong>treasury abstraction</strong>: sponsors should pay in fiat, with the platform or a payment partner handling USDC on-ramp and custody. A sponsor sees a budget, a campaign, and a settlement receipt — not wallets, gas, or RPC. On-chain verifiability is a back-office property of the settlement, not a UX burden placed on the buyer.</div>
+    </section>
+
+    <!-- 13 STATUS -->
+    <section id="status">
+      <div class="sec-num">13</div>
+      <h2>Current Status &amp; Roadmap</h2>
+      <p>StreamPump is an advanced prototype. The first production corridor is <strong>verified end-to-end on devnet</strong>: an authenticated creator publishes content through R2/Mux, the post appears in the public feed from a backend projection, the creator opens a proposal intent, creator and sponsor co-sign, the backend relays the transaction to Solana, and the campaign detail shows verifiable proof — real proposal PDA, confirmed relay, manifest hash, funded state.</p>
+      <p>Readiness is tracked honestly and never promoted by copy alone. Layers labeled <span class="pill designed">DESIGNED</span> in this paper (loyalty/badge economy, influence model, production metric provider, Track&nbsp;3 merchant integration) are specified but not fully shipped.</p>
+      <h3>Roadmap</h3>
+      <table>
+        <tr><th>Phase</th><th>Goal</th></tr>
+        <tr><td><strong>1 · Production corridor</strong></td><td>Harden the verified creator → media → feed → proposal → campaign-proof path.</td></tr>
+        <tr><td><strong>2 · Auth &amp; identity</strong></td><td>Production provider verification, managed-wallet mapping, role/profile records.</td></tr>
+        <tr><td><strong>3 · Media &amp; feed</strong></td><td>Retry/resume, publish eligibility, deployed R2/Mux smoke, no silent fallback.</td></tr>
+        <tr><td><strong>4 · S1 lifecycle</strong></td><td>Self-serve creator readiness, rating/cap provenance, full buyout productization.</td></tr>
+        <tr><td><strong>5 · S2 lifecycle</strong></td><td>Endorsement, fan rewards, Track&nbsp;1/2 operator settlement, Track&nbsp;3 gated reconciliation.</td></tr>
+        <tr><td><strong>6 · Operations</strong></td><td>Operator dashboards, observability, deployment health checks.</td></tr>
+        <tr><td><strong>7 · Audit &amp; growth</strong></td><td>Freeze instruction interface, expand tests, abuse controls, pilot launch.</td></tr>
+      </table>
+    </section>
+
+    <!-- 14 RISKS -->
+    <section id="risks">
+      <div class="sec-num">14</div>
+      <h2>Risks &amp; Open Problems</h2>
+      <p>Stating the hard problems openly is how the team signals it knows where the real difficulty lies.</p>
+      <table>
+        <tr><th>Risk</th><th>Where it stands</th></tr>
+        <tr><td><strong>Sponsor adoption</strong></td><td>The core demand-side risk. Mitigated by treasury abstraction and crypto-native early sponsors; unproven at scale.</td></tr>
+        <tr><td><strong>Oracle / operator trust</strong></td><td>Rating, metric validation, and certain settlement cranks are operator-assisted today. StreamPump is positioned as operator-assisted workflow with verifiable settlement, with a progressive-decentralization path — not as fully trustless.</td></tr>
+        <tr><td><strong>Metric integrity</strong></td><td>No production metric/merchant provider yet; Track&nbsp;2 runs on controlled data and Track&nbsp;3 is gated. Target architecture in §9.</td></tr>
+        <tr><td><strong>Regulatory</strong></td><td>Token classification and reward characterization require counsel; launch is geofenced and gated.</td></tr>
+        <tr><td><strong>Cold-start</strong></td><td>Three-sided market; addressed by creator-first, single-vertical sequencing.</td></tr>
+        <tr><td><strong>Security</strong></td><td>Program not yet audited; instruction interface to be frozen before an independent audit ahead of mainnet.</td></tr>
+      </table>
+    </section>
+
+    <!-- APPENDIX -->
+    <section id="appendix">
+      <div class="sec-num">A</div>
+      <h2>Appendix — Formulas</h2>
+      <p>Reference formulas for the mechanisms described above. Parameters live in on-chain <code>ProtocolConfig</code> and are tunable without changing PDA seeds; default values are illustrative and subject to audit.</p>
+
+      <h3>A.1 · Rating-adjusted bonding curve (S1)</h3>
+      <p>The S1 position price follows a quadratic curve scaled by the creator's momentum rating. With supply <strong>S</strong>, trade size <strong>dS</strong>, base coefficient <strong>base_k</strong>, and rating in basis points:</p>
+      <div class="card tight">
+        <p style="margin:0;font-family:'Courier New',monospace;color:var(--text-main);font-size:13.5px;line-height:1.9">
+          effective_k = base_k × creator_rating_bps / 10_000<br>
+          buy_cost&nbsp;&nbsp;&nbsp;= effective_k / 2 × ((S + dS)² − S²)<br>
+          sell_return = effective_k / 2 × (S² − (S − dS)²)
+        </p>
+      </div>
+      <p>Rating defaults to <code>10_000</code> (1.0×) and is bounded to <code>5_000</code>–<code>20_000</code> (0.5×–2.0×), with a per-day change cap and delayed activation to prevent front-running of momentum updates.</p>
+
+      <h3>A.2 · Buyout split &amp; capped discovery reward (S1)</h3>
+      <p>At graduation the sponsor's committed buyout USDC (<strong>D</strong>) is split between the creator and a bounded discovery pool. Backer rewards are capped per user and decoupled from stake size — distribution depends on holder counts and tier, never on SPUMP staked.</p>
+      <div class="card tight">
+        <p style="margin:0;font-family:'Courier New',monospace;color:var(--text-main);font-size:13.5px;line-height:1.9">
+          creator_payout = D × creator_share_bps / 10_000<br>
+          discovery_pool = D − creator_payout<br>
+          <span style="color:var(--text-muted)"># flat model</span><br>
+          reward(user) = min( discovery_pool / eligible_holders, per_user_cap )<br>
+          <span style="color:var(--text-muted)"># earliness-tiered model (early weight w_e, regular w_r)</span><br>
+          unit&nbsp;= discovery_pool × w / (early·w_e + regular·w_r)<br>
+          reward(user) = min( unit, per_user_cap )
+        </p>
+      </div>
+      <p>Any unclaimed residual after the claim window is swept to the configured destination (creator or sponsor); it is never re-distributed proportionally to backers.</p>
+
+      <h3>A.3 · Track 2 settlement &amp; capped fan reward (S2)</h3>
+      <p>Track 2 settles against an oracle-validated metric at a cliff threshold. With deposited budget <strong>B</strong>, achieved fraction <strong>a</strong> (capped at 1.0), and minimum cliff <strong>c</strong>:</p>
+      <div class="card tight">
+        <p style="margin:0;font-family:'Courier New',monospace;color:var(--text-main);font-size:13.5px;line-height:1.9">
+          if a &lt; c:&nbsp;&nbsp;sponsor_refund = B&nbsp;&nbsp;(creator = 0, fans = 0)<br>
+          else:<br>
+          &nbsp;&nbsp;achieved&nbsp;&nbsp;&nbsp;= B × a<br>
+          &nbsp;&nbsp;creator_pay = achieved × 80%<br>
+          &nbsp;&nbsp;fan_pool&nbsp;&nbsp;&nbsp;= achieved × 20%<br>
+          &nbsp;&nbsp;sponsor_refund = B − achieved<br>
+          &nbsp;&nbsp;<span style="color:var(--text-muted)"># capped flat, not stake-proportional</span><br>
+          &nbsp;&nbsp;reward(fan) = min( fan_pool / endorser_count, per_user_cap )
+        </p>
+      </div>
+      <p>Failed-campaign endorsements refund 100% SPUMP principal; cancelled/voided campaigns refund principal minus a fixed slash. Track 3 (CPS) settles after a refund window against approved sales and remains gated until a real merchant provider exists.</p>
+    </section>
+
+    <!-- DISCLAIMER -->
+    <section id="disclaimer">
+      <div class="sec-num">—</div>
+      <h2>Disclaimer</h2>
+      <div class="card tight">
+        <p style="margin-bottom:10px">This document is provided for <strong>informational purposes only</strong>. It is a description of a protocol design and product direction, not an offer or solicitation.</p>
+        <ul style="margin-bottom:0">
+          <li><strong>SPUMP is a non-transferable utility token.</strong> There is no token sale, and SPUMP is not and will not be listed on any exchange.</li>
+          <li>Nothing here is an <strong>offer to sell</strong> or a solicitation to buy any token, security, or financial instrument.</li>
+          <li>Nothing here is <strong>investment, legal, financial, or tax advice</strong>. Statements about compliance describe design intent, not a legal conclusion.</li>
+          <li>Forward-looking statements and any layer marked <em>designed / planned</em> are subject to change and may not ship as described.</li>
+        </ul>
+      </div>
+      <div class="footer">
+        <p><strong>StreamPump Whitepaper</strong> · Draft v0.1 · 2026-06-21 · Built on Solana · Token-2022 · Anchor</p>
+        <p>On-chain programs are licensed under Apache 2.0; this document and the product are works in progress. Figures cited from Goldman Sachs and IAB are third-party estimates.</p>
+      </div>
+    </section>
+
+  </div>
+  </main>
+</div>
+
+<script>
+  // active-section highlight in sidebar
+  const links = [...document.querySelectorAll('#nav a')];
+  const map = {};
+  links.forEach(a=>{const id=a.getAttribute('href').slice(1);const el=document.getElementById(id);if(el)map[id]=a;});
+  const obs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        links.forEach(l=>l.classList.remove('active'));
+        const a=map[e.target.id]; if(a)a.classList.add('active');
+      }
+    });
+  },{rootMargin:'-20% 0px -70% 0px',threshold:0});
+  Object.keys(map).forEach(id=>{const el=document.getElementById(id);if(el)obs.observe(el);});
+</script>
+</body>
+</html>

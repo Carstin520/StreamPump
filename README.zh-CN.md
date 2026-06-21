@@ -4,11 +4,11 @@
     <strong>面向创作者赞助的 Web2.5 信任层——把内容创作、创作者势能、粉丝参与和赞助预算，放进同一个产品闭环，并在 Solana 上结算。</strong>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/Built_on-Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana">
-    <img src="https://img.shields.io/badge/Anchor-0.32-512BD4?style=for-the-badge" alt="Anchor">
-    <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js">
-    <img src="https://img.shields.io/badge/TypeScript-5-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit" alt="Last Commit">
+    <img src="https://img.shields.io/badge/Built_on-Solana-de402a?style=for-the-badge&logo=solana&logoColor=white&labelColor=0a1018" alt="Solana">
+    <img src="https://img.shields.io/badge/Anchor-0.32-1b2740?style=for-the-badge&labelColor=0a1018" alt="Anchor">
+    <img src="https://img.shields.io/badge/Next.js-15-1b2740?style=for-the-badge&logo=nextdotjs&logoColor=white&labelColor=0a1018" alt="Next.js">
+    <img src="https://img.shields.io/badge/TypeScript-5-1b2740?style=for-the-badge&logo=typescript&logoColor=white&labelColor=0a1018" alt="TypeScript">
+    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit&color=de402a&labelColor=0a1018" alt="Last Commit">
   </p>
   <p align="center">
     <a href="README.md">🇬🇧 English README</a>
@@ -48,7 +48,7 @@
 它**不是** fan token 赌场，**不是**传统 influencer CRM，也**不是** view-to-earn 刷量农场。它是三方之间缺失的那一层——**信任层**：
 
 - **创作者**：先从粉丝处获得冷启动资金，再毕业进入结构化赞助，既有保底报酬，也有表现激励。
-- **粉丝 / 支持者**：用非转让的 `SPUMP` 早期支持创作者；当赞助方买断你看好的创作者时，你赚到真实的 **USDC**——而不是靠二级市场投机。
+- **粉丝 / 支持者**：用非转让的 `SPUMP` 早期支持创作者；当你 back 的创作者毕业时，获得永久创始身份，外加一份**有上限、由赞助方出资的发现奖励**——而不是按持仓比例的回报，也不是二级市场投机。
 - **赞助方**：无需中介代理，直接触达创作者，通过三条灵活的 USDC 预算轨道投放，并拿到可验证的链上活动凭证。
 
 ```text
@@ -89,9 +89,9 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 | 能力 | 说明 |
 |---|---|
 | 🚀 **S1 创作者发现** | 粉丝 burn `SPUMP` 进入按评级调整的 bonding-curve 头寸，早期支持创作者 |
-| 🤝 **S1 → S2 买断桥接** | 赞助方出 USDC 买断创作者；持有者可 rage-quit 退出，或在毕业时按比例领取分成 |
+| 🤝 **S1 → S2 买断桥接** | 赞助方出 USDC 买断创作者；创作者拿大头，持有者可 rage-quit 退出，或在毕业时领取一份有上限、与持仓解耦的发现奖励 |
 | 📊 **三轨赞助** | 固定保底、表现预算、延迟 CPS——每条轨道独立链上结算 |
-| 🗳️ **粉丝背书池** | 粉丝 burn `SPUMP` 背书活动，从 Track 2 表现池按比例赚取 USDC |
+| 🗳️ **粉丝背书池** | 粉丝 burn `SPUMP` 背书活动，从 Track 2 表现池赚取一份有上限的统一（非按持仓比例）USDC 奖励 |
 | 🔗 **可验证活动凭证** | 每个活动都暴露其 PDA、交易签名、manifest hash 和内容锚定 |
 | 👛 **Web2.5 托管钱包** | 邮箱/社交登录用户获得平台代管钱包——后端签名并代付，全程零 SOL |
 | 🛡️ **反投机护栏** | 非转让 token、每日买入上限、动态退出税、延迟评级、背书上限 |
@@ -125,7 +125,7 @@ buy cost    = effective_k / 2 * ((S + dS)^2 - S^2)
 sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 ```
 
-默认评级为 `10_000`（1.0×），区间 `5_000`–`20_000`（0.5×–2.0×），带每日变动上限和延迟生效。当创作者达到临界规模，赞助方提交**买断报价**；创作者接受并经过 rage-quit 窗口后，执行**毕业**，剩余持有者按比例领取买断 USDC。
+默认评级为 `10_000`（1.0×），区间 `5_000`–`20_000`（0.5×–2.0×），带每日变动上限和延迟生效。当创作者达到临界规模，赞助方提交**买断报价**；创作者接受并经过 rage-quit 窗口后，执行**毕业**——创作者拿到买断 USDC 的大头，剩余持有者领取一份**有上限、非按比例的发现奖励**（按资格 / 早期程度 / 忠诚度，绝不随 staked SPUMP 缩放）。
 
 > 参数与反套利护栏详见 [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md)。
 
@@ -187,7 +187,7 @@ flowchart LR
 - **工作流 DB-first：** 草稿、manifest、上传、媒体处理、proposal intent、重试、workspace 状态。
 - **资金 chain-first：** 赞助出资、proposal 创建、结算、退款、token mint/burn、不可变内容锚定。
 
-Anchor 程序提供 **32 个类型安全指令**和 **13 个 PDA 账户类型**，覆盖完整生命周期——S1 发现、S1 买断、S2 活动、三轨结算、内容锚定，以及协议/用户/组织状态。
+Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**，覆盖完整生命周期——S1 发现、S1 买断、S2 活动、三轨结算、内容锚定，以及协议/用户/组织状态。
 
 ---
 
@@ -201,7 +201,7 @@ Anchor 程序提供 **32 个类型安全指令**和 **13 个 PDA 账户类型**�
 | **不到 1 美分手续费** | 让 Track 2 微结算和 Track 3 CPS 支付在经济上可行 |
 | **Token-2022 NonTransferable** | 在协议层强制 `SPUMP` 不可转让，而非靠约定 |
 | **PDA 架构** | 配置、档案、S1 头寸、proposal、USDC vault 都是确定性、可验证的链上状态 |
-| **Anchor 框架** | 整个产品生命周期的 32 个类型安全指令集于一个程序 |
+| **Anchor 框架** | 整个产品生命周期的 35 个类型安全指令集于一个程序 |
 | **生态** | 钱包适配器、Web3Auth 社交登录、成熟 RPC，以及用于快速迭代的 devnet |
 
 ---
@@ -228,7 +228,7 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 
 ### 合规与代币定性（设计推进中）
 
-`SPUMP` 是非转让的效用/消耗单位，**无货币价值、无利润预期**。为了让 backing 保持为有代价的信念信号、同时**不**构成投资合同，backer 的 USDC 机制正在从"按持仓比例分买断款"（当前链上代码仍是这样实现的）重新定性为**有上限、由平台出资、且不随 staked `SPUMP` 数量缩放的发现/忠诚奖励**——以永久的创始身份、而非 USDC 作为主奖励。面向公众的真实资金上线，门槛包括：这套重设计、地域限制、对收 USDC 用户的 KYC、一次 Anchor 审计，以及一份法律代币定性意见书。详见 [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md)。在此之前，所有 USDC 奖励流都应视为仅 demo/种子用途。
+`SPUMP` 是非转让的效用/消耗单位，**无货币价值、无利润预期**。为了让 backing 保持为有代价的信念信号、同时**不**构成投资合同，backer 的 USDC 机制已从"按持仓比例分买断款"重新设计为**有上限、由赞助方出资、且不随 staked `SPUMP` 数量缩放的发现奖励**（创作者拿到买断款的大头），并以永久创始身份、而非 USDC 作为主奖励。这套重设计**已在工作分支上完成代码级实现**，且在公众真实资金上线前**仍被门控**，门槛包括：一次 Anchor 审计、一份法律代币定性意见书、程序部署、地域限制，以及对收 USDC 用户的 KYC。详见 [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md)。在这些门槛清除前，所有 USDC 奖励流都应视为仅 demo/种子用途。
 
 完整情况见 [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md)（权威路线图 + 进度账本）与 [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md)。
 
@@ -240,7 +240,7 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 |---|---|
 | `programs/streampump-core` | Anchor 程序：协议状态、S1、S1 买断、S2 三轨结算、内容锚定 |
 | `programs/tests` | 10 个 Anchor TypeScript 测试套件（happy/unhappy、guard、buyout、S2 流程） |
-| `backend` | Express v1 API、Prisma（22 模型 / 17 迁移）、R2/Mux、认证、索引、调度器、投影 |
+| `backend` | Express v1 API、Prisma（22 模型 / 19 迁移）、R2/Mux、认证、索引、调度器、投影 |
 | `app` | Next.js 15 前端：发现、创作者、资产、workspace、campaign、认证等界面 |
 | `docs` | 协议设计、后端 API 合同、前端规范、部署说明、路线图 |
 | `scripts` | devnet seed、demo、smoke、部署和 git hook 脚本 |

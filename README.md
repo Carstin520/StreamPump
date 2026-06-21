@@ -4,11 +4,11 @@
     <strong>The Web2.5 trust layer for creator sponsorship — where content, creator momentum, fan participation, and sponsor budgets settle on Solana in one product loop.</strong>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/Built_on-Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana">
-    <img src="https://img.shields.io/badge/Anchor-0.32-512BD4?style=for-the-badge" alt="Anchor">
-    <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js">
-    <img src="https://img.shields.io/badge/TypeScript-5-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit" alt="Last Commit">
+    <img src="https://img.shields.io/badge/Built_on-Solana-de402a?style=for-the-badge&logo=solana&logoColor=white&labelColor=0a1018" alt="Solana">
+    <img src="https://img.shields.io/badge/Anchor-0.32-1b2740?style=for-the-badge&labelColor=0a1018" alt="Anchor">
+    <img src="https://img.shields.io/badge/Next.js-15-1b2740?style=for-the-badge&logo=nextdotjs&logoColor=white&labelColor=0a1018" alt="Next.js">
+    <img src="https://img.shields.io/badge/TypeScript-5-1b2740?style=for-the-badge&logo=typescript&logoColor=white&labelColor=0a1018" alt="TypeScript">
+    <img src="https://img.shields.io/github/last-commit/Carstin520/StreamPump?style=for-the-badge&label=Last+Commit&color=de402a&labelColor=0a1018" alt="Last Commit">
   </p>
   <p align="center">
     <a href="README.zh-CN.md">🇨🇳 中文版 README</a>
@@ -48,7 +48,7 @@
 It is **not** a fan-token casino, **not** an influencer CRM, and **not** a view-to-earn reward farm. It is the **trust layer** between three groups who currently lack one:
 
 - **Creators** get cold-start funding from fans, then graduate into structured sponsorship deals with guaranteed base pay *and* performance upside.
-- **Fans / backers** support creators early with non-transferable `SPUMP`, and earn real **USDC** when a sponsor buys out a creator they believed in — not from secondary-market speculation.
+- **Fans / backers** support creators early with non-transferable `SPUMP`, and earn permanent founding status plus a **capped, sponsor-funded discovery reward** when a creator they backed graduates — never a stake-proportional return or secondary-market speculation.
 - **Sponsors** reach creators directly (no agency middlemen) through three flexible USDC budget tracks, and receive verifiable on-chain campaign proof.
 
 ```text
@@ -89,9 +89,9 @@ StreamPump is built on four convictions that avoid every one of these traps:
 | Feature | Description |
 |---|---|
 | 🚀 **S1 Creator Discovery** | Fans burn `SPUMP` into rating-adjusted bonding-curve positions to back creators early |
-| 🤝 **S1 → S2 Buyout Bridge** | Sponsors bid USDC to buy out a creator; backers rage-quit or claim a pro-rata share at graduation |
+| 🤝 **S1 → S2 Buyout Bridge** | Sponsors bid USDC to buy out a creator; the creator takes the majority, while backers rage-quit or claim a capped, decoupled discovery reward at graduation |
 | 📊 **Three-Track Sponsorship** | Fixed base pay, performance budget, and delayed CPS — all settled per track on-chain |
-| 🗳️ **Fan Endorsement Pool** | Fans burn `SPUMP` to endorse campaigns and earn pro-rata USDC from the Track 2 performance pool |
+| 🗳️ **Fan Endorsement Pool** | Fans burn `SPUMP` to endorse campaigns and earn a capped, flat USDC reward from the Track 2 performance pool |
 | 🔗 **Verifiable Campaign Proof** | Every campaign exposes its PDA, tx signature, manifest hash, and content anchor |
 | 👛 **Web2.5 Managed Wallets** | Email/social users get a platform-custodied wallet — backend signs and pays, zero SOL required |
 | 🛡️ **Anti-Speculation Guardrails** | Non-transferable token, daily buy caps, dynamic exit tax, delayed ratings, endorsement caps |
@@ -125,7 +125,7 @@ buy cost    = effective_k / 2 * ((S + dS)^2 - S^2)
 sell return = effective_k / 2 * (S^2 - (S - dS)^2)
 ```
 
-Default rating is `10_000` (1.0×), bounded `5_000`–`20_000` (0.5×–2.0×), with daily change caps and delayed activation. When a creator reaches critical mass, sponsors submit **buyout offers**; after creator acceptance and a rage-quit window, **graduation** executes and remaining backers claim their share of buyout USDC.
+Default rating is `10_000` (1.0×), bounded `5_000`–`20_000` (0.5×–2.0×), with daily change caps and delayed activation. When a creator reaches critical mass, sponsors submit **buyout offers**; after creator acceptance and a rage-quit window, **graduation** executes — the creator receives the majority of the buyout USDC, and remaining backers claim a **capped, non-proportional discovery reward** (by eligibility, earliness, or loyalty — never scaled by SPUMP staked).
 
 > See [docs/protocol/s1-market-design.md](docs/protocol/s1-market-design.md) for parameters and anti-arbitrage guardrails.
 
@@ -187,7 +187,7 @@ flowchart LR
 - **DB-first for workflow:** drafts, manifests, uploads, media processing, proposal intents, retries, workspace state.
 - **Chain-first for truth:** sponsor funding, proposal creation, settlement, refunds, token mint/burn, immutable content anchors.
 
-The Anchor program ships **32 type-safe instructions** and **13 PDA account types** covering the full lifecycle — S1 discovery, S1 buyout, S2 campaigns, three-track settlement, content anchoring, and protocol/user/org state.
+The Anchor program ships **35 type-safe instructions** and **13 PDA account types** covering the full lifecycle — S1 discovery, S1 buyout, S2 campaigns, three-track settlement, content anchoring, and protocol/user/org state.
 
 ---
 
@@ -201,7 +201,7 @@ Every core mechanism depends on a specific Solana capability — this is not a m
 | **Sub-cent fees** | Makes Track 2 micro-settlements and Track 3 CPS payouts economically viable |
 | **Token-2022 NonTransferable** | Enforces `SPUMP` non-transferability at the protocol level, not by convention |
 | **PDA architecture** | Config, profiles, S1 positions, proposals, and USDC vaults are deterministic, verifiable on-chain state |
-| **Anchor framework** | 32 type-safe instructions for the entire product lifecycle in one program |
+| **Anchor framework** | 35 type-safe instructions for the entire product lifecycle in one program |
 | **Ecosystem** | Wallet adapters, Web3Auth social login, mature RPC, and devnet for fast iteration |
 
 ---
@@ -228,7 +228,7 @@ StreamPump is a serious prototype with a **verified end-to-end production corrid
 
 ### Compliance & token posture (design in progress)
 
-`SPUMP` is a non-transferable utility/consumption unit with no monetary value and no expectation of profit. To keep backing a costly conviction signal **without** it being an investment contract, the backer USDC mechanism is being recharacterized from a *pro-rata share of the buyout* (which current on-chain code still implements) into a **capped, platform-funded discovery/loyalty reward that does not scale with `SPUMP` staked** — with permanent founding status, not USDC, as the headline reward. Public, real-money launch is gated on this redesign plus geofencing, KYC for USDC-receiving users, an Anchor audit, and a legal token-classification opinion. See [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md). Until then, treat all USDC reward flows as demo/seeded only.
+`SPUMP` is a non-transferable utility/consumption unit with no monetary value and no expectation of profit. To keep backing a costly conviction signal **without** it being an investment contract, the backer USDC mechanism has been redesigned from a *pro-rata share of the buyout* into a **capped, sponsor-funded discovery reward that does not scale with `SPUMP` staked** (the creator receives the majority of the buyout), with permanent founding status — not USDC — as the headline reward. This redesign is **implemented at the code level on the working branch** and is **gated** behind an Anchor audit, a legal token-classification opinion, program deployment, geofencing, and KYC for USDC-receiving users before any public, real-money launch. See [docs/protocol/spump-compliance-and-value-model.md](docs/protocol/spump-compliance-and-value-model.md). Until those gates clear, treat all USDC reward flows as demo/seeded only.
 
 For the full picture see [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) (canonical roadmap + progress ledger) and [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md).
 
@@ -240,7 +240,7 @@ For the full picture see [docs/streamPump-long-term-roadmap.md](docs/streamPump-
 |---|---|
 | `programs/streampump-core` | Anchor program: protocol state, S1, S1 buyout, S2 three-track settlement, content anchoring |
 | `programs/tests` | 10 Anchor TypeScript suites (happy/unhappy paths, guards, buyout, S2 flows) |
-| `backend` | Express v1 API, Prisma (22 models / 17 migrations), R2/Mux, auth, indexer, schedulers, projections |
+| `backend` | Express v1 API, Prisma (22 models / 19 migrations), R2/Mux, auth, indexer, schedulers, projections |
 | `app` | Next.js 15 frontend: discovery, creator, portfolio, workspace, campaign, and auth surfaces |
 | `docs` | Protocol design, backend API contracts, frontend specs, deployment notes, roadmap |
 | `scripts` | Devnet seed, demo, smoke, deploy, and git-hook scripts |
