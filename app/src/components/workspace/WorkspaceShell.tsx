@@ -82,40 +82,55 @@ export const WorkspaceShell = ({
         <div className="border-b border-white/[0.06] px-5 py-3">
           <div className="flex items-center gap-2">
             <StagePill stage={stage} compact />
-            <span className="text-[11px] text-[#8ea0ba]">{STAGE_LABELS[stage]}</span>
+            <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{STAGE_LABELS[stage]}</span>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 scrollbar-none">
-          {workspaceSidebarNav.map((item) => {
-            const Icon = ICON_MAP[item.iconName];
-            const active = isRouteActive(router.asPath, item);
-            const disabled = item.disabled;
+          {workspaceSidebarNav
+            .filter((item) => !item.disabled)
+            .map((item) => {
+              const Icon = ICON_MAP[item.iconName];
+              const active = isRouteActive(router.asPath, item);
 
-            return (
-              <Link
-                className={`glass-nav-link group flex h-10 items-center gap-3 rounded-xl px-3 text-sm transition duration-200 ${
-                  disabled ? "pointer-events-none opacity-35" : ""
-                }`}
-                data-active={active}
-                href={disabled ? `${item.href}#` : item.href}
-                key={item.href}
-              >
-                {Icon && (
-                  <Icon className={`h-[18px] w-[18px] shrink-0 transition ${active ? "text-white" : "text-[#6b7d96] group-hover:text-white"}`} />
-                )}
-                <span className={`transition ${active ? "font-medium text-white" : "text-[#8f9eb7] group-hover:text-white"}`}>
-                  {item.labelKey ? t(item.labelKey) : item.label}
-                </span>
-                {disabled && (
-                  <span className="ml-auto rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#5a6b82]">
-                    {t("shell.soon")}
+              return (
+                <Link
+                  className="glass-nav-link group flex h-10 items-center gap-3 rounded-xl px-3 text-sm transition duration-200"
+                  data-active={active}
+                  href={item.href}
+                  key={item.href}
+                >
+                  {Icon && (
+                    <Icon className={`h-[18px] w-[18px] shrink-0 transition ${active ? "text-white" : "text-[#6b7d96] group-hover:text-white"}`} />
+                  )}
+                  <span className={`transition ${active ? "font-medium text-white" : "text-[#8f9eb7] group-hover:text-white"}`}>
+                    {item.labelKey ? t(item.labelKey) : item.label}
                   </span>
-                )}
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            })}
+
+          {workspaceSidebarNav.some((item) => item.disabled) && (
+            <div className="mt-5 border-t border-white/[0.05] pt-4">
+              <p className="type-overline px-3 pb-1.5 text-[color:var(--text-faint)]">{t("shell.soon")}</p>
+              {workspaceSidebarNav
+                .filter((item) => item.disabled)
+                .map((item) => {
+                  const Icon = ICON_MAP[item.iconName];
+
+                  return (
+                    <span
+                      className="group flex h-9 items-center gap-3 rounded-xl px-3 text-sm opacity-40"
+                      key={item.href}
+                    >
+                      {Icon && <Icon className="h-[18px] w-[18px] shrink-0 text-[#6b7d96]" />}
+                      <span className="text-[#8f9eb7]">{item.labelKey ? t(item.labelKey) : item.label}</span>
+                    </span>
+                  );
+                })}
+            </div>
+          )}
         </nav>
 
         {/* Wallet mini */}
@@ -143,7 +158,7 @@ export const WorkspaceShell = ({
               key={item.href}
             >
               {Icon && <Icon className="h-5 w-5" />}
-              <span className="text-[10px]">{item.labelKey ? t(item.labelKey) : item.label}</span>
+              <span className="text-[length:var(--fs-micro)]">{item.labelKey ? t(item.labelKey) : item.label}</span>
             </Link>
           );
         })}
@@ -154,7 +169,7 @@ export const WorkspaceShell = ({
             type="button"
           >
             <MoreIcon className="h-5 w-5" />
-            <span className="text-[10px]">{t("shell.mobileMore")}</span>
+            <span className="text-[length:var(--fs-micro)]">{t("shell.mobileMore")}</span>
           </button>
         )}
       </nav>
@@ -173,15 +188,29 @@ export const WorkspaceShell = ({
             <div className="grid grid-cols-4 gap-3">
               {workspaceSidebarNav.map((item) => {
                 const Icon = ICON_MAP[item.iconName];
+                const label = item.labelKey ? t(item.labelKey) : item.label;
+
+                if (item.disabled) {
+                  return (
+                    <span
+                      className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center opacity-35"
+                      key={item.href}
+                    >
+                      {Icon && <Icon className="h-5 w-5 text-[#93a2bb]" />}
+                      <span className="text-[length:var(--fs-micro)] text-[#93a2bb]">{label}</span>
+                    </span>
+                  );
+                }
+
                 return (
                   <Link
-                    className={`flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition ${item.disabled ? "opacity-35" : "hover:bg-white/[0.05]"}`}
-                    href={item.disabled ? `${item.href}#` : item.href}
+                    className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition hover:bg-white/[0.05]"
+                    href={item.href}
                     key={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {Icon && <Icon className="h-5 w-5 text-[#93a2bb]" />}
-                    <span className="text-[10px] text-[#93a2bb]">{item.labelKey ? t(item.labelKey) : item.label}</span>
+                    <span className="text-[length:var(--fs-micro)] text-[#93a2bb]">{label}</span>
                   </Link>
                 );
               })}

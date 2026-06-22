@@ -80,7 +80,7 @@ export default function DemoHubPage() {
           />
 
           <section className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] px-5 py-5 md:px-6">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#67b8ff]">
+            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.22em] text-[#67b8ff]">
               Demo hub
             </p>
             <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
@@ -92,7 +92,7 @@ export default function DemoHubPage() {
                   Fixed entry points for what can be shown today, with preview/operator boundaries kept visible.
                 </p>
               </div>
-              <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[#9aabc4]">
+              <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] text-[#9aabc4]">
                 Boundary-first demo
               </div>
             </div>
@@ -138,12 +138,12 @@ export default function DemoHubPage() {
                   </div>
                   <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">
+                      <span className="text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">
                         Readiness
                       </span>
                       <ReadinessPill status={card.readiness} />
                     </div>
-                    <p className="mt-2 text-[11px] leading-5 text-[#8ea0ba]">{card.boundary}</p>
+                    <p className="mt-2 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{card.boundary}</p>
                   </div>
 
                   <Link
@@ -157,7 +157,7 @@ export default function DemoHubPage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {card.secondaryLinks.map((link) => (
                       <Link
-                        className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+                        className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
                         href={link.href}
                         key={link.href}
                       >
@@ -177,22 +177,24 @@ export default function DemoHubPage() {
 
 const BoundaryItem = ({ label, text }: { label: string; text: string }) => (
   <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67b8ff]">{label}</p>
-    <p className="mt-2 text-[11px] leading-5 text-[#8ea0ba]">{text}</p>
+    <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#67b8ff]">{label}</p>
+    <p className="mt-2 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{text}</p>
   </div>
 );
 
+// Shared semantic tone classes (see globals.css); OPERATOR_REQUIRED is decoupled
+// from brand red via --state-danger.
 const READINESS_TONES: Record<ProductReadinessStatus, string> = {
-  LIVE: "border-[#65ecaf]/25 bg-[#0e1f17]/60 text-[#8df0c4]",
-  SEEDED_DEMO: "border-[#67b8ff]/25 bg-[#0d1b2a]/60 text-[#a8d8ff]",
-  MOCK_PREVIEW: "border-[#f3b33e]/25 bg-[#1f1708]/60 text-[#f8d48a]",
-  BACKEND_READY_UI_GAP: "border-[#b890ff]/25 bg-[#161225]/60 text-[#cdb5ff]",
-  OPERATOR_REQUIRED: "border-[#de402a]/25 bg-[#24110d]/60 text-[#ff9a88]",
-  NOT_STARTED: "border-white/[0.12] bg-white/[0.04] text-[#cbd6e7]",
+  LIVE: "tone-state-success",
+  SEEDED_DEMO: "tone-state-info",
+  MOCK_PREVIEW: "tone-state-warning",
+  BACKEND_READY_UI_GAP: "tone-state-pending",
+  OPERATOR_REQUIRED: "tone-state-danger",
+  NOT_STARTED: "tone-state-neutral",
 };
 
 const ReadinessPill = ({ status }: { status: ProductReadinessStatus }) => (
-  <span className={`rounded-full border px-2 py-0.5 font-mono text-[9px] font-semibold ${READINESS_TONES[status]}`}>
+  <span className={`rounded-full border px-2 py-0.5 font-mono text-[length:var(--fs-nano)] font-semibold ${READINESS_TONES[status]}`}>
     {status}
   </span>
 );

@@ -124,26 +124,25 @@ export const isRouteActive = (currentHref: string, item: RouteItem) => {
   return prefixes.some((prefix) => prefixMatches(current.path, normalizePathname(prefix)));
 };
 
+// Labels are i18n-driven (labelKey). Demo is an internal/presentation surface
+// and is intentionally NOT in the consumer primary nav (still at /demo).
 export const primaryNavItems: RouteItem[] = [
-  { href: EXPLORE_PATH, label: "发现", labelKey: "nav.explore", prefixes: [EXPLORE_PATH, "/posts"] },
-  { href: ACTIVITY_PATH, label: "动态", labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
-  { href: TRENDING_PATH, label: "Trending", labelKey: "nav.trending", prefixes: [TRENDING_PATH] },
-  { href: PORTFOLIO_PATH, label: "支持组合", labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
-  { href: REWARDS_PATH, label: "Rewards", labelKey: "nav.rewards", prefixes: [REWARDS_PATH] },
-  { href: DEMO_PATH, label: "Demo", labelKey: "nav.demo", prefixes: [DEMO_PATH] },
+  { href: EXPLORE_PATH, labelKey: "nav.explore", prefixes: [EXPLORE_PATH, "/posts"] },
+  { href: ACTIVITY_PATH, labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
+  { href: TRENDING_PATH, labelKey: "nav.trending", prefixes: [TRENDING_PATH] },
+  { href: PORTFOLIO_PATH, labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
+  { href: REWARDS_PATH, labelKey: "nav.rewards", prefixes: [REWARDS_PATH] },
 ];
 
 export const workspacePageTabs: RouteItem[] = [
-  { href: WORKSPACE_PATH, label: "Overview", labelKey: "nav.overview", exact: true },
+  { href: WORKSPACE_PATH, labelKey: "nav.overview", exact: true },
   {
     href: WORKSPACE_SPONSORSHIPS_PATH,
-    label: "Needs Action",
     labelKey: "nav.needsAction",
     prefixes: ["/workspace/sponsorships", "/workspace/intents"],
   },
   {
     href: WORKSPACE_CONTENT_NEW_PATH,
-    label: "Create Content",
     labelKey: "nav.createContent",
     prefixes: ["/workspace/content"],
   },
@@ -154,15 +153,17 @@ export type WorkspaceNavItem = RouteItem & {
   disabled?: boolean;
 };
 
+// Labels are i18n-driven (labelKey). `disabled` items are upcoming surfaces;
+// the shell groups them under a muted "soon" section instead of inline.
 export const workspaceSidebarNav: WorkspaceNavItem[] = [
-  { href: WORKSPACE_PATH, label: "总览", labelKey: "nav.overview", iconName: "overview", exact: true },
-  { href: WORKSPACE_CONTENT_NEW_PATH, label: "创作", labelKey: "nav.create", iconName: "create", prefixes: ["/workspace/content"] },
-  { href: WORKSPACE_LIBRARY_PATH, label: "内容库", labelKey: "nav.library", iconName: "library", disabled: true },
-  { href: WORKSPACE_SPONSORSHIPS_PATH, label: "赞助合作", labelKey: "nav.sponsorships", iconName: "sponsor", prefixes: ["/workspace/sponsorships", "/workspace/intents"] },
-  { href: WORKSPACE_SPONSOR_ONBOARDING_PATH, label: "Sponsor KYB", labelKey: "nav.sponsorKyb", iconName: "sponsor", prefixes: [WORKSPACE_SPONSOR_ONBOARDING_PATH] },
-  { href: WORKSPACE_BUYOUT_PATH, label: "Buyout", labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
-  { href: WORKSPACE_CAMPAIGNS_PATH, label: "Campaign", labelKey: "nav.campaign", iconName: "campaign", disabled: true },
-  { href: WORKSPACE_ANALYTICS_PATH, label: "数据", labelKey: "nav.analytics", iconName: "analytics", disabled: true },
-  { href: WORKSPACE_EARNINGS_PATH, label: "结算", labelKey: "nav.earnings", iconName: "earnings", disabled: true },
-  { href: WORKSPACE_SETTINGS_PATH, label: "设置", labelKey: "nav.settings", iconName: "settings", disabled: true },
+  { href: WORKSPACE_PATH, labelKey: "nav.overview", iconName: "overview", exact: true },
+  { href: WORKSPACE_CONTENT_NEW_PATH, labelKey: "nav.create", iconName: "create", prefixes: ["/workspace/content"] },
+  { href: WORKSPACE_LIBRARY_PATH, labelKey: "nav.library", iconName: "library", disabled: true },
+  { href: WORKSPACE_SPONSORSHIPS_PATH, labelKey: "nav.sponsorships", iconName: "sponsor", prefixes: ["/workspace/sponsorships", "/workspace/intents"] },
+  { href: WORKSPACE_SPONSOR_ONBOARDING_PATH, labelKey: "nav.sponsorKyb", iconName: "sponsor", prefixes: [WORKSPACE_SPONSOR_ONBOARDING_PATH] },
+  { href: WORKSPACE_BUYOUT_PATH, labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
+  { href: WORKSPACE_CAMPAIGNS_PATH, labelKey: "nav.campaign", iconName: "campaign", disabled: true },
+  { href: WORKSPACE_ANALYTICS_PATH, labelKey: "nav.analytics", iconName: "analytics", disabled: true },
+  { href: WORKSPACE_EARNINGS_PATH, labelKey: "nav.earnings", iconName: "earnings", disabled: true },
+  { href: WORKSPACE_SETTINGS_PATH, labelKey: "nav.settings", iconName: "settings", disabled: true },
 ];
