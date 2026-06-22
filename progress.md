@@ -1,3 +1,170 @@
+# StreamPump Progress Review - 2026-06-22 Frontend Design-System Migration And Texture Pass
+
+## Scope
+- This review covers additional uncommitted frontend design-system migration work observed after the latest existing `progress.md` entry for the design-system audit and token scaffold.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `6fb5cc6`, `progress.md` was already modified by prior recorder entries, many `app/src` components/pages are now modified, and `docs/frontend/texture-upgrade-plan-2026-06.md` is untracked.
+- The material current change is a frontend visual-system and navigation/IA cleanup pass, not a backend, chain, route/API contract, settlement, or production-readiness change.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Extended `app/src/styles/globals.css` beyond the initial token scaffold into token-driven typography classes, semantic status/stage tone classes, canonical `surface-0` through `surface-3` elevation surfaces, legacy glass-class aliases, and texture controls for sheen, edge reflection, brand glow, ambient orbs, and mesh background intensity.
+- Migrated representative shared components and major surfaces toward the new token layer, including readiness/status banners, stage pills, demo action status cards, workspace shell/sidebar, portfolio, market, buyout, campaign, rewards, onboarding, login, pitch, and workspace content/intent pages.
+- Decoupled readiness/status color presentation from brand red by routing `LIVE`, `SEEDED_DEMO`, `MOCK_PREVIEW`, `BACKEND_READY_UI_GAP`, `OPERATOR_REQUIRED`, and `NOT_STARTED` through semantic tone classes while preserving the exact readiness labels.
+- Cleaned route/navigation metadata so consumer primary navigation no longer includes `/demo`, route labels rely on `labelKey`, and disabled workspace items are grouped as a muted "soon" section instead of occupying equal weight with active tools.
+- Added `docs/frontend/texture-upgrade-plan-2026-06.md`, a Chinese follow-up plan for restrained glass/texture polish covering ambient background reduction, unified highlight/reflection dials, glass-material convergence, and calmer glow/micro-interaction rules.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- No browser smoke was run by this recorder after the production frontend build passed.
+- The pass does not complete productized S1 buyout formation, S2 endorsement, Track3 merchant reconciliation, production auth, media recovery, or operator dashboards.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- The frontend now has broader token consumption across shared components and route surfaces, plus a calmer visual texture direction documented for follow-up.
+- `/demo` remains available as a route, but it is no longer listed in the consumer primary nav by the current route metadata.
+- Readiness labels remain visible and exact; this styling pass changes presentation, not product truth.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/frontend/texture-upgrade-plan-2026-06.md` was added as design-system planning documentation.
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because the frontend build smoke status changed from the prior recorder's TypeScript blocker to a passing production app build.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain preview/seeded by surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree include:
+  - `app/src/styles/globals.css`
+  - `app/src/lib/routes.ts`
+  - `app/src/components/shared/ProductReadinessBanner.tsx`
+  - `app/src/components/shared/StagePill.tsx`
+  - `app/src/components/shared/AnimatedFeedBackdrop.tsx`
+  - `app/src/components/workspace/WorkspaceShell.tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/pages/market/[creatorId].tsx`
+  - `app/src/pages/workspace/content/new.tsx`
+  - `docs/frontend/texture-upgrade-plan-2026-06.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified frontend components/pages, modified `app/src/styles/globals.css`, modified `progress.md`, and untracked `docs/frontend/design-system-audit-2026-06.md` plus `docs/frontend/texture-upgrade-plan-2026-06.md`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed.
+
+# StreamPump Progress Review - 2026-06-22 Frontend Design-System Audit And Token Scaffold
+
+## Scope
+- This review covers current uncommitted frontend design-system work observed after the latest existing `progress.md` entry for whitepaper and demo collateral alignment.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `6fb5cc6`, `progress.md` was already modified by the prior recorder entry, `app/src/styles/globals.css` is modified, and `docs/frontend/design-system-audit-2026-06.md` is untracked.
+- The material current change is a frontend style-system audit plus an additive global CSS token scaffold, not a new route/API/backend/chain product workflow.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added a Chinese frontend design-system audit at `docs/frontend/design-system-audit-2026-06.md` covering token gaps, glass-container duplication, brand-red semantic overload, navigation/information-architecture debt, type scale drift, readiness-state presentation, and a staged consumer-first upgrade path.
+- Added a documented `:root` design-token scaffold in `app/src/styles/globals.css` for background/surface ramps, text levels, brand/accent colors, semantic state colors, S1/buyout/S2 stage colors, glass fills/lines, radius, type scale, tracking, motion, and elevation presets.
+- Preserved existing variable names through aliases, including `--primary`, `--radius-card`, and existing glass variables, so current pages can keep rendering while later batches migrate duplicated glass/type styles onto shared tokens.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The token scaffold does not by itself complete the proposed glass-container consolidation, type-class migration, navigation cleanup, presentation/internal readiness-mode split, or browser-verified page redesign.
+- The audit notes that pitch-language touching S1 buyout rewards still needs follow-up before public use where it conflicts with the capped/decoupled reward model; current product claims should continue to follow the README, roadmap, and compliance/value-model wording.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- Shared CSS now has a first-pass canonical token layer for future UI migration.
+- No page route, API client, wallet flow, readiness banner, or product workflow behavior changed.
+- No browser smoke was run for this recorder; validation was limited to the production app build.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because the change does not materially affect product readiness, route/API behavior, smoke status, or known blocker state.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain preview/seeded by surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `app/src/styles/globals.css`
+  - `docs/frontend/design-system-audit-2026-06.md`
+- Recorder verification:
+  - `pwd` returned `/Users/jamesli/Developer/Sol Projects/StreamPump`.
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified `app/src/styles/globals.css`, modified `progress.md`, and untracked `docs/frontend/design-system-audit-2026-06.md`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - `npm run build --prefix app` passed.
+
+# StreamPump Progress Review - 2026-06-22 Whitepaper And Demo Collateral Alignment
+
+## Scope
+- This review covers committed docs/collateral work observed after the latest existing `progress.md` entry for the 2026-06-21 demo-day Howey fix execution prompts.
+- Comparison evidence is local commit range `689c23c..6fb5cc6` on `codex/post-deadline-phase-0`; the material commit is `89a1ecb` (`docs: add whitepaper and demo day collateral`), followed by merge/sync commit `6fb5cc6`.
+- The material current change is documentation, whitepaper, and investor/demo collateral alignment, not a new route/API/chain implementation change.
+- Current working tree before this recorder edit had only `demo-day/~$StreamPump-DemoDay-zh.pptx` untracked. No protected files were edited.
+
+## Completed Work
+- Added `whitepaper/index.html`, a single-page HTML whitepaper using the StreamPump dark-glass visual language and covering the product problem, protocol model, S1/S2 mechanics, utility-only `SPUMP`, level/scout reputation, settlement architecture, Web2.5 architecture, GTM/status/risk framing, and disclaimers.
+- Committed the demo-day collateral package under `demo-day/`, including the feasibility/GTM note, demo script, Solana skills checklist, two Howey/reward execution prompts, and English/Chinese pitch deck artifacts.
+- Updated `README.md` and `README.zh-CN.md` to align the public repo overview with capped/decoupled S1 buyout rewards, flat capped Track2 endorsement rewards, refreshed badges, current instruction/migration counts, and the compliance note that the reward redesign is code-level but still gated.
+- Synced `AGENTS.md`, `CLAUDE.md`, and `docs/streamPump-long-term-roadmap.md` with the current instruction set, error/state inventory, branch/status language, and product-boundary wording.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The collateral is not legal sign-off, audit evidence, production migration approval, upgraded program deployment, or wallet-backed devnet smoke evidence.
+- Existing blockers still stand: legal token-classification opinion, jurisdiction/KYC decisions, Anchor audit, production migration approval, upgraded program deployment, wallet-level devnet smoke, holder-counter backfill for pre-counter buyouts, and operator/audit validation.
+- The untracked `demo-day/~$StreamPump-DemoDay-zh.pptx` file appears to be a local Office lock/temp artifact and was not treated as product progress.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- No Next.js route, API client, readiness banner, wallet flow, or browser-smoked product UI behavior changed.
+- The whitepaper is a static collateral artifact, not a product workflow or readiness promotion.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed in this recorded pass.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` already contains a matching 2026-06-21 progress-ledger row for the whitepaper, investor/demo collateral, and doc alignment work, so this recorder did not edit the roadmap.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed/preview depending on surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `689c23c..6fb5cc6` include:
+  - `whitepaper/index.html`
+  - `demo-day/01-feasibility-and-gtm.md`
+  - `demo-day/02-demo-script.md`
+  - `demo-day/03-solana-skills-checklist.md`
+  - `demo-day/04-howey-fix-execution-prompt.md`
+  - `demo-day/05-howey-fix-round2-prompt.md`
+  - `demo-day/StreamPump-DemoDay.pptx`
+  - `demo-day/StreamPump-DemoDay-zh.pptx`
+  - `README.md`
+  - `README.zh-CN.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `progress.md`
+- Verification recorded in the roadmap ledger:
+  - `git diff --check`
+  - protected files untouched
+  - no code/schema/financial-semantics changed
+  - deck visual QA and whitepaper structure validation completed in the producing work
+- Recorder verification before this edit:
+  - `pwd` returned `/Users/jamesli/Developer/Sol Projects/StreamPump`.
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed only `?? demo-day/~$StreamPump-DemoDay-zh.pptx`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+
 # StreamPump Progress Review - 2026-06-21 Demo Day Howey Fix Execution Prompts
 
 ## Scope
