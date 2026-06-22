@@ -73,7 +73,7 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">Current price</p>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">Current price</p>
           <p className="mt-1.5 text-[32px] font-bold leading-none tracking-[-0.05em] text-white md:text-[40px]">
             {formatSpump(profile.creator.currentPriceSpump)}
           </p>
@@ -117,7 +117,7 @@ function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
     <div className="grid grid-cols-2 gap-2.5">
       {stats.map((s) => (
         <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3" key={s.label}>
-          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{s.label}</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{s.label}</p>
           <p className={`mt-1 text-lg font-bold tracking-[-0.04em] ${s.color}`}>{s.value}</p>
         </div>
       ))}
@@ -151,18 +151,18 @@ function BuyoutSummary({
     <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Buyout</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Buyout</p>
           <p className="mt-1 text-sm font-semibold text-white">{statusLabel[status] ?? status}</p>
         </div>
         {buyout?.latestOfferUsdc ? (
           <div className="text-right">
-            <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Latest offer</p>
+            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Latest offer</p>
             <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(buyout.latestOfferUsdc)}</p>
           </div>
         ) : null}
       </div>
       <Link
-        className="mt-2 inline-flex items-center text-[10px] font-medium text-[#67b8ff] transition hover:text-white"
+        className="mt-2 inline-flex items-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
         href={href ?? `/buyout/${creatorWallet}`}
       >
         Open buyout room →
@@ -187,23 +187,23 @@ function PositionCard({
   return (
     <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-3.5">
       <div className="flex items-center gap-3.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#65ecaf]/10 text-[10px] font-bold text-[#65ecaf]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#65ecaf]/10 text-[length:var(--fs-micro)] font-bold text-[#65ecaf]">
           S1
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Your position</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Your position</p>
           <p className="mt-0.5 text-base font-bold tracking-[-0.03em] text-white">
             {pos ? `${formatS1Amount(pos.internalTokenBalance)} S1` : "No position"}
           </p>
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold text-white">{pos ? formatSpump(pos.spumpCostBasis) : "—"}</p>
-          <p className="text-[9px] text-[#5a6d87]">Cost basis</p>
+          <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">Cost basis</p>
         </div>
       </div>
       {pos?.estimatedClaimableUsdc && Number(pos.estimatedClaimableUsdc) > 0 ? (
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.04] pt-2">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Claimable</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Claimable</p>
           <p className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(pos.estimatedClaimableUsdc)}</p>
         </div>
       ) : null}
@@ -299,7 +299,7 @@ function TradePanel({
       <div className="flex gap-1 rounded-full border border-white/[0.06] bg-white/[0.02] p-0.5">
         {(["buy", "sell"] as const).map((s) => (
           <button
-            className={`flex-1 rounded-full py-2 text-[12px] font-semibold transition-all ${
+            className={`flex-1 rounded-full py-2 text-[length:var(--fs-overline)] font-semibold transition-all ${
               side === s
                 ? s === "buy"
                   ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.75)_0%,rgba(190,52,34,0.75)_100%)] text-white shadow-[0_4px_14px_rgba(222,64,42,0.25)]"
@@ -318,7 +318,7 @@ function TradePanel({
       {/* Amount input */}
       <div className="mt-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Amount</span>
+          <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Amount</span>
           <input
             className="w-20 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-right text-lg font-bold tracking-[-0.03em] text-white outline-none transition focus:border-white/[0.16]"
             max={side === "sell" && hasPosition ? maxSell : undefined}
@@ -333,7 +333,7 @@ function TradePanel({
         <div className="mt-2.5 flex gap-1.5">
           {AMOUNT_CHIPS.map((v) => (
             <button
-              className={`flex-1 rounded-lg py-1.5 text-[10px] font-semibold transition ${
+              className={`flex-1 rounded-lg py-1.5 text-[length:var(--fs-micro)] font-semibold transition ${
                 amount === v
                   ? "border border-[#de402a]/40 bg-[#de402a]/10 text-[#ff8a78]"
                   : "border border-white/[0.06] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.12] hover:text-white"
@@ -347,7 +347,7 @@ function TradePanel({
           ))}
           {side === "sell" && hasPosition ? (
             <button
-              className={`flex-1 rounded-lg py-1.5 text-[10px] font-semibold transition ${
+              className={`flex-1 rounded-lg py-1.5 text-[length:var(--fs-micro)] font-semibold transition ${
                 amount === maxSell
                   ? "border border-[#de402a]/40 bg-[#de402a]/10 text-[#ff8a78]"
                   : "border border-white/[0.06] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.12] hover:text-white"
@@ -372,7 +372,7 @@ function TradePanel({
           bold
         />
         {sellOverLimit ? (
-          <p className="mt-2 text-[10px] font-medium text-[#ff8a78]">
+          <p className="mt-2 text-[length:var(--fs-micro)] font-medium text-[#ff8a78]">
             Sell amount cannot exceed your {formatS1Amount(String(maxSell))} S1 position.
           </p>
         ) : null}
@@ -385,7 +385,7 @@ function TradePanel({
       {isDemoRoute ? (
         <>
           <button
-            className={`mt-4 w-full rounded-full py-3 text-[13px] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`mt-4 w-full rounded-full py-3 text-[length:var(--fs-caption)] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
               side === "buy"
                 ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] hover:brightness-110"
                 : "bg-white/10 text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] hover:bg-white/14"
@@ -420,7 +420,7 @@ function TradePanel({
         <div className="mt-4 space-y-2">
           <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
           <Link
-            className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+            className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
             href={`/login?next=/market/${creatorWallet}`}
           >
             Sign in to trade
@@ -428,14 +428,14 @@ function TradePanel({
         </div>
       ) : !sessionToken || isLocalDemoSession ? (
         <Link
-          className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[13px] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
+          className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[length:var(--fs-caption)] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
           href={`/login?next=/market/${creatorWallet}`}
         >
           {isLocalDemoSession ? "Sign in with wallet session" : "Sign in to trade"}
         </Link>
       ) : (
         <button
-          className={`mt-4 w-full rounded-full py-3 text-[13px] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+          className={`mt-4 w-full rounded-full py-3 text-[length:var(--fs-caption)] font-bold tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
             side === "buy"
               ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] hover:brightness-110"
               : "bg-white/10 text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] hover:bg-white/14"
@@ -465,8 +465,8 @@ function TradePanel({
 function Row({ bold, label, value }: { bold?: boolean; label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className={`text-[10px] ${bold ? "font-semibold text-[#8ea0ba]" : "text-[#6f8099]"}`}>{label}</span>
-      <span className={`text-[11px] ${bold ? "font-bold text-white" : "font-medium text-white"}`}>{value}</span>
+      <span className={`text-[length:var(--fs-micro)] ${bold ? "font-semibold text-[#8ea0ba]" : "text-[#6f8099]"}`}>{label}</span>
+      <span className={`text-[length:var(--fs-micro)] ${bold ? "font-bold text-white" : "font-medium text-white"}`}>{value}</span>
     </div>
   );
 }
@@ -514,10 +514,10 @@ function DemoRouteRail() {
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 demo path</span>
+      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 demo path</span>
       {links.map((link) => (
         <Link
-          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
           href={link.href}
           key={link.href}
         >
@@ -560,11 +560,11 @@ function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
     <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Market data source</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Market data source</p>
           <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
         </div>
-        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
           {config.label}
         </span>
       </div>
@@ -769,7 +769,7 @@ function MarketPage() {
                 sessionWallet={sessionWallet}
               />
               {demoSummary ? (
-                <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[12px] font-medium text-[#8df0c4]">
+                <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
                   {demoSummary}
                 </div>
               ) : null}

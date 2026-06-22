@@ -48,14 +48,15 @@ export const MANIFEST_STATUS_LABELS: Record<ContentManifestStatus, string> = {
   ARCHIVED: "Archived",
 };
 
+// Mapped onto shared semantic tones by hue (see globals.css .tone-*).
 export const MANIFEST_STATUS_TONES: Record<ContentManifestStatus, string> = {
-  DRAFT: "border-white/[0.08] bg-white/[0.04] text-[#9aabc4]",
-  UPLOADING: "border-[#67b8ff]/25 bg-[#0e1726]/80 text-[#8ad0ff]",
-  READY: "border-[#65ecaf]/22 bg-[#0e1f17]/80 text-[#8df0c4]",
-  LOCKED: "border-[#f3b33e]/25 bg-[#1a1408]/80 text-[#f3c66e]",
-  ANCHORED: "border-[#de402a]/25 bg-[#1f120e]/80 text-[#ff8a78]",
-  PUBLISHED: "border-[#65ecaf]/35 bg-[#0e1f17]/85 text-[#8df0c4]",
-  ARCHIVED: "border-white/[0.06] bg-white/[0.03] text-[#7e90aa]",
+  DRAFT: "tone-state-neutral",
+  UPLOADING: "tone-state-info",
+  READY: "tone-state-success",
+  LOCKED: "tone-state-warning",
+  ANCHORED: "tone-stage-buyout",
+  PUBLISHED: "tone-state-success",
+  ARCHIVED: "tone-state-neutral",
 };
 
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
@@ -77,15 +78,15 @@ export const INTENT_STATUS_LABELS: Record<ProposalIntentStatus, string> = {
 };
 
 export const INTENT_STATUS_TONES: Record<ProposalIntentStatus, string> = {
-  DRAFT: "border-white/[0.08] bg-white/[0.04] text-[#9aabc4]",
-  TERMS_LOCKED: "border-[#67b8ff]/25 bg-[#0e1726]/80 text-[#8ad0ff]",
-  BUNDLE_BUILT: "border-[#f3b33e]/25 bg-[#1a1408]/80 text-[#f3c66e]",
-  CREATOR_PARTIALLY_SIGNED: "border-[#65ecaf]/22 bg-[#0e1f17]/80 text-[#8df0c4]",
-  SPONSOR_SIGNED: "border-[#65ecaf]/30 bg-[#0e1f17]/85 text-[#8df0c4]",
-  SUBMITTED: "border-[#de402a]/25 bg-[#1f120e]/80 text-[#ff8a78]",
-  CONFIRMED: "border-[#de402a]/35 bg-[#1f120e]/85 text-[#ff8a78]",
-  FAILED: "border-[#f67263]/30 bg-[#1a1115]/80 text-[#f67263]",
-  EXPIRED: "border-white/[0.06] bg-white/[0.03] text-[#7e90aa]",
+  DRAFT: "tone-state-neutral",
+  TERMS_LOCKED: "tone-state-info",
+  BUNDLE_BUILT: "tone-state-warning",
+  CREATOR_PARTIALLY_SIGNED: "tone-state-success",
+  SPONSOR_SIGNED: "tone-state-success",
+  SUBMITTED: "tone-stage-buyout",
+  CONFIRMED: "tone-stage-buyout",
+  FAILED: "tone-state-danger",
+  EXPIRED: "tone-state-neutral",
 };
 
 type StageRailStatus = "done" | "current" | "blocked" | "pending";
@@ -134,21 +135,21 @@ const OperatingHeader = ({ persona }: { persona: WorkspacePersona }) => {
             src={persona.avatarSrc}
           />
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+            <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
               {today}
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              <p className="truncate text-[15px] font-semibold text-white">{persona.displayName}</p>
+              <p className="truncate text-[length:var(--fs-sm)] font-semibold text-white">{persona.displayName}</p>
               <StagePill compact stage={persona.stage} />
-              <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-[#6f8099] sm:inline">
+              <span className="hidden text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#6f8099] sm:inline">
                 {STAGE_CONSOLE_TITLE[persona.stage]}
               </span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="text-[12px] font-medium text-[#cbd6e7]">{persona.handle}</span>
+              <span className="text-[length:var(--fs-overline)] font-medium text-[#cbd6e7]">{persona.handle}</span>
               <button
                 aria-label="Copy wallet"
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] text-[#bcc8de] transition hover:border-white/[0.12] hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 font-mono text-[length:var(--fs-micro)] text-[#bcc8de] transition hover:border-white/[0.12] hover:text-white"
                 type="button"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
@@ -161,14 +162,14 @@ const OperatingHeader = ({ persona }: { persona: WorkspacePersona }) => {
 
         <div className="flex flex-wrap items-center gap-1.5">
           <Link
-            className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+            className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
             href={WORKSPACE_SPONSORSHIPS_PATH}
           >
             <SparklesIcon className="h-3.5 w-3.5" />
             New campaign
           </Link>
           <Link
-            className="flex items-center gap-1.5 rounded-md bg-[#de402a] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#ea523e]"
+            className="flex items-center gap-1.5 rounded-md bg-[#de402a] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-white transition hover:bg-[#ea523e]"
             href={WORKSPACE_CONTENT_NEW_PATH}
           >
             <UploadIcon className="h-3.5 w-3.5" />
@@ -188,11 +189,11 @@ const StageLifecycleRail = ({ persona }: { persona: WorkspacePersona }) => {
   return (
     <section className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3 md:px-5 md:py-3.5">
       <header className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
           Today&rsquo;s flow
         </p>
         <Link
-          className="text-[10px] text-[#7486a1] hover:text-white"
+          className="text-[length:var(--fs-micro)] text-[#7486a1] hover:text-white"
           href={WORKSPACE_SPONSORSHIPS_PATH}
         >
           Detailed flow →
@@ -210,7 +211,7 @@ const StageLifecycleRail = ({ persona }: { persona: WorkspacePersona }) => {
                   <div className="flex w-full items-center gap-2">
                     <RailDot status={step.status} />
                     <p
-                      className={`truncate text-[12px] font-semibold tracking-[-0.01em] ${
+                      className={`truncate text-[length:var(--fs-overline)] font-semibold tracking-[-0.01em] ${
                         step.status === "current"
                           ? "text-white"
                           : step.status === "done"
@@ -224,7 +225,7 @@ const StageLifecycleRail = ({ persona }: { persona: WorkspacePersona }) => {
                     </p>
                   </div>
                   <p
-                    className={`pl-7 text-[10px] leading-snug ${
+                    className={`pl-7 text-[length:var(--fs-micro)] leading-snug ${
                       step.status === "pending" ? "text-[#5a6b82]" : "text-[#9aabc4]"
                     }`}
                   >
@@ -440,9 +441,9 @@ const KpiTile = ({
   <div className="rounded-xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(14,19,28,0.95)_0%,rgba(9,13,20,0.95)_100%)] px-3 py-2.5">
     <div className="flex items-center justify-between gap-1">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <span className="text-[9px] font-medium uppercase tracking-[0.12em] text-[#5a6b82]">{delta}</span>
+      <span className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.12em] text-[#5a6b82]">{delta}</span>
     </div>
-    <p className="mt-1 text-[9px] font-medium uppercase tracking-[0.14em] text-[#6f8099]">{label}</p>
+    <p className="mt-1 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.14em] text-[#6f8099]">{label}</p>
     <p
       className={`mt-0.5 text-[20px] font-semibold leading-tight tracking-[-0.03em] ${
         tone === "warn" ? "text-[#f3c66e]" : "text-white"
@@ -450,7 +451,7 @@ const KpiTile = ({
     >
       {value}
     </p>
-    <p className="mt-0.5 truncate text-[10px] text-[#6f8099]">{hint}</p>
+    <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#6f8099]">{hint}</p>
   </div>
 );
 
@@ -481,15 +482,15 @@ const NextActions = ({ persona }: { persona: WorkspacePersona }) => {
     <section className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)] p-3 md:p-4">
       <header className="mb-2.5 flex items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
             What you should do today
           </p>
-          <p className="mt-0.5 text-[10px] text-[#7486a1]">
+          <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">
             {top.length} priority · {hidden > 0 ? `${hidden} more queued` : "all surfaced"}
           </p>
         </div>
         <Link
-          className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+          className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
           href={WORKSPACE_SPONSORSHIPS_PATH}
         >
           View all →
@@ -533,23 +534,23 @@ const NextActionCard = ({ action }: { action: WorkspaceActionItem }) => {
           {ACTION_ICONS[action.iconName]}
         </span>
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] ${workflowBadgeClass(action.workflowState, action.disabled)}`}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] ${workflowBadgeClass(action.workflowState, action.disabled)}`}
         >
           {workflowLabel(action)}
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-white">{action.title}</p>
+        <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{action.title}</p>
         {action.subtitle ? (
-          <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-[#7e90aa]">{action.subtitle}</p>
+          <p className="mt-0.5 line-clamp-2 text-[length:var(--fs-micro)] leading-relaxed text-[#7e90aa]">{action.subtitle}</p>
         ) : null}
         {action.chainHint ? (
-          <p className="mt-1.5 truncate font-mono text-[9px] text-[#5a6b82]">{action.chainHint}</p>
+          <p className="mt-1.5 truncate font-mono text-[length:var(--fs-nano)] text-[#5a6b82]">{action.chainHint}</p>
         ) : null}
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-white/[0.04] pt-2">
         <span
-          className={`truncate text-[11px] font-semibold ${
+          className={`truncate text-[length:var(--fs-micro)] font-semibold ${
             action.disabled ? "text-[#5a6b82]" : action.tone === "urgent" ? "text-[#ff8a78]" : "text-[#cbd6e7]"
           }`}
         >
@@ -626,19 +627,19 @@ const RecentContent = ({ persona }: { persona: WorkspacePersona }) => {
     <section className="overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)]">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] px-3 py-2.5 md:px-4">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Recent content</p>
-          <p className="mt-0.5 text-[10px] text-[#7486a1]">
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Recent content</p>
+          <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">
             {persona.contentItems.length} total · showing top {Math.min(items.length, RECENT_CONTENT_LIMIT)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {persona.pipelineDemoFallback ? (
-            <span className="rounded-full border border-[#67b8ff]/25 bg-[#0e1726]/80 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8ad0ff]">
+            <span className="rounded-full border border-[#67b8ff]/25 bg-[#0e1726]/80 px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#8ad0ff]">
               Demo data
             </span>
           ) : null}
           <Link
-            className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+            className="flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
             href={WORKSPACE_CONTENT_NEW_PATH}
           >
             <UploadIcon className="h-3 w-3" />
@@ -649,7 +650,7 @@ const RecentContent = ({ persona }: { persona: WorkspacePersona }) => {
 
       <div className="divide-y divide-white/[0.04]">
         {items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[12px] text-[#7e90aa]">
+          <div className="px-4 py-8 text-center text-[length:var(--fs-overline)] text-[#7e90aa]">
             No content yet —{" "}
             <Link className="text-[#cbd6e7] underline-offset-4 hover:underline" href={WORKSPACE_CONTENT_NEW_PATH}>
               upload your first asset
@@ -689,20 +690,20 @@ const RecentContentRow = ({ item }: { item: WorkspaceContentItem }) => {
           />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-white">{item.title}</p>
+          <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{item.title}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span
-              className={`inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${statusToneClass(friendly.tone)}`}
+              className={`inline-flex rounded-full border px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${statusToneClass(friendly.tone)}`}
             >
               {friendly.label}
             </span>
-            <span className="truncate text-[10px] text-[#7e90aa]">{friendly.hint}</span>
+            <span className="truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{friendly.hint}</span>
           </div>
         </div>
       </Link>
 
       <Link
-        className={`flex h-8 shrink-0 items-center justify-center rounded-md px-3 text-[11px] font-semibold transition ${
+        className={`flex h-8 shrink-0 items-center justify-center rounded-md px-3 text-[length:var(--fs-micro)] font-semibold transition ${
           primary.variant === "primary"
             ? "bg-[#de402a] text-white hover:bg-[#ea523e]"
             : "border border-white/[0.08] bg-white/[0.03] text-[#cbd6e7] hover:border-white/[0.16] hover:text-white"
@@ -759,8 +760,8 @@ const DeadlineReminderCard = ({ persona }: { persona: WorkspacePersona }) => {
   return (
     <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
       <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Today</p>
-        <Link className="text-[11px] text-[#cbd6e7] hover:text-white" href={WORKSPACE_SPONSORSHIPS_PATH}>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Today</p>
+        <Link className="text-[length:var(--fs-micro)] text-[#cbd6e7] hover:text-white" href={WORKSPACE_SPONSORSHIPS_PATH}>
           Open desk →
         </Link>
       </header>
@@ -776,8 +777,8 @@ const DeadlineReminderCard = ({ persona }: { persona: WorkspacePersona }) => {
             <div className="flex items-start gap-2 rounded-xl px-2.5 py-2" key={reminder.id}>
               <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
               <div className="min-w-0">
-                <p className="truncate text-[12px] font-medium text-white">{reminder.title}</p>
-                <p className="mt-0.5 truncate text-[10px] text-[#7486a1]">{reminder.subtitle}</p>
+                <p className="truncate text-[length:var(--fs-overline)] font-medium text-white">{reminder.title}</p>
+                <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7486a1]">{reminder.subtitle}</p>
               </div>
             </div>
           );
@@ -795,9 +796,9 @@ const ContentPreviewCompact = ({ item }: { item: WorkspacePersona["previewItem"]
   return (
     <section className="overflow-hidden rounded-[14px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)]">
       <header className="flex items-center justify-between border-b border-white/[0.05] px-3 py-2">
-        <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Latest manifest</p>
+        <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Latest manifest</p>
         {item.href ? (
-          <Link className="text-[10px] text-[#cbd6e7] hover:text-white" href={item.href}>
+          <Link className="text-[length:var(--fs-micro)] text-[#cbd6e7] hover:text-white" href={item.href}>
             Open
           </Link>
         ) : null}
@@ -807,10 +808,10 @@ const ContentPreviewCompact = ({ item }: { item: WorkspacePersona["previewItem"]
           <ProgressiveImage alt={item.title} className="h-full w-full object-cover" fill sizes="80px" src={item.coverSrc} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-white">{item.title}</p>
-          <p className="mt-0.5 text-[9px] text-[#7486a1]">{item.subtitle}</p>
+          <p className="line-clamp-2 text-[length:var(--fs-micro)] font-semibold leading-snug text-white">{item.title}</p>
+          <p className="mt-0.5 text-[length:var(--fs-nano)] text-[#7486a1]">{item.subtitle}</p>
           <span
-            className={`mt-1 inline-block rounded border px-1.5 py-px text-[8px] font-semibold uppercase ${
+            className={`mt-1 inline-block rounded border px-1.5 py-px text-[length:var(--fs-nano)] font-semibold uppercase ${
               empty
                 ? "border-white/[0.08] bg-white/[0.04] text-[#9aabc4]"
                 : "border-[#65ecaf]/25 bg-[#0e1f17]/80 text-[#8df0c4]"
@@ -837,7 +838,7 @@ export const ConsoleLoading = () => (
 
 export const ConsoleAuthRequired = ({ loginHref }: { loginHref: string }) => (
   <section className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-6 py-8">
-    <p className="text-[10px] uppercase tracking-[0.2em] text-[#7486a1]">Login required</p>
+    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.2em] text-[#7486a1]">Login required</p>
     <h2 className="mt-2 text-lg font-semibold text-white">Sign in to open the console</h2>
     <p className="mt-2 text-sm text-[#9aabc4]">
       Connect your wallet to load creator manifests, campaigns, and on-chain status.

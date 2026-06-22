@@ -207,11 +207,11 @@ export const ClaimQueueSection = ({
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Opens</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">Opens</p>
                 <p className="mt-1 text-sm font-medium text-[#67b8ff]">{record.opensInLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Discovery reward</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">Discovery reward</p>
                 <p className="mt-1 text-sm font-medium text-white">{formatUsd(record.estimatedPayoutUsd)}</p>
               </div>
             </div>
@@ -389,7 +389,7 @@ const PortfolioOverviewCard = ({ totalExposure }: { totalExposure: number }) => 
           strokeWidth={3}
           width={640}
         />
-        <div className="mt-4 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] text-[#70819a]">
+        <div className="mt-4 flex items-center justify-between gap-3 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#70819a]">
           {timelineLabels.map((label) => (
             <span className="shrink-0" key={label}>
               {label}
@@ -412,7 +412,7 @@ const PendingClaimCard = ({
 
   return (
     <div className="card-radius border border-[#8d6120]/34 bg-[linear-gradient(180deg,rgba(77,49,20,0.3)_0%,rgba(24,17,12,0.95)_100%)] p-5 shadow-[0_18px_44px_rgba(0,0,0,0.24)]">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f3b33e]">
+      <div className="flex items-center gap-2 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3b33e]">
         <ClockIcon className="h-3.5 w-3.5" />
         {record.statusLabel}
       </div>
@@ -430,7 +430,7 @@ const PendingClaimCard = ({
       </div>
 
       <div className="card-radius mt-4 border border-[#65ecaf]/20 bg-[linear-gradient(180deg,rgba(18,45,33,0.4)_0%,rgba(9,21,16,0.6)_100%)] px-4 py-4 text-center">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[#8df0bb]">Estimated discovery reward</p>
+        <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8df0bb]">Estimated discovery reward</p>
         <p className="mt-2 text-[32px] font-bold tracking-[-0.04em] text-[#65ecaf]">{formatUsd(record.payoutUsd)}</p>
       </div>
 
@@ -493,7 +493,7 @@ const ClaimMetricCard = ({
   tone?: "default" | "positive";
 }) => (
   <div className="card-radius border border-white/[0.06] bg-[#121826] px-4 py-4">
-    <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">{label}</p>
+    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">{label}</p>
     <p className={`mt-2 text-[28px] font-semibold tracking-[-0.04em] ${tone === "positive" ? "text-[#65ecaf]" : "text-white"}`}>{value}</p>
   </div>
 );
@@ -528,7 +528,7 @@ const HoldingMetric = ({
   highlight?: "green" | "pink" | "neutral";
 }) => (
   <div>
-    <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">{label}</p>
+    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">{label}</p>
     <p className={`mt-1 text-sm font-medium ${highlight === "green" ? "text-[#65ecaf]" : highlight === "pink" ? "text-[#ff8ca8]" : "text-white"}`}>{value}</p>
   </div>
 );
@@ -566,20 +566,20 @@ export const EndorsementsSection = () => (
 
     <div className="grid gap-3 md:grid-cols-3">
       <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Total staked</p>
+        <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">Total staked</p>
         <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-white">
           {(MOCK_ENDORSEMENTS.reduce((s, e) => s + e.stakedSpump, 0) / 1000).toFixed(0)}k
         </p>
         <p className="mt-1 text-xs text-[#6b7d96]">SPUMP across {MOCK_ENDORSEMENTS.length} positions</p>
       </div>
       <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Claimable USDC</p>
+        <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">Claimable USDC</p>
         <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-[#65ecaf]">
           {formatUsd(MOCK_ENDORSEMENTS.filter((e) => e.claimable && e.status === "success").reduce((s, e) => s + e.estimatedUsdcReward, 0))}
         </p>
       </div>
       <div className="card-radius border border-white/[0.06] bg-[#121826] px-5 py-4">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[#73849f]">Active positions</p>
+        <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849f]">Active positions</p>
         <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] text-white">
           {MOCK_ENDORSEMENTS.filter((e) => e.status === "active").length}
         </p>
@@ -599,7 +599,7 @@ export const EndorsementsSection = () => (
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-white">{endorsement.proposalLabel}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ${tone.badge}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.1em] ${tone.badge}`}>
                       {tone.badgeText}
                     </span>
                   </div>
@@ -608,7 +608,7 @@ export const EndorsementsSection = () => (
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#73849f]">Track 2</p>
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#73849f]">Track 2</p>
                   <div className="mt-1 flex items-center gap-2">
                     <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.06]">
                       <div

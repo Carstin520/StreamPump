@@ -80,7 +80,7 @@ function TabBar({ active, onChange }: { active: LiveTab; onChange: (t: LiveTab) 
     <div className="flex items-center gap-5 border-b border-white/[0.06]">
       {LIVE_TABS.map((tab) => (
         <button
-          className={`relative pb-3 text-[12px] font-medium transition ${active === tab ? "text-white" : "text-[#7486a1] hover:text-white"}`}
+          className={`relative pb-3 text-[length:var(--fs-overline)] font-medium transition ${active === tab ? "text-white" : "text-[#7486a1] hover:text-white"}`}
           key={tab}
           onClick={() => onChange(tab)}
           type="button"
@@ -114,11 +114,11 @@ function WalletHeader({
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{sourceLabel}</p>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{sourceLabel}</p>
           <h1 className="mt-1 truncate font-mono text-lg font-bold tracking-[-0.02em] text-white sm:text-xl">
             {shortenWallet(portfolio.userWallet)}
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[#8ea0ba]">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-micro)] text-[#8ea0ba]">
             <span>Session: {sessionWallet ? shortenWallet(sessionWallet) : "—"}</span>
             <span>Connected: {connectedWallet ? shortenWallet(connectedWallet) : "—"}</span>
           </div>
@@ -154,7 +154,7 @@ function MetricsStrip({ portfolio }: { portfolio: S1PortfolioResponse }) {
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {items.map((it) => (
         <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3" key={it.label}>
-          <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
           <p className={`mt-1 text-xl font-bold tracking-[-0.04em] ${it.color}`}>{it.value}</p>
         </div>
       ))}
@@ -193,17 +193,17 @@ function PositionRow({
     <div className="rounded-[14px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4">
       {/* Desktop layout */}
       <div className="hidden items-center gap-4 xl:flex">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#67b8ff]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[length:var(--fs-micro)] font-bold text-[#67b8ff]">
           S1
         </div>
         <div className="min-w-[160px] flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <Link className="truncate text-[13px] font-semibold text-white transition hover:text-[#67b8ff]" href={`/market/${position.creatorWallet}`}>
+            <Link className="truncate text-[length:var(--fs-caption)] font-semibold text-white transition hover:text-[#67b8ff]" href={`/market/${position.creatorWallet}`}>
               {name}
             </Link>
             {position.creator ? <StagePill compact stage={position.creator.stage} /> : null}
           </div>
-          <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
+          <p className="mt-0.5 truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
         </div>
         <MetricCell label="S1" value={formatS1Amount(position.internalTokenBalance)} />
         <MetricCell label="SPUMP used" value={formatSpump(position.spumpCostBasis)} />
@@ -212,13 +212,13 @@ function PositionRow({
         <MetricCell label="Updated" value={new Date(position.updatedAt).toLocaleDateString()} />
         <div className="flex items-center gap-2">
           <Link
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
             href={`/market/${position.creatorWallet}`}
           >
             Market
           </Link>
           <Link
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
             href={`/buyout/${position.creatorWallet}`}
           >
             Buyout
@@ -233,17 +233,17 @@ function PositionRow({
       {/* Mobile card layout */}
       <div className="space-y-3 xl:hidden">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#67b8ff]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[length:var(--fs-micro)] font-bold text-[#67b8ff]">
             S1
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              <Link className="truncate text-[13px] font-semibold text-white" href={`/market/${position.creatorWallet}`}>
+              <Link className="truncate text-[length:var(--fs-caption)] font-semibold text-white" href={`/market/${position.creatorWallet}`}>
                 {name}
               </Link>
               {position.creator ? <StagePill compact stage={position.creator.stage} /> : null}
             </div>
-            <p className="truncate font-mono text-[10px] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
+            <p className="truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -255,13 +255,13 @@ function PositionRow({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:text-white"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:text-white"
             href={`/market/${position.creatorWallet}`}
           >
             Market
           </Link>
           <Link
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:text-white"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:text-white"
             href={`/buyout/${position.creatorWallet}`}
           >
             Buyout
@@ -278,7 +278,7 @@ function PositionRow({
 
 function DisabledClaimPill({ label = "Demo only" }: { label?: string }) {
   return (
-    <span className="rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-1.5 text-[10px] font-semibold text-[#f3c66e]">
+    <span className="rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#f3c66e]">
       {label}
     </span>
   );
@@ -287,8 +287,8 @@ function DisabledClaimPill({ label = "Demo only" }: { label?: string }) {
 function MetricCell({ color, label, value }: { color?: string; label: string; value: string }) {
   return (
     <div className="min-w-[78px] text-right">
-      <p className="text-[9px] uppercase tracking-[0.12em] text-[#5a6d87]">{label}</p>
-      <p className={`mt-0.5 text-[12px] font-semibold ${color ?? "text-white"}`}>{value}</p>
+      <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">{label}</p>
+      <p className={`mt-0.5 text-[length:var(--fs-overline)] font-semibold ${color ?? "text-white"}`}>{value}</p>
     </div>
   );
 }
@@ -296,8 +296,8 @@ function MetricCell({ color, label, value }: { color?: string; label: string; va
 function MobileMetric({ color, label, value }: { color?: string; label: string; value: string }) {
   return (
     <div className="rounded-[8px] border border-white/[0.04] bg-white/[0.015] px-2.5 py-1.5">
-      <p className="text-[8px] uppercase tracking-[0.14em] text-[#5a6d87]">{label}</p>
-      <p className={`mt-0.5 text-[11px] font-semibold ${color ?? "text-white"}`}>{value}</p>
+      <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{label}</p>
+      <p className={`mt-0.5 text-[length:var(--fs-micro)] font-semibold ${color ?? "text-white"}`}>{value}</p>
     </div>
   );
 }
@@ -332,7 +332,7 @@ function ClaimButton({
   return (
     <div className="space-y-2">
       <button
-        className="rounded-lg bg-[#65ecaf] px-3.5 py-1.5 text-[10px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg bg-[#65ecaf] px-3.5 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
         disabled={busy}
         onClick={() => void execute()}
         type="button"
@@ -385,16 +385,16 @@ function ClaimQueue({
   return (
     <div className="space-y-3">
       {!claimsEnabled ? (
-        <div className="rounded-[12px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-2 text-[11px] leading-5 text-[#f3c66e]">
+        <div className="rounded-[12px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-2 text-[length:var(--fs-micro)] leading-5 text-[#f3c66e]">
           Local demo sessions show discovery-reward eligibility only. A real claim requires a matching wallet session, backend builder, wallet signature, and synchronized S1 projection.
         </div>
       ) : null}
 
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-[#5a6d87]">
+        <span className="text-[length:var(--fs-micro)] uppercase tracking-[0.14em] text-[#5a6d87]">
           {claimable.length} ready · {ineligible.length} ineligible · {claimed.length} claimed
         </span>
-        <span className="text-[12px] font-semibold text-[#65ecaf]">
+        <span className="text-[length:var(--fs-overline)] font-semibold text-[#65ecaf]">
           Total capped rewards: {formatUsdcAmount(String(totalUsdc))}
         </span>
       </div>
@@ -407,10 +407,10 @@ function ClaimQueue({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold text-white">
+                <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">
                   {displayPortfolioCreatorName(pos, locale)}
                 </p>
-                <p className="mt-0.5 text-[10px] text-[#8ea0ba]">
+                <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">
                   {formatS1Amount(pos.internalTokenBalance)} S1
                 </p>
               </div>
@@ -431,16 +431,16 @@ function ClaimQueue({
 
       {ineligible.length > 0 ? (
         <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/45 p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
             Not eligible in current snapshot
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {ineligible.map((pos) => (
               <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={pos.positionPda}>
-                <p className="truncate text-[12px] font-semibold text-white">
+                <p className="truncate text-[length:var(--fs-overline)] font-semibold text-white">
                   {displayPortfolioCreatorName(pos, locale)}
                 </p>
-                <p className="mt-1 text-[10px] leading-4 text-[#f3c66e]">
+                <p className="mt-1 text-[length:var(--fs-micro)] leading-4 text-[#f3c66e]">
                   This row is not counted in the discovery reward snapshot. The position is not cleared by an ineligible claim attempt.
                 </p>
               </div>
@@ -451,16 +451,16 @@ function ClaimQueue({
 
       {claimed.length > 0 ? (
         <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">
             Already finalized
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {claimed.map((pos) => (
               <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={pos.positionPda}>
-                <p className="truncate text-[12px] font-semibold text-white">
+                <p className="truncate text-[length:var(--fs-overline)] font-semibold text-white">
                   {displayPortfolioCreatorName(pos, locale)}
                 </p>
-                <p className="mt-1 text-[10px] text-[#8ea0ba]">
+                <p className="mt-1 text-[length:var(--fs-micro)] text-[#8ea0ba]">
                   Final discovery reward: {formatUsdcAmount(pos.lastDiscoveryRewardUsdc ?? "0")}
                 </p>
               </div>
@@ -533,7 +533,7 @@ function S2ClaimButton({
   return (
     <div className="space-y-2">
       <button
-        className="rounded-lg bg-[#65ecaf] px-3.5 py-1.5 text-[10px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg bg-[#65ecaf] px-3.5 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
         disabled={busy}
         onClick={() => void execute()}
         type="button"
@@ -595,19 +595,19 @@ function S2EndorsementRow({
     <div className="rounded-[14px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4">
       {/* Desktop layout */}
       <div className="hidden items-center gap-4 xl:flex">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#f3b33e]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[length:var(--fs-micro)] font-bold text-[#f3b33e]">
           S2
         </div>
         <div className="min-w-[160px] flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-semibold text-white">
+            <span className="truncate text-[length:var(--fs-caption)] font-semibold text-white">
               Campaign {shortenWallet(endorsement.proposalPda)}
             </span>
-            <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${statusColor}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-wider ${statusColor}`}>
               {statusText}
             </span>
           </div>
-          <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">
+          <p className="mt-0.5 truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">
             Creator: {endorsement.creatorWallet ? shortenWallet(endorsement.creatorWallet) : "—"}
           </p>
         </div>
@@ -626,7 +626,7 @@ function S2EndorsementRow({
         <div className="flex items-center gap-2">
           {endorsement.proposalPda && (
             <Link
-              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:border-white/[0.14] hover:text-white"
               href={`/campaigns/${endorsement.proposalPda}`}
             >
               Campaign
@@ -637,12 +637,12 @@ function S2EndorsementRow({
           ) : null}
           {isClaimable && !claimsEnabled ? <DisabledClaimPill /> : null}
           {!isClaimable && !isClaimed && (
-            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
               Staking
             </span>
           )}
           {isClaimed && (
-            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
               Claimed
             </span>
           )}
@@ -652,19 +652,19 @@ function S2EndorsementRow({
       {/* Mobile card layout */}
       <div className="space-y-3 xl:hidden">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#f3b33e]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[length:var(--fs-micro)] font-bold text-[#f3b33e]">
             S2
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-[13px] font-semibold text-white">
+              <span className="truncate text-[length:var(--fs-caption)] font-semibold text-white">
                 Campaign {shortenWallet(endorsement.proposalPda)}
               </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${statusColor}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-wider ${statusColor}`}>
                 {statusText}
               </span>
             </div>
-            <p className="truncate font-mono text-[10px] text-[#6f8099]">
+            <p className="truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">
               Creator: {endorsement.creatorWallet ? shortenWallet(endorsement.creatorWallet) : "—"}
             </p>
           </div>
@@ -686,7 +686,7 @@ function S2EndorsementRow({
         <div className="flex flex-wrap items-center gap-2">
           {endorsement.proposalPda && (
             <Link
-              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-medium text-[#8ea0ba] transition hover:text-white"
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#8ea0ba] transition hover:text-white"
               href={`/campaigns/${endorsement.proposalPda}`}
             >
               Campaign
@@ -697,12 +697,12 @@ function S2EndorsementRow({
           ) : null}
           {isClaimable && !claimsEnabled ? <DisabledClaimPill /> : null}
           {!isClaimable && !isClaimed && (
-            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
               Staking
             </span>
           )}
           {isClaimed && (
-            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[10px] font-semibold text-[#8ea0ba]">
+            <span className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
               Claimed
             </span>
           )}
@@ -758,17 +758,17 @@ function DemoHolderHints() {
 
   return (
     <div className="rounded-[12px] border border-[#67b8ff]/10 bg-[#0e1726]/40 px-3.5 py-2.5">
-      <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Seeded test wallets</p>
+      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Seeded test wallets</p>
       <div className="mt-1.5 space-y-1">
         {holders.map((h) => (
           <div className="flex items-center justify-between gap-3" key={h.wallet}>
-            <span className="text-[10px] text-[#8ea0ba]">{h.label}</span>
+            <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{h.label}</span>
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-mono text-[10px] text-[#7486a1]" title={h.wallet}>
+              <span className="truncate font-mono text-[length:var(--fs-micro)] text-[#7486a1]" title={h.wallet}>
                 {shortenWallet(h.wallet)}
               </span>
               <button
-                className="rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-[#8ad0ff] transition hover:border-white/[0.14] hover:text-white"
+                className="rounded border border-white/[0.06] px-1.5 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#8ad0ff] transition hover:border-white/[0.14] hover:text-white"
                 onClick={() => void navigator.clipboard?.writeText(h.wallet)}
                 type="button"
               >
@@ -787,15 +787,15 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
     <div className="rounded-[14px] border border-[#67b8ff]/15 bg-[#0e1726]/50 p-4 text-left">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
             Demo portfolio
           </p>
-          <p className="mt-1 text-[12px] leading-5 text-[#8ea0ba]">
+          <p className="mt-1 text-[length:var(--fs-overline)] leading-5 text-[#8ea0ba]">
             Load a local mock session to preview S1 positions and claim eligibility labels without a wallet.
           </p>
         </div>
         <button
-          className="rounded-full bg-[#de402a] px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-[#ea523e]"
+          className="rounded-full bg-[#de402a] px-4 py-2 text-[length:var(--fs-micro)] font-semibold text-white transition hover:bg-[#ea523e]"
           onClick={onLoadDemo}
           type="button"
         >
@@ -810,7 +810,7 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
           { href: DEMO_S1_CREATOR_PATH, label: "Creator profile" },
         ].map((link) => (
           <Link
-            className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-semibold text-[#8ad0ff] transition hover:border-white/[0.14] hover:text-white"
+            className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ad0ff] transition hover:border-white/[0.14] hover:text-white"
             href={link.href}
             key={link.href}
           >
@@ -830,11 +830,11 @@ function FallbackPreview({ reason }: { reason: string }) {
   return (
     <div className="mx-auto max-w-4xl space-y-4 py-6">
       <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Fallback preview</p>
-        <p className="mt-1 text-[12px] leading-5 text-[#f3c66e]">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Fallback preview</p>
+        <p className="mt-1 text-[length:var(--fs-overline)] leading-5 text-[#f3c66e]">
           No live portfolio projection is loaded from this state. Demo links below are informational until the API, session, RPC, and seeded S1 projection are available.
         </p>
-        <p className="mt-2 font-mono text-[10px] text-[#c9a044]">{reason}</p>
+        <p className="mt-2 font-mono text-[length:var(--fs-micro)] text-[#c9a044]">{reason}</p>
       </div>
       <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
       <DemoHolderHints />
@@ -880,11 +880,11 @@ function PortfolioSourceNotice({
     <section className={`mt-3 rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Portfolio data source</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Portfolio data source</p>
           <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
         </div>
-        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
           {config.label}
         </span>
       </div>
@@ -1024,14 +1024,14 @@ function PortfolioPage() {
                 : "Portfolio and claim queue require a connected wallet plus an authenticated wallet session."}
             </p>
             {connectedWallet ? (
-              <p className="mx-auto max-w-xs rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-[#8ea0ba]">
+              <p className="mx-auto max-w-xs rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 font-mono text-[length:var(--fs-micro)] text-[#8ea0ba]">
                 {t("portfolio.connected")}: {shortenWallet(connectedWallet)}
               </p>
             ) : null}
             <div className="flex flex-wrap items-center justify-center gap-3">
               <WalletMultiButton className="!rounded-full !text-sm" />
               <Link
-                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-5 py-2.5 text-[12px] font-semibold text-white transition hover:border-white/[0.14]"
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-5 py-2.5 text-[length:var(--fs-overline)] font-semibold text-white transition hover:border-white/[0.14]"
                 href="/login?next=/portfolio"
               >
                 {connectedWallet ? "Sign message to load portfolio" : "Sign in"}

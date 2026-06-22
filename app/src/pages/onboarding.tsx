@@ -199,7 +199,7 @@ const OnboardingReadinessNotice = ({
   <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/65 px-4 py-3 text-[#f8d48a]">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
         <p className="mt-1 text-sm font-semibold text-white">
           {signedIn && storageStatus === "LIVE"
             ? "Session-backed account profile"
@@ -215,7 +215,7 @@ const OnboardingReadinessNotice = ({
               : "Use email OTP or wallet signature login first. Local preview rewards are still shown only after a real session-backed profile can be saved."}
         </p>
       </div>
-      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
         {signedIn && storageStatus === "LIVE" ? "SEEDED_DEMO" : signedIn ? "BACKEND_READY_UI_GAP" : "MOCK_PREVIEW"}
       </span>
     </div>
@@ -374,10 +374,10 @@ export default function OnboardingPage() {
                   <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#de402a] text-2xl font-bold shadow-[0_20px_50px_rgba(222,64,42,0.36)]">
                     SP
                   </div>
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
+                  <h1 className="type-h2 font-semibold">
                     Welcome to StreamPump
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
                     Complete the account profile for your current session
                   </p>
                   <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
@@ -393,7 +393,7 @@ export default function OnboardingPage() {
                   </div>
                   {accountState.kind === "signed-out" ? (
                     <Link
-                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold"
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                       href={buildLoginHref({ nextPath: "/onboarding" })}
                     >
                       <WalletIcon />
@@ -401,7 +401,7 @@ export default function OnboardingPage() {
                     </Link>
                   ) : (
                     <button
-                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold disabled:opacity-45"
                       disabled={!canWriteProfile}
                       onClick={goNext}
                       type="button"
@@ -423,10 +423,10 @@ export default function OnboardingPage() {
                       <path d="M16 3.13a4 4 0 010 7.75" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
+                  <h1 className="type-h2 font-semibold">
                     Choose Your Role
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
                     How will you use StreamPump?
                   </p>
 
@@ -443,12 +443,12 @@ export default function OnboardingPage() {
                         type="button"
                       >
                         <div className="flex items-start gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-[11px] font-bold text-[#ffb2a6]">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-[length:var(--fs-micro)] font-bold text-[#ffb2a6]">
                             {option.badge}
                           </div>
                           <div className="pr-8">
                             <div className="text-[16px] font-semibold">{option.label}</div>
-                            <div className="mt-0.5 text-[13px] text-[#8ea0ba]">{option.description}</div>
+                            <div className="mt-0.5 text-[length:var(--fs-caption)] text-[#8ea0ba]">{option.description}</div>
                           </div>
                         </div>
                         {role === option.role && (
@@ -466,7 +466,7 @@ export default function OnboardingPage() {
 
                   <div className="mt-5 grid gap-3 text-left">
                     <label className="block space-y-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Display name</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Display name</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={80}
@@ -476,7 +476,7 @@ export default function OnboardingPage() {
                       />
                     </label>
                     <label className="block space-y-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Handle</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Handle</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={30}
@@ -494,7 +494,7 @@ export default function OnboardingPage() {
                   ) : null}
 
                   <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold disabled:opacity-45"
                     disabled={!canWriteProfile || saving}
                     onClick={() => void completeProfile()}
                     type="button"
@@ -507,10 +507,10 @@ export default function OnboardingPage() {
               {currentStep === 2 && (
                 <div className="liquid-glass-shell p-8 text-center">
                   <CheckCircle animated />
-                  <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.05em]">
+                  <h1 className="type-h2 mt-4 font-semibold">
                     Profile Saved
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
                     {account?.profile?.handle
                       ? `@${account.profile.handle} is now stored for this session.`
                       : "Your account profile is now stored for this session."}
@@ -520,7 +520,7 @@ export default function OnboardingPage() {
                     className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.08] px-5 py-2.5"
                     style={{ animation: "count-pop 500ms ease-out" }}
                   >
-                    <span className="text-[13px] font-medium text-[#65ecaf]">Preview XP</span>
+                    <span className="text-[length:var(--fs-caption)] font-medium text-[#65ecaf]">Preview XP</span>
                     <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[#6f8099]">
@@ -528,7 +528,7 @@ export default function OnboardingPage() {
                   </p>
 
                   <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold"
+                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                     onClick={goNext}
                     type="button"
                   >
@@ -551,10 +551,10 @@ export default function OnboardingPage() {
                     </svg>
                   </div>
 
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
+                  <h1 className="type-h2 font-semibold">
                     Preview SPUMP Ready
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
                     Reward issuance is not live yet. This allocation remains a local onboarding preview.
                   </p>
 
@@ -569,7 +569,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <Link
-                    className="glass-button-primary mt-8 flex w-full items-center justify-center px-6 py-3.5 text-[15px] font-semibold"
+                    className="glass-button-primary mt-8 flex w-full items-center justify-center px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                     href="/explore"
                   >
                     Start Exploring

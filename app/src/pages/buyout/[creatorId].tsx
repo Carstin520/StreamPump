@@ -111,7 +111,7 @@ function PhaseStepper({ current }: { current: BuyoutPhase }) {
                 ) : null}
               </div>
               <span
-                className={`whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.1em] ${
+                className={`whitespace-nowrap text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.1em] ${
                   active ? "text-white" : done ? "text-[#8df0c4]/80" : "text-[#5a6d87]"
                 }`}
               >
@@ -134,10 +134,10 @@ function DemoRouteRail() {
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 buyout path</span>
+      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 buyout path</span>
       {links.map((link) => (
         <Link
-          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+          className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
           href={link.href}
           key={link.href}
         >
@@ -204,7 +204,7 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {items.map((it) => (
         <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={it.label}>
-          <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
           <p className={`mt-1 text-sm font-semibold tracking-[-0.02em] ${it.color ?? "text-white"}`}>{it.value}</p>
         </div>
       ))}
@@ -218,7 +218,7 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
   if (buyout.residualSwept) {
     return (
       <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
           Discovery reward window swept
         </p>
         <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
@@ -232,7 +232,7 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
   if (buyout.vaultClosed) {
     return (
       <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
           Buyout vault closed
         </p>
         <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
@@ -245,7 +245,7 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
   if (buyout.graduatedAt) {
     return (
       <section className="rounded-[14px] border border-[#67b8ff]/15 bg-[#0d1b2a]/45 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
           Discovery claim window
         </p>
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
@@ -264,7 +264,7 @@ function DiscoveryProgressCard({ profile }: { profile: S1MarketProfileResponse }
   return (
     <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-left">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">
+        <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">
           S1 discovery progress
         </span>
         <span className="text-sm font-semibold text-white">{progress}%</span>
@@ -305,11 +305,11 @@ function Countdown({ deadline }: { deadline: string | null | undefined }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-[14px] border border-[#de402a]/20 bg-[#1a120e]/60 py-6">
       <span
-        className={`font-mono text-[36px] font-semibold tracking-[-0.04em] tabular-nums ${expired ? "text-[#ff8a78]/60" : "text-white"}`}
+        className={`font-mono text-[36px] font-semibold tracking-[-0.04em] tabular-nums ${expired ? "text-[color:var(--state-danger)]" : "text-white"}`}
       >
         {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
       </span>
-      <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
+      <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
         {expired ? "Rage quit window expired" : "Rage quit deadline"}
       </span>
     </div>
@@ -334,7 +334,7 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
       {/* Header row */}
       <div className="grid grid-cols-[1fr_1fr_90px_80px] gap-2 border-b border-white/[0.04] bg-white/[0.015] px-3.5 py-2">
         {["Sponsor", "Amount", "Status", "Expires"].map((h) => (
-          <span className="text-[9px] font-medium uppercase tracking-[0.14em] text-[#5a6d87]" key={h}>{h}</span>
+          <span className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.14em] text-[#5a6d87]" key={h}>{h}</span>
         ))}
       </div>
       {offers.map((offer) => {
@@ -346,12 +346,12 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
             }`}
             key={offer.buyoutOfferPda}
           >
-            <span className="truncate font-mono text-[11px] font-medium text-white">{shortenWallet(offer.sponsorWallet)}</span>
-            <span className="text-[12px] font-semibold text-white">{formatUsdcAmount(offer.usdcAmount)}</span>
-            <span className={`text-[10px] font-medium ${isAccepted ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
+            <span className="truncate font-mono text-[length:var(--fs-micro)] font-medium text-white">{shortenWallet(offer.sponsorWallet)}</span>
+            <span className="text-[length:var(--fs-overline)] font-semibold text-white">{formatUsdcAmount(offer.usdcAmount)}</span>
+            <span className={`text-[length:var(--fs-micro)] font-medium ${isAccepted ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
               {isAccepted ? "Accepted" : offer.status}
             </span>
-            <span className="text-[10px] text-[#6f8099]">
+            <span className="text-[length:var(--fs-micro)] text-[#6f8099]">
               {offer.sponsorCancelAfterAt ? new Date(offer.sponsorCancelAfterAt).toLocaleDateString() : "—"}
             </span>
           </div>
@@ -433,8 +433,8 @@ function RageQuitPanel({
   return (
     <div className={`rounded-[14px] border p-5 ${active ? "border-[#de402a]/25 bg-[#1a120e]/50" : "border-white/[0.05] bg-white/[0.015] opacity-70"}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#de402a]">Rage Quit</h3>
-        <span className="text-[10px] text-[#8ea0ba]">{formatS1Amount(positionBalance)} S1 held</span>
+        <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#de402a]">Rage Quit</h3>
+        <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{formatS1Amount(positionBalance)} S1 held</span>
       </div>
 
       {maxTokens <= 0 ? (
@@ -442,7 +442,7 @@ function RageQuitPanel({
       ) : (
         <>
           <div className="mt-3 flex items-baseline justify-between gap-3">
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#5a6d87]">Exit amount</span>
+            <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#5a6d87]">Exit amount</span>
             <div className="flex items-center gap-2">
               <input
                 className="w-16 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-right text-sm font-bold text-white outline-none transition focus:border-white/[0.16]"
@@ -454,7 +454,7 @@ function RageQuitPanel({
                 value={amount}
               />
               <button
-                className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold text-[#8ea0ba] transition hover:text-white disabled:opacity-40"
+                className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[length:var(--fs-nano)] font-semibold text-[#8ea0ba] transition hover:text-white disabled:opacity-40"
                 disabled={!active || demoBusy}
                 onClick={() => { setAmount(maxTokens); demoFlow.reset(); }}
                 type="button"
@@ -476,7 +476,7 @@ function RageQuitPanel({
 
           <div className="mt-3 grid gap-2">
             <div className="rounded-[10px] border border-[#de402a]/20 bg-[#21100d]/45 px-3 py-2.5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#ff9a88]">
+              <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#ff9a88]">
                 Rage Quit 退出
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
@@ -484,13 +484,13 @@ function RageQuitPanel({
               </p>
             </div>
             <div className="rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8df0c4]">
+              <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#8df0c4]">
                 留守毕业
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
                 预计可领取 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 发现奖励（封顶估算）
               </p>
-              <p className="mt-2 border-t border-white/[0.06] pt-2 text-[10px] leading-4 text-[#8ea0ba]">
+              <p className="mt-2 border-t border-white/[0.06] pt-2 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
                 注意：发现奖励按合格人数与档位估算，并受单用户上限约束；S1 数量不会按比例放大 USDC 领取额。最终领取额以实际链上结算为准。
               </p>
             </div>
@@ -501,7 +501,7 @@ function RageQuitPanel({
           {isDemoRoute ? (
             <>
               <button
-                className={`mt-4 w-full rounded-full py-2.5 text-[12px] font-semibold transition-all ${
+                className={`mt-4 w-full rounded-full py-2.5 text-[length:var(--fs-overline)] font-semibold transition-all ${
                   active && amount > 0
                     ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.8)_0%,rgba(190,52,34,0.8)_100%)] text-white shadow-[0_6px_20px_rgba(222,64,42,0.2)] hover:brightness-110"
                     : "cursor-not-allowed bg-white/[0.04] text-white/30"
@@ -532,7 +532,7 @@ function RageQuitPanel({
             <div className="mt-4 space-y-2">
               <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
               <Link
-                className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+                className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
                 href={`/login?next=/buyout/${creatorWallet}`}
               >
                 {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
@@ -540,7 +540,7 @@ function RageQuitPanel({
             </div>
           ) : (
             <button
-              className={`mt-4 w-full rounded-full py-2.5 text-[12px] font-semibold transition-all ${
+              className={`mt-4 w-full rounded-full py-2.5 text-[length:var(--fs-overline)] font-semibold transition-all ${
                 active && amount > 0
                   ? "bg-[linear-gradient(180deg,rgba(222,64,42,0.8)_0%,rgba(190,52,34,0.8)_100%)] text-white shadow-[0_6px_20px_rgba(222,64,42,0.2)] hover:brightness-110"
                   : "cursor-not-allowed bg-white/[0.04] text-white/30"
@@ -651,27 +651,27 @@ function ClaimPanel({
 
   return (
     <div className="rounded-[14px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 p-5">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim Discovery Reward</h3>
+      <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim Discovery Reward</h3>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-[#f3b33e]">Your position</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#f3b33e]">Your position</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatS1Amount(positionBalance)} S1</p>
         </div>
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-[#67b8ff]">Discovery reward</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#67b8ff]">Discovery reward</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatUsdcAmount(claimableUsdc)}</p>
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-white/[0.04] bg-white/[0.015] px-3 py-2.5">
         <div className="min-w-0">
-          <p className="text-[10px] text-[#8ea0ba]">{claimStatus}</p>
-          <p className="mt-0.5 font-mono text-[11px] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
+          <p className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{claimStatus}</p>
+          <p className="mt-0.5 font-mono text-[length:var(--fs-micro)] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
         </div>
         {isDemoRoute ? (
           <button
-            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[12px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[length:var(--fs-overline)] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canClaim || demoBusy || demoFlow.state.status === "success"}
             onClick={demoFlow.begin}
             type="button"
@@ -686,7 +686,7 @@ function ClaimPanel({
           </button>
         ) : signedIn ? (
           <button
-            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[12px] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full bg-[#65ecaf] px-5 py-2 text-[length:var(--fs-overline)] font-semibold text-[#090d14] transition hover:bg-[#7bf0bd] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canClaim || busy}
             onClick={() => void execute()}
             type="button"
@@ -697,7 +697,7 @@ function ClaimPanel({
           <div className="space-y-2">
             <WalletMultiButton className="!rounded-full !text-sm" />
             <Link
-              className="block text-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+              className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
               href={`/login?next=/buyout/${creatorWallet}`}
             >
               {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
@@ -767,11 +767,11 @@ function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
     <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Buyout data source</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Buyout data source</p>
           <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
         </div>
-        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+        <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
           {config.label}
         </span>
       </div>
@@ -1005,7 +1005,7 @@ function BuyoutPage() {
                 <span aria-hidden className="text-sm">‹</span>
               </Link>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 Buyout Room</p>
+                <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 Buyout Room</p>
                 <h1 className="mt-0.5 truncate text-xl font-bold tracking-[-0.03em] text-white">{title}</h1>
                 <p className="mt-0.5 truncate text-xs text-[#8ea0ba]">
                   @{handle} · {shortenWallet(profile.creator.creatorWallet)}
@@ -1031,7 +1031,7 @@ function BuyoutPage() {
               </p>
               <DiscoveryProgressCard profile={profile} />
               <Link
-                className="mt-4 inline-flex items-center text-[11px] font-medium text-[#67b8ff] transition hover:text-white"
+                className="mt-4 inline-flex items-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
                 href={isDemoRoute ? DEMO_S1_MARKET_PATH : `/market/${creatorWallet}`}
               >
                 ← Back to market
@@ -1047,7 +1047,7 @@ function BuyoutPage() {
             <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
               {/* Offers */}
               <section className="space-y-2">
-                <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8ea0ba]">
+                <h2 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.14em] text-[#8ea0ba]">
                   Sponsor offers
                 </h2>
                 <OffersList
@@ -1089,22 +1089,22 @@ function BuyoutPage() {
                 ) : null}
 
                 {demoSummary ? (
-                  <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[12px] font-medium text-[#8df0c4]">
+                  <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
                     {demoSummary}
                   </div>
                 ) : null}
 
                 {/* Position summary */}
                 <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
-                  <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Your S1 position</p>
+                  <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Your S1 position</p>
                   <p className="mt-1 text-lg font-bold text-white">{formatS1Amount(positionBalance)} S1</p>
                   {position?.estimatedClaimableUsdc && hasClaimableUsdc(position.estimatedClaimableUsdc) ? (
-                    <p className="mt-0.5 text-[11px] text-[#65ecaf]">
+                    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#65ecaf]">
                       Discovery reward: {formatUsdcAmount(position.estimatedClaimableUsdc)}
                     </p>
                   ) : null}
                   {position?.discoveryRewardEligible === false ? (
-                    <p className="mt-0.5 text-[11px] text-[#f3c66e]">
+                    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#f3c66e]">
                       Not eligible for this discovery reward snapshot.
                     </p>
                   ) : null}

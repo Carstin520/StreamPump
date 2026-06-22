@@ -9,9 +9,9 @@ const stageLabel: Record<Exclude<StageValue, "NONE">, string> = {
 };
 
 const stageTone: Record<Exclude<StageValue, "NONE">, string> = {
-  S1_DISCOVERY: "border-[#67b8ff]/25 bg-[#0e1726]/80 text-[#8ad0ff]",
-  S1_BUYOUT: "border-[#de402a]/30 bg-[#1f120e]/80 text-[#ff8a78]",
-  S2_ACTIVE: "border-[#65ecaf]/25 bg-[#0e1f17]/80 text-[#8df0c4]",
+  S1_DISCOVERY: "tone-stage-s1",
+  S1_BUYOUT: "tone-stage-buyout",
+  S2_ACTIVE: "tone-stage-s2",
 };
 
 export const StagePill = ({
@@ -30,7 +30,7 @@ export const StagePill = ({
   return (
     <span
       className={`inline-flex rounded-full border px-2.5 py-1 font-semibold uppercase tracking-[0.18em] shadow-[0_12px_28px_rgba(0,0,0,0.12)] backdrop-blur-md ${
-        compact ? "text-[9px]" : "text-[10px]"
+        compact ? "text-[length:var(--fs-nano)]" : "text-[length:var(--fs-micro)]"
       } ${stageTone[stage]} ${className}`}
     >
       {stageLabel[stage]}

@@ -53,7 +53,7 @@ export const PreviewPanel = ({
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {tags.slice(0, 5).map((tag) => (
                 <span
-                  className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-[#93a2bb]"
+                  className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[length:var(--fs-micro)] text-[#93a2bb]"
                   key={tag}
                 >
                   #{tag}
@@ -80,7 +80,7 @@ export const HealthChecklist = ({
   items: HealthItem[];
 }) => (
   <div className="liquid-card card-radius p-4">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">系统状态</p>
+    <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">系统状态</p>
     <div className="mt-3 space-y-2.5">
       {items.map((item) => (
         <div className="flex items-center gap-2.5" key={item.label}>

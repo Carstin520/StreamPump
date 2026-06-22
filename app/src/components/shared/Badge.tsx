@@ -13,4 +13,4 @@ export const Badge = ({
 }: {
   label: string;
   tone?: BadgeTone;
-}) => <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${toneClasses[tone]}`}>{label}</span>;
+}) => <span className={`rounded-full px-3 py-1 text-[length:var(--fs-micro)] font-medium ${toneClasses[tone]}`}>{label}</span>;

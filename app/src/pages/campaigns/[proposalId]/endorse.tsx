@@ -385,24 +385,24 @@ export default function EndorsePage() {
           <div className="space-y-5">
             {/* ── Campaign target ── */}
             <section className="liquid-card section-enter rounded-[28px] p-6">
-              <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">Campaign Target</p>
+              <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">Campaign Target</p>
               <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{campaignTitle}</h2>
               <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{CAMPAIGN_BRIEF}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Metric</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Metric</p>
                   <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {track2Metric}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Cliff</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Cliff</p>
                   <p className="mt-0.5 text-sm font-semibold text-white">{track2CliffFraction * 100}%</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
                   <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatCampaignUsdValue(fanPoolShare)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
                   <p className="mt-0.5 text-sm font-semibold text-white">{deadlineLabel}</p>
                 </div>
               </div>
@@ -481,7 +481,7 @@ export default function EndorsePage() {
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                     {formatCampaignUsdValue(successUsdc)}
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                     Est. USDC if success
                   </p>
                 </div>
@@ -489,7 +489,7 @@ export default function EndorsePage() {
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-white">
                     {(fraction * 100).toFixed(1)}%
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                     Of balance
                   </p>
                 </div>
@@ -497,7 +497,7 @@ export default function EndorsePage() {
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-[#de402a]">
                     {compactNumber(failLoss)}
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                     Fail slash
                   </p>
                 </div>
@@ -521,7 +521,7 @@ export default function EndorsePage() {
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(stakeAmount)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       SPUMP back
                     </p>
                   </div>
@@ -529,13 +529,13 @@ export default function EndorsePage() {
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                       +{formatCampaignUsdValue(successUsdc)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       Capped reward
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
+                <p className="mt-4 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
                   Track 2 metric ≥ {track2CliffFraction * 100}% cliff
                 </p>
               </section>
@@ -553,7 +553,7 @@ export default function EndorsePage() {
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(stakeAmount)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       SPUMP back
                     </p>
                   </div>
@@ -561,7 +561,7 @@ export default function EndorsePage() {
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                       0
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       SPUMP slashed on fail
                     </p>
                   </div>
@@ -569,13 +569,13 @@ export default function EndorsePage() {
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#8ea0ba]">
                       $0
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
                       Capped reward
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
+                <p className="mt-4 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
                   Track 2 metric &lt; {track2CliffFraction * 100}% cliff. Cancelled/voided campaigns still return only {compactNumber(cancelVoidRefund)} SPUMP and leave {compactNumber(cancelVoidLoss)} SPUMP unminted.
                 </p>
               </section>
@@ -606,7 +606,7 @@ export default function EndorsePage() {
                           }}
                         />
                       </div>
-                      <p className="mt-1 text-[10px] text-[#8ea0ba]">
+                      <p className="mt-1 text-[length:var(--fs-micro)] text-[#8ea0ba]">
                         {t.settled ? "Settled" : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${track2Metric.toLowerCase()} · ${pct.toFixed(0)}%`}
                       </p>
                     </div>
@@ -635,7 +635,7 @@ export default function EndorsePage() {
                 <p className="truncate text-sm font-semibold text-white">{creatorName}</p>
                 <p className="truncate text-xs text-[#8ea0ba]">{creator.handle}</p>
               </div>
-              <span className="ml-auto shrink-0 rounded-full bg-[#65ecaf]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#65ecaf]">
+              <span className="ml-auto shrink-0 rounded-full bg-[#65ecaf]/10 px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-[#65ecaf]">
                 S2 Active
               </span>
             </section>
@@ -731,7 +731,7 @@ export default function EndorsePage() {
             </button>
             {isLiveCampaign ? (
               <section className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">Wallet transaction</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">Wallet transaction</p>
                 <p className="mt-1 text-xs leading-5 text-[#a7b2c4]">
                   {liveEndorsementBlockedReason
                     ? liveEndorsementBlockedReason
@@ -760,7 +760,7 @@ export default function EndorsePage() {
               />
             )}
             {demoSummary ? (
-              <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
+              <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
                 {demoSummary}
               </div>
             ) : null}
@@ -849,7 +849,7 @@ const EndorsementPreviewNotice = ({
           {error ? ` API fallback reason: ${error}` : ""}
         </p>
       </div>
-      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f8d48a]">
         {proposalId || "proposal pending"}
       </span>
     </div>

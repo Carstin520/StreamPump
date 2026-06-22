@@ -438,7 +438,7 @@ function SlideStats({ stats }: { stats: StatCard[] }) {
           className="rounded-[18px] border border-white/[0.07] bg-white/[0.035] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
           key={`${stat.label}-${stat.value}`}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{stat.label}</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{stat.label}</p>
           <p className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-white md:text-3xl">{stat.value}</p>
           <p className="mt-2 text-xs leading-5 text-[#93a2bb]">{stat.note}</p>
         </div>
@@ -499,10 +499,10 @@ function PitchSlide({ index, slide }: { index: number; slide: Slide }) {
       <div className="relative mx-auto grid w-full max-w-7xl gap-7 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] lg:items-center">
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-white/[0.1] bg-white/[0.055] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#cbd6e7]">
+            <span className="rounded-full border border-white/[0.1] bg-white/[0.055] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.22em] text-[#cbd6e7]">
               {String(index + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#67b8ff]">
+            <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.22em] text-[#67b8ff]">
               {slide.eyebrow}
             </span>
           </div>
@@ -561,7 +561,7 @@ export default function PitchPage() {
           </Link>
 
           <div className="hidden min-w-0 flex-1 justify-center md:flex">
-            <div className="truncate rounded-full border border-white/[0.06] bg-white/[0.035] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
+            <div className="truncate rounded-full border border-white/[0.06] bg-white/[0.035] px-3 py-1 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
               {activeLabel}
             </div>
           </div>
@@ -569,7 +569,7 @@ export default function PitchPage() {
           <nav className="flex items-center gap-2">
             {demoLinks.map((link) => (
               <Link
-                className="hidden rounded-full px-3 py-1.5 text-[11px] font-semibold text-[#b6c4d8] transition hover:bg-white/[0.06] hover:text-white lg:inline-flex"
+                className="hidden rounded-full px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#b6c4d8] transition hover:bg-white/[0.06] hover:text-white lg:inline-flex"
                 href={link.href}
                 key={link.href}
               >
@@ -577,7 +577,7 @@ export default function PitchPage() {
               </Link>
             ))}
             <a
-              className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-[12px] font-bold text-white shadow-[0_14px_32px_rgba(222,64,42,0.28)] transition hover:brightness-110"
+              className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-[length:var(--fs-overline)] font-bold text-white shadow-[0_14px_32px_rgba(222,64,42,0.28)] transition hover:brightness-110"
               href="#hero"
             >
               Pitch
@@ -614,7 +614,7 @@ export default function PitchPage() {
               <div className="flex flex-wrap gap-2">
                 {[...sourceLinks, ...demoLinks].map((link) => (
                   <Link
-                    className="rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-medium text-[#cbd6e7] transition hover:border-white/[0.16] hover:text-white"
+                    className="rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.16] hover:text-white"
                     href={link.href}
                     key={`${link.href}-${link.label}`}
                     target={link.href.startsWith("http") ? "_blank" : undefined}

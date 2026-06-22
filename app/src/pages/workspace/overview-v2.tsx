@@ -115,12 +115,12 @@ const WorkspacePreviewNotice = ({ message }: { message: string }) => (
   <section className="rounded-2xl border border-[#f0b35f]/20 bg-[#1c1510]/72 px-5 py-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f0b35f]">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#f0b35f]">
           Preview desk
         </p>
         <p className="mt-1 text-sm text-[#c6d1e2]">{message}</p>
       </div>
-      <span className="rounded-full border border-[#f0b35f]/20 bg-[#f0b35f]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffd39b]">
+      <span className="rounded-full border border-[#f0b35f]/20 bg-[#f0b35f]/10 px-3 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#ffd39b]">
         Demo data
       </span>
     </div>

@@ -51,13 +51,13 @@ export const PostCard = ({
         </div>
 
         {(post.type === "VIDEO" || post.hasMultipleImages) ? (
-          <div className="absolute right-3 top-3 z-[2] flex h-8 min-w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 px-2 text-[10px] uppercase tracking-[0.16em] text-white backdrop-blur-md">
+          <div className="absolute right-3 top-3 z-[2] flex h-8 min-w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 px-2 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-white backdrop-blur-md">
             {post.type === "VIDEO" ? "▶" : "•••"}
           </div>
         ) : null}
 
         <div className="absolute inset-x-0 bottom-0 z-[2] bg-[linear-gradient(180deg,rgba(8,12,30,0.2)_0%,rgba(8,12,30,0.82)_100%)] px-4 pb-3 pt-3 backdrop-blur-[18px]">
-          <p className="line-clamp-2 text-[15px] font-medium leading-6 text-[#f6f8fd]">{post.title}</p>
+          <p className="line-clamp-2 text-[length:var(--fs-sm)] font-medium leading-6 text-[#f6f8fd]">{post.title}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <img alt={post.creatorName} className="h-6 w-6 rounded-full object-cover" src={post.creatorAvatarSrc} />

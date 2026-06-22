@@ -159,14 +159,14 @@ const WorkspacePreviewNotice = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-          <p className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
+          <p className={`text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
             {tone === "warn" ? "Session" : "Preview"}
           </p>
-          <p className="truncate text-[11px] text-[#9aabc4]">{message}</p>
+          <p className="truncate text-[length:var(--fs-micro)] text-[#9aabc4]">{message}</p>
         </div>
         {loginHref ? (
           <a
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
             href={loginHref}
           >
             Sign in again
@@ -185,12 +185,12 @@ const StageSwitcher = ({
   onChange: (stage: CreatorSeasonState) => void;
 }) => (
   <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-    <span className="px-2 text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+    <span className="px-2 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
       Demo stage
     </span>
     {WORKSPACE_STAGE_ORDER.map((stage) => (
       <button
-        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition ${
+        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] transition ${
           activeStage === stage
             ? "bg-white/[0.06] text-white"
             : "text-[#7e90aa] hover:bg-white/[0.04] hover:text-white"

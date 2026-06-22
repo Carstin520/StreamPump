@@ -10,9 +10,9 @@ export const InfluenceChip = ({ influence }: { influence: InfluenceRecord }) => 
       className="inline-flex items-center gap-1.5 rounded-full border border-[#67b8ff]/20 bg-[#67b8ff]/8 px-2.5 py-1"
       title={t("influence.chipTooltip")}
     >
-      <span className="text-[11px] font-bold text-[#67b8ff]">Lv{influence.level}</span>
-      <span className="text-[10px] text-[#67b8ff]/50">·</span>
-      <span className="text-[10px] font-medium text-[#8ec8ff]">{tierLabel}</span>
+      <span className="text-[length:var(--fs-micro)] font-bold text-[#67b8ff]">Lv{influence.level}</span>
+      <span className="text-[length:var(--fs-micro)] text-[#67b8ff]/50">·</span>
+      <span className="text-[length:var(--fs-micro)] font-medium text-[#8ec8ff]">{tierLabel}</span>
     </span>
   );
 };

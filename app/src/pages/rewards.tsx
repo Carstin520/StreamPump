@@ -81,21 +81,21 @@ export default function RewardsPage() {
           <section className="glass-card section-enter border-[#f3b33e]/20 px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Mixed rewards ledger</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Mixed rewards ledger</p>
                 <p className="mt-1 text-sm font-semibold text-white">Daily claim is live-wired; mission progress is still preview.</p>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-[#95a6bf]">
                   Use a signed-in managed wallet for one-click backend signing, or an external wallet for the normal wallet-sign flow.
                   Mission rewards still need live claim records and abuse controls before they affect holdings.
                 </p>
               </div>
-              <span className="w-fit rounded-full border border-[#f3b33e]/30 bg-[#f3b33e]/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+              <span className="w-fit rounded-full border border-[#f3b33e]/30 bg-[#f3b33e]/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f8d48a]">
                 SEEDED_DEMO
               </span>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {REWARD_BOUNDARIES.map((item) => (
                 <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2" key={item.label}>
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">{item.label}</p>
+                  <p className="text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">{item.label}</p>
                   <p className="mt-1 text-xs text-[#d7e3f4]">{item.value}</p>
                 </div>
               ))}
@@ -114,16 +114,16 @@ export default function RewardsPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-semibold text-white">Level {CURRENT_LEVEL}</p>
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#67b8ff]/20 bg-[#67b8ff]/8 px-2 py-0.5">
-                        <span className="text-[9px] font-medium text-[#8ec8ff]">{locale === "zh" ? SCOUT_TIER_ZH : SCOUT_TIER_LABEL}</span>
+                        <span className="text-[length:var(--fs-nano)] font-medium text-[#8ec8ff]">{locale === "zh" ? SCOUT_TIER_ZH : SCOUT_TIER_LABEL}</span>
                         <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1 py-px text-[7px] font-semibold uppercase tracking-[0.08em] text-[#f3c66e]">
                           Mock
                         </span>
                       </span>
                     </div>
-                    <p className="text-[10px] text-[#8ea0ba]">{fmt(totalXP)} / {fmt(LEVEL_XP)} XP</p>
+                    <p className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{fmt(totalXP)} / {fmt(LEVEL_XP)} XP</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-medium text-[#67b8ff]">Level {CURRENT_LEVEL + 1} →</span>
+                <span className="text-[length:var(--fs-micro)] font-medium text-[#67b8ff]">Level {CURRENT_LEVEL + 1} →</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
@@ -140,9 +140,9 @@ export default function RewardsPage() {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">⚡</span>
                     <h3 className="text-xs font-bold tracking-[-0.02em] text-white">New User Boost</h3>
-                    <span className="rounded-full bg-[#f3b33e]/15 px-1.5 py-0.5 text-[8px] font-bold text-[#f3b33e]">+25%</span>
+                    <span className="rounded-full bg-[#f3b33e]/15 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-bold text-[#f3b33e]">+25%</span>
                   </div>
-                  <p className="mt-0.5 text-[10px] text-[#8ea0ba]">{BOOST_DAYS_LEFT} days remaining</p>
+                  <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">{BOOST_DAYS_LEFT} days remaining</p>
                 </div>
               </div>
               <div className="relative mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
@@ -151,7 +151,7 @@ export default function RewardsPage() {
                   style={{ width: `${((7 - BOOST_DAYS_LEFT) / 7) * 100}%` }}
                 />
               </div>
-              <div className="mt-1 flex justify-between text-[8px] text-[#5a6b82]">
+              <div className="mt-1 flex justify-between text-[length:var(--fs-nano)] text-[#5a6b82]">
                 <span>Day 1</span>
                 <span>Day 7</span>
               </div>
@@ -186,7 +186,7 @@ export default function RewardsPage() {
                     <span className="text-2xl">✓</span>
                     <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">{claimedLabel}</span>
                     <span className="text-xs font-medium text-[#65ecaf]/70">{fmt(DAILY_AMOUNT)}</span>
-                    <span className="text-center text-[8px] uppercase tracking-[0.14em] text-[#65ecaf]/50">
+                    <span className="text-center text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#65ecaf]/50">
                       {managedWallet.isManagedWallet ? "managed tx" : "wallet tx"}
                     </span>
                   </>
@@ -195,14 +195,14 @@ export default function RewardsPage() {
                     <span className="text-2xl">...</span>
                     <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Claiming</span>
                     <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
-                    <span className="text-[8px] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
+                    <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
                 ) : (
                   <>
                     <span className="text-3xl">🪙</span>
                     <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">{claimLabel}</span>
                     <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
-                    <span className="text-[8px] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
+                    <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
                 )}
               </button>
@@ -216,7 +216,7 @@ export default function RewardsPage() {
           <section className="section-enter">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold text-white">Login Streak</h2>
-              <span className="rounded-full bg-[#f3b33e]/15 px-2.5 py-0.5 text-[10px] font-bold text-[#f3b33e]">
+              <span className="rounded-full bg-[#f3b33e]/15 px-2.5 py-0.5 text-[length:var(--fs-micro)] font-bold text-[#f3b33e]">
                 ×{STREAK} Multiplier
               </span>
             </div>
@@ -236,8 +236,8 @@ export default function RewardsPage() {
                     }`}
                     key={day}
                   >
-                    <span className="text-[8px] uppercase">{active ? "✓" : ""}</span>
-                    <span className="text-[10px] font-semibold">D{day}</span>
+                    <span className="text-[length:var(--fs-nano)] uppercase">{active ? "✓" : ""}</span>
+                    <span className="text-[length:var(--fs-micro)] font-semibold">D{day}</span>
                   </div>
                 );
               })}
@@ -268,17 +268,17 @@ export default function RewardsPage() {
                       <div>
                         <p className="text-xs font-semibold text-white">{m.name}</p>
                         <div className="mt-0.5 flex items-center gap-2">
-                          <span className="text-[10px] font-medium text-[#de402a]">{fmt(m.spump)} SPUMP</span>
-                          <span className="text-[10px] text-[#8ea0ba]">+{m.xp} XP</span>
+                          <span className="text-[length:var(--fs-micro)] font-medium text-[#de402a]">{fmt(m.spump)} SPUMP</span>
+                          <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">+{m.xp} XP</span>
                         </div>
                       </div>
                     </div>
                     {m.done ? (
-                      <span className="rounded-full bg-[#65ecaf]/15 px-2 py-0.5 text-[9px] font-medium text-[#65ecaf]">
+                      <span className="rounded-full bg-[#65ecaf]/15 px-2 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#65ecaf]">
                         Fixture
                       </span>
                     ) : (
-                      <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[9px] font-medium text-[#8ea0ba]">
+                      <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#8ea0ba]">
                         Preview
                       </span>
                     )}

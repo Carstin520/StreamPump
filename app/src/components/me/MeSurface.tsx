@@ -63,7 +63,7 @@ export const MeSurface = ({
           >
             {tab.label}
             {tab.count != null ? (
-              <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-[#8ea0ba]">
+              <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
                 {tab.count}
               </span>
             ) : null}
@@ -119,7 +119,7 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
               <h1 className="truncate text-xl font-bold tracking-[-0.03em] text-white sm:text-2xl">{currentUser.name}</h1>
               {influence ? <InfluenceChip influence={influence} /> : null}
               {currentUser.sessionMode ? (
-                <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
+                <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
                   {currentUser.sessionMode}
                 </span>
               ) : null}
@@ -134,7 +134,7 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
           </Link>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-[#8ea0ba]">
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-[length:var(--fs-overline)] text-[#8ea0ba]">
           <span className="flex items-center gap-1">
             <strong className="text-white">{compactNumber(currentUser.followingCount)}</strong> following
           </span>
@@ -145,7 +145,7 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
             <strong className="text-white">{compactNumber(currentUser.totalLikesAndSavesCount)}</strong> likes & saves
           </span>
           {truncatedWallet ? (
-            <span className="flex items-center gap-1 font-mono text-[10px] text-[#5a6d87]">
+            <span className="flex items-center gap-1 font-mono text-[length:var(--fs-micro)] text-[#5a6d87]">
               {t("me.wallet")}: {truncatedWallet}
             </span>
           ) : null}
@@ -155,7 +155,7 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
         </div>
 
         {currentUser.bio ? (
-          <p className="mt-2.5 text-[13px] leading-6 text-[#b8c6da]">{currentUser.bio}</p>
+          <p className="mt-2.5 text-[length:var(--fs-caption)] leading-6 text-[#b8c6da]">{currentUser.bio}</p>
         ) : null}
       </div>
     </div>
@@ -297,8 +297,8 @@ const NoteCard = ({ note }: { note: UserNoteRecord }) => (
       </div>
     ) : null}
     <div className="px-3 py-2.5">
-      <p className="line-clamp-2 text-[13px] font-medium leading-5 text-white">{note.title}</p>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#8ea0ba]">
+      <p className="line-clamp-2 text-[length:var(--fs-caption)] font-medium leading-5 text-white">{note.title}</p>
+      <div className="mt-1.5 flex items-center gap-1.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">
         <img alt={note.authorName} className="h-4 w-4 rounded-full object-cover" src={note.authorAvatarSrc} />
         <span className="truncate">{note.authorName}</span>
         <span className="text-[#3e4a5e]">·</span>
@@ -310,10 +310,10 @@ const NoteCard = ({ note }: { note: UserNoteRecord }) => (
 
 const MockPreviewBadge = () => (
   <div className="flex items-center gap-2">
-    <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
+    <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
       Mock Preview
     </span>
-    <span className="text-[10px] text-[#6f8099]">Derived from feed posts — not from user action history</span>
+    <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Derived from feed posts — not from user action history</span>
   </div>
 );
 

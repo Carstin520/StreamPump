@@ -31,14 +31,16 @@ const STATUS_LABELS: Record<ContentManifestStatus, string> = {
   ARCHIVED: "已归档",
 };
 
+// Mapped onto shared semantic tones by hue: gray→neutral, blue→info,
+// green→success, amber→warning, on-chain coral→stage-buyout.
 const STATUS_TONES: Record<ContentManifestStatus, string> = {
-  DRAFT: "border-[#7486a1]/30 bg-[#7486a1]/12 text-[#a8b6cc]",
-  UPLOADING: "border-[#67b8ff]/30 bg-[#67b8ff]/12 text-[#8ad0ff]",
-  READY: "border-[#65ecaf]/30 bg-[#65ecaf]/12 text-[#8df0c4]",
-  LOCKED: "border-[#f3b33e]/30 bg-[#f3b33e]/12 text-[#f3c66e]",
-  ANCHORED: "border-[#de402a]/30 bg-[#de402a]/12 text-[#ff8a78]",
-  PUBLISHED: "border-[#65ecaf]/40 bg-[#65ecaf]/16 text-[#65ecaf]",
-  ARCHIVED: "border-white/10 bg-white/5 text-[#8ea0ba]",
+  DRAFT: "tone-state-neutral",
+  UPLOADING: "tone-state-info",
+  READY: "tone-state-success",
+  LOCKED: "tone-state-warning",
+  ANCHORED: "tone-stage-buyout",
+  PUBLISHED: "tone-state-success",
+  ARCHIVED: "tone-state-neutral",
 };
 
 const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
@@ -60,15 +62,15 @@ const INTENT_STATUS_LABELS: Record<ProposalIntentStatus, string> = {
 };
 
 const INTENT_STATUS_TONES: Record<ProposalIntentStatus, string> = {
-  DRAFT: "border-[#7486a1]/30 bg-[#7486a1]/12 text-[#a8b6cc]",
-  TERMS_LOCKED: "border-[#67b8ff]/30 bg-[#67b8ff]/12 text-[#8ad0ff]",
-  BUNDLE_BUILT: "border-[#f3b33e]/30 bg-[#f3b33e]/12 text-[#f3c66e]",
-  CREATOR_PARTIALLY_SIGNED: "border-[#65ecaf]/30 bg-[#65ecaf]/12 text-[#8df0c4]",
-  SPONSOR_SIGNED: "border-[#65ecaf]/40 bg-[#65ecaf]/16 text-[#65ecaf]",
-  SUBMITTED: "border-[#de402a]/30 bg-[#de402a]/12 text-[#ff8a78]",
-  CONFIRMED: "border-[#de402a]/40 bg-[#de402a]/16 text-[#ff8a78]",
-  FAILED: "border-[#f67263]/30 bg-[#f67263]/12 text-[#f67263]",
-  EXPIRED: "border-white/10 bg-white/5 text-[#8ea0ba]",
+  DRAFT: "tone-state-neutral",
+  TERMS_LOCKED: "tone-state-info",
+  BUNDLE_BUILT: "tone-state-warning",
+  CREATOR_PARTIALLY_SIGNED: "tone-state-success",
+  SPONSOR_SIGNED: "tone-state-success",
+  SUBMITTED: "tone-stage-buyout",
+  CONFIRMED: "tone-stage-buyout",
+  FAILED: "tone-state-danger",
+  EXPIRED: "tone-state-neutral",
 };
 
 const MOCK_COVERS = [
@@ -197,8 +199,8 @@ const DraftCard = ({
         <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="truncate text-[15px] font-medium text-white">{manifest.title}</h3>
-              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${STATUS_TONES[manifest.status]}`}>
+              <h3 className="truncate text-[length:var(--fs-sm)] font-medium text-white">{manifest.title}</h3>
+              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] ${STATUS_TONES[manifest.status]}`}>
                 {STATUS_LABELS[manifest.status]}
               </span>
             </div>
@@ -207,7 +209,7 @@ const DraftCard = ({
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#7486a1]">{manifest.updatedAtLabel}</span>
+            <span className="text-[length:var(--fs-micro)] text-[#7486a1]">{manifest.updatedAtLabel}</span>
             <ChevronRightIcon className="h-4 w-4 text-[#7486a1]" />
           </div>
         </div>
@@ -223,7 +225,7 @@ const DashboardCard = () => {
 
   return (
     <div className="liquid-glass-shell hero-glow card-radius p-5">
-      <p className="text-[11px] uppercase tracking-[0.22em] text-[#7486a1]">创作数据</p>
+      <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.22em] text-[#7486a1]">创作数据</p>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <StatCell label="总浏览" value={compactCreatorNumber(DASHBOARD_STATS.totalViews)} />
@@ -259,7 +261,7 @@ const StatCell = ({
   accent?: boolean;
 }) => (
   <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-3">
-    <p className="text-[10px] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
+    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
     <p className={`mt-1.5 text-xl font-semibold tracking-[-0.03em] ${accent ? "text-[#de402a]" : "text-white"}`}>
       {value}
     </p>
@@ -272,7 +274,7 @@ const PendingActionsCard = () => {
   if (actionableIntents.length === 0) {
     return (
       <div className="liquid-card card-radius px-5 py-4">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">
+        <div className="flex items-center gap-2 text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">
           <ClockIcon className="h-3.5 w-3.5" />
           待处理
         </div>
@@ -283,7 +285,7 @@ const PendingActionsCard = () => {
 
   return (
     <div className="card-radius border border-[#8d6120]/34 bg-[linear-gradient(180deg,rgba(77,49,20,0.2)_0%,rgba(18,21,32,0.9)_100%)] p-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f3b33e]">
+      <div className="flex items-center gap-2 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3b33e]">
         <ClockIcon className="h-3.5 w-3.5" />
         需要你的操作
       </div>
@@ -344,7 +346,7 @@ const CollaborationCard = ({ intent }: { intent: IntentRecord }) => {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="truncate text-base font-semibold text-white">{intent.manifestTitle}</h3>
-              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${INTENT_STATUS_TONES[intent.status]}`}>
+              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] ${INTENT_STATUS_TONES[intent.status]}`}>
                 {INTENT_STATUS_LABELS[intent.status]}
               </span>
             </div>
@@ -353,7 +355,7 @@ const CollaborationCard = ({ intent }: { intent: IntentRecord }) => {
             </p>
           </div>
           {isActionable ? (
-            <span className="shrink-0 animate-pulse rounded-full bg-[#f3b33e] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1a1108]">
+            <span className="shrink-0 animate-pulse rounded-full bg-[#f3b33e] px-3 py-1 text-[length:var(--fs-micro)] font-bold uppercase tracking-[0.16em] text-[#1a1108]">
               需要操作
             </span>
           ) : null}
@@ -388,9 +390,9 @@ const BudgetCell = ({
   sublabel: string;
 }) => (
   <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-3">
-    <p className="text-[10px] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
+    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#73849e]">{label}</p>
     <p className="mt-1.5 text-base font-semibold text-white">{value}</p>
-    <p className="mt-1 text-[10px] text-[#7486a1]">{sublabel}</p>
+    <p className="mt-1 text-[length:var(--fs-micro)] text-[#7486a1]">{sublabel}</p>
   </div>
 );
 
@@ -511,21 +513,21 @@ const ComposeView = () => {
           <div className="glass-card card-radius p-5">
             <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
               <div>
-                <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">封面</p>
+                <p className="mb-2 text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">封面</p>
                 <div className="glass-vignette aspect-[4/5] overflow-hidden rounded-2xl border border-dashed border-white/[0.12] bg-[#0d1420]">
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06]">
                       <TrendUpIcon className="h-5 w-5 text-[#7486a1]" />
                     </div>
                     <p className="text-xs text-[#7486a1]">点击上传封面</p>
-                    <p className="text-[10px] text-[#5a6b82]">JPG / PNG / WebP</p>
+                    <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">JPG / PNG / WebP</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <label className="block space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">标题</span>
+                  <span className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">标题</span>
                   <input
                     className="input-glass w-full rounded-2xl px-4 py-3 text-sm text-white outline-none placeholder:text-[#5a6b82]"
                     onChange={(e) => setTitle(e.target.value)}
@@ -535,7 +537,7 @@ const ComposeView = () => {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">正文</span>
+                  <span className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">正文</span>
                   <textarea
                     className="input-glass min-h-[160px] w-full resize-none rounded-3xl px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-[#5a6b82]"
                     onChange={(e) => setCaption(e.target.value)}
@@ -545,7 +547,7 @@ const ComposeView = () => {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">标签</span>
+                  <span className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">标签</span>
                   <input
                     className="input-glass w-full rounded-2xl px-4 py-3 text-sm text-white outline-none placeholder:text-[#5a6b82]"
                     onChange={(e) => setTagsInput(e.target.value)}
@@ -567,7 +569,7 @@ const ComposeView = () => {
                 </label>
 
                 <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">素材上传</span>
+                  <span className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">素材上传</span>
                   <div className="grid grid-cols-3 gap-3">
                     {[0, 1, 2].map((index) => (
                       <div
@@ -622,7 +624,7 @@ const ComposeView = () => {
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="space-y-4">
               <div className="glass-card card-radius p-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">内容预览</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">内容预览</p>
                 <div className="mt-4 glass-card card-radius overflow-hidden">
                   <div className="relative h-[180px] bg-[linear-gradient(135deg,#121826_0%,#1a2438_100%)]">
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -632,20 +634,20 @@ const ComposeView = () => {
                     </div>
                     <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_50%,rgba(8,17,28,0.7)_100%)]" />
                     {contentType ? (
-                      <div className="liquid-pill absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
+                      <div className="liquid-pill absolute right-3 top-3 rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-white">
                         {CONTENT_TYPE_LABELS[contentType]}
                       </div>
                     ) : null}
                   </div>
                   <div className="glass-card-footer px-4 pb-4 pt-3">
-                    <p className="line-clamp-2 text-[15px] font-medium text-white">{title || "未命名内容"}</p>
+                    <p className="line-clamp-2 text-[length:var(--fs-sm)] font-medium text-white">{title || "未命名内容"}</p>
                     <p className="mt-2 line-clamp-2 text-xs text-[#8ea0ba]">{caption || "暂无描述"}</p>
                   </div>
                 </div>
               </div>
 
               <div className="glass-card card-radius p-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">赞助合作设置</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">赞助合作设置</p>
                 <div className="mt-4 space-y-3">
                   <ToggleRow
                     label="开放赞助商匹配"
@@ -663,7 +665,7 @@ const ComposeView = () => {
 
             <div className="space-y-4">
               <div className="liquid-card card-radius p-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#7486a1]">发布选项</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">发布选项</p>
                 <div className="mt-4 space-y-3">
                   <VisibilityOption label="公开" sublabel="所有用户可见" active />
                   <VisibilityOption label="仅粉丝" sublabel="只有关注你的人可见" />
@@ -766,11 +768,11 @@ const VisibilityOption = ({
           : "border-white/20 bg-transparent"
       }`}
     >
-      {active ? <span className="text-[10px] text-white">✓</span> : null}
+      {active ? <span className="text-[length:var(--fs-micro)] text-white">✓</span> : null}
     </div>
     <div>
       <p className="text-sm font-medium text-white">{label}</p>
-      <p className="text-[11px] text-[#7486a1]">{sublabel}</p>
+      <p className="text-[length:var(--fs-micro)] text-[#7486a1]">{sublabel}</p>
     </div>
   </div>
 );

@@ -61,13 +61,13 @@ const STATUS_LABELS: Record<ContentManifestStatus, string> = {
   ANCHORED: "已锚定", PUBLISHED: "已发布", ARCHIVED: "已归档",
 };
 const STATUS_TONES: Record<ContentManifestStatus, string> = {
-  DRAFT: "border-[#7486a1]/30 bg-[#7486a1]/12 text-[#a8b6cc]",
-  UPLOADING: "border-[#67b8ff]/30 bg-[#67b8ff]/12 text-[#8ad0ff]",
-  READY: "border-[#65ecaf]/30 bg-[#65ecaf]/12 text-[#8df0c4]",
-  LOCKED: "border-[#f3b33e]/30 bg-[#f3b33e]/12 text-[#f3c66e]",
-  ANCHORED: "border-[#de402a]/30 bg-[#de402a]/12 text-[#ff8a78]",
-  PUBLISHED: "border-[#65ecaf]/40 bg-[#65ecaf]/16 text-[#65ecaf]",
-  ARCHIVED: "border-white/10 bg-white/5 text-[#8ea0ba]",
+  DRAFT: "tone-state-neutral",
+  UPLOADING: "tone-state-info",
+  READY: "tone-state-success",
+  LOCKED: "tone-state-warning",
+  ANCHORED: "tone-stage-buyout",
+  PUBLISHED: "tone-state-success",
+  ARCHIVED: "tone-state-neutral",
 };
 const UPLOAD_STAGE_LABELS: Record<UploadStage, string> = {
   selected: "待上传", hashing: "计算哈希", presigning: "请求签名",
@@ -414,19 +414,19 @@ export default function ManifestDetailPage() {
     <aside className="space-y-4">
       <div className="liquid-card card-radius p-4">
         <div className="flex items-center justify-between">
-          <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${STATUS_TONES[d.status]}`}>
+          <span className={`rounded-full border px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.1em] ${STATUS_TONES[d.status]}`}>
             {STATUS_LABELS[d.status]}
           </span>
-          <span className="text-[10px] text-[#5a6b82]">{formatIsoLabel(d.updatedAt)}</span>
+          <span className="text-[length:var(--fs-micro)] text-[#5a6b82]">{formatIsoLabel(d.updatedAt)}</span>
         </div>
         <p className="mt-3 text-sm font-medium text-white">{d.title ?? t("workspace.unknownContent")}</p>
-        <p className="mt-1 text-[11px] text-[#6b7d96]">{d.contentType} · {d.assets.length} {t("workspace.media")} · v{d.version}</p>
-        <p className="mt-2 text-[11px] text-[#5a6b82]">{t("common.creator")}: {shortenWallet(d.creatorWallet)}</p>
+        <p className="mt-1 text-[length:var(--fs-micro)] text-[#6b7d96]">{d.contentType} · {d.assets.length} {t("workspace.media")} · v{d.version}</p>
+        <p className="mt-2 text-[length:var(--fs-micro)] text-[#5a6b82]">{t("common.creator")}: {shortenWallet(d.creatorWallet)}</p>
       </div>
 
       {d.manifestHashHex && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.chainStatus")}</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.chainStatus")}</p>
           <div className="mt-2 space-y-2">
             <HashRow label="Manifest Hash" value={d.manifestHashHex} />
             <HashRow label="Anchor PDA" value={d.currentAnchorPda} />
@@ -438,12 +438,12 @@ export default function ManifestDetailPage() {
         <div className="liquid-card card-radius p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
-              <p className={`mt-1 text-[10px] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
+              <p className={`mt-1 text-[length:var(--fs-micro)] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
                 {isPublicFeedEligible ? "Public Feed Eligible" : publicFeedBlockedReason}
               </p>
             </div>
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+            <span className={`rounded-full border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
               isPublicFeedEligible
                 ? "border-[#65ecaf]/30 bg-[#65ecaf]/10 text-[#8df0c4]"
                 : "border-white/10 bg-white/[0.04] text-[#8ea0ba]"
@@ -455,7 +455,7 @@ export default function ManifestDetailPage() {
             <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={pub.publicationId}>
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs font-medium text-white">{pub.platform}</p>
-                <span className={`rounded-full px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] ${
+                <span className={`rounded-full px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
                   pub.verificationStatus === "VERIFIED"
                     ? "bg-[#65ecaf]/10 text-[#8df0c4]"
                     : "bg-[#f3b33e]/10 text-[#f3c66e]"
@@ -463,10 +463,10 @@ export default function ManifestDetailPage() {
                   {pub.verificationStatus}
                 </span>
               </div>
-              <p className="mt-0.5 truncate text-[10px] text-[#5a6b82]">{pub.externalUrl}</p>
+              <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#5a6b82]">{pub.externalUrl}</p>
               {pub.verificationStatus === "PENDING" ? (
                 <button
-                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[10px] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
+                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[length:var(--fs-micro)] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
                   disabled={busyAction !== null || verifyingPublicationId !== null}
                   onClick={() => void handleVerifyPublication(pub.publicationId)}
                   type="button"
@@ -513,7 +513,7 @@ export default function ManifestDetailPage() {
                 <AssetPreview asset={asset} />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-medium text-white">{asset.assetType} #{asset.orderIndex + 1}</span>
+                    <span className="text-[length:var(--fs-nano)] font-medium text-white">{asset.assetType} #{asset.orderIndex + 1}</span>
                     <StatusDot tone={asset.uploadStatus === "UPLOADED" ? "success" : asset.uploadStatus === "FAILED" ? "error" : "processing"} size="xs" />
                   </div>
                 </div>
@@ -544,21 +544,21 @@ export default function ManifestDetailPage() {
               <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Media recovery status</p>
+                    <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Media recovery status</p>
                     <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
                       {assetsWithIssues.length > 0
                         ? `${assetsWithIssues.length} asset(s) need operator/user recovery. Upload replacement files here, then finalize again after storage is healthy.`
                         : `${assetsWaiting.length} asset(s) are still waiting on upload, processing, ingest, or delivery updates.`}
                     </p>
                   </div>
-                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#f3c66e]">
+                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f3c66e]">
                     {assetsWithIssues.length > 0 ? "RECOVERY_NEEDED" : "PROCESSING"}
                   </span>
                 </div>
                 {assetsWithIssues.length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     {assetsWithIssues.slice(0, 3).map((asset) => (
-                      <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[11px]" key={asset.assetId}>
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[length:var(--fs-micro)]" key={asset.assetId}>
                         <span className="font-mono text-[#8ea0ba]">{asset.assetType} #{asset.orderIndex + 1}</span>
                         <span className="truncate text-[#f67263]">{asset.processingError || `${asset.uploadStatus} / ${asset.processingStatus} / ${asset.deliveryStatus}`}</span>
                       </div>
@@ -582,7 +582,7 @@ export default function ManifestDetailPage() {
                   <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5" key={item.key}>
                     {item.file.type.startsWith("video/") ? <VideoIcon className="h-4 w-4 text-[#67b8ff]" /> : <ImageIcon className="h-4 w-4 text-[#65ecaf]" />}
                     <span className="min-w-0 flex-1 truncate text-xs text-white">{item.file.name}</span>
-                    <span className={`text-[10px] font-medium ${UPLOAD_STAGE_TONES[item.stage]}`}>{UPLOAD_STAGE_LABELS[item.stage]}</span>
+                    <span className={`text-[length:var(--fs-micro)] font-medium ${UPLOAD_STAGE_TONES[item.stage]}`}>{UPLOAD_STAGE_LABELS[item.stage]}</span>
                     {(item.stage === "uploading" || item.stage === "hashing" || item.stage === "presigning") && (
                       <div className="h-3 w-3 animate-spin rounded-full border border-[#67b8ff] border-t-transparent" />
                     )}
@@ -621,15 +621,15 @@ export default function ManifestDetailPage() {
           <div className="section-enter space-y-4">
             <div className="space-y-3">
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishPlatform")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishPlatform")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPlatform(e.target.value.toUpperCase())} value={publicationPlatform} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
               </label>
             </div>
@@ -656,37 +656,37 @@ export default function ManifestDetailPage() {
             )}
             <div className="space-y-3">
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorWallet")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorWallet")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setSponsorWallet(e.target.value)} placeholder={t("workspace.sponsorPublicKey")} value={sponsorWallet} />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
+                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
+                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
                 </label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
+                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
                   <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
                     <option value="VIEWS">{t("workspace.views")}</option><option value="CLICKS">{t("workspace.clicks")}</option><option value="SAVES">{t("workspace.saves")}</option>
                   </select>
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
+                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
                 </label>
               </div>
               <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Track 3 CPS operator-gated</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Track 3 CPS operator-gated</p>
                 <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
                   Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
                 </p>
@@ -730,7 +730,7 @@ function AssetPreview({ asset }: { asset: ManifestAssetRecord }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center">
       {isVideoAsset(asset) ? <VideoIcon className="h-5 w-5 text-[#4a5568]" /> : <ImageIcon className="h-5 w-5 text-[#4a5568]" />}
-      <span className="text-[10px] text-[#4a5568]">{asset.ingestStatus === "READY" ? t("workspace.transcoding") : t("workspace.previewUnavailable")}</span>
+      <span className="text-[length:var(--fs-micro)] text-[#4a5568]">{asset.ingestStatus === "READY" ? t("workspace.transcoding") : t("workspace.previewUnavailable")}</span>
     </div>
   );
 }
@@ -739,8 +739,8 @@ function HashRow({ label, value }: { label: string; value: string | null | undef
   const display = value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "—";
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] text-[#5a6b82]">{label}</span>
-      <span className="font-mono text-[10px] text-[#93a2bb]">{display}</span>
+      <span className="text-[length:var(--fs-micro)] text-[#5a6b82]">{label}</span>
+      <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{display}</span>
     </div>
   );
 }

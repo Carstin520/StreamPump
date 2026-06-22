@@ -15,7 +15,7 @@ type TrendingTab = "hot" | "s1" | "s2";
 const GRADUATION_THRESHOLD = 80;
 
 const DerivedBadge = ({ label }: { label: string }) => (
-  <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#7486a1]">
+  <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#7486a1]">
     {label}
   </span>
 );
@@ -130,7 +130,7 @@ const HotTab = ({
         <section>
           <div className="mb-3 flex items-center gap-2">
             <h2 className="text-sm font-semibold text-white">{t("feed.trending.graduationWatch")}</h2>
-            <span className="rounded-full border border-[#de402a]/20 bg-[#de402a]/[0.06] px-2 py-0.5 text-[10px] font-semibold text-[#ff8a78]">
+            <span className="rounded-full border border-[#de402a]/20 bg-[#de402a]/[0.06] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold text-[#ff8a78]">
               {graduationWatchCreators.length}
             </span>
           </div>
@@ -172,15 +172,15 @@ const HotPostCard = ({
         <StagePill compact stage={post.stage} />
       </div>
       <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-3">
-        <p className="line-clamp-2 text-[13px] font-semibold leading-5 text-white">{post.title}</p>
+        <p className="line-clamp-2 text-[length:var(--fs-caption)] font-semibold leading-5 text-white">{post.title}</p>
         {creator ? (
           <div className="mt-1.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-[11px] text-[#cbd6e8]">
+            <div className="flex items-center gap-1.5 text-[length:var(--fs-micro)] text-[#cbd6e8]">
               <img alt={creator.name} className="h-4 w-4 rounded-full object-cover" src={creator.avatarSrc} />
               <span className="truncate">{creator.name}</span>
             </div>
             {creator.state === "S2_ACTIVE" && creator.activeCampaignCount ? (
-              <span className="rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.06] px-1.5 py-0.5 text-[9px] font-semibold text-[#8df0c4]">
+              <span className="rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.06] px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold text-[#8df0c4]">
                 {creator.activeCampaignCount} campaign{creator.activeCampaignCount > 1 ? "s" : ""}
               </span>
             ) : null}
@@ -214,11 +214,11 @@ const GraduationWatchRow = ({
           <p className="truncate text-sm font-semibold text-white">{creator.name}</p>
           <StagePill compact stage={creator.state} />
         </div>
-        <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
+        <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
       </div>
       <div className="hidden items-center gap-3 sm:flex">
         <div className="text-right">
-          <p className="text-[9px] uppercase tracking-[0.12em] text-[#5a6d87]">Price</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">Price</p>
           <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
         </div>
         <div className="w-20">
@@ -229,7 +229,7 @@ const GraduationWatchRow = ({
                 style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
               />
             </div>
-            <span className="text-[10px] font-semibold text-[#ff8a78]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
+            <span className="text-[length:var(--fs-micro)] font-semibold text-[#ff8a78]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
           </div>
         </div>
         {trend.length > 1 ? (
@@ -266,7 +266,7 @@ const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
 
   return (
     <div className="overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)]">
-      <div className="hidden border-b border-white/[0.05] px-4 py-2.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[#5a6d87] lg:grid lg:grid-cols-[2.4fr_0.8fr_0.8fr_0.8fr_1fr_0.8fr] lg:items-center lg:gap-3">
+      <div className="hidden border-b border-white/[0.05] px-4 py-2.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87] lg:grid lg:grid-cols-[2.4fr_0.8fr_0.8fr_0.8fr_1fr_0.8fr] lg:items-center lg:gap-3">
         <span>Creator</span>
         <span className="text-right">{t("feed.trending.price")}</span>
         <span className="text-right">{t("feed.trending.volume24h")}</span>
@@ -302,16 +302,16 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
         <img alt={creator.name} className="h-9 w-9 shrink-0 rounded-xl object-cover" src={creator.avatarSrc} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="truncate text-[13px] font-semibold text-white">{creator.name}</p>
+            <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{creator.name}</p>
             <StagePill compact stage={creator.state} />
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
+          <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
         </div>
       </div>
 
       <div className="lg:text-right">
         <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
-        <p className={`text-[10px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
+        <p className={`text-[length:var(--fs-micro)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
           {hasMarketProjection ? `${isUp ? "+" : ""}${change24h.toFixed(2)}%` : "content only"}
         </p>
       </div>
@@ -332,7 +332,7 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
               style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
             />
           </div>
-          <span className="shrink-0 text-[10px] font-medium text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
+          <span className="shrink-0 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
         </div>
       </div>
 
@@ -396,18 +396,18 @@ const S2Tab = ({
                 {matchCreator ? (
                   <img alt={matchCreator.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" src={matchCreator.avatarSrc} />
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-[10px] font-bold text-[#65ecaf]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-[length:var(--fs-micro)] font-bold text-[#65ecaf]">
                     S2
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-white">{campaign.creatorName}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">
+                  <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{campaign.creatorName}</p>
+                  <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">
                     {t("feed.trending.sponsor")}: {campaign.sponsorName}
                   </p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${statusColor[campaign.status] ?? statusColor.OPEN}`}>
+              <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${statusColor[campaign.status] ?? statusColor.OPEN}`}>
                 {campaign.status.replace(/_/g, " ")}
               </span>
             </div>
@@ -419,7 +419,7 @@ const S2Tab = ({
               <CampaignMetric accent label={t("feed.trending.budget")} value={formatUsd(totalBudget)} />
             </div>
 
-            <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[#7e90aa]">
+            <div className="mt-2.5 flex items-center gap-3 text-[length:var(--fs-micro)] text-[#7e90aa]">
               <span>{t("feed.trending.metric")}: {campaign.metric}</span>
               <span>·</span>
               <span>{campaign.actualValue}</span>
@@ -439,7 +439,7 @@ const S2Tab = ({
 
 const CampaignMetric = ({ accent, label, value }: { accent?: boolean; label: string; value: string }) => (
   <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-2.5 py-2">
-    <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">{label}</p>
+    <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{label}</p>
     <p className={`mt-0.5 text-xs font-semibold ${accent ? "text-[#8df0c4]" : "text-white"}`}>{value}</p>
   </div>
 );

@@ -313,8 +313,8 @@ function RailPipeline({ data }: { data: SettlementData }) {
               )}
 
               <div className="relative z-10 text-center">
-                <p className="text-[11px] font-semibold text-white">{t.key}</p>
-                <p className="text-[10px]" style={{ color: settled ? t.color : C.text2 }}>
+                <p className="text-[length:var(--fs-micro)] font-semibold text-white">{t.key}</p>
+                <p className="text-[length:var(--fs-micro)]" style={{ color: settled ? t.color : C.text2 }}>
                   {formatUsd(t.budget)}
                 </p>
               </div>
@@ -337,7 +337,7 @@ function RailPipeline({ data }: { data: SettlementData }) {
               className="h-2 w-2 rounded-full"
               style={{ background: t.status === "SETTLED" ? t.color : C.dimBorder }}
             />
-            <span className="text-[10px] text-[#8ea0ba]">
+            <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">
               {t.key} {t.label} — {t.status === "SETTLED" ? "Settled" : t.status === "VOIDED" ? "Voided" : "Pending"}
             </span>
           </div>
@@ -411,7 +411,7 @@ function MoneyFlow({ data }: { data: SettlementData }) {
                   }}
                 >
                   {pct > 12 && (
-                    <span className="relative z-10 truncate px-2 text-[10px] font-medium" style={{ color: seg.color }}>
+                    <span className="relative z-10 truncate px-2 text-[length:var(--fs-micro)] font-medium" style={{ color: seg.color }}>
                       {seg.label} {formatUsd(seg.amount)}
                     </span>
                   )}
@@ -422,7 +422,7 @@ function MoneyFlow({ data }: { data: SettlementData }) {
 
           <div className="mt-1 flex flex-wrap gap-3">
             {flow.segments.map((seg) => (
-              <span className="flex items-center gap-1 text-[10px] text-[#8ea0ba]" key={seg.label}>
+              <span className="flex items-center gap-1 text-[length:var(--fs-micro)] text-[#8ea0ba]" key={seg.label}>
                 <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: seg.color }} />
                 {seg.label}: {formatUsd(seg.amount)}
               </span>
@@ -463,7 +463,7 @@ function TrackCard({ children, color, status, title }: { children: React.ReactNo
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">{title}</h3>
         <span
-          className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+          className="rounded-full px-3 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em]"
           style={{
             background: status === "SETTLED" ? `${color}22` : status === "VOIDED" ? `${C.accent}22` : `${C.dim}`,
             color: status === "SETTLED" ? color : status === "VOIDED" ? C.accent : C.text2,
@@ -532,7 +532,7 @@ function SettlementPreviewNotice({
             {error ? ` API fallback reason: ${error}` : ""}
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
+        <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f8d48a]">
           {proposalId || "proposal pending"}
         </span>
       </div>
@@ -615,7 +615,7 @@ export default function SettlementPage() {
               { label: "Status", value: data.status.replace(/_/g, " "), color: data.status === "VOIDED" ? C.accent : C.success },
             ].map((s) => (
               <div className="surface-muted flex flex-col items-center rounded-[28px] p-5 text-center" key={s.label}>
-                <p className="text-[10px] uppercase tracking-[0.24em] text-[#7486a1]">{s.label}</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.24em] text-[#7486a1]">{s.label}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-[-0.05em]" style={{ color: s.color }}>{s.value}</p>
               </div>
             ))}

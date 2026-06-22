@@ -30,7 +30,7 @@ export const TrendingCreatorCard = ({
           <div className="absolute left-3 top-3 z-[2]">
             <StagePill compact stage={creator.state} />
           </div>
-          <div className="absolute right-3 top-3 z-[2] max-w-[50%] truncate rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-white/80 backdrop-blur-md">
+          <div className="absolute right-3 top-3 z-[2] max-w-[50%] truncate rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-white/80 backdrop-blur-md">
             {creator.niche}
           </div>
         </div>
@@ -44,7 +44,7 @@ export const TrendingCreatorCard = ({
                 src={creator.avatarSrc}
               />
             </div>
-            <p className="pt-2 text-[10px] text-[#90a0b9]">{creator.city}</p>
+            <p className="pt-2 text-[length:var(--fs-micro)] text-[#90a0b9]">{creator.city}</p>
           </div>
 
           <div className="mb-0.5 min-w-0 space-y-0.5">
@@ -68,7 +68,7 @@ export const TrendingCreatorCard = ({
 
 const Metric = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (
   <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 backdrop-blur-md">
-    <p className="truncate text-[9px] uppercase tracking-[0.16em] text-[#73849e]">{label}</p>
+    <p className="truncate text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#73849e]">{label}</p>
     <p className={`mt-1 truncate text-sm font-semibold ${accent ? "text-[#de402a]" : "text-white"}`}>{value}</p>
   </div>
 );

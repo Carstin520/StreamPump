@@ -54,7 +54,7 @@ export const StepProgress = ({
                   </svg>
                 )}
               </div>
-              <span className={`mt-1.5 whitespace-nowrap text-center ${compact ? "text-[10px]" : "text-[11px]"} leading-tight ${STATUS_LABEL[step.status]}`}>
+              <span className={`mt-1.5 whitespace-nowrap text-center ${compact ? "text-[length:var(--fs-micro)]" : "text-[length:var(--fs-micro)]"} leading-tight ${STATUS_LABEL[step.status]}`}>
                 {step.label}
               </span>
             </div>

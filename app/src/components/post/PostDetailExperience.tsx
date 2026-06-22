@@ -204,7 +204,7 @@ export const PostDetailExperience = ({
             </div>
           </div>
 
-          <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-[10px] text-white/44">
+          <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-[length:var(--fs-micro)] text-white/44">
             ◢
           </div>
         </div>
@@ -372,7 +372,7 @@ const VideoStage = ({ post }: { post: PostRecord }) => (
         </>
       )}
       {post.durationLabel ? (
-        <div className="pointer-events-none absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
+        <div className="pointer-events-none absolute bottom-5 right-5 rounded-full border border-white/12 bg-black/26 px-3 py-1.5 text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-white backdrop-blur-xl">
           {post.durationLabel}
         </div>
       ) : null}
@@ -439,7 +439,7 @@ const StageOverlayControls = ({
 
     <div className="absolute right-4 top-4 z-30 flex items-start gap-2">
       {showScrollHint ? (
-        <div className="hint-flash rounded-full border border-white/[0.08] bg-black/22 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-[#c3d0e2] backdrop-blur-md">
+        <div className="hint-flash rounded-full border border-white/[0.08] bg-black/22 px-2.5 py-1.5 text-[length:var(--fs-micro)] uppercase tracking-[0.2em] text-[#c3d0e2] backdrop-blur-md">
           {t("feed.scroll")}
         </div>
       ) : null}

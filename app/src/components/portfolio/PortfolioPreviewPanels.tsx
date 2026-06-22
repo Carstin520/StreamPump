@@ -113,10 +113,10 @@ const SnapshotTile = ({ accent, hint, label, tone = "neutral", value }: { accent
   <div className="rounded-xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-3 py-2.5">
     <div className="flex items-center gap-1.5">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
+      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
     </div>
     <p className={`mt-1 text-base font-semibold tracking-[-0.03em] ${tone === "positive" ? "text-[#8df0c4]" : tone === "negative" ? "text-[#f67263]" : "text-white"}`}>{value}</p>
-    <p className="mt-0.5 truncate text-[10px] text-[#6f8099]">{hint}</p>
+    <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#6f8099]">{hint}</p>
   </div>
 );
 
@@ -129,15 +129,15 @@ export const PreviewPortfolioHero = ({ portfolio }: { portfolio: PreviewPortfoli
   return (
     <div className="rounded-[16px] border border-white/[0.05] bg-white/[0.02] p-3.5 md:p-4">
       <div className="flex items-center gap-2 mb-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
-        <span className="text-[10px] text-[#6f8099]">Mock portfolio from fixture data</span>
+        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock portfolio from fixture data</span>
       </div>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Preview Portfolio Value</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Preview Portfolio Value</p>
           <p className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-white md:text-[32px]">{formatUsd(portfolio.totalValueUsd)}</p>
-          <div className="mt-1 flex items-center gap-2 text-[10px]">
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isUp ? "bg-[#65ecaf]/[0.12] text-[#8df0c4]" : "bg-[#f67263]/[0.12] text-[#f67263]"}`}>
+          <div className="mt-1 flex items-center gap-2 text-[length:var(--fs-micro)]">
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[length:var(--fs-micro)] font-semibold ${isUp ? "bg-[#65ecaf]/[0.12] text-[#8df0c4]" : "bg-[#f67263]/[0.12] text-[#f67263]"}`}>
               {isUp ? "↑" : "↓"} {portfolio.change24hPct.toFixed(2)}%
             </span>
             <span className="text-[#7486a1]">24h</span>
@@ -164,11 +164,11 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
-        <span className="text-[10px] text-[#6f8099]">Mock fixture data — not from chain</span>
+        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock fixture data — not from chain</span>
       </div>
       <div className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-        <div className="hidden border-b border-white/[0.04] px-3.5 py-2 text-[9px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr] lg:items-center lg:gap-3">
+        <div className="hidden border-b border-white/[0.04] px-3.5 py-2 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr] lg:items-center lg:gap-3">
           <span>Creator</span>
           <span className="text-right">Price</span>
           <span className="text-right">Holding</span>
@@ -195,7 +195,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
                       <p className="truncate text-xs font-semibold text-white">{creator.name}</p>
                       <StagePill compact stage={creator.state} />
                     </div>
-                    <p className="mt-0.5 truncate text-[10px] text-[#7e90aa]">{creator.handle} · {compactNumber(creator.holderCount)} holders</p>
+                    <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{creator.handle} · {compactNumber(creator.holderCount)} holders</p>
                   </div>
                 </div>
                 <div className="lg:text-right">
@@ -203,7 +203,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
                 </div>
                 <div className="lg:text-right">
                   <p className="text-xs font-semibold text-white">{holding.tokenCount} S1</p>
-                  <p className="text-[9px] text-[#7e90aa]">{formatUsd(marketValueUsd)}</p>
+                  <p className="text-[length:var(--fs-nano)] text-[#7e90aa]">{formatUsd(marketValueUsd)}</p>
                 </div>
                 <div className="hidden lg:block lg:text-right">
                   <p className="text-xs text-[#cbd6e7]">{formatUsd(holding.avgEntryUsd)}</p>
@@ -212,7 +212,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
                   <p className={`text-xs font-semibold ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
                     {isUp ? "+" : ""}{formatUsd(pnlUsd)}
                   </p>
-                  <p className={`text-[9px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
+                  <p className={`text-[length:var(--fs-nano)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
                     {isUp ? "+" : ""}{pnlPct.toFixed(2)}%
                   </p>
                 </div>
@@ -221,7 +221,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#de402a] to-[#ff8a78]" style={{ width: `${Math.min(100, creator.graduationProgress)}%` }} />
                     </div>
-                    <span className="shrink-0 text-[10px] font-medium text-[#cbd6e7]">{creator.graduationProgress}%</span>
+                    <span className="shrink-0 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7]">{creator.graduationProgress}%</span>
                   </div>
                 </div>
               </Link>
@@ -248,11 +248,11 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
-        <span className="text-[10px] text-[#6f8099]">Mock watchlist from fixture creators</span>
+        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock watchlist from fixture creators</span>
       </div>
       <div className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-        <div className="hidden border-b border-white/[0.04] px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.8fr_0.8fr_1.4fr] lg:items-center lg:gap-4">
+        <div className="hidden border-b border-white/[0.04] px-4 py-2.5 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.8fr_0.8fr_1.4fr] lg:items-center lg:gap-4">
           <span>Creator</span>
           <span className="text-right">Price</span>
           <span className="text-right">Momentum</span>
@@ -277,23 +277,23 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
                       <p className="truncate text-sm font-semibold text-white">{creator.name}</p>
                       <StagePill compact stage={creator.state} />
                     </div>
-                    <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
+                    <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
                   </div>
                 </div>
                 <div className="lg:text-right">
                   <p className="text-sm font-semibold text-white">{formatUsd(creator.tokenPrice)}</p>
-                  <p className={`text-[10px] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>{isUp ? "+" : ""}{change24hPct.toFixed(2)}% 24h</p>
+                  <p className={`text-[length:var(--fs-micro)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>{isUp ? "+" : ""}{change24hPct.toFixed(2)}% 24h</p>
                 </div>
                 <div className="hidden lg:block lg:text-right">
                   <div className="flex items-center justify-end gap-2">
                     <div className="h-1 w-16 overflow-hidden rounded-full bg-white/[0.05]">
                       <div className="h-full rounded-full bg-gradient-to-r from-[#67b8ff] via-[#ffb38a] to-[#de402a]" style={{ width: `${Math.min(100, creator.momentumScore)}%` }} />
                     </div>
-                    <span className="text-[11px] font-medium text-[#cbd6e7]">{creator.momentumScore}</span>
+                    <span className="text-[length:var(--fs-micro)] font-medium text-[#cbd6e7]">{creator.momentumScore}</span>
                   </div>
                 </div>
                 <div className="hidden min-w-0 lg:block">
-                  <p className="line-clamp-1 text-[12px] text-[#cbd6e7]">{creator.teaser}</p>
+                  <p className="line-clamp-1 text-[length:var(--fs-overline)] text-[#cbd6e7]">{creator.teaser}</p>
                 </div>
               </Link>
             );
@@ -309,8 +309,8 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
 export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => (
   <div className="space-y-3">
     <div className="flex items-center gap-2">
-      <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
-      <span className="text-[10px] text-[#6f8099]">Local preview only — real claims require the rewards ledger</span>
+      <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+      <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Local preview only — real claims require the rewards ledger</span>
     </div>
     <div className="grid gap-3 md:grid-cols-2">
       <RewardItem accent="#65ecaf" amount={`${compactNumber(portfolio.dailySpumpReward)} SPUMP`} label="Daily Engagement" status="Preview ready" />
@@ -321,9 +321,9 @@ export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolio
     <div className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] p-3.5 md:p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Preview claimable</p>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">Preview claimable</p>
           <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em] text-white">{formatUsd(portfolio.claimableRewardsUsd + portfolio.pendingCampaignUsd)}</p>
-          <p className="mt-0.5 text-[10px] text-[#7486a1]">3 rewards ready · 1 pending settlement</p>
+          <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">3 rewards ready · 1 pending settlement</p>
         </div>
         <button className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] opacity-50 cursor-not-allowed" disabled type="button">
           Preview Claim All
@@ -338,10 +338,10 @@ const RewardItem = ({ accent, amount, label, status }: { accent: string; amount:
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
       </div>
       <p className="mt-0.5 truncate text-base font-semibold tracking-[-0.02em] text-white">{amount}</p>
-      <p className="mt-0.5 text-[10px] text-[#7486a1]">{status}</p>
+      <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">{status}</p>
     </div>
   </div>
 );

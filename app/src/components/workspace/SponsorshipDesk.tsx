@@ -404,23 +404,23 @@ const DeskHeader = () => (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#7486a1]">Workspace</p>
-          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2 py-0.5 font-mono text-[9px] font-semibold text-[#f8d48a]">
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.22em] text-[#7486a1]">Workspace</p>
+          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2 py-0.5 font-mono text-[length:var(--fs-nano)] font-semibold text-[#f8d48a]">
             LOCAL FIXTURES
           </span>
         </div>
         <h1 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-white md:text-[20px]">Sponsorship Desk</h1>
-        <p className="mt-1 max-w-[640px] text-[12px] leading-relaxed text-[#9aabc4] md:text-[13px]">
+        <p className="mt-1 max-w-[640px] text-[length:var(--fs-overline)] leading-relaxed text-[#9aabc4] md:text-[length:var(--fs-caption)]">
           Review the intended operator model for terms, signatures, funding, and settlement across mock creator campaigns.
         </p>
-        <p className="mt-1 max-w-[640px] text-[10px] leading-relaxed text-[#6f8099]">
+        <p className="mt-1 max-w-[640px] text-[length:var(--fs-micro)] leading-relaxed text-[#6f8099]">
           This page does not import live proposals, submit signatures, fund vaults, run oracle jobs, or settle campaigns.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           aria-disabled="true"
-          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[10px] font-medium text-[#7e90aa]"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#7e90aa]"
           disabled
           type="button"
         >
@@ -429,7 +429,7 @@ const DeskHeader = () => (
         </button>
         <button
           aria-disabled="true"
-          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[10px] font-medium text-[#7e90aa]"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-1.5 text-[length:var(--fs-micro)] font-medium text-[#7e90aa]"
           disabled
           type="button"
         >
@@ -438,7 +438,7 @@ const DeskHeader = () => (
         </button>
         <button
           aria-disabled="true"
-          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-[#de402a]/20 bg-[#de402a]/10 px-3 py-1.5 text-[10px] font-semibold text-[#ff9a88]"
+          className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-[#de402a]/20 bg-[#de402a]/10 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#ff9a88]"
           disabled
           type="button"
         >
@@ -447,7 +447,7 @@ const DeskHeader = () => (
         </button>
       </div>
     </div>
-    <p className="mt-3 border-t border-white/[0.04] pt-3 text-[9px] text-[#5a6b82]">
+    <p className="mt-3 border-t border-white/[0.04] pt-3 text-[length:var(--fs-nano)] text-[#5a6b82]">
       Mock preview · use `/workspace/content/[manifestId]` and `/workspace/intents/[intentId]` for the API/wallet-wired proposal flow.
     </p>
   </section>
@@ -500,10 +500,10 @@ const AlertTile = ({
   <div className="rounded-2xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3">
     <div className="flex items-center gap-1.5">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
+      <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">{label}</p>
     </div>
     <p className="mt-1.5 text-[14px] font-semibold tracking-[-0.01em] text-white">{message}</p>
-    <p className="mt-0.5 text-[11px] text-[#7486a1]">{hint}</p>
+    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">{hint}</p>
   </div>
 );
 
@@ -523,7 +523,7 @@ const DeskFilters = ({
       const isActive = activeFilter === filter.id;
       return (
         <button
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition ${
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[length:var(--fs-micro)] transition ${
             isActive
               ? "bg-[#de402a]/[0.18] text-[#ff8a78] ring-1 ring-[#de402a]/30"
               : "text-[#9aabc4] hover:bg-white/[0.05] hover:text-white"
@@ -535,7 +535,7 @@ const DeskFilters = ({
         >
           <span className="font-medium">{filter.label}</span>
           <span
-            className={`rounded-full px-1.5 py-px text-[10px] font-mono ${
+            className={`rounded-full px-1.5 py-px text-[length:var(--fs-micro)] font-mono ${
               isActive ? "bg-[#de402a]/[0.16] text-[#ff8a78]" : "bg-white/[0.05] text-[#9aabc4]"
             }`}
           >
@@ -559,7 +559,7 @@ const CampaignBoard = ({
   selectedId: string;
 }) => (
   <section className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
-    <div className="hidden border-b border-white/[0.04] px-4 py-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#6f8099] lg:grid lg:grid-cols-[1.45fr_0.85fr_0.85fr_0.65fr_1.1fr_1fr_auto] lg:items-center lg:gap-2">
+    <div className="hidden border-b border-white/[0.04] px-4 py-2 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.16em] text-[#6f8099] lg:grid lg:grid-cols-[1.45fr_0.85fr_0.85fr_0.65fr_1.1fr_1fr_auto] lg:items-center lg:gap-2">
       <span>Campaign</span>
       <span>Sponsor</span>
       <span>Creator</span>
@@ -612,8 +612,8 @@ const BoardRow = ({
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="h-8 w-8 shrink-0 rounded-lg bg-[#de402a]/[0.12] ring-1 ring-[#de402a]/25" />
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-white">{campaign.title}</p>
-          <p className="mt-0.5 truncate font-mono text-[10px] text-[#6f8099]">
+          <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{campaign.title}</p>
+          <p className="mt-0.5 truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">
             Mock PDA {campaign.proposalPda}
           </p>
         </div>
@@ -621,12 +621,12 @@ const BoardRow = ({
 
       <div className="min-w-0">
         <MobileLabel>Sponsor</MobileLabel>
-        <p className="truncate text-[12px] text-[#cbd6e7]">{campaign.sponsorName}</p>
+        <p className="truncate text-[length:var(--fs-overline)] text-[#cbd6e7]">{campaign.sponsorName}</p>
       </div>
 
       <div className="min-w-0">
         <MobileLabel>Creator</MobileLabel>
-        <p className="truncate text-[12px] text-[#cbd6e7]">{campaign.creatorName}</p>
+        <p className="truncate text-[length:var(--fs-overline)] text-[#cbd6e7]">{campaign.creatorName}</p>
       </div>
 
       <div>
@@ -649,19 +649,19 @@ const BoardRow = ({
             </span>
           ) : null}
         </div>
-        <p className="mt-1 truncate text-[10px] text-[#6f8099]">{campaign.deadlineLabel}</p>
+        <p className="mt-1 truncate text-[length:var(--fs-micro)] text-[#6f8099]">{campaign.deadlineLabel}</p>
       </div>
 
       <div className="min-w-0 lg:text-left">
         <MobileLabel>Latest tx</MobileLabel>
-        <p className="truncate font-mono text-[10px] text-[#8d9cb4]">
+        <p className="truncate font-mono text-[length:var(--fs-micro)] text-[#8d9cb4]">
           {campaign.latestTxShort ?? "—"}
         </p>
       </div>
 
       <div className="flex items-center justify-end gap-1.5">
         <span
-          className="flex h-8 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] px-3 text-[11px] font-semibold text-[#cbd6e7]"
+          className="flex h-8 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] px-3 text-[length:var(--fs-micro)] font-semibold text-[#cbd6e7]"
         >
           {ctaLabel}
         </span>
@@ -678,7 +678,7 @@ const RolePill = ({ role }: { role: ViewerRole }) => {
     Observer: { dot: "bg-[#9aabc4]", text: "text-[#9aabc4]" },
   } as const;
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${palette[role].text}`}>
+    <span className={`inline-flex items-center gap-1 text-[length:var(--fs-micro)] font-medium ${palette[role].text}`}>
       <span className={`h-1 w-1 rounded-full ${palette[role].dot}`} />
       {role}
     </span>
@@ -686,7 +686,7 @@ const RolePill = ({ role }: { role: ViewerRole }) => {
 };
 
 const MobileLabel = ({ children }: { children: React.ReactNode }) => (
-  <span className="block text-[10px] uppercase tracking-[0.14em] text-[#6f8099] lg:hidden">{children}</span>
+  <span className="block text-[length:var(--fs-micro)] uppercase tracking-[0.14em] text-[#6f8099] lg:hidden">{children}</span>
 );
 
 const MobileDeskCtaBar = ({ campaign }: { campaign: DeskCampaign }) => {
@@ -694,7 +694,7 @@ const MobileDeskCtaBar = ({ campaign }: { campaign: DeskCampaign }) => {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[rgba(8,10,16,0.92)] px-4 py-3 backdrop-blur-md xl:hidden">
       <button
-        className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-3 text-[13px] font-semibold text-[#7e90aa]"
+        className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-3 text-[length:var(--fs-caption)] font-semibold text-[#7e90aa]"
         disabled
         title={cta.hint}
         type="button"
@@ -720,11 +720,11 @@ const CampaignDetailDrawer = ({ campaign }: { campaign: DeskCampaign }) => (
 
 const DrawerSummary = ({ campaign }: { campaign: DeskCampaign }) => (
   <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3.5">
-    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Campaign</p>
-    <p className="mt-1 truncate text-[15px] font-semibold tracking-[-0.02em] text-white">
+    <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Campaign</p>
+    <p className="mt-1 truncate text-[length:var(--fs-sm)] font-semibold tracking-[-0.02em] text-white">
       {campaign.title}
     </p>
-    <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">
+    <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">
       {campaign.creatorName} × {campaign.sponsorName}
     </p>
     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -744,11 +744,11 @@ const DrawerSummary = ({ campaign }: { campaign: DeskCampaign }) => (
 
 const DrawerOnChain = ({ campaign }: { campaign: DeskCampaign }) => (
   <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3.5">
-    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Illustrative Chain Proof</p>
-    <p className="mt-1 text-[10px] leading-4 text-[#6f8099]">
+    <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Illustrative Chain Proof</p>
+    <p className="mt-1 text-[length:var(--fs-micro)] leading-4 text-[#6f8099]">
       These identifiers are deterministic local fixtures, not Solana or backend reads.
     </p>
-    <div className="mt-2 space-y-1.5 text-[11px]">
+    <div className="mt-2 space-y-1.5 text-[length:var(--fs-micro)]">
       <HashRow label="Mock manifest hash" value={campaign.manifestHash} />
       <HashRow label="Mock anchor PDA" value={campaign.anchorPda} />
       <HashRow label="Mock proposal PDA" value={campaign.proposalPda} />
@@ -769,7 +769,7 @@ const HashRow = ({ label, value }: { label: string; value: string }) => (
 
 const DrawerTracks = ({ campaign }: { campaign: DeskCampaign }) => (
   <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-4 py-3.5">
-    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Track Configuration</p>
+    <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Track Configuration</p>
     <div className="mt-2 space-y-2">
       <TrackRow accent="#67b8ff" label="Track 1 · Base" metric={campaign.track1Metric} target={campaign.track1Target} actual={campaign.track1Actual} amount={campaign.track1BaseUsd} />
       <TrackRow accent="#ffb38a" label="Track 2 · KPI" metric={campaign.track2Metric} target={campaign.track2Target} actual={campaign.track2Actual} amount={campaign.track2PoolUsd} />
@@ -795,13 +795,13 @@ const TrackRow = ({
 }) => (
   <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] px-3 py-2">
     <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-1.5 text-[11px] font-medium text-white">
+      <span className="flex items-center gap-1.5 text-[length:var(--fs-micro)] font-medium text-white">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
         {label}
       </span>
-      <span className="text-[12px] font-semibold text-white">{formatUsd(amount)}</span>
+      <span className="text-[length:var(--fs-overline)] font-semibold text-white">{formatUsd(amount)}</span>
     </div>
-    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7486a1]">
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-[length:var(--fs-micro)] text-[#7486a1]">
       <span>{metric}</span>
       <span className="text-[#5a6b82]">·</span>
       <span>Target {target}</span>
@@ -817,7 +817,7 @@ const DrawerSignatures = ({ campaign }: { campaign: DeskCampaign }) => {
   return (
     <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
       <header className="border-b border-white/[0.05] px-4 py-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Signature Checklist</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Signature Checklist</p>
       </header>
       <div className="space-y-1 px-2 py-2">
         {campaign.signatures.map((item) => (
@@ -826,7 +826,7 @@ const DrawerSignatures = ({ campaign }: { campaign: DeskCampaign }) => {
       </div>
       <div className="hidden border-t border-white/[0.05] p-3 xl:block">
         <button
-          className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[12px] font-semibold text-[#7e90aa]"
+          className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[length:var(--fs-overline)] font-semibold text-[#7e90aa]"
           disabled
           title={cta.hint}
           type="button"
@@ -834,7 +834,7 @@ const DrawerSignatures = ({ campaign }: { campaign: DeskCampaign }) => {
           <SignatureIcon className="h-3.5 w-3.5" />
           {cta.label}
         </button>
-        <p className="mt-2 text-center text-[10px] leading-4 text-[#6f8099]">{cta.hint}</p>
+        <p className="mt-2 text-center text-[length:var(--fs-micro)] leading-4 text-[#6f8099]">{cta.hint}</p>
       </div>
     </section>
   );
@@ -871,8 +871,8 @@ const ChecklistRow = ({ item }: { item: SignatureChecklistItem }) => {
       <div className="flex min-w-0 items-center gap-2">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
         <div className="min-w-0">
-          <p className={`truncate text-[12px] font-medium ${labelClass}`}>{item.label}</p>
-          <p className="truncate text-[10px] text-[#6f8099]">{item.detail}</p>
+          <p className={`truncate text-[length:var(--fs-overline)] font-medium ${labelClass}`}>{item.label}</p>
+          <p className="truncate text-[length:var(--fs-micro)] text-[#6f8099]">{item.detail}</p>
         </div>
       </div>
       {item.owner ? <RolePill role={item.owner} /> : null}
@@ -883,7 +883,7 @@ const ChecklistRow = ({ item }: { item: SignatureChecklistItem }) => {
 const DrawerSettlement = ({ campaign }: { campaign: DeskCampaign }) => (
   <section className="rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
     <header className="border-b border-white/[0.05] px-4 py-3">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Settlement & Proof</p>
+      <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Settlement & Proof</p>
     </header>
     <div className="space-y-1 px-2 py-2">
       {campaign.proof.map((item) => (
@@ -895,7 +895,7 @@ const DrawerSettlement = ({ campaign }: { campaign: DeskCampaign }) => (
       <SettlementCell label="Track 2" settled={campaign.settlement.track2Settled} />
       <SettlementCell label="Track 3" settled={campaign.settlement.track3Settled} />
     </div>
-    <div className="space-y-1 border-t border-white/[0.05] px-4 py-3 text-[11px]">
+    <div className="space-y-1 border-t border-white/[0.05] px-4 py-3 text-[length:var(--fs-micro)]">
       <div className="flex items-center justify-between text-[#7486a1]">
         <span>Remaining USDC</span>
         <span className="font-semibold text-white">{formatUsd(campaign.settlement.remainingUsdc)}</span>
@@ -921,9 +921,9 @@ const ProofRow = ({ item }: { item: ProofChecklistItem }) => {
     <div className="flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
-        <p className={`truncate text-[12px] font-medium ${tone.label}`}>{item.label}</p>
+        <p className={`truncate text-[length:var(--fs-overline)] font-medium ${tone.label}`}>{item.label}</p>
       </div>
-      <p className="shrink-0 text-[10px] text-[#7486a1]">{item.detail}</p>
+      <p className="shrink-0 text-[length:var(--fs-micro)] text-[#7486a1]">{item.detail}</p>
     </div>
   );
 };
@@ -936,9 +936,9 @@ const SettlementCell = ({ label, settled }: { label: string; settled: boolean })
         : "border-white/[0.06] bg-white/[0.02]"
     }`}
   >
-    <p className="text-[9px] uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
+    <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#6f8099]">{label}</p>
     <p
-      className={`mt-1 text-[11px] font-semibold ${
+      className={`mt-1 text-[length:var(--fs-micro)] font-semibold ${
         settled ? "text-[#8df0c4]" : "text-[#9aabc4]"
       }`}
     >

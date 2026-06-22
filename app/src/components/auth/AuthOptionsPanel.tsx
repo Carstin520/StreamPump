@@ -447,7 +447,7 @@ export const AuthOptionsPanel = ({
         </div>
 
         {previewSocialAuthEnabled ? (
-          <div className="mb-5 rounded-full border border-[#f3b33e]/25 bg-[#2a1f0b]/80 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f8d48a]">
+          <div className="mb-5 rounded-full border border-[#f3b33e]/25 bg-[#2a1f0b]/80 px-3 py-1.5 text-center text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#f8d48a]">
             Preview Session Enabled
           </div>
         ) : null}
@@ -458,7 +458,7 @@ export const AuthOptionsPanel = ({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#87e7bd]">
                 Identity verified
               </p>
-              <h2 className="mt-3 text-[30px] font-semibold text-white">选择钱包模式</h2>
+              <h2 className="type-h2 mt-3 font-semibold text-white">选择钱包模式</h2>
               <p className="mt-3 text-sm leading-6 text-[#93a3bb]">
                 使用平台分配的托管账户可立即浏览和互动；绑定 Phantom/Solflare 会把这个登录身份映射到你的自有钱包。
               </p>
@@ -495,7 +495,7 @@ export const AuthOptionsPanel = ({
         ) : mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-[40px] font-semibold tracking-[-0.05em] text-white">{t("auth.welcomeBack")}</h2>
+              <h2 className="type-h1 font-semibold text-white">{t("auth.welcomeBack")}</h2>
               <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.signInOrCreate")}</p>
             </div>
 
@@ -579,19 +579,19 @@ export const AuthOptionsPanel = ({
                     </div>
                     <div className="flex items-center gap-2">
                       {method.id === "email" ? (
-                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
+                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
                           OTP
                         </span>
                       ) : socialDisabled ? (
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
                           {t("auth.envOff")}
                         </span>
                       ) : method.id === "wallet" ? (
-                        <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
+                        <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
                           {connecting ? t("auth.walletConnecting") : connected ? t("auth.walletReady") : "Web3"}
                         </span>
                       ) : (
-                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
+                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
                           {t("auth.ready")}
                         </span>
                       )}
@@ -609,7 +609,7 @@ export const AuthOptionsPanel = ({
         ) : (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className="text-[32px] font-semibold tracking-[-0.05em] text-white">{t("auth.switchAccount")}</h2>
+              <h2 className="type-h2 font-semibold text-white">{t("auth.switchAccount")}</h2>
               <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.continueCurrent")}</p>
             </div>
 
@@ -617,13 +617,13 @@ export const AuthOptionsPanel = ({
               <div className="flex items-center gap-4">
                 <img alt={currentAccount.name} className="h-16 w-16 rounded-full object-cover ring-1 ring-white/10" src={currentAccount.avatarSrc} />
                 <div className="min-w-0">
-                  <p className="truncate text-[32px] font-semibold tracking-[-0.05em] text-white">{currentAccount.name}</p>
+                  <p className="type-h2 truncate font-semibold text-white">{currentAccount.name}</p>
                   <p className="mt-1 text-lg text-[#97a7bf]">{currentAccount.handle}</p>
                 </div>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/92">{getAccountSessionLabel(currentAccount.id, t)}</span>
-                <span className="liquid-pill rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#93a3bb]">{getAccountMethodLabel(currentAccount.id, t)}</span>
+                <span className="liquid-pill rounded-full px-3 py-1 text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-white/92">{getAccountSessionLabel(currentAccount.id, t)}</span>
+                <span className="liquid-pill rounded-full px-3 py-1 text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#93a3bb]">{getAccountMethodLabel(currentAccount.id, t)}</span>
               </div>
             </div>
 

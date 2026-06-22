@@ -318,7 +318,7 @@ const CampaignSourceNotice = ({
         </p>
       </div>
       <span
-        className={`rounded-full border px-3 py-1 font-mono text-[10px] font-semibold ${
+        className={`rounded-full border px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold ${
           isDemoProposal
             ? "border-[#f3b33e]/30 bg-[#2a1f0b] text-[#f8d48a]"
             : "border-[#67b8ff]/25 bg-[#0d2236] text-[#a8d8ff]"

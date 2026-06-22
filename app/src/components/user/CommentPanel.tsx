@@ -248,7 +248,7 @@ const CommentRow = ({ comment, emphasized = false }: { comment: CommentRecord; e
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs font-medium text-white">{comment.author}</span>
-          <span className="text-[10px] text-[#7485a0]">{comment.timeLabel}</span>
+          <span className="text-[length:var(--fs-micro)] text-[#7485a0]">{comment.timeLabel}</span>
         </div>
         <p className="mt-1 text-sm leading-6 text-[#d1d9e7]">{comment.content}</p>
         <div className="mt-2 flex items-center gap-4 text-xs text-[#7c8ba1]">

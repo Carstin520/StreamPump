@@ -67,8 +67,8 @@ export const ActivitySurface = ({
                 }}
                 type="button"
               >
-                <span className="text-[13px] font-medium">{t("feed.allActivity")}</span>
-                <span className="text-[11px] text-[#7f91ab]">{activityFeedItems.length}</span>
+                <span className="text-[length:var(--fs-caption)] font-medium">{t("feed.allActivity")}</span>
+                <span className="text-[length:var(--fs-micro)] text-[#7f91ab]">{activityFeedItems.length}</span>
               </button>
 
               <div className="liquid-glass-shell p-1.5">
@@ -99,8 +99,8 @@ export const ActivitySurface = ({
                         ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium">{creator.name}</p>
-                        <p className="mt-0.5 line-clamp-1 text-[11px] text-[#7487a3]">{author.note}</p>
+                        <p className="truncate text-[length:var(--fs-caption)] font-medium">{creator.name}</p>
+                        <p className="mt-0.5 line-clamp-1 text-[length:var(--fs-micro)] text-[#7487a3]">{author.note}</p>
                       </div>
                     </button>
                   );
@@ -164,16 +164,16 @@ export const ActivitySurface = ({
                           <img alt={creator.name} className="h-9 w-9 rounded-full object-cover" src={creator.avatarSrc} />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="truncate text-[13px] font-semibold text-white">{creator.name}</p>
+                              <p className="truncate text-[length:var(--fs-caption)] font-semibold text-white">{creator.name}</p>
                               <StagePill compact stage={creator.state} />
                             </div>
-                            <p className="mt-0.5 truncate text-[11px] text-[#7e90aa]">
+                            <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">
                               {creator.handle} · {item.postedAtLabel}
                             </p>
                           </div>
                         </Link>
 
-                        <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#7f90ab]">
+                        <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7f90ab]">
                           {item.kind === "post" ? "POST" : "UPDATE"}
                         </span>
                       </div>
@@ -184,8 +184,8 @@ export const ActivitySurface = ({
                             {item.title}
                           </h2>
                         ) : null}
-                        <p className="mt-1.5 line-clamp-2 text-[13px] leading-[1.55] text-[#bcc8de]">{item.body}</p>
-                        <p className="mt-1.5 text-[11px] text-[#de7a68]">{item.actionSummary}</p>
+                        <p className="mt-1.5 line-clamp-2 text-[length:var(--fs-caption)] leading-[1.55] text-[#bcc8de]">{item.body}</p>
+                        <p className="mt-1.5 text-[length:var(--fs-micro)] text-[#de7a68]">{item.actionSummary}</p>
 
                         {item.coverSrc ? (
                           <div className="mt-3 overflow-hidden rounded-lg bg-[#0b1019]">
@@ -215,7 +215,7 @@ export const ActivitySurface = ({
                                   src={item.coverSrc}
                                 />
                                 {item.mediaType === "VIDEO" && item.durationLabel ? (
-                                  <div className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                  <div className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-white">
                                     {item.durationLabel}
                                   </div>
                                 ) : null}
@@ -269,7 +269,7 @@ export const ActivitySurface = ({
                           src={item.coverSrc}
                         />
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent" />
-                        <div className="absolute bottom-1.5 left-2 z-[2] flex items-center gap-2.5 text-[11px] text-white/80">
+                        <div className="absolute bottom-1.5 left-2 z-[2] flex items-center gap-2.5 text-[length:var(--fs-micro)] text-white/80">
                           <span className="flex items-center gap-0.5">
                             <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 16 16"><path d="M6.25 4.72a.75.75 0 0 1 1.06-.02l3.22 3.05a.75.75 0 0 1 0 1.08l-3.22 3.05a.75.75 0 0 1-1.03-1.09L8.87 8.2 6.27 5.78a.75.75 0 0 1-.02-1.06Z" /></svg>
                             {compactNumber(item.viewsCount)}
@@ -280,15 +280,15 @@ export const ActivitySurface = ({
                           </span>
                         </div>
                         {item.durationLabel ? (
-                          <div className="absolute bottom-1.5 right-2 z-[2] rounded px-1 py-px text-[11px] font-medium leading-4 text-white/90 bg-black/50">
+                          <div className="absolute bottom-1.5 right-2 z-[2] rounded px-1 py-px text-[length:var(--fs-micro)] font-medium leading-4 text-white/90 bg-black/50">
                             {item.durationLabel}
                           </div>
                         ) : null}
                       </div>
 
                       <div className="mt-2 px-0.5">
-                        <p className="line-clamp-2 text-[13px] font-normal leading-[1.4] text-[#d1d7e0] group-hover:text-[#67b8ff]">{item.title}</p>
-                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#9aa8bc]">
+                        <p className="line-clamp-2 text-[length:var(--fs-caption)] font-normal leading-[1.4] text-[#d1d7e0] group-hover:text-[#67b8ff]">{item.title}</p>
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[length:var(--fs-micro)] text-[#9aa8bc]">
                           <img alt={creator.name} className="h-5 w-5 rounded-full object-cover" src={creator.avatarSrc} />
                           <span className="truncate">{creator.name}</span>
                           <span className="text-[#4a5568]">·</span>
@@ -307,10 +307,10 @@ export const ActivitySurface = ({
               <div className="liquid-glass-shell card-radius px-3.5 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[13px] font-semibold text-white">{t("feed.activeCreators")}</p>
-                    <p className="mt-0.5 text-[11px] text-[#7d8faa]">{t("feed.activeCreatorsDesc")}</p>
+                    <p className="text-[length:var(--fs-caption)] font-semibold text-white">{t("feed.activeCreators")}</p>
+                    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7d8faa]">{t("feed.activeCreatorsDesc")}</p>
                   </div>
-                  <span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-[#8b9cb7]">
+                  <span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#8b9cb7]">
                     {activitySidebarHighlights.length}
                   </span>
                 </div>
@@ -332,11 +332,11 @@ export const ActivitySurface = ({
                       <img alt={creator.name} className="h-8 w-8 rounded-full object-cover" src={creator.avatarSrc} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <p className="truncate text-[13px] font-medium text-white">{creator.name}</p>
+                          <p className="truncate text-[length:var(--fs-caption)] font-medium text-white">{creator.name}</p>
                           <StagePill compact stage={creator.state} />
                         </div>
-                        <p className="mt-1 line-clamp-2 text-[12px] leading-[1.5] text-[#cbd6e7]">{item.headline}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[#7f90ab]">{item.statusLabel}</p>
+                        <p className="mt-1 line-clamp-2 text-[length:var(--fs-overline)] leading-[1.5] text-[#cbd6e7]">{item.headline}</p>
+                        <p className="mt-1 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7f90ab]">{item.statusLabel}</p>
                       </div>
                     </Link>
                   );

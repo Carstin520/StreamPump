@@ -25,7 +25,7 @@ export const WorkspaceHeader = ({
       <div className="flex items-center gap-3">
         {shortWallet && (
           <span className="hidden items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1.5 text-xs text-[#93a2bb] md:inline-flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--state-success)]" />
             {shortWallet}
           </span>
         )}

@@ -169,8 +169,8 @@ const FeedStatChip = ({
 
   return (
     <div className={`flex items-center gap-2 rounded-full border ${t.ring} ${t.bg} px-3 py-1.5 backdrop-blur-sm`}>
-      <span className="text-[11px] font-semibold tracking-wide text-white">{value}</span>
-      <span className={`text-[10px] ${t.text}`}>{label}</span>
+      <span className="text-[length:var(--fs-micro)] font-semibold tracking-wide text-white">{value}</span>
+      <span className={`text-[length:var(--fs-micro)] ${t.text}`}>{label}</span>
     </div>
   );
 };

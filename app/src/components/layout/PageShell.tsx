@@ -45,9 +45,9 @@ export const PageShell = ({
             {title || subtitle || action ? (
               <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
-                  <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">{eyebrow}</p>
+                  <p className="type-overline text-[color:var(--text-faint)]">{eyebrow}</p>
                   {title ? (
-                    <h1 className="mt-3 text-[38px] font-semibold tracking-[-0.06em] text-white md:text-[46px]">
+                    <h1 className="type-h1 mt-3 font-semibold text-white">
                       {title}
                     </h1>
                   ) : null}

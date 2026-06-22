@@ -105,7 +105,7 @@ function MockIntentSigningStep() {
           <div className="liquid-card card-radius p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
                   Demo signing step
                 </p>
                 <h1 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
@@ -116,7 +116,7 @@ function MockIntentSigningStep() {
                 </p>
               </div>
               <Link
-                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[11px] font-medium text-[#cbd6e7] transition hover:text-white"
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:text-white"
                 href={WORKSPACE_SPONSORSHIPS_PATH}
               >
                 Back to desk
@@ -126,7 +126,7 @@ function MockIntentSigningStep() {
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">合作进程</p>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">合作进程</p>
               <span className="text-xs text-white">等待创作者签名</span>
             </div>
             <StepProgress steps={demoIntentSteps} />
@@ -167,7 +167,7 @@ function MockIntentSigningStep() {
 
             <aside className="space-y-3">
               <div className="liquid-card card-radius p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Track budgets</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Track budgets</p>
                 <div className="mt-3 space-y-2 text-xs">
                   <div className="flex justify-between"><span className="text-[#8ea0ba]">Track 1</span><span className="text-white">$1,800</span></div>
                   <div className="flex justify-between"><span className="text-[#8ea0ba]">Track 2</span><span className="text-white">$3,600</span></div>
@@ -385,15 +385,15 @@ export default function IntentDetailPage() {
       {/* Content preview */}
       {d.manifest && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">关联内容</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">关联内容</p>
           <p className="mt-2 text-sm font-medium text-white">{d.manifest.title ?? "未命名"}</p>
-          <p className="mt-1 text-[11px] text-[#6b7d96]">{d.manifest.status} · {d.manifest.assets.length} 素材</p>
+          <p className="mt-1 text-[length:var(--fs-micro)] text-[#6b7d96]">{d.manifest.status} · {d.manifest.assets.length} 素材</p>
         </div>
       )}
 
       {/* On-chain summary */}
       <div className="liquid-card card-radius p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">链上信息</p>
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">链上信息</p>
         <div className="mt-3 space-y-2">
           <HashRow label="Manifest Hash" value={d.manifest?.manifestHashHex} />
           <HashRow label="Anchor PDA" value={d.manifest?.currentAnchorPda} />
@@ -405,14 +405,14 @@ export default function IntentDetailPage() {
       {/* Bundle info */}
       {d.bundles.length > 0 && (
         <div className="liquid-card card-radius p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">交易包</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">交易包</p>
           {d.bundles.slice(0, 2).map((b) => (
             <div className="mt-2 rounded-xl bg-white/[0.04] px-3 py-2" key={b.bundleId}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-white">{b.status}</span>
-                <span className="text-[9px] text-[#5a6b82]">{b.submitMode}</span>
+                <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{b.submitMode}</span>
               </div>
-              <p className="mt-1 text-[10px] text-[#5a6b82]">过期: {formatIsoLabel(b.expiresAt)}</p>
+              <p className="mt-1 text-[length:var(--fs-micro)] text-[#5a6b82]">过期: {formatIsoLabel(b.expiresAt)}</p>
             </div>
           ))}
         </div>
@@ -425,7 +425,7 @@ export default function IntentDetailPage() {
             <CheckCircleIcon className="h-4 w-4 text-[#65ecaf]" />
             <div>
               <p className="text-xs font-medium text-white">查看 Campaign</p>
-              <p className="text-[10px] text-[#5a6b82]">{d.proposal.status} · {formatIsoLabel(d.proposal.deadlineAt)}</p>
+              <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">{d.proposal.status} · {formatIsoLabel(d.proposal.deadlineAt)}</p>
             </div>
           </div>
         </Link>
@@ -453,11 +453,11 @@ export default function IntentDetailPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-medium text-[#93a2bb]">
+              <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#93a2bb]">
                 {isCreator ? "创作者" : isSponsor ? "赞助商" : "观察者"}
               </span>
               <button
-                className="glass-button-ghost px-3 py-1.5 text-[11px] disabled:opacity-40"
+                className="glass-button-ghost px-3 py-1.5 text-[length:var(--fs-micro)] disabled:opacity-40"
                 disabled={busyAction !== null}
                 onClick={() => void handleRefresh()}
                 type="button"
@@ -471,7 +471,7 @@ export default function IntentDetailPage() {
         {/* Lifecycle progress */}
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">合作进程</p>
+            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">合作进程</p>
             <span className="text-xs text-white">{STATUS_LABELS[intent.status]}</span>
           </div>
           <StepProgress steps={steps} />
@@ -644,19 +644,19 @@ export default function IntentDetailPage() {
 
         {/* Operator/debug fallback for controlled demos and API verification. */}
         <details className="rounded-2xl border border-white/[0.06]">
-          <summary className="cursor-pointer px-4 py-3 text-[11px] font-medium text-[#5a6b82] hover:text-[#8ea0ba]">
+          <summary className="cursor-pointer px-4 py-3 text-[length:var(--fs-micro)] font-medium text-[#5a6b82] hover:text-[#8ea0ba]">
             Operator / Debug Fallback
           </summary>
           <div className="space-y-4 border-t border-white/[0.06] p-4">
             <div className="rounded-xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f3c66e]">Operator-only path</p>
-              <p className="mt-1 text-[11px] leading-5 text-[#9aabc4]">
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#f3c66e]">Operator-only path</p>
+              <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#9aabc4]">
                 Use these pasted-signature controls only for controlled demos, wallet adapter failures, or backend bundle verification. Normal creator/sponsor users should use the wallet signing buttons above.
               </p>
             </div>
             {isCreator && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[#5a6b82]">Operator paste: partiallySignedTxBase64</p>
+                <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">Operator paste: partiallySignedTxBase64</p>
                 <textarea
                   className="input-glass min-h-[100px] w-full rounded-2xl px-3 py-2 text-xs text-white outline-none"
                   onChange={(e) => setCreatorSignedBase64(e.target.value)}
@@ -664,7 +664,7 @@ export default function IntentDetailPage() {
                   value={creatorSignedBase64}
                 />
                 <button
-                  className="glass-button-ghost px-3 py-1.5 text-[11px] disabled:opacity-40"
+                  className="glass-button-ghost px-3 py-1.5 text-[length:var(--fs-micro)] disabled:opacity-40"
                   disabled={busyAction !== null || !latestBundle}
                   onClick={() => void handleCreatorPartialSign()}
                   type="button"
@@ -675,7 +675,7 @@ export default function IntentDetailPage() {
             )}
             {isSponsor && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[#5a6b82]">Operator paste: fullySignedTxBase64</p>
+                <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">Operator paste: fullySignedTxBase64</p>
                 <textarea
                   className="input-glass min-h-[100px] w-full rounded-2xl px-3 py-2 text-xs text-white outline-none"
                   onChange={(e) => setFullySignedBase64(e.target.value)}
@@ -683,7 +683,7 @@ export default function IntentDetailPage() {
                   value={fullySignedBase64}
                 />
                 <button
-                  className="glass-button-ghost px-3 py-1.5 text-[11px] disabled:opacity-40"
+                  className="glass-button-ghost px-3 py-1.5 text-[length:var(--fs-micro)] disabled:opacity-40"
                   disabled={busyAction !== null || !latestBundle}
                   onClick={() => void handleSubmitBundle()}
                   type="button"
@@ -710,9 +710,9 @@ export default function IntentDetailPage() {
 function TrackCard({ label, sublabel, value }: { label: string; sublabel: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-[#5a6b82]">{label}</p>
+      <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.14em] text-[#5a6b82]">{label}</p>
       <p className="mt-1.5 text-lg font-semibold text-white">{value}</p>
-      <p className="mt-1 text-[10px] text-[#4a5568]">{sublabel}</p>
+      <p className="mt-1 text-[length:var(--fs-micro)] text-[#4a5568]">{sublabel}</p>
     </div>
   );
 }
@@ -721,8 +721,8 @@ function HashRow({ label, value }: { label: string; value: string | null | undef
   const display = value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "—";
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] text-[#5a6b82]">{label}</span>
-      <span className="font-mono text-[10px] text-[#93a2bb]">{display}</span>
+      <span className="text-[length:var(--fs-micro)] text-[#5a6b82]">{label}</span>
+      <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{display}</span>
     </div>
   );
 }
