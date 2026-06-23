@@ -1,5 +1,5 @@
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   useExploreFeedViewModel,
@@ -45,6 +45,34 @@ const discoverCategoryKeys = [
   "feed.categories.creatorWatch",
 ] as const;
 
+type DiscoverCategoryKey = (typeof discoverCategoryKeys)[number];
+
+// Real client-side filtering over the loaded feed's actual tags / stage.
+// Keyword sets match the seeded tag vocabulary (tags, title, location, excerpt).
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "feed.categories.racing": ["赛车", "f1", "赛道", "方程式", "机械美学", "速度感"],
+  "feed.categories.game": ["游戏", "3a", "gta", "黑神话", "deathstranding", "预告片"],
+  "feed.categories.film": ["电影", "科幻电影", "沙丘", "沙漠科幻", "银翼杀手", "观影", "观后感", "电影感"],
+  "feed.categories.tech": ["航天", "火箭", "科技", "太空", "工程", "理工"],
+  "feed.categories.city": ["城市", "赛博朋克", "夜景", "霓虹", "山城", "重庆夜"],
+  "feed.categories.mood": ["情绪", "氛围", "治愈", "反差萌", "居家", "猫咪", "音乐现场", "演出", "舞台", "演唱会"],
+};
+
+const matchesCategory = (post: PostRecord, categoryKey: DiscoverCategoryKey): boolean => {
+  if (categoryKey === "feed.categories.recommended") {
+    return true;
+  }
+  if (categoryKey === "feed.categories.creatorWatch") {
+    return post.stage !== "NONE";
+  }
+  const keywords = CATEGORY_KEYWORDS[categoryKey];
+  if (!keywords) {
+    return true;
+  }
+  const haystack = [post.title, post.excerpt, post.location, ...post.tags].join(" ").toLowerCase();
+  return keywords.some((keyword) => haystack.includes(keyword));
+};
+
 export const DiscoverSurface = ({
   initialError = null,
   initialPosts = [],
@@ -86,11 +114,32 @@ const ExploreView = ({
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
   const { t } = useI18n();
-  const postCount = viewModel.posts.length;
+  const [activeCategory, setActiveCategory] = useState<DiscoverCategoryKey>(discoverCategoryKeys[0]);
+
+  const visiblePosts = useMemo(() => {
+    if (activeCategory === "feed.categories.creatorWatch") {
+      // Prefer real market-season metadata when present (seeded/demo feeds)...
+      const staged = viewModel.posts.filter((post) => post.stage !== "NONE");
+      if (staged.length > 0) {
+        return staged;
+      }
+      // ...otherwise (imported feed has no season metadata, and likes/saves are
+      // not populated) rank creators by profile richness (tag count) and take the
+      // top half — a stable, non-empty ~50% "worth watching" subset that holds for
+      // any tag distribution. Deterministic tie-break by id; original order kept.
+      const ranked = [...viewModel.posts].sort(
+        (a, b) => b.tags.length - a.tags.length || a.id.localeCompare(b.id),
+      );
+      const half = Math.max(1, Math.ceil(ranked.length / 2));
+      const watchIds = new Set(ranked.slice(0, half).map((post) => post.id));
+      return viewModel.posts.filter((post) => watchIds.has(post.id));
+    }
+    return viewModel.posts.filter((post) => matchesCategory(post, activeCategory));
+  }, [viewModel.posts, activeCategory]);
 
   return (
     <div className="-mt-3 space-y-4">
-      <PublicFeedSourceNotice error={viewModel.error} postCount={postCount} surface="explore" />
+      <PublicFeedSourceNotice error={viewModel.error} postCount={viewModel.posts.length} surface="explore" />
       <section
         className="sticky z-30 pt-1"
         style={{
@@ -98,29 +147,32 @@ const ExploreView = ({
         }}
       >
         <div className="glass-toolbar flex items-center gap-2 overflow-x-auto px-2 py-2 text-sm">
-          {discoverCategoryKeys.map((categoryKey, index) => (
-            <button
-              className={`whitespace-nowrap rounded-full px-4 py-2 transition duration-200 ${
-                index === 0
-                  ? "liquid-pill liquid-pill-active text-white"
-                  : "liquid-pill text-[#edf2fb]/50 cursor-default"
-              }`}
-              key={categoryKey}
-              type="button"
-              disabled={index !== 0}
-            >
-              {t(categoryKey)}
-            </button>
-          ))}
-          {postCount > 0 ? (
+          {discoverCategoryKeys.map((categoryKey) => {
+            const active = categoryKey === activeCategory;
+            return (
+              <button
+                className={`whitespace-nowrap rounded-full px-4 py-2 transition duration-200 ${
+                  active
+                    ? "liquid-pill liquid-pill-active text-white"
+                    : "liquid-pill text-[#edf2fb]/70 hover:text-white"
+                }`}
+                key={categoryKey}
+                onClick={() => setActiveCategory(categoryKey)}
+                type="button"
+              >
+                {t(categoryKey)}
+              </button>
+            );
+          })}
+          {visiblePosts.length > 0 ? (
             <div className="ml-auto hidden shrink-0 items-center gap-1.5 lg:flex">
-              <FeedStatChip label={t("feed.stat.posts")} value={String(postCount)} tone="info" />
+              <FeedStatChip label={t("feed.stat.posts")} value={String(visiblePosts.length)} tone="info" />
             </div>
           ) : null}
         </div>
       </section>
 
-      <PostsSection onOpenPost={onOpenPost} viewModel={viewModel} />
+      <PostsSection onOpenPost={onOpenPost} posts={visiblePosts} viewModel={viewModel} />
     </div>
   );
 };
@@ -136,11 +188,11 @@ const PublicFeedSourceNotice = ({
 }) => {
   if (error) {
     return (
-      <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/55 px-4 py-3 text-[#f8d48a]">
+      <section className="tone-state-warning rounded-[14px] border px-4 py-3">
         <p className="text-sm font-semibold text-white">
           {surface === "explore" ? "Feed unavailable" : "Trending unavailable"}
         </p>
-        <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{error}</p>
+        <p className="mt-1 text-[length:var(--fs-caption)] leading-5 text-[#9aabc4]">{error}</p>
       </section>
     );
   }
@@ -161,29 +213,28 @@ const FeedStatChip = ({
   value: string;
   tone: "info" | "success";
 }) => {
-  const toneMap = {
-    info: { ring: "border-[#67b8ff]/25", text: "text-[#8ad0ff]", bg: "bg-[#67b8ff]/[0.06]" },
-    success: { ring: "border-[#65ecaf]/25", text: "text-[#8df0c4]", bg: "bg-[#65ecaf]/[0.06]" },
-  };
-  const t = toneMap[tone];
+  const toneClass = tone === "success" ? "tone-state-success" : "tone-state-info";
 
   return (
-    <div className={`flex items-center gap-2 rounded-full border ${t.ring} ${t.bg} px-3 py-1.5 backdrop-blur-sm`}>
+    <div className={`${toneClass} flex items-center gap-2 rounded-full border px-3 py-1.5 backdrop-blur-sm`}>
       <span className="text-[length:var(--fs-micro)] font-semibold tracking-wide text-white">{value}</span>
-      <span className={`text-[length:var(--fs-micro)] ${t.text}`}>{label}</span>
+      <span className="text-[length:var(--fs-micro)]">{label}</span>
     </div>
   );
 };
 
 const PostsSection = ({
   onOpenPost,
+  posts,
   viewModel,
 }: {
   onOpenPost: (postId: string) => void;
+  posts: PostRecord[];
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
   const { t } = useI18n();
-  const { error, loading, posts } = viewModel;
+  const { error, loading } = viewModel;
+  const hasAnyPosts = viewModel.posts.length > 0;
 
   return (
     <section className="section-enter pb-8">
@@ -205,10 +256,17 @@ const PostsSection = ({
         </div>
       ) : null}
 
-      {!loading && !error && posts.length === 0 ? (
+      {!loading && !error && !hasAnyPosts ? (
         <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
           <p className="font-semibold text-white">{t("feed.emptyTitle")}</p>
           <p className="mt-2 text-[#8ea0ba]">{t("feed.emptyBody")}</p>
+        </div>
+      ) : null}
+
+      {!loading && !error && hasAnyPosts && posts.length === 0 ? (
+        <div className="liquid-panel rounded-[28px] px-5 py-5 text-sm text-[#c8d4e6]">
+          <p className="font-semibold text-white">{t("feed.categoryEmptyTitle")}</p>
+          <p className="mt-2 text-[#8ea0ba]">{t("feed.categoryEmptyBody")}</p>
         </div>
       ) : null}
 
@@ -259,11 +317,11 @@ const TrendingView = ({
       <PublicFeedSourceNotice error={error} postCount={creators.length} surface="trending" />
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-white">{t("feed.trendingCreators")}</h1>
-          <p className="mt-1 text-xs text-[#97a7be]">{t("feed.trendingDesc")}</p>
+          <h1 className="type-h3 text-white">{t("feed.trendingCreators")}</h1>
+          <p className="mt-1 text-[length:var(--fs-caption)] text-[color:var(--text-faint)]">{t("feed.trendingDesc")}</p>
         </div>
         {creators.length > 0 ? (
-          <div className="rounded-full border border-[#67b8ff]/20 bg-[#0d1b2a] px-3 py-1.5 text-xs font-medium text-[#a8d8ff]">
+          <div className="tone-state-info rounded-full border px-3 py-1.5 text-[length:var(--fs-caption)] font-medium">
             {creators.length} {creators.length === 1 ? "creator" : "creators"}
           </div>
         ) : null}
