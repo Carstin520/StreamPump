@@ -20,7 +20,6 @@ import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 const creator = findCreator("neo-park");
 
 const SPONSOR_NAME = "Nova Screen";
-const CAMPAIGN_BRIEF = "Nova Screen's sponsored review video reaches 10,000 likes within the campaign window.";
 const TRACK1_BASE = 100_000;
 const TRACK2_BUDGET = 1_000_000;
 const TRACK3_BUDGET = 300_000;
@@ -31,7 +30,17 @@ const TRACK2_CURRENT = 0;
 const FAN_POOL_SHARE = TRACK2_BUDGET * 0.2;
 const FAN_BALANCE = 500_000;
 const STATUS = "FUNDED";
-const DEADLINE = "May 15, 2026";
+
+const localizeEnum = (
+  t: (key: string) => string,
+  prefix: string,
+  value: string | null | undefined,
+) => {
+  if (!value) return value ?? "";
+  const key = `${prefix}.${value}`;
+  const resolved = t(key);
+  return resolved === key ? value : resolved;
+};
 
 const ENDORSERS = [
   { name: "0xA7...91", amount: 50_000 },
@@ -60,7 +69,8 @@ type UserEndorsement = NonNullable<S1PortfolioResponse["s2Endorsements"]>[number
 
 export default function EndorsePage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "zh-CN";
   const [stakeAmount, setStakeAmount] = useState(10_000);
   const [endorsers, setEndorsers] = useState(ENDORSERS);
   const [demoSummary, setDemoSummary] = useState<string | null>(null);
@@ -157,7 +167,7 @@ export default function EndorsePage() {
   const track2Current = campaign
     ? parseAmount(campaign.budgetTracks.track2ActualValue, TRACK2_CURRENT)
     : TRACK2_CURRENT;
-  const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString() : DEADLINE;
+  const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString(dateLocale) : t("endorse.demoDeadline");
   const statusLabel = campaign?.status ?? STATUS;
   const track1Budget = campaign
     ? parseAmount(campaign.budgetTracks.track1BaseUsdc, TRACK1_BASE)
@@ -207,14 +217,14 @@ export default function EndorsePage() {
     : endorsers;
   const visibleTracks = [
     {
-      label: `${t("campaign.track1Label")} · Base`,
+      label: `${t("campaign.track1Label")} · ${t("endorse.trackBase")}`,
       valueLabel: formatCampaignUsdValue(track1Budget),
       settled: campaign?.budgetTracks.track1Claimed ?? true,
       color: "#65ecaf",
       gated: false,
     },
     {
-      label: `${t("campaign.track2Label")} · ${track2Metric}`,
+      label: `${t("campaign.track2Label")} · ${localizeEnum(t, "campaign.metricLabel", track2Metric)}`,
       valueLabel: formatCampaignUsdValue(track2Budget),
       settled: Boolean(campaign?.budgetTracks.track2SettledAt),
       color: "#67b8ff",
@@ -394,14 +404,14 @@ export default function EndorsePage() {
               <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{campaignTitle}</h2>
               {/* Data-truth fix: only render the hardcoded brief in the non-live (demo) case */}
               {!isLiveCampaign ? (
-                <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{CAMPAIGN_BRIEF}</p>
+                <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{t("endorse.demoBrief")}</p>
               ) : (
                 <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{t("endorse.liveBriefPlaceholder")}</p>
               )}
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.metricLabel")}</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {track2Metric}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {localizeEnum(t, "campaign.metricLabel", track2Metric)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
                   <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.cliffLabel")}</p>
@@ -422,7 +432,7 @@ export default function EndorsePage() {
             <section className="liquid-card section-enter flex flex-col items-center gap-6 rounded-[28px] p-8">
               <div className="flex items-center gap-3 self-start">
                 <span className="liquid-pill rounded-full px-3 py-1 text-xs font-medium text-white">
-                  {statusLabel}
+                  {localizeEnum(t, "campaign.statusLabel", statusLabel)}
                 </span>
                 <span className="text-xs text-[#8ea0ba]">{t("endorse.deadlineLabel")} {deadlineLabel}</span>
               </div>
@@ -624,7 +634,7 @@ export default function EndorsePage() {
                         />
                       </div>
                       <p className="mt-1 text-[length:var(--fs-micro)] text-[#8ea0ba]">
-                        {track.settled ? t("endorse.settled") : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${track2Metric.toLowerCase()} · ${pct.toFixed(0)}%`}
+                        {track.settled ? t("endorse.settled") : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${localizeEnum(t, "campaign.metricLabel", track2Metric)} · ${pct.toFixed(0)}%`}
                       </p>
                     </div>
                   );
@@ -668,7 +678,7 @@ export default function EndorsePage() {
                     key={e.name}
                     className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3"
                   >
-                    <span className="font-mono text-xs text-[#8ea0ba]">{e.name}</span>
+                    <span className="font-mono text-xs text-[#8ea0ba]">{e.name === "You" ? t("endorse.you") : e.name}</span>
                     <span className="text-sm font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(e.amount)}
                     </span>
@@ -694,7 +704,7 @@ export default function EndorsePage() {
               </p>
               <div className="mt-4 space-y-2.5">
                 {[
-                  [t("endorse.track2Target"), `${compactNumber(track2Target)} ${track2Metric.toLowerCase()}`],
+                  [t("endorse.track2Target"), `${compactNumber(track2Target)} ${localizeEnum(t, "campaign.metricLabel", track2Metric)}`],
                   [t("endorse.cliff"), `${track2CliffFraction * 100}%`],
                   [t("endorse.fanPool20"), formatCampaignUsdValue(fanPoolShare)],
                   [t("endorse.yourBalance"), `${compactNumber(FAN_BALANCE)} SPUMP`],
@@ -804,7 +814,7 @@ export default function EndorsePage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-[#8ea0ba]">{t("endorse.status")}</span>
                     <span className="text-sm font-semibold text-white">
-                      {userEndorsement.claimedStatus ? t("endorse.claimed") : (userEndorsement.status ?? t("endorse.pending"))}
+                      {userEndorsement.claimedStatus ? t("endorse.claimed") : (userEndorsement.status ? localizeEnum(t, "campaign.statusLabel", userEndorsement.status) : t("endorse.pending"))}
                     </span>
                   </div>
                 </div>

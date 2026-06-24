@@ -23,6 +23,17 @@ import {
 } from "@/lib/routes";
 import { getAccessToken, loadWithPublicFallback } from "@/lib/session-flow";
 
+const localizeEnum = (
+  t: (key: string) => string,
+  prefix: string,
+  value: string | null | undefined,
+) => {
+  if (!value) return value ?? "";
+  const key = `${prefix}.${value}`;
+  const resolved = t(key);
+  return resolved === key ? value : resolved;
+};
+
 type PageState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
@@ -82,6 +93,7 @@ const resolveProposalRouteId = (
 export default function CampaignDetailPage() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "zh-CN";
   const [state, setState] = useState<PageState>({ kind: "loading" });
 
   useEffect(() => {
@@ -201,7 +213,7 @@ export default function CampaignDetailPage() {
                         : t("campaign.viewerMode", { role: state.data.viewerRole })}
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-100">{state.data.proposal.status}</span>
+                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs text-slate-100">{localizeEnum(t, "campaign.statusLabel", state.data.proposal.status)}</span>
                 </div>
                 {state.proofStatus ? (
                   <div className="rounded-2xl border border-[#67b8ff]/20 bg-[#0d1b2a]/55 px-4 py-3 text-sm text-slate-300">
@@ -253,9 +265,9 @@ export default function CampaignDetailPage() {
                 <div className="surface-muted rounded-2xl p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("campaign.metricProgress")}</p>
                   <p className="mt-2 text-sm text-slate-200">
-                    {state.data.proposal.track2MetricType}: {state.data.proposal.track2ActualValue ?? t("campaign.pendingReport")} / {state.data.proposal.track2TargetValue}
+                    {localizeEnum(t, "campaign.metricLabel", state.data.proposal.track2MetricType)}: {state.data.proposal.track2ActualValue ?? t("campaign.pendingReport")} / {state.data.proposal.track2TargetValue}
                   </p>
-                  <p className="mt-2 text-xs text-slate-400">{t("campaign.deadline")} {formatIsoLabel(state.data.proposal.deadlineAt)}</p>
+                  <p className="mt-2 text-xs text-slate-400">{t("campaign.deadline")} {formatIsoLabel(state.data.proposal.deadlineAt, dateLocale)}</p>
                 </div>
               </Panel>
             </div>
@@ -270,9 +282,9 @@ export default function CampaignDetailPage() {
                   : t("campaign.liveApiDescription")}
               </p>
               <div className="surface-muted rounded-2xl p-4 text-sm text-slate-300">
-                <p>{t("campaign.oracleSync")} {state.data.proposal.oracleSyncStatus ?? t("campaign.oracleSyncPublic")}</p>
-                <p className="mt-2">{t("campaign.track2Settled")} {state.data.proposal.track2SettledAt ? formatIsoLabel(state.data.proposal.track2SettledAt) : t("campaign.notSettled")}</p>
-                <p className="mt-2">{t("campaign.track3Settled")} {state.data.proposal.track3SettledAt ? formatIsoLabel(state.data.proposal.track3SettledAt) : t("campaign.notSettledPrivate")}</p>
+                <p>{t("campaign.oracleSync")} {state.data.proposal.oracleSyncStatus ? localizeEnum(t, "campaign.oracleLabel", state.data.proposal.oracleSyncStatus) : t("campaign.oracleSyncPublic")}</p>
+                <p className="mt-2">{t("campaign.track2Settled")} {state.data.proposal.track2SettledAt ? formatIsoLabel(state.data.proposal.track2SettledAt, dateLocale) : t("campaign.notSettled")}</p>
+                <p className="mt-2">{t("campaign.track3Settled")} {state.data.proposal.track3SettledAt ? formatIsoLabel(state.data.proposal.track3SettledAt, dateLocale) : t("campaign.notSettledPrivate")}</p>
               </div>
               <div className="grid gap-3">
                 {isDemoProposal ? (
