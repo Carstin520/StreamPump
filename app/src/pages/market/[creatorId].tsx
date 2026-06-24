@@ -60,6 +60,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
   const priceHistory = useMemo(
     () =>
       createMockPriceHistory({
@@ -73,12 +74,12 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">当前应援价</p>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{t("common.currentPrice")}</p>
           <p className="mt-1.5 text-[32px] font-bold leading-none tracking-[-0.05em] text-white md:text-[40px]">
             {formatSpump(profile.creator.currentPriceSpump)}
           </p>
           <p className="mt-2 text-xs text-[#8ea0ba]">
-            下一档: {formatSpump(profile.creator.nextPriceSpump)}
+            {t("market.nextTier")}: {formatSpump(profile.creator.nextPriceSpump)}
           </p>
         </div>
         <StagePill stage={profile.creator.stage} />
@@ -92,6 +93,8 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
           points={priceHistory}
         />
       </div>
+      {/* Chart note: current price is real on-chain; history curve is synthetic */}
+      <p className="mt-2 text-[length:var(--fs-micro)] text-[#5a6d87]">{t("market.priceChartNote")}</p>
     </div>
   );
 }
@@ -101,16 +104,17 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
 /* ------------------------------------------------------------------ */
 
 function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
   const grad = formatGraduationProgressPercent(profile.creator.graduationProgressBps);
   const stats = [
-    { label: "Supply", value: formatS1Amount(profile.creator.s1Supply), color: "text-white" },
-    { label: "Holders", value: compactNumber(profile.creator.holderCount), color: "text-[#67b8ff]" },
+    { label: t("market.supply"), value: formatS1Amount(profile.creator.s1Supply), color: "text-white" },
+    { label: t("market.holders"), value: compactNumber(profile.creator.holderCount), color: "text-[#67b8ff]" },
     {
-      label: "Graduation",
+      label: t("market.graduation"),
       value: `${grad}%`,
       color: grad >= 100 ? "text-[color:var(--state-success)]" : "text-[color:var(--state-warning)]",
     },
-    { label: "Pool", value: formatSpump(profile.creator.supporterPoolSpump), color: "text-white" },
+    { label: t("market.pool"), value: formatSpump(profile.creator.supporterPoolSpump), color: "text-white" },
   ];
 
   return (
@@ -138,25 +142,26 @@ function BuyoutSummary({
   creatorWallet: string;
   href?: string;
 }) {
+  const { t } = useI18n();
   const status = buyout?.status ?? "NONE";
   const statusLabel: Record<string, string> = {
-    NONE: "No buyout",
-    OFFER_OPEN: "Offers open",
-    ACCEPTED: "Accepted",
-    EXECUTION_PENDING: "Execution pending",
-    GRADUATED: "Graduated",
+    NONE: t("market.buyoutStatus.none"),
+    OFFER_OPEN: t("market.buyoutStatus.offerOpen"),
+    ACCEPTED: t("market.buyoutStatus.accepted"),
+    EXECUTION_PENDING: t("market.buyoutStatus.executionPending"),
+    GRADUATED: t("market.buyoutStatus.graduated"),
   };
 
   return (
     <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Buyout</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.buyoutLabel")}</p>
           <p className="mt-1 text-sm font-semibold text-white">{statusLabel[status] ?? status}</p>
         </div>
         {buyout?.latestOfferUsdc ? (
           <div className="text-right">
-            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Latest offer</p>
+            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("market.latestOffer")}</p>
             <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(buyout.latestOfferUsdc)}</p>
           </div>
         ) : null}
@@ -165,7 +170,7 @@ function BuyoutSummary({
         className="mt-2 inline-flex items-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
         href={href ?? `/buyout/${creatorWallet}`}
       >
-        Open buyout room →
+        {t("market.openBuyoutRoom")}
       </Link>
     </div>
   );
@@ -182,6 +187,7 @@ function PositionCard({
   portfolio: S1PortfolioResponse | null;
   profile: S1MarketProfileResponse;
 }) {
+  const { t } = useI18n();
   const pos = findPortfolioPosition(portfolio, profile.creator.creatorWallet);
 
   return (
@@ -191,19 +197,19 @@ function PositionCard({
           S1
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Your position</p>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.yourPosition")}</p>
           <p className="mt-0.5 text-base font-bold tracking-[-0.03em] text-white">
-            {pos ? `${formatS1Amount(pos.internalTokenBalance)} S1` : "No position"}
+            {pos ? `${formatS1Amount(pos.internalTokenBalance)} S1` : t("market.noPosition")}
           </p>
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold text-white">{pos ? formatSpump(pos.spumpCostBasis) : "—"}</p>
-          <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">Cost basis</p>
+          <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("market.costBasis")}</p>
         </div>
       </div>
       {pos?.estimatedClaimableUsdc && Number(pos.estimatedClaimableUsdc) > 0 ? (
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.04] pt-2">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">Claimable</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("market.claimable")}</p>
           <p className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAmount(pos.estimatedClaimableUsdc)}</p>
         </div>
       ) : null}
@@ -240,6 +246,7 @@ function TradePanel({
   profile: S1MarketProfileResponse;
   sessionWallet: string | null;
 }) {
+  const { t } = useI18n();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(10);
   const demoFlow = useDemoActionFlow();
@@ -285,12 +292,12 @@ function TradePanel({
   const demoBusy = demoFlow.state.status === "submitted";
 
   const ctaLabel = (): string => {
-    if (!wallet.connected) return "Connect wallet";
-    if (!sessionToken || isLocalDemoSession) return "Sign in with wallet session";
-    if (walletMismatch) return "Wallet mismatch";
-    if (side === "sell" && !hasPosition) return "No position to sell";
-    if (sellOverLimit) return "Amount exceeds position";
-    return side === "buy" ? "Buy S1" : "Sell S1";
+    if (!wallet.connected) return t("market.connectWallet");
+    if (!sessionToken || isLocalDemoSession) return t("market.signInWithWallet");
+    if (walletMismatch) return t("market.walletMismatch");
+    if (side === "sell" && !hasPosition) return t("market.noPositionToSell");
+    if (sellOverLimit) return t("market.amountExceedsPosition");
+    return side === "buy" ? t("market.buySide") : t("market.sellSide");
   };
 
   return (
@@ -310,7 +317,7 @@ function TradePanel({
             onClick={() => { setSide(s); flow.reset(); demoFlow.reset(); }}
             type="button"
           >
-            {s === "buy" ? "Buy" : "Sell"}
+            {s === "buy" ? t("market.tabBuy") : t("market.tabSell")}
           </button>
         ))}
       </div>
@@ -318,7 +325,7 @@ function TradePanel({
       {/* Amount input */}
       <div className="mt-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">Amount</span>
+          <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.amount")}</span>
           <input
             className="w-20 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-right text-lg font-bold tracking-[-0.03em] text-white outline-none transition focus:border-white/[0.16]"
             max={side === "sell" && hasPosition ? maxSell : undefined}
@@ -355,7 +362,7 @@ function TradePanel({
               onClick={() => setAmount(maxSell)}
               type="button"
             >
-              Max
+              {t("market.maxAmount")}
             </button>
           ) : null}
         </div>
@@ -363,17 +370,17 @@ function TradePanel({
 
       {/* Price info */}
       <div className="mt-4 space-y-1.5 rounded-xl border border-white/[0.04] bg-white/[0.015] p-3">
-        <Row label="当前应援价" value={formatSpump(profile.creator.currentPriceSpump)} />
-        <Row label="下一档" value={formatSpump(profile.creator.nextPriceSpump)} />
+        <Row label={t("common.currentPrice")} value={formatSpump(profile.creator.currentPriceSpump)} />
+        <Row label={t("market.nextTier")} value={formatSpump(profile.creator.nextPriceSpump)} />
         <div className="h-px bg-white/[0.04]" />
         <Row
-          label={side === "buy" ? "Est. cost" : "Est. return"}
+          label={side === "buy" ? t("market.estCost") : t("market.estReturn")}
           value={`~${estimatedCost.toFixed(3)} SPUMP`}
           bold
         />
         {sellOverLimit ? (
           <p className="mt-2 text-[length:var(--fs-micro)] font-medium text-[#ff8a78]">
-            Sell amount cannot exceed your {formatS1Amount(String(maxSell))} S1 position.
+            {t("market.sellOverLimitMsg", { balance: formatS1Amount(String(maxSell)) })}
           </p>
         ) : null}
       </div>
@@ -395,25 +402,21 @@ function TradePanel({
             type="button"
           >
             {demoBusy
-              ? "Previewing..."
+              ? t("market.previewing")
               : demoFlow.state.status === "success"
-                ? side === "buy" ? "Preview bought" : "Preview sold"
-                : side === "buy" ? "Preview Buy S1" : "Preview Sell S1"}
+                ? side === "buy" ? t("market.previewBought") : t("market.previewSold")
+                : side === "buy" ? t("market.previewBuyS1") : t("market.previewSellS1")}
           </button>
           <DemoActionStatusCard
             amountLabel={`${amount} S1 · ~${estimatedCost.toFixed(3)} SPUMP`}
-            confirmLabel={side === "buy" ? "Confirm preview buy" : "Confirm preview sell"}
-            description={
-              side === "buy"
-                ? "Confirm this local preview buy. The page position updates locally; no backend builder, wallet signature, or Solana transaction is used."
-                : "Confirm this local preview sell. The page position updates locally; no backend builder, wallet signature, or Solana transaction is used."
-            }
+            confirmLabel={side === "buy" ? t("market.confirmPreviewBuy") : t("market.confirmPreviewSell")}
+            description={side === "buy" ? t("market.previewBuyDesc") : t("market.previewSellDesc")}
             onCancel={demoFlow.reset}
             onConfirm={executeDemoTrade}
             onRetry={demoFlow.retry}
             state={demoFlow.state}
-            successLabel={side === "buy" ? "Preview bought" : "Preview sold"}
-            title={side === "buy" ? "Preview buy confirmation" : "Preview sell confirmation"}
+            successLabel={side === "buy" ? t("market.previewBought") : t("market.previewSold")}
+            title={side === "buy" ? t("market.previewBuyTitle") : t("market.previewSellTitle")}
           />
         </>
       ) : !wallet.connected ? (
@@ -423,7 +426,7 @@ function TradePanel({
             className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
             href={`/login?next=/market/${creatorWallet}`}
           >
-            Sign in to trade
+            {t("market.signInToTrade")}
           </Link>
         </div>
       ) : !sessionToken || isLocalDemoSession ? (
@@ -431,7 +434,7 @@ function TradePanel({
           className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[length:var(--fs-caption)] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
           href={`/login?next=/market/${creatorWallet}`}
         >
-          {isLocalDemoSession ? "Sign in with wallet session" : "Sign in to trade"}
+          {isLocalDemoSession ? t("market.signInWithWallet") : t("market.signInToTrade")}
         </Link>
       ) : (
         <button
@@ -444,14 +447,17 @@ function TradePanel({
           onClick={() => void executeTrade()}
           type="button"
         >
-          {busy ? "Processing..." : ctaLabel()}
+          {busy ? t("common.processing") : ctaLabel()}
         </button>
       )}
+
+      {/* Capped / non-proportional discovery reward disclaimer */}
+      <p className="mt-3 text-[length:var(--fs-micro)] leading-relaxed text-[#5a6d87]">{t("market.cappedDisclaimer")}</p>
 
       {/* Shared transaction drawer */}
       <div className="mt-3">
         <S1TransactionDrawer
-          actionLabel={side === "buy" ? "Buy S1" : "Sell S1"}
+          actionLabel={side === "buy" ? t("market.buySide") : t("market.sellSide")}
           amountLabel={`${amount} S1`}
           flow={flow.state}
           onClose={flow.reset}
