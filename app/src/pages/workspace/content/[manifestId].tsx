@@ -458,7 +458,7 @@ export default function ManifestDetailPage() {
                 <span className={`rounded-full px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
                   pub.verificationStatus === "VERIFIED"
                     ? "bg-[#65ecaf]/10 text-[#8df0c4]"
-                    : "bg-[#f3b33e]/10 text-[#f3c66e]"
+                    : "bg-[#f3b33e]/10"
                 }`}>
                   {pub.verificationStatus}
                 </span>
@@ -541,17 +541,17 @@ export default function ManifestDetailPage() {
         {activeSection === "assets" && (
           <div className="section-enter space-y-4">
             {(assetsWithIssues.length > 0 || assetsWaiting.length > 0) && (
-              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
+              <div className="rounded-2xl border tone-state-warning px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Media recovery status</p>
+                    <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">Media recovery status</p>
                     <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
                       {assetsWithIssues.length > 0
                         ? `${assetsWithIssues.length} asset(s) need operator/user recovery. Upload replacement files here, then finalize again after storage is healthy.`
                         : `${assetsWaiting.length} asset(s) are still waiting on upload, processing, ingest, or delivery updates.`}
                     </p>
                   </div>
-                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f3c66e]">
+                  <span className="rounded-full border border-[#f3b33e]/25 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
                     {assetsWithIssues.length > 0 ? "RECOVERY_NEEDED" : "PROCESSING"}
                   </span>
                 </div>
@@ -650,7 +650,7 @@ export default function ManifestDetailPage() {
         {activeSection === "sponsor" && (
           <div className="section-enter space-y-4">
             {!["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && (
-              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#f3b33e]/[0.06] px-4 py-3 text-xs text-[#f3c66e]">
+              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#f3b33e]/[0.06] px-4 py-3 text-xs">
                 {t("workspace.sponsorshipAfterDraft")}
               </div>
             )}
@@ -685,8 +685,8 @@ export default function ManifestDetailPage() {
                   <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
                 </label>
               </div>
-              <div className="rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/35 px-4 py-3">
-                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Track 3 CPS operator-gated</p>
+              <div className="rounded-2xl border tone-state-warning px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">Track 3 CPS operator-gated</p>
                 <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
                   Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
                 </p>

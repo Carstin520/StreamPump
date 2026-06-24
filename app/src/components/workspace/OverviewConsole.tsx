@@ -30,7 +30,7 @@ import {
 
 const STAGE_CONSOLE_TITLE: Record<CreatorSeasonState, string> = {
   S1_DISCOVERY: "S1 Discovery",
-  S1_BUYOUT: "S1 Buyout Watch",
+  S1_BUYOUT: "S1 毕业赞助",
   S2_ACTIVE: "S2 Sponsored Creator",
 };
 
@@ -602,7 +602,7 @@ const statusToneClass = (tone: "ready" | "progress" | "wait" | "needs") => {
     case "progress":
       return "border-[#67b8ff]/22 bg-[#0e1726]/80 text-[#8ad0ff]";
     case "needs":
-      return "border-[#f3b33e]/25 bg-[#1a1408]/80 text-[#f3c66e]";
+      return "tone-state-warning";
     default:
       return "border-white/[0.08] bg-white/[0.04] text-[#9aabc4]";
   }

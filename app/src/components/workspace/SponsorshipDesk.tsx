@@ -405,7 +405,7 @@ const DeskHeader = () => (
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.22em] text-[#7486a1]">Workspace</p>
-          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2 py-0.5 font-mono text-[length:var(--fs-nano)] font-semibold text-[#f8d48a]">
+          <span className="rounded-full border tone-state-warning px-2 py-0.5 font-mono text-[length:var(--fs-nano)] font-semibold">
             LOCAL FIXTURES
           </span>
         </div>

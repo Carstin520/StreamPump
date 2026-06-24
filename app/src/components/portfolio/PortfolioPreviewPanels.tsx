@@ -104,7 +104,7 @@ export const PreviewSnapshotStrip = ({ portfolio }: { portfolio: PreviewPortfoli
     <SnapshotTile accent="#67b8ff" hint={`${portfolio.holdings.filter((h) => h.creator.state === "S1_DISCOVERY").length} discovery · ${portfolio.holdings.filter((h) => h.creator.state === "S1_BUYOUT").length} buyout`} label="Preview S1 Holdings" value={String(portfolio.s1HoldingsCount)} />
     <SnapshotTile accent="#65ecaf" hint="Active campaigns" label="Preview S2 Exposure" value={portfolio.s2ExposureUsd > 0 ? formatUsd(portfolio.s2ExposureUsd) : "—"} />
     <SnapshotTile accent="#ffb38a" hint={`${portfolioClaimWindows.length} ready · ${portfolioUpcomingClaims.length} pending`} label="Preview Claimable" tone="positive" value={formatUsd(portfolio.claimableRewardsUsd)} />
-    <SnapshotTile accent="#de402a" hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"} label="Preview Buyout Claims" tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"} value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"} />
+    <SnapshotTile accent="#de402a" hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"} label="毕业赞助 · 可领发现奖励（封顶）" tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"} value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"} />
     <SnapshotTile accent="#8ad0ff" hint={`+${portfolio.dailySpumpReward}/day streak`} label="Preview SPUMP" value={compactNumber(portfolio.spumpBalance)} />
   </section>
 );
@@ -129,7 +129,7 @@ export const PreviewPortfolioHero = ({ portfolio }: { portfolio: PreviewPortfoli
   return (
     <div className="rounded-[16px] border border-white/[0.05] bg-white/[0.02] p-3.5 md:p-4">
       <div className="flex items-center gap-2 mb-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="rounded border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">Preview</span>
         <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock portfolio from fixture data</span>
       </div>
       <div className="flex items-start justify-between gap-3">
@@ -164,7 +164,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="rounded border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">Preview</span>
         <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock fixture data — not from chain</span>
       </div>
       <div className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
@@ -248,7 +248,7 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+        <span className="rounded border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">Preview</span>
         <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Mock watchlist from fixture creators</span>
       </div>
       <div className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
@@ -309,7 +309,7 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
 export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => (
   <div className="space-y-3">
     <div className="flex items-center gap-2">
-      <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">Preview</span>
+      <span className="rounded border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">Preview</span>
       <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Local preview only — real claims require the rewards ledger</span>
     </div>
     <div className="grid gap-3 md:grid-cols-2">

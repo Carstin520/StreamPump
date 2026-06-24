@@ -78,17 +78,17 @@ export default function RewardsPage() {
             title="Daily reward claim is transaction-wired; missions remain preview"
           />
 
-          <section className="glass-card section-enter border-[#f3b33e]/20 px-4 py-3">
+          <section className="glass-card section-enter border-[color:color-mix(in_srgb,var(--state-warning)_22%,transparent)] px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#f3b33e]">Mixed rewards ledger</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[color:var(--state-warning)]">Mixed rewards ledger</p>
                 <p className="mt-1 text-sm font-semibold text-white">Daily claim is live-wired; mission progress is still preview.</p>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-[#95a6bf]">
                   Use a signed-in managed wallet for one-click backend signing, or an external wallet for the normal wallet-sign flow.
                   Mission rewards still need live claim records and abuse controls before they affect holdings.
                 </p>
               </div>
-              <span className="w-fit rounded-full border border-[#f3b33e]/30 bg-[#f3b33e]/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f8d48a]">
+              <span className="tone-state-warning w-fit rounded-full border px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
                 SEEDED_DEMO
               </span>
             </div>
@@ -115,7 +115,7 @@ export default function RewardsPage() {
                       <p className="text-xs font-semibold text-white">Level {CURRENT_LEVEL}</p>
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#67b8ff]/20 bg-[#67b8ff]/8 px-2 py-0.5">
                         <span className="text-[length:var(--fs-nano)] font-medium text-[#8ec8ff]">{locale === "zh" ? SCOUT_TIER_ZH : SCOUT_TIER_LABEL}</span>
-                        <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1 py-px text-[7px] font-semibold uppercase tracking-[0.08em] text-[#f3c66e]">
+                        <span className="rounded border tone-state-warning px-1 py-px text-[7px] font-semibold uppercase tracking-[0.08em]">
                           Mock
                         </span>
                       </span>

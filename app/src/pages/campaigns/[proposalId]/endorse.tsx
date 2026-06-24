@@ -833,10 +833,10 @@ const EndorsementPreviewNotice = ({
   isLiveCampaign: boolean;
   proposalId: string;
 }) => (
-  <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
+  <section className="rounded-[20px] border tone-state-warning px-4 py-3">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">
+        <p className="text-xs uppercase tracking-[0.2em]">
           {isLiveCampaign ? "Seeded chain/API path" : "Local simulator"}
         </p>
         <p className="mt-1 text-sm font-semibold text-white">
@@ -849,7 +849,7 @@ const EndorsementPreviewNotice = ({
           {error ? ` API fallback reason: ${error}` : ""}
         </p>
       </div>
-      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f8d48a]">
+      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
         {proposalId || "proposal pending"}
       </span>
     </div>

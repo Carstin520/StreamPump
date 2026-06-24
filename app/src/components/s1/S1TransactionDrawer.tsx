@@ -130,7 +130,7 @@ export const S1TransactionDrawer = ({
       ) : null}
 
       {projectionLag ? (
-        <p className="mt-2 rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/60 px-2.5 py-1.5 text-[length:var(--fs-micro)] text-[#f3c66e]">
+        <p className="mt-2 rounded-lg border tone-state-warning px-2.5 py-1.5 text-[length:var(--fs-micro)]">
           Transaction confirmed on-chain. Read model may lag until the indexer catches up.
         </p>
       ) : null}
@@ -180,8 +180,8 @@ export const WalletSessionAlert = ({
   if (connectedWallet === sessionWallet) return null;
 
   return (
-    <div className="rounded-lg border border-[#f3b33e]/25 bg-[#1a1408]/70 px-3 py-2">
-      <p className="text-[length:var(--fs-micro)] font-semibold text-[#f3c66e]">Wallet mismatch</p>
+    <div className="rounded-lg border tone-state-warning px-3 py-2">
+      <p className="text-[length:var(--fs-micro)] font-semibold">Wallet mismatch</p>
       <p className="mt-0.5 text-[length:var(--fs-micro)] leading-relaxed text-[#c9a044]">
         Connected wallet ({shortenWallet(connectedWallet)}) differs from your signed-in session ({shortenWallet(sessionWallet)}).
         Switch wallets or sign in again to trade.

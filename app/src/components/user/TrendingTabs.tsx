@@ -218,7 +218,7 @@ const GraduationWatchRow = ({
       </div>
       <div className="hidden items-center gap-3 sm:flex">
         <div className="text-right">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">Price</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">应援价</p>
           <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
         </div>
         <div className="w-20">

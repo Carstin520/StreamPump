@@ -58,8 +58,8 @@ function SponsorOfferLockNotice() {
     remainingMs === null ? "--" : String(Math.floor((remainingMs % 3_600_000) / 60_000));
 
   return (
-    <div className="rounded-[14px] border border-[#f3b33e]/18 bg-[#1f1708]/45 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+    <div className="rounded-[14px] border tone-state-warning px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em]">
         S1 Buyout 报价锁定
       </p>
       <p className="mt-1 text-sm text-[#f5d391]">锁定期剩余 {hours} 小时 {minutes} 分钟</p>

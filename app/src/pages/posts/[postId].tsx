@@ -81,7 +81,7 @@ const PostDetailUnavailableState = ({
   title: string;
 }) => (
   <main className="relative flex min-h-screen items-center justify-center bg-[#090d14] px-4 py-5 text-white">
-    <section className="w-full max-w-[520px] rounded-[18px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-5 py-4 text-[#f8d48a]">
+    <section className="w-full max-w-[520px] rounded-[18px] border tone-state-warning px-5 py-4">
       <p className="text-base font-semibold text-white">{title}</p>
       <p className="mt-2 text-sm leading-6 text-[#c8d4e6]">{detail}</p>
     </section>

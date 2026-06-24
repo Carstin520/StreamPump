@@ -306,7 +306,7 @@ const CampaignSourceNotice = ({
   <section
     className={`rounded-2xl border px-4 py-3 ${
       isDemoProposal
-        ? "border-[#f3b33e]/25 bg-[#1f1708]/60"
+        ? "tone-state-warning"
         : "border-[#67b8ff]/20 bg-[#0d1b2a]/55"
     }`}
   >
@@ -320,7 +320,7 @@ const CampaignSourceNotice = ({
       <span
         className={`rounded-full border px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold ${
           isDemoProposal
-            ? "border-[#f3b33e]/30 bg-[#2a1f0b] text-[#f8d48a]"
+            ? "border-[#f3b33e]/30 bg-[#2a1f0b]"
             : "border-[#67b8ff]/25 bg-[#0d2236] text-[#a8d8ff]"
         }`}
       >

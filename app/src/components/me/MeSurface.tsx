@@ -116,7 +116,7 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
           />
           <div className="min-w-0 flex-1 pb-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-bold tracking-[-0.03em] text-white sm:text-2xl">{currentUser.name}</h1>
+              <h1 className="type-h3 truncate font-bold text-white">{currentUser.name}</h1>
               {influence ? <InfluenceChip influence={influence} /> : null}
               {currentUser.sessionMode ? (
                 <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
@@ -310,7 +310,7 @@ const NoteCard = ({ note }: { note: UserNoteRecord }) => (
 
 const MockPreviewBadge = () => (
   <div className="flex items-center gap-2">
-    <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
+    <span className="tone-state-warning rounded border px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">
       Mock Preview
     </span>
     <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Derived from feed posts — not from user action history</span>

@@ -206,7 +206,7 @@ const ProfileHero = ({
           <span className="h-1 w-1 rounded-full bg-white/20" />
           <span className="truncate">{market.levelLabel}</span>
         </div>
-        <h1 className="mt-1.5 truncate text-[22px] font-semibold tracking-[-0.04em] text-white md:text-[26px]">
+        <h1 className="type-h3 mt-1.5 truncate font-semibold text-white">
           {creator.name}
         </h1>
         <div className="mt-0.5 flex items-center gap-2 text-xs text-[#92a3bc]">
@@ -248,26 +248,26 @@ const ProfileHero = ({
 const StatusBadge = ({ market }: { market: MarketModel }) => {
   if (market.state === "S2_ACTIVE") {
     return (
-      <span className="flex items-center gap-1.5 rounded-full border border-[#65ecaf]/30 bg-[#0e1f17]/80 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8df0c4] backdrop-blur-md">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#65ecaf]" />
+      <span className="tone-stage-s2 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--stage-s2)]" />
         S2 Profile
       </span>
     );
   }
   if (market.state === "S1_BUYOUT") {
     return (
-      <span className="flex items-center gap-1.5 rounded-full border border-[#de402a]/35 bg-[#1f120e]/80 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#ff8a78] backdrop-blur-md">
+      <span className="tone-stage-buyout flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
         <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#de402a] opacity-60" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#de402a]" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--stage-buyout)] opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--stage-buyout)]" />
         </span>
         Buyout Watch
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-1.5 rounded-full border border-[#67b8ff]/30 bg-[#0e1726]/80 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff] backdrop-blur-md">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#67b8ff]" />
+    <span className="tone-stage-s1 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--stage-s1)]" />
       S1 Profile · {market.graduationPct}%
     </span>
   );
@@ -291,9 +291,9 @@ const MarketStatsBar = ({
         <StatCell label="24h Change" tone={positive ? "positive" : "negative"}>
           <span className="flex items-center gap-1">
             {positive ? (
-              <ArrowUpIcon className="h-3 w-3 text-[#65ecaf]" />
+              <ArrowUpIcon className="h-3 w-3 text-[color:var(--state-success)]" />
             ) : (
-              <ArrowDownIcon className="h-3 w-3 text-[#f67263]" />
+              <ArrowDownIcon className="h-3 w-3 text-[color:var(--state-danger)]" />
             )}
             {positive ? "+" : ""}
             {market.change24hPct.toFixed(2)}%
@@ -350,9 +350,9 @@ const StatCell = ({
     <div
       className={`mt-1 whitespace-nowrap text-sm font-semibold tracking-[-0.02em] ${
         tone === "positive"
-          ? "text-[#65ecaf]"
+          ? "text-[color:var(--state-success)]"
           : tone === "negative"
-            ? "text-[#f67263]"
+            ? "text-[color:var(--state-danger)]"
             : "text-white"
       }`}
     >
@@ -388,12 +388,12 @@ const PriceHistoryPanel = ({
             <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Market History</p>
             <h3 className="mt-1 text-sm font-semibold text-white">Projection pending</h3>
           </div>
-          <span className="rounded-full border border-[#f3b33e]/25 bg-[#1f1708]/60 px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
+          <span className="tone-state-warning rounded-full border px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">
             Content only
           </span>
         </header>
         <div className="px-4 py-10 text-center text-xs leading-5 text-[#8ea0ba]">
-          This public profile is derived from feed content. S1 price, supply, holders, and graduation history require CreatorMarketProjection from the market API.
+          This public profile is derived from feed content. S1 势能/供应, holders, and graduation history require CreatorMarketProjection from the market API.
         </div>
       </section>
     );
@@ -529,7 +529,7 @@ const BuyPanel = ({
         </div>
 
         <div className="space-y-1.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <SummaryRow label="Avg price" value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
+          <SummaryRow label="平均投入" value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
           <SummaryRow accent label="Estimated cost" value={hasMarketProjection ? `${buyPreview.cost} SPUMP` : "—"} />
           <SummaryRow
             label="You will hold"
@@ -537,7 +537,7 @@ const BuyPanel = ({
             sublabel={hasMarketProjection ? `+${buyPreview.amount} new` : undefined}
           />
           <SummaryRow
-            label="Price after buy"
+            label="投入后档位"
             value={hasMarketProjection ? `${buyPreview.priceAfter} SPUMP` : "—"}
             sublabel={
               hasMarketProjection
@@ -594,7 +594,7 @@ const BuyPanel = ({
                 ? "Market Projection Pending"
                 : disabled
                 ? market.state === "S1_BUYOUT"
-                  ? "Buyout Live · Buy Locked"
+                  ? "毕业赞助进行中 · 应援暂停"
                   : "Graduated · S2 Active"
                 : "Preview Buy"}
             </button>
@@ -619,7 +619,7 @@ const BuyPanel = ({
           <p className="text-center text-[length:var(--fs-micro)] text-[#5a6b82]">
             {hasMarketProjection
               ? "Local preview only. Open a seeded market route for transaction builders."
-              : "Public content feed does not provide S1 price, supply, holders, or buyout truth."}
+              : "Public content feed does not provide S1 势能/供应, holders, or graduation truth."}
           </p>
         ) : null}
       </div>

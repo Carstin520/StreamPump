@@ -66,7 +66,7 @@ function OfferCard({
   return (
     <div className="relative">
       {isTop && (
-        <span className="absolute -top-2.5 right-5 z-10 rounded-full border border-[#f3b33e]/25 bg-[#1a1408] px-2.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] text-[#f3c66e]">
+        <span className="absolute -top-2.5 right-5 z-10 rounded-full border tone-state-warning px-2.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em]">
           Highest
         </span>
       )}
@@ -87,7 +87,7 @@ function OfferCard({
             <div>
               <p className="text-[length:var(--fs-caption)] font-semibold text-white">{offer.sponsor}</p>
               <p className="text-[length:var(--fs-micro)] text-[#6f8099]">{offer.time}</p>
-              <p className="mt-1 text-[length:var(--fs-micro)] font-medium text-[#f3c66e]">
+              <p className="mt-1 text-[length:var(--fs-micro)] font-medium">
                 <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
               </p>
             </div>
@@ -145,7 +145,7 @@ function ConfirmModal({
         <p className="mt-0.5 text-[length:var(--fs-overline)] text-[#9aabc4]">
           Accept ${fmt(offer.amount)} USDC from {offer.sponsor}
         </p>
-        <p className="mt-2 rounded-lg border border-[#f3b33e]/15 bg-[#1f1708]/55 px-3 py-2 text-[length:var(--fs-micro)] font-medium text-[#f3c66e]">
+        <p className="mt-2 rounded-lg border tone-state-warning px-3 py-2 text-[length:var(--fs-micro)] font-medium">
           <OfferLockCountdown initialHours={offer.lockHoursRemaining} />
         </p>
 
@@ -284,7 +284,7 @@ export default function BuyoutPage() {
                         ${fmt(o.amount)}
                       </p>
                       {i === 0 && (
-                        <span className="mt-1 inline-block rounded-md border border-[#f3b33e]/20 bg-[#1a1408]/70 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#f3c66e]">
+                        <span className="mt-1 inline-block rounded-md border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-medium">
                           Best
                         </span>
                       )}

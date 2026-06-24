@@ -61,9 +61,9 @@ export const PostCard = ({
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <img alt={post.creatorName} className="h-6 w-6 rounded-full object-cover" src={post.creatorAvatarSrc} />
-              <span className="truncate text-xs text-[#cbd7e8]">{post.creatorName}</span>
+              <span className="truncate text-[length:var(--fs-caption)] text-[#cbd7e8]">{post.creatorName}</span>
             </div>
-            <span className="shrink-0 text-xs text-[#8ea0ba]">
+            <span className="shrink-0 text-[length:var(--fs-caption)] text-[#8ea0ba]">
               {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : "metrics pending"}
             </span>
           </div>

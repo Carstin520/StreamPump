@@ -489,7 +489,7 @@ export default function IntentDetailPage() {
           <div className="flex items-center gap-3 rounded-2xl border border-[#f3b33e]/25 bg-[#f3b33e]/[0.06] px-4 py-3">
             <WarningIcon className="h-5 w-5 shrink-0 text-[#f3b33e]" />
             <div>
-              <p className="text-sm font-medium text-[#f3c66e]">钱包不匹配</p>
+              <p className="text-sm font-medium">钱包不匹配</p>
               <p className="text-xs text-[#8ea0ba]">
                 当前: {shortenWallet(connectedWallet)} · 所需: {shortenWallet(requiredWallet)}
               </p>
@@ -648,8 +648,8 @@ export default function IntentDetailPage() {
             Operator / Debug Fallback
           </summary>
           <div className="space-y-4 border-t border-white/[0.06] p-4">
-            <div className="rounded-xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-3 py-2">
-              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#f3c66e]">Operator-only path</p>
+            <div className="rounded-xl border tone-state-warning px-3 py-2">
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em]">Operator-only path</p>
               <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#9aabc4]">
                 Use these pasted-signature controls only for controlled demos, wallet adapter failures, or backend bundle verification. Normal creator/sponsor users should use the wallet signing buttons above.
               </p>

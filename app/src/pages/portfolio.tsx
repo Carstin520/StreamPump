@@ -278,7 +278,7 @@ function PositionRow({
 
 function DisabledClaimPill({ label = "Demo only" }: { label?: string }) {
   return (
-    <span className="rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#f3c66e]">
+    <span className="rounded-lg border tone-state-warning px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold">
       {label}
     </span>
   );
@@ -385,7 +385,7 @@ function ClaimQueue({
   return (
     <div className="space-y-3">
       {!claimsEnabled ? (
-        <div className="rounded-[12px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-3 py-2 text-[length:var(--fs-micro)] leading-5 text-[#f3c66e]">
+        <div className="rounded-[12px] border tone-state-warning px-3 py-2 text-[length:var(--fs-micro)] leading-5">
           Local demo sessions show discovery-reward eligibility only. A real claim requires a matching wallet session, backend builder, wallet signature, and synchronized S1 projection.
         </div>
       ) : null}
@@ -430,8 +430,8 @@ function ClaimQueue({
       </div>
 
       {ineligible.length > 0 ? (
-        <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/45 p-4">
-          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+        <div className="rounded-[14px] border tone-state-warning p-4">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">
             Not eligible in current snapshot
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -440,7 +440,7 @@ function ClaimQueue({
                 <p className="truncate text-[length:var(--fs-overline)] font-semibold text-white">
                   {displayPortfolioCreatorName(pos, locale)}
                 </p>
-                <p className="mt-1 text-[length:var(--fs-micro)] leading-4 text-[#f3c66e]">
+                <p className="mt-1 text-[length:var(--fs-micro)] leading-4">
                   This row is not counted in the discovery reward snapshot. The position is not cleared by an ineligible claim attempt.
                 </p>
               </div>
@@ -576,19 +576,19 @@ function S2EndorsementRow({
   const rewardUsdc = formatUsdcAmount(endorsement.estimatedUsdcReward);
 
   let statusText = status.replace("_", " ");
-  let statusColor = "text-[#8ea0ba] bg-white/[0.04]";
+  let statusColor = "tone-state-neutral";
   if (status === "RESOLVED_SUCCESS") {
     statusText = "Success";
-    statusColor = "text-[#65ecaf] bg-[#65ecaf]/10";
+    statusColor = "tone-state-success";
   } else if (status === "RESOLVED_FAIL") {
     statusText = "Failed";
-    statusColor = "text-[#de402a] bg-[#de402a]/10";
+    statusColor = "tone-state-danger";
   } else if (status === "CANCELLED" || status === "VOIDED") {
     statusText = "Voided";
-    statusColor = "text-[#8ea0ba] bg-white/[0.06]";
+    statusColor = "tone-state-neutral";
   } else if (status === "OPEN" || status === "FUNDED") {
     statusText = "Active";
-    statusColor = "text-[#67b8ff] bg-[#67b8ff]/10";
+    statusColor = "tone-state-info";
   }
 
   return (
@@ -615,7 +615,7 @@ function S2EndorsementRow({
         <MetricCell
           label={status === "RESOLVED_SUCCESS" ? "Capped reward" : "Reward est."}
           value={rewardUsdc}
-          color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
+          color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[color:var(--state-success)]" : undefined}
         />
         <MetricCell
           label="Status"
@@ -674,7 +674,7 @@ function S2EndorsementRow({
           <MobileMetric
             label={status === "RESOLVED_SUCCESS" ? "Capped reward" : "Reward est."}
             value={rewardUsdc}
-            color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[#65ecaf]" : undefined}
+            color={isClaimable && status === "RESOLVED_SUCCESS" ? "text-[color:var(--state-success)]" : undefined}
           />
           <MobileMetric
             label="Status"
@@ -829,9 +829,9 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
 function FallbackPreview({ reason }: { reason: string }) {
   return (
     <div className="mx-auto max-w-4xl space-y-4 py-6">
-      <div className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 p-4">
-        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">Fallback preview</p>
-        <p className="mt-1 text-[length:var(--fs-overline)] leading-5 text-[#f3c66e]">
+      <div className="rounded-[14px] border tone-state-warning p-4">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">Fallback preview</p>
+        <p className="mt-1 text-[length:var(--fs-overline)] leading-5">
           No live portfolio projection is loaded from this state. Demo links below are informational until the API, session, RPC, and seeded S1 projection are available.
         </p>
         <p className="mt-2 font-mono text-[length:var(--fs-micro)] text-[#c9a044]">{reason}</p>
@@ -854,25 +854,25 @@ function PortfolioSourceNotice({
       label: "AUTH_REQUIRED",
       title: "Portfolio waits for wallet-backed session",
       body: "No portfolio API request is treated as usable until a wallet is connected and the stored auth session matches it. Demo shortcuts remain preview-only.",
-      tone: "border-white/[0.08] bg-white/[0.03] text-[#9aabc4]",
+      tone: "tone-state-neutral",
     },
     live: {
       label: "SEEDED_DEMO",
       title: "Backend portfolio projection",
       body: "Positions come from the portfolio API. USDC claim actions build a devnet transaction through the backend, require the matching wallet signature, and depend on the S1 projection being synchronized.",
-      tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+      tone: "tone-state-info",
     },
     mock: {
       label: "MOCK_PREVIEW",
       title: "Local demo portfolio session",
       body: "This state is generated from a local mock token. It does not call the portfolio API, request a wallet signature, build a claim transaction, or update account balances.",
-      tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+      tone: "tone-state-warning",
     },
     fallback: {
       label: "API_FALLBACK",
       title: "Live projection unavailable",
       body: `The portfolio API did not provide a usable live projection${reason ? `: ${reason}` : "."} Demo links below do not represent a production claim path.`,
-      tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+      tone: "tone-state-warning",
     },
   }[mode];
 

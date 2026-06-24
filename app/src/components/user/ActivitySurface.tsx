@@ -112,7 +112,7 @@ export const ActivitySurface = ({
           <section className="min-w-0 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
               <div className="flex items-baseline gap-3">
-                <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-white">{t("common.activity")}</h1>
+                <h1 className="type-h3 font-semibold text-white">{t("common.activity")}</h1>
                 <p className="hidden text-xs text-[#7f90ab] md:block">
                   {t("feed.followFirst")}
                 </p>
@@ -356,7 +356,7 @@ const ActivitySourceNotice = ({ error }: { error: string | null }) => {
   }
 
   return (
-    <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/55 px-4 py-3 text-[#f8d48a]">
+    <section className="tone-state-warning rounded-[14px] border px-4 py-3">
       <p className="text-sm font-semibold text-white">Activity unavailable</p>
       <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{error}</p>
     </section>

@@ -73,12 +73,12 @@ function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">Current price</p>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">当前应援价</p>
           <p className="mt-1.5 text-[32px] font-bold leading-none tracking-[-0.05em] text-white md:text-[40px]">
             {formatSpump(profile.creator.currentPriceSpump)}
           </p>
           <p className="mt-2 text-xs text-[#8ea0ba]">
-            Next: {formatSpump(profile.creator.nextPriceSpump)}
+            下一档: {formatSpump(profile.creator.nextPriceSpump)}
           </p>
         </div>
         <StagePill stage={profile.creator.stage} />
@@ -108,7 +108,7 @@ function StatsGrid({ profile }: { profile: S1MarketProfileResponse }) {
     {
       label: "Graduation",
       value: `${grad}%`,
-      color: grad >= 100 ? "text-[#65ecaf]" : "text-[#f3b33e]",
+      color: grad >= 100 ? "text-[color:var(--state-success)]" : "text-[color:var(--state-warning)]",
     },
     { label: "Pool", value: formatSpump(profile.creator.supporterPoolSpump), color: "text-white" },
   ];
@@ -363,8 +363,8 @@ function TradePanel({
 
       {/* Price info */}
       <div className="mt-4 space-y-1.5 rounded-xl border border-white/[0.04] bg-white/[0.015] p-3">
-        <Row label="Current price" value={formatSpump(profile.creator.currentPriceSpump)} />
-        <Row label="Next price" value={formatSpump(profile.creator.nextPriceSpump)} />
+        <Row label="当前应援价" value={formatSpump(profile.creator.currentPriceSpump)} />
+        <Row label="下一档" value={formatSpump(profile.creator.nextPriceSpump)} />
         <div className="h-px bg-white/[0.04]" />
         <Row
           label={side === "buy" ? "Est. cost" : "Est. return"}
@@ -547,13 +547,13 @@ function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
         label: "MOCK_PREVIEW",
         title: "Local S1 market preview",
         body: "This demo slug uses fixture creator and portfolio state. Buy and sell controls update local UI only; they do not call S1 builders, request a wallet signature, burn SPUMP, or submit a Solana transaction.",
-        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+        tone: "tone-state-warning",
       }
     : {
         label: "SEEDED_DEMO",
         title: "Backend S1 market projection",
         body: "This route reads the creator market projection from the backend. Buy and sell can build devnet transactions only with a real wallet session; rating provenance, daily cap usage, open onboarding, and full projection coverage are still roadmap work.",
-        tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+        tone: "tone-state-info",
       };
 
   return (
@@ -769,7 +769,7 @@ function MarketPage() {
                 sessionWallet={sessionWallet}
               />
               {demoSummary ? (
-                <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
+                <div className="tone-state-success rounded-[12px] border px-3.5 py-3 text-[length:var(--fs-overline)] font-medium">
                   {demoSummary}
                 </div>
               ) : null}

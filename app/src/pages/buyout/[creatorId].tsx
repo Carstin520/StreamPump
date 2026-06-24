@@ -217,11 +217,11 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
 
   if (buyout.residualSwept) {
     return (
-      <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
-        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+      <section className="rounded-[14px] border tone-state-warning px-4 py-3">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">
           Discovery reward window swept
         </p>
-        <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
+        <p className="mt-1 text-xs leading-5">
           The unclaimed discovery pool has been swept by an authorized operator
           {buyout.residualSweptAt ? ` on ${new Date(buyout.residualSweptAt).toLocaleString()}` : ""}. Later claims are no longer expected to succeed because the vault is closed or emptied.
         </p>
@@ -231,11 +231,11 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
 
   if (buyout.vaultClosed) {
     return (
-      <section className="rounded-[14px] border border-[#f3b33e]/20 bg-[#1a1408]/50 px-4 py-3">
-        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f3c66e]">
+      <section className="rounded-[14px] border tone-state-warning px-4 py-3">
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">
           Buyout vault closed
         </p>
-        <p className="mt-1 text-xs leading-5 text-[#f3c66e]">
+        <p className="mt-1 text-xs leading-5">
           The buyout vault no longer holds USDC. Portfolio rows may still show historical reward state until projections finish syncing.
         </p>
       </section>
@@ -485,7 +485,7 @@ function RageQuitPanel({
             </div>
             <div className="rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
               <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#8df0c4]">
-                留守毕业
+                留到毕业
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
                 预计可领取 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 发现奖励（封顶估算）
@@ -754,20 +754,20 @@ function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
         label: "MOCK_PREVIEW",
         title: "Local S1 buyout preview",
         body: "This demo slug uses fixture buyout and portfolio state. Rage quit and claim controls update local UI only; they do not call S1 builders, request a wallet signature, move USDC, or submit a Solana transaction.",
-        tone: "border-[#f3b33e]/25 bg-[#1f1708]/55 text-[#f8d48a]",
+        tone: "tone-state-warning",
       }
     : {
         label: "SEEDED_DEMO + OPERATOR_REQUIRED",
         title: "Seeded buyout projection",
         body: "This route reads backend S1 market and buyout projections. Rage quit and claim can build devnet transactions only with a real wallet session and prepared buyout state; offer creation, creator acceptance, graduation, reclaim, and full lifecycle projection remain operator/productization work.",
-        tone: "border-[#67b8ff]/20 bg-[#0d1b2a]/55 text-[#a8d8ff]",
+        tone: "tone-state-info",
       };
 
   return (
     <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Buyout data source</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">毕业赞助数据来源</p>
           <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
         </div>
@@ -977,7 +977,7 @@ function BuyoutPage() {
 
   return (
     <>
-      <Head><title>{`StreamPump | ${title} Buyout Room`}</title></Head>
+      <Head><title>{`StreamPump | ${title} 毕业赞助`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4">
           <ProductReadinessBanner
@@ -1005,7 +1005,7 @@ function BuyoutPage() {
                 <span aria-hidden className="text-sm">‹</span>
               </Link>
               <div className="min-w-0 flex-1">
-                <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 Buyout Room</p>
+                <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 毕业赞助</p>
                 <h1 className="mt-0.5 truncate text-xl font-bold tracking-[-0.03em] text-white">{title}</h1>
                 <p className="mt-0.5 truncate text-xs text-[#8ea0ba]">
                   @{handle} · {shortenWallet(profile.creator.creatorWallet)}
@@ -1089,7 +1089,7 @@ function BuyoutPage() {
                 ) : null}
 
                 {demoSummary ? (
-                  <div className="rounded-[12px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-3.5 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
+                  <div className="tone-state-success rounded-[12px] border px-3.5 py-3 text-[length:var(--fs-overline)] font-medium">
                     {demoSummary}
                   </div>
                 ) : null}
@@ -1104,7 +1104,7 @@ function BuyoutPage() {
                     </p>
                   ) : null}
                   {position?.discoveryRewardEligible === false ? (
-                    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#f3c66e]">
+                    <p className="mt-0.5 text-[length:var(--fs-micro)]">
                       Not eligible for this discovery reward snapshot.
                     </p>
                   ) : null}

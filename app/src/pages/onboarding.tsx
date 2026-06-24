@@ -196,7 +196,7 @@ const OnboardingReadinessNotice = ({
   const storageStatus = signedIn ? accountState.account.storageStatus : null;
 
   return (
-  <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/65 px-4 py-3 text-[#f8d48a]">
+  <section className="rounded-[14px] border tone-state-warning px-4 py-3">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
@@ -488,7 +488,7 @@ export default function OnboardingPage() {
                   </div>
 
                   {saveMessage ? (
-                    <div className="mt-4 rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-4 py-3 text-left text-xs text-[#f8d48a]">
+                    <div className="mt-4 rounded-2xl border tone-state-warning px-4 py-3 text-left text-xs">
                       {saveMessage}
                     </div>
                   ) : null}

@@ -154,7 +154,7 @@ const MeReadinessNotice = ({
   }
 
   return (
-    <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/55 px-4 py-3 text-[#f8d48a]">
+    <section className="rounded-[14px] border tone-state-warning px-4 py-3">
       <p className="text-sm font-semibold text-white">Profile data partially unavailable</p>
       {messages.map((msg) => (
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]" key={msg}>
