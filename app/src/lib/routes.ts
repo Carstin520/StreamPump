@@ -132,6 +132,7 @@ export const primaryNavItems: RouteItem[] = [
   { href: TRENDING_PATH, labelKey: "nav.trending", prefixes: [TRENDING_PATH] },
   { href: PORTFOLIO_PATH, labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
   { href: REWARDS_PATH, labelKey: "nav.rewards", prefixes: [REWARDS_PATH] },
+  { href: WORKSPACE_PATH, labelKey: "nav.workspace", prefixes: [WORKSPACE_PATH] },
 ];
 
 export const workspacePageTabs: RouteItem[] = [

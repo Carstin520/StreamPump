@@ -139,6 +139,7 @@ const ExploreView = ({
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
   const { t } = useI18n();
+  const [feedTab, setFeedTab] = useState<"recommended" | "following">("recommended");
   const [activeCategory, setActiveCategory] = useState<DiscoverCategoryKey>(discoverCategoryKeys[0]);
 
   const visiblePosts = useMemo(() => {
@@ -165,6 +166,30 @@ const ExploreView = ({
   return (
     <div className="-mt-3 space-y-4">
       <PublicFeedSourceNotice error={viewModel.error} postCount={viewModel.posts.length} surface="explore" />
+
+      {/* 推荐 / 关注 feed tabs (prototype topbar). Following has no real follow
+          graph yet, so it shows the recommended feed with an honest preview note. */}
+      <div className="flex items-center gap-1.5">
+        {(["recommended", "following"] as const).map((tab) => (
+          <button
+            className={`rounded-full px-4 py-1.5 text-sm font-bold transition duration-200 ${
+              feedTab === tab ? "bg-white/10 text-white" : "text-[#8192ac] hover:text-white"
+            }`}
+            key={tab}
+            onClick={() => setFeedTab(tab)}
+            type="button"
+          >
+            {tab === "recommended" ? t("feed.tabRecommended") : t("feed.tabFollowing")}
+          </button>
+        ))}
+      </div>
+
+      {feedTab === "following" ? (
+        <p className="tone-state-info rounded-[12px] border px-3.5 py-2 text-[length:var(--fs-caption)]">
+          {t("feed.followingPreviewNote")}
+        </p>
+      ) : null}
+
       <section
         className="sticky z-30 pt-1"
         style={{

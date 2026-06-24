@@ -7,7 +7,7 @@ import { SwitchAccountIcon } from "@/components/shared/AppIcons";
 import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
 import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
-import { PROFILE_PATH, buildLoginHref, isRouteActive, primaryNavItems } from "@/lib/routes";
+import { PROFILE_PATH, REWARDS_PATH, buildLoginHref, isRouteActive, primaryNavItems } from "@/lib/routes";
 
 export const UserShell = ({
   children,
@@ -62,6 +62,22 @@ export const UserShell = ({
         </nav>
 
         <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-4">
+          <Link className="hidden lg:block" href={REWARDS_PATH}>
+            <div
+              className="flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition hover:opacity-90"
+              style={{
+                background: "color-mix(in srgb, var(--brand) 12%, transparent)",
+                borderColor: "color-mix(in srgb, var(--brand) 30%, transparent)",
+              }}
+            >
+              <span className="text-base" style={{ color: "var(--energy, #f0a070)" }}>⚡</span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold" style={{ color: "var(--energy-soft, #f5b8ab)" }}>{t("shell.spumpEnergy")}</p>
+                <p className="truncate text-[length:var(--fs-nano)] text-[#9aabc4]">{t("shell.spumpClaim")}</p>
+              </div>
+            </div>
+          </Link>
+
           <Link href={PROFILE_PATH}>
             <div
               className={`surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 transition duration-200 lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
