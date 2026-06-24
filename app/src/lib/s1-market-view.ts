@@ -163,6 +163,7 @@ export const buildDemoS1Portfolio = (
       earlyCohortBalance: "80",
       spumpCostBasis: "288000000000",
       estimatedClaimableUsdc: profile.buyout?.claimableUsdcRemaining ?? null,
+      discoveryRewardEligible: true,
       updatedAt: profile.creator.updatedAt,
     },
   ],

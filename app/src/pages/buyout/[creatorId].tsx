@@ -327,6 +327,18 @@ function Countdown({ deadline }: { deadline: string | null | undefined }) {
 /*  Offers list                                                        */
 /* ------------------------------------------------------------------ */
 
+const OFFER_STATUS_KEYS: Record<string, string> = {
+  OPEN: "buyout.offerStatus.open",
+  OUTBID: "buyout.offerStatus.outbid",
+  ACCEPTED: "buyout.offerStatus.accepted",
+  CANCELLED: "buyout.offerStatus.cancelled",
+  CANCELED: "buyout.offerStatus.cancelled",
+  EXPIRED: "buyout.offerStatus.expired",
+  WITHDRAWN: "buyout.offerStatus.withdrawn",
+  ABORTED: "buyout.offerStatus.aborted",
+  PENDING: "buyout.offerStatus.pending",
+};
+
 function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["offers"]; acceptedPda: string | null }) {
   const { t } = useI18n();
   if (offers.length === 0) {
@@ -364,7 +376,11 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
             <span className="truncate font-mono text-[length:var(--fs-micro)] font-medium text-white">{shortenWallet(offer.sponsorWallet)}</span>
             <span className="text-[length:var(--fs-overline)] font-semibold text-white">{formatUsdcAmount(offer.usdcAmount)}</span>
             <span className={`text-[length:var(--fs-micro)] font-medium ${isAccepted ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
-              {isAccepted ? t("buyout.offers.accepted") : offer.status}
+              {isAccepted
+                ? t("buyout.offers.accepted")
+                : OFFER_STATUS_KEYS[offer.status]
+                  ? t(OFFER_STATUS_KEYS[offer.status])
+                  : offer.status}
             </span>
             <span className="text-[length:var(--fs-micro)] text-[#6f8099]">
               {offer.sponsorCancelAfterAt ? new Date(offer.sponsorCancelAfterAt).toLocaleDateString() : "—"}
@@ -419,7 +435,7 @@ function RageQuitPanel({
       : null;
   const estimatedSpumpReturnLabel =
     estimatedSpumpReturn === null
-      ? "待链上报价"
+      ? t("buyout.rageQuit.pendingQuote")
       : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(estimatedSpumpReturn)} SPUMP`;
 
   useEffect(() => {
@@ -493,10 +509,10 @@ function RageQuitPanel({
           <div className="mt-3 grid gap-2">
             <div className="rounded-[10px] border border-[#de402a]/20 bg-[#21100d]/45 px-3 py-2.5">
               <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#ff9a88]">
-                Rage Quit 退出
+                {t("buyout.rageQuit.exitOptionLabel")}
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
-                可获得 {estimatedSpumpReturnLabel}
+                {t("buyout.rageQuit.youReceive", { value: estimatedSpumpReturnLabel })}
               </p>
             </div>
             <div className="rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">

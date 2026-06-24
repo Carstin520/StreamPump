@@ -1,4 +1,5 @@
 import { CreatorSeasonState } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 
 type StageValue = CreatorSeasonState | "NONE";
 
@@ -23,9 +24,13 @@ export const StagePill = ({
   compact?: boolean;
   className?: string;
 }) => {
+  const { t } = useI18n();
+
   if (stage === "NONE") {
     return null;
   }
+
+  const label = stage === "S1_BUYOUT" ? t("stage.s1Buyout") : stageLabel[stage];
 
   return (
     <span
@@ -33,7 +38,7 @@ export const StagePill = ({
         compact ? "text-[length:var(--fs-nano)]" : "text-[length:var(--fs-micro)]"
       } ${stageTone[stage]} ${className}`}
     >
-      {stageLabel[stage]}
+      {label}
     </span>
   );
 };
