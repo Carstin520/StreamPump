@@ -185,6 +185,7 @@ const OnboardingReadinessNotice = ({
 }: {
   accountState: AccountLoadState;
 }) => {
+  const { t } = useI18n();
   const signedIn = accountState.kind === "ready";
   const storageStatus = signedIn ? accountState.account.storageStatus : null;
 
@@ -192,20 +193,20 @@ const OnboardingReadinessNotice = ({
   <section className="rounded-[14px] border tone-state-warning px-4 py-3">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">{t("onboarding.dataSource.header")}</p>
         <p className="mt-1 text-sm font-semibold text-white">
           {signedIn && storageStatus === "LIVE"
-            ? "Session-backed account profile"
+            ? t("onboarding.dataSource.titleLive")
             : signedIn
-              ? "Account profile migration required"
-              : "Sign-in required before profile creation"}
+              ? t("onboarding.dataSource.titleMigration")
+              : t("onboarding.dataSource.titleSignin")}
         </p>
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
           {signedIn && storageStatus === "LIVE"
-            ? "This flow reads and writes the current session's account profile. SPUMP rewards remain preview-only until the reward ledger is productized."
+            ? t("onboarding.dataSource.descLive")
             : signedIn
-              ? "The backend session is valid, but AccountProfile storage has not been migrated in this environment. Apply the Prisma migration before production onboarding writes are available."
-              : "Use email OTP or wallet signature login first. Local preview rewards are still shown only after a real session-backed profile can be saved."}
+              ? t("onboarding.dataSource.descMigration")
+              : t("onboarding.dataSource.descSignin")}
         </p>
       </div>
       <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
@@ -388,9 +389,9 @@ export default function OnboardingPage() {
 
           <div className="mx-auto mt-4 w-full max-w-[720px] space-y-2">
             <ProductReadinessBanner
-              description="Onboarding now reads the stored auth session and writes AccountProfile when the migration is applied. Reward animation remains preview-only until real SPUMP issuance and anti-abuse gates are live."
+              description={t("onboarding.readiness.bannerDesc")}
               status={canWriteProfile ? "SEEDED_DEMO" : "BACKEND_READY_UI_GAP"}
-              title="Onboarding is session-backed; rewards are still preview-only"
+              title={t("onboarding.readiness.bannerTitle")}
             />
             <OnboardingReadinessNotice accountState={accountState} />
           </div>
