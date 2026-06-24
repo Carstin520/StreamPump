@@ -692,7 +692,7 @@ const en: Record<string, string> = {
   "portfolio.action": "Action",
   "portfolio.actions": "Actions",
   "portfolio.addPosition": "Add Position",
-  "portfolio.avgEntry": "Energy backed",
+  "portfolio.avgEntry": "Energy basis",
   "portfolio.browseTrending": "Browse Trending",
   "portfolio.buyoutClaims": "Buyout Claims",
   "portfolio.buyoutPool": "Buyout Pool",
