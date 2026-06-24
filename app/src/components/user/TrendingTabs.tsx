@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { startTransition, useMemo, useState } from "react";
 
+import { MomentumLine } from "@/components/shared/MomentumLine";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { SparklineChart } from "@/components/shared/SparklineChart";
 import { StagePill } from "@/components/shared/StagePill";
@@ -249,55 +250,180 @@ const GraduationWatchRow = ({
 
 /* ──────────────────────────────  S1 tab  ────────────────────────────── */
 
+const TOP_MOVERS_COUNT = 4;
+
 const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
   const { t } = useI18n();
+
+  // Sort by momentumScore descending — highest momentum = top mover
   const sorted = useMemo(
     () => [...creators].sort((a, b) => b.momentumScore - a.momentumScore),
     [creators],
   );
 
+  // Distinct niches from the creator set for category chip filter
+  const niches = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const c of sorted) {
+      if (c.niche && !seen.has(c.niche)) {
+        seen.add(c.niche);
+        result.push(c.niche);
+      }
+    }
+    return result;
+  }, [sorted]);
+
+  const [activeNiche, setActiveNiche] = useState<string>("__all__");
+
+  const filtered = useMemo(
+    () => (activeNiche === "__all__" ? sorted : sorted.filter((c) => c.niche === activeNiche)),
+    [sorted, activeNiche],
+  );
+
+  // Top movers: top N by momentumScore from the full sorted list (not affected by chip filter)
+  const topMovers = useMemo(() => sorted.slice(0, TOP_MOVERS_COUNT), [sorted]);
+
   if (sorted.length === 0) {
     return (
       <div className="rounded-[16px] border border-white/[0.05] bg-white/[0.02] p-6 text-center text-xs text-[#8ea0ba]">
-        No S1 creators found from current feed data.
+        {t("discover.noCreators")}
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)]">
-      <div className="hidden border-b border-white/[0.05] px-4 py-2.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87] lg:grid lg:grid-cols-[2.4fr_0.8fr_0.8fr_0.8fr_1fr_0.8fr] lg:items-center lg:gap-3">
-        <span>Creator</span>
-        <span className="text-right">{t("feed.trending.price")}</span>
-        <span className="text-right">{t("feed.trending.volume24h")}</span>
-        <span className="text-right">{t("feed.trending.holders")}</span>
-        <span>{t("feed.trending.graduation")}</span>
-        <span className="text-right">Trend</span>
+    <div className="space-y-4">
+      {/* Slogan header */}
+      <div className="px-1">
+        <h2 className="text-lg font-extrabold leading-tight tracking-tight text-white">
+          {t("discover.slogan")}
+        </h2>
+        <p className="mt-1 text-[length:var(--fs-caption)] text-[color:var(--text-muted)]">
+          {t("discover.sloganSub")}
+        </p>
       </div>
-      <div className="divide-y divide-white/[0.04]">
-        {sorted.map((creator) => (
-          <S1CreatorRow creator={creator} key={creator.id} />
-        ))}
+
+      {/* Movers panel + category chips side-by-side on wide screens */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        {/* Top movers panel */}
+        {topMovers.length > 0 ? (
+          <div className="shrink-0 rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.84)_0%,rgba(10,14,22,0.80)_100%)] p-4 lg:w-56">
+            <p className="mb-3 text-[length:var(--fs-caption)] font-semibold text-[#93a2bb]">
+              {t("discover.moversHeading")}
+            </p>
+            <div className="divide-y divide-white/[0.04]">
+              {topMovers.map((mover) => {
+                const moverWallet = resolveCreatorWalletForRoute(mover.id);
+                return (
+                  <Link
+                    className="flex items-center gap-2.5 py-2.5 transition hover:opacity-80"
+                    href={moverWallet ? `/market/${moverWallet}` : `/creators/${mover.id}`}
+                    key={mover.id}
+                  >
+                    <img
+                      alt={mover.name}
+                      className="h-7 w-7 shrink-0 rounded-lg object-cover"
+                      src={mover.avatarSrc}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[length:var(--fs-micro)] font-semibold text-white">{mover.name}</p>
+                      <p className="truncate text-[length:var(--fs-nano)] text-[#7e90aa]">{mover.niche}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[length:var(--fs-micro)] font-bold text-white">{mover.momentumScore}</p>
+                      <StagePill compact stage={mover.state} />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[length:var(--fs-nano)] text-[#5a6d87]">
+              <DerivedBadge label={t("feed.trending.derived")} />
+              <span className="ml-1.5">{t("discover.momentumLabel")}</span>
+            </p>
+          </div>
+        ) : null}
+
+        {/* Category chips + table */}
+        <div className="min-w-0 flex-1 space-y-3">
+          {/* Category chips */}
+          {niches.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("discover.filterBy")}</span>
+              <button
+                className={`rounded-full border px-3 py-1 text-[length:var(--fs-micro)] font-medium transition ${
+                  activeNiche === "__all__"
+                    ? "border-white/[0.25] bg-white/[0.12] text-white"
+                    : "border-white/[0.08] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.14] hover:text-white"
+                }`}
+                onClick={() => startTransition(() => setActiveNiche("__all__"))}
+                type="button"
+              >
+                {t("discover.allNiches")}
+              </button>
+              {niches.map((niche) => (
+                <button
+                  className={`rounded-full border px-3 py-1 text-[length:var(--fs-micro)] font-medium transition ${
+                    activeNiche === niche
+                      ? "border-[color:var(--brand)]/40 bg-[color:var(--brand)]/[0.12] text-[color:var(--brand)]"
+                      : "border-white/[0.08] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.14] hover:text-white"
+                  }`}
+                  key={niche}
+                  onClick={() => startTransition(() => setActiveNiche(niche))}
+                  type="button"
+                >
+                  {niche}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Creator table */}
+          <div className="overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)]">
+            <div className="hidden border-b border-white/[0.05] px-4 py-2.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87] lg:grid lg:grid-cols-[2.4fr_0.7fr_0.7fr_0.7fr_1fr_0.7fr_auto] lg:items-center lg:gap-3">
+              <span>Creator</span>
+              <span className="text-right">{t("discover.momentumLabel")}</span>
+              <span className="text-right">{t("feed.trending.volume24h")}</span>
+              <span className="text-right">{t("discover.backersLabel")}</span>
+              <span>{t("discover.graduationLabel")}</span>
+              <span className="text-right">{t("discover.trendCaption").split("·")[0].trim()}</span>
+              <span />
+            </div>
+            <div className="divide-y divide-white/[0.04]">
+              {filtered.map((creator) => (
+                <S1CreatorRow creator={creator} key={creator.id} />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const { t } = useI18n();
   const liveWallet = resolveCreatorWalletForRoute(creator.id);
   const hasMarketProjection = creator.momentumScore > 0;
-  const change24h = hasMarketProjection ? Number(((creator.momentumScore - 70) * 0.18).toFixed(2)) : 0;
-  const isUp = change24h >= 0;
-  const trend = hasMarketProjection
-    ? creator.contentPool.map((_, i) => creator.momentumScore * (0.9 + i * 0.03 + Math.random() * 0.03))
-    : [];
+
+  // Derive momentum sparkline from contentPool length + momentumScore — labeled as signal, not price
+  const momentumPoints = useMemo((): number[] => {
+    if (!hasMarketProjection || creator.contentPool.length < 2) return [];
+    const n = creator.contentPool.length;
+    // Seed a deterministic-ish wave anchored to momentumScore so no Math.random() flicker
+    return creator.contentPool.map((_, i) => {
+      const phase = (i / (n - 1)) * Math.PI;
+      return Math.max(0, Math.min(100, creator.momentumScore * (0.85 + 0.15 * Math.sin(phase + i * 0.7))));
+    });
+  }, [creator.contentPool, creator.momentumScore, hasMarketProjection]);
+
+  const marketHref = liveWallet ? `/market/${liveWallet}` : `/creators/${creator.id}`;
 
   return (
-    <Link
-      className="grid items-center gap-3 px-4 py-3 transition hover:bg-white/[0.02] lg:grid-cols-[2.4fr_0.8fr_0.8fr_0.8fr_1fr_0.8fr]"
-      href={liveWallet ? `/market/${liveWallet}` : `/creators/${creator.id}`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="grid items-center gap-3 px-4 py-3 transition hover:bg-white/[0.02] lg:grid-cols-[2.4fr_0.7fr_0.7fr_0.7fr_1fr_0.7fr_auto]">
+      {/* Creator identity — links to market/creator page */}
+      <Link className="flex min-w-0 items-center gap-3" href={marketHref}>
         <img alt={creator.name} className="h-9 w-9 shrink-0 rounded-xl object-cover" src={creator.avatarSrc} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -306,23 +432,27 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
           </div>
           <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#7e90aa]">{creator.handle} · {creator.niche}</p>
         </div>
-      </div>
+      </Link>
 
+      {/* Momentum (big number) — reads momentumScore directly */}
       <div className="lg:text-right">
-        <p className="text-xs font-semibold text-white">{hasMarketProjection ? creator.momentumScore : "—"}</p>
-        <p className={`text-[length:var(--fs-micro)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
-          {hasMarketProjection ? `${isUp ? "+" : ""}${change24h.toFixed(2)}%` : "content only"}
-        </p>
+        <p className="text-xs font-bold text-white">{hasMarketProjection ? creator.momentumScore : "—"}</p>
+        <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("discover.momentumLabel")}</p>
       </div>
 
+      {/* Graduation % as "graduating" column */}
       <div className="hidden lg:block lg:text-right">
         <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</p>
+        <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("feed.trending.volume24h")}</p>
       </div>
 
+      {/* Backer count — reads holderCount directly */}
       <div className="hidden lg:block lg:text-right">
         <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? compactNumber(creator.holderCount) : "—"}</p>
+        <p className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("discover.backersLabel")}</p>
       </div>
 
+      {/* Graduation progress bar — reads graduationProgress directly */}
       <div className="hidden lg:block">
         <div className="flex items-center gap-1.5">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -331,22 +461,32 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
               style={{ width: `${Math.min(100, creator.graduationProgress)}%` }}
             />
           </div>
-          <span className="shrink-0 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</span>
+          <span className="shrink-0 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7]">
+            {hasMarketProjection ? `${creator.graduationProgress}%` : "—"}
+          </span>
         </div>
       </div>
 
+      {/* MomentumLine spark — derived from contentPool + momentumScore, captioned as signal */}
       <div className="hidden justify-end lg:flex">
-        {trend.length > 1 ? (
-          <SparklineChart
-            color={isUp ? "#65ecaf" : "#f67263"}
-            fillColor={isUp ? "rgba(101,236,175,0.1)" : "rgba(246,114,99,0.1)"}
+        {momentumPoints.length > 1 ? (
+          <MomentumLine
             height={28}
-            points={trend}
-            width={64}
+            points={momentumPoints}
           />
         ) : null}
       </div>
-    </Link>
+
+      {/* ⚡ Back CTA — navigation Link only, no transaction */}
+      <div className="flex justify-end">
+        <Link
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--brand)]/30 bg-[color:var(--brand)]/[0.10] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[color:var(--brand)] transition hover:border-[color:var(--brand)]/50 hover:bg-[color:var(--brand)]/[0.18]"
+          href={marketHref}
+        >
+          {t("discover.backCta")}
+        </Link>
+      </div>
+    </div>
   );
 };
 

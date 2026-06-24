@@ -510,6 +510,15 @@ const zh: Record<string, string> = {
   "onboarding.roleSponsorDesc": "以 USDC 作为营销预算（营销支出方，不是投资人），获得可验证的活动凭证。",
   "onboarding.displayName": "显示名称",
   "onboarding.handle": "用户名",
+  "discover.moversHeading": "📈 本周势能上升最快",
+  "discover.allNiches": "全部",
+  "discover.filterBy": "分类",
+  "discover.momentumLabel": "势能",
+  "discover.graduationLabel": "毕业进度",
+  "discover.backersLabel": "应援人数",
+  "discover.backCta": "⚡ Back 应援",
+  "discover.trendCaption": "势能 · 发现信号，不是价格",
+  "discover.noCreators": "暂无 S1 创作者数据",
 };
 
 const en: Record<string, string> = {
@@ -1001,6 +1010,15 @@ const en: Record<string, string> = {
   "onboarding.roleSponsorDesc": "Spend USDC as a marketing budget (marketing spender, not investor) and receive verifiable campaign proof.",
   "onboarding.displayName": "Display name",
   "onboarding.handle": "Handle",
+  "discover.moversHeading": "📈 Top momentum this week",
+  "discover.allNiches": "All",
+  "discover.filterBy": "Filter",
+  "discover.momentumLabel": "Momentum",
+  "discover.graduationLabel": "Graduation",
+  "discover.backersLabel": "Backers",
+  "discover.backCta": "⚡ Back",
+  "discover.trendCaption": "Momentum · discovery signal, not price",
+  "discover.noCreators": "No S1 creators in current feed data",
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, zh };
