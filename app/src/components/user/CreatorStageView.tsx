@@ -3,17 +3,24 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import { ArrowDownIcon, ArrowUpIcon, FollowCheckIcon, FollowPlusIcon } from "@/components/shared/AppIcons";
-import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
+import { MomentumLine } from "@/components/shared/MomentumLine";
+import { MomentumMeter } from "@/components/shared/MomentumMeter";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
 import { requireInteractiveSession } from "@/lib/interaction-auth";
-import { createMockPriceHistory } from "@/lib/price-history";
 import { compactNumber } from "@/lib/public-data";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
+import { useI18n } from "@/lib/i18n";
 
 type ProfileTab = "Posts" | "Investment File" | "Signals";
 
 const TABS: ProfileTab[] = ["Posts", "Investment File", "Signals"];
+
+const TAB_I18N_KEYS: Record<ProfileTab, string> = {
+  "Posts": "creator.tabs.posts",
+  "Investment File": "creator.tabs.investmentFile",
+  "Signals": "creator.tabs.signals",
+};
 
 const SPUMP_PER_USD = 40;
 
@@ -57,7 +64,7 @@ export const CreatorStageView = ({
 
       <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3.5">
-          <PriceHistoryPanel creator={creator} market={market} />
+          <MomentumPanel creator={creator} market={market} />
           <MarketStatsBar creator={creator} market={market} />
           <LifecycleTimeline creator={creator} market={market} />
           <ContentSurface
@@ -102,6 +109,7 @@ type MarketModel = {
   state: CreatorMarketRecord["state"];
   level: number;
   levelLabel: string;
+  levelKey: string;
 };
 
 const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
@@ -120,6 +128,7 @@ const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
   const liquiditySpump = Math.round(priceSpump * supply * 0.18);
   const level = creator.state === "S2_ACTIVE" ? 5 : creator.state === "S1_BUYOUT" ? 3 : 2;
   const levelLabel = levelDescriptor(creator);
+  const levelKeyValue = levelKey(creator);
 
   return {
     priceSpump,
@@ -136,7 +145,16 @@ const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
     state: creator.state,
     level,
     levelLabel,
+    levelKey: levelKeyValue,
   };
+};
+
+const LEVEL_KEYS: Record<string, string> = {
+  "S2_ACTIVE": "creator.level.graduatedSponsorActive",
+  "S1_BUYOUT": "creator.level.buyoutWatch",
+  "rising": "creator.level.risingCreator",
+  "discovery": "creator.level.discoveryStage",
+  "early": "creator.level.earlyDiscovery",
 };
 
 const levelDescriptor = (creator: CreatorMarketRecord): string => {
@@ -145,6 +163,14 @@ const levelDescriptor = (creator: CreatorMarketRecord): string => {
   if (creator.graduationProgress >= 60) return "Rising Creator";
   if (creator.graduationProgress >= 30) return "Discovery Stage";
   return "Early Discovery";
+};
+
+const levelKey = (creator: CreatorMarketRecord): string => {
+  if (creator.state === "S2_ACTIVE") return LEVEL_KEYS["S2_ACTIVE"];
+  if (creator.state === "S1_BUYOUT") return LEVEL_KEYS["S1_BUYOUT"];
+  if (creator.graduationProgress >= 60) return LEVEL_KEYS["rising"];
+  if (creator.graduationProgress >= 30) return LEVEL_KEYS["discovery"];
+  return LEVEL_KEYS["early"];
 };
 
 const previewBuy = (market: MarketModel, amount: number) => {
@@ -178,72 +204,76 @@ const ProfileHero = ({
   isFollowing: boolean;
   market: MarketModel;
   onToggleFollow: () => void;
-}) => (
-  <section className="relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
-    <div className="relative h-36 md:h-44">
-      <ProgressiveImage
-        alt={`${creator.name} banner`}
-        className="h-full w-full object-cover"
-        fill
-        priority
-        sizes="(max-width: 768px) 100vw, 1280px"
-        src={creator.heroSrc}
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.05)_0%,rgba(7,11,18,0.42)_55%,rgba(7,11,18,0.96)_100%)]" />
-      <div className="absolute right-3 top-3 flex items-center gap-2">
-        <StatusBadge market={market} />
-      </div>
-    </div>
+}) => {
+  const { t } = useI18n();
 
-    <div className="relative -mt-10 flex flex-col gap-3 px-5 pb-5 md:flex-row md:items-end md:gap-5 md:px-6 md:pb-5">
-      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_14px_36px_rgba(0,0,0,0.5)] md:h-22 md:w-22">
-        <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[length:var(--fs-nano)] uppercase tracking-[0.22em] text-[#7486a1]">
-          <span>Level {market.level}</span>
-          <span className="h-1 w-1 rounded-full bg-white/20" />
-          <span className="truncate">{market.levelLabel}</span>
+  return (
+    <section className="relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.94)_0%,rgba(9,13,20,0.94)_100%)]">
+      <div className="relative h-36 md:h-44">
+        <ProgressiveImage
+          alt={`${creator.name} banner`}
+          className="h-full w-full object-cover"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, 1280px"
+          src={creator.heroSrc}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,18,0.05)_0%,rgba(7,11,18,0.42)_55%,rgba(7,11,18,0.96)_100%)]" />
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          <StatusBadge market={market} />
         </div>
-        <h1 className="type-h3 mt-1.5 truncate font-semibold text-white">
-          {creator.name}
-        </h1>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-[#92a3bc]">
-          <span className="truncate">{creator.handle}</span>
-          <span className="text-[#3e4a5e]">·</span>
-          <span className="truncate">{creator.city}</span>
-          <span className="text-[#3e4a5e]">·</span>
-          <span className="truncate text-[#7486a1]">{creator.niche}</span>
-        </div>
-        <p className="mt-2 line-clamp-2 max-w-[640px] text-xs leading-5 text-[#bcc8de]">
-          {creator.intro}
-        </p>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <button
-          className="liquid-glass-btn rounded-full px-4 py-2 text-xs text-white transition hover:bg-white/[0.08]"
-          type="button"
-        >
-          Message
-        </button>
-        <button
-          className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
-            isFollowing
-              ? "border border-white/10 bg-[#13291f] text-[#90efac]"
-              : "bg-[#de402a] text-white hover:bg-[#ea523e]"
-          }`}
-          onClick={onToggleFollow}
-          type="button"
-        >
-          {isFollowing ? <FollowCheckIcon className="h-3.5 w-3.5" /> : <FollowPlusIcon className="h-3.5 w-3.5" />}
-          {isFollowing ? "Following" : "Follow"}
-        </button>
+      <div className="relative -mt-10 flex flex-col gap-3 px-5 pb-5 md:flex-row md:items-end md:gap-5 md:px-6 md:pb-5">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-[#0b1119] bg-[#0b1119] shadow-[0_14px_36px_rgba(0,0,0,0.5)] md:h-22 md:w-22">
+          <img alt={creator.name} className="h-full w-full object-cover" src={creator.avatarSrc} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[length:var(--fs-nano)] uppercase tracking-[0.22em] text-[#7486a1]">
+            <span>{t("creator.levelLabel", { level: market.level })}</span>
+            <span className="h-1 w-1 rounded-full bg-white/20" />
+            <span className="truncate">{t(market.levelKey)}</span>
+          </div>
+          <h1 className="type-h3 mt-1.5 truncate font-semibold text-white">
+            {creator.name}
+          </h1>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-[#92a3bc]">
+            <span className="truncate">{creator.handle}</span>
+            <span className="text-[#3e4a5e]">·</span>
+            <span className="truncate">{creator.city}</span>
+            <span className="text-[#3e4a5e]">·</span>
+            <span className="truncate text-[#7486a1]">{creator.niche}</span>
+          </div>
+          <p className="mt-2 line-clamp-2 max-w-[640px] text-xs leading-5 text-[#bcc8de]">
+            {creator.intro}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            className="liquid-glass-btn rounded-full px-4 py-2 text-xs text-white transition hover:bg-white/[0.08]"
+            type="button"
+          >
+            {t("creator.message")}
+          </button>
+          <button
+            className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
+              isFollowing
+                ? "border border-white/10 bg-[#13291f] text-[#90efac]"
+                : "bg-[#de402a] text-white hover:bg-[#ea523e]"
+            }`}
+            onClick={onToggleFollow}
+            type="button"
+          >
+            {isFollowing ? <FollowCheckIcon className="h-3.5 w-3.5" /> : <FollowPlusIcon className="h-3.5 w-3.5" />}
+            {isFollowing ? t("creator.following") : t("creator.follow")}
+          </button>
+        </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const StatusBadge = ({ market }: { market: MarketModel }) => {
   if (market.state === "S2_ACTIVE") {
@@ -282,29 +312,21 @@ const MarketStatsBar = ({
   creator: CreatorMarketRecord;
   market: MarketModel;
 }) => {
+  const { t } = useI18n();
   const positive = market.change24hPct >= 0;
 
   return (
     <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
       <div className="grid grid-cols-3 divide-x divide-white/[0.05] lg:grid-cols-6">
+        {/* Momentum is the real primary stat */}
+        <MomentumCell creator={creator} />
         <PriceCell market={market} />
-        <StatCell label="24h Change" tone={positive ? "positive" : "negative"}>
-          <span className="flex items-center gap-1">
-            {positive ? (
-              <ArrowUpIcon className="h-3 w-3 text-[color:var(--state-success)]" />
-            ) : (
-              <ArrowDownIcon className="h-3 w-3 text-[color:var(--state-danger)]" />
-            )}
-            {positive ? "+" : ""}
-            {market.change24hPct.toFixed(2)}%
-          </span>
-        </StatCell>
-        <StatCell label="Holders">{compactNumber(market.holders)}</StatCell>
-        <StatCell label="S1 Supply">{compactNumber(market.supply)}</StatCell>
-        <StatCell label="Pool">
+        <StatCell label={t("market.holders")}>{compactNumber(market.holders)}</StatCell>
+        <StatCell label={t("market.s1Supply")}>{compactNumber(market.supply)}</StatCell>
+        <StatCell label={t("market.pool")}>
           {market.supporterPoolUsd ? `$${compactNumber(market.supporterPoolUsd)}` : "—"}
         </StatCell>
-        <StatCell label="Graduation">
+        <StatCell label={t("market.graduation")}>
           <span className="flex items-center gap-1.5">
             <span>{market.graduationPct}%</span>
             <span className="h-1 w-8 overflow-hidden rounded-full bg-white/[0.06]">
@@ -320,21 +342,52 @@ const MarketStatsBar = ({
         <span className="text-[#7486a1]">Niche</span>
         <span className="ml-2 text-[#c8d3e6]">{creator.niche}</span>
         <span className="ml-4 text-[#7486a1]">Tags</span>
-        <span className="ml-2 text-[#c8d3e6]">{creator.tags.slice(0, 3).map((t) => `#${t}`).join("  ")}</span>
+        <span className="ml-2 text-[#c8d3e6]">{creator.tags.slice(0, 3).map((tag) => `#${tag}`).join("  ")}</span>
       </div>
     </section>
   );
 };
 
-const PriceCell = ({ market }: { market: MarketModel }) => (
-  <div className="min-w-0 px-3.5 py-2.5">
-    <p className="truncate text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">S1 Position Price</p>
-    <p className="mt-1 whitespace-nowrap text-lg font-semibold tracking-[-0.04em] text-white">
-      {market.priceSpump}
-      <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">SPUMP</span>
-    </p>
-  </div>
-);
+const MomentumCell = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const { t } = useI18n();
+
+  return (
+    <div className="min-w-0 px-3.5 py-2.5">
+      <p className="truncate text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+        {t("creator.momentumHeadline")}
+      </p>
+      <p className="mt-1 whitespace-nowrap text-lg font-semibold tracking-[-0.04em]" style={{ color: "var(--brand)" }}>
+        {creator.momentumScore}
+        <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">/100</span>
+      </p>
+    </div>
+  );
+};
+
+const PriceCell = ({ market }: { market: MarketModel }) => {
+  const { t } = useI18n();
+
+  return (
+    <div className="min-w-0 px-3.5 py-2.5">
+      <p className="truncate text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+        {t("market.positionPrice")}
+      </p>
+      <p className="mt-1 whitespace-nowrap text-sm font-semibold tracking-[-0.03em] text-white">
+        {market.priceSpump > 0 ? (
+          <>
+            {market.priceSpump}
+            <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">SPUMP</span>
+          </>
+        ) : (
+          <span className="text-[#7486a1]">—</span>
+        )}
+      </p>
+      <p className="mt-0.5 text-[length:var(--fs-micro)] leading-tight text-[#5a6b82]">
+        {t("market.positionPriceDisclaimer")}
+      </p>
+    </div>
+  );
+};
 
 const StatCell = ({
   children,
@@ -361,23 +414,41 @@ const StatCell = ({
   </div>
 );
 
-/* ──────────────────────────  Price history  ────────────────────────── */
+/* ──────────────────────────  Momentum panel (replaces price chart)  ────────────────────────── */
 
-const PriceHistoryPanel = ({
+/**
+ * Build a deterministic momentum trend from momentumScore + contentPool length.
+ * NO Math.random — points are derived from stable creator fields only.
+ */
+const buildMomentumPoints = (momentumScore: number, contentCount: number): number[] => {
+  const base = Math.max(10, Math.min(100, momentumScore));
+  const count = Math.max(2, Math.min(8, contentCount));
+  // Spread over 24 fixed steps, seeded from base + count
+  const points: number[] = [];
+  for (let i = 0; i < 24; i++) {
+    // Deterministic oscillation around base using trigonometry seeded by count
+    const phase = (i / 23) * Math.PI * 2 * (1 + (count % 3) * 0.25);
+    const wave = Math.sin(phase + count) * (base * 0.14);
+    const trend = (i / 23) * (base * 0.08); // slight upward drift toward current score
+    points.push(Math.max(1, Math.min(100, Math.round(base - base * 0.18 + wave + trend))));
+  }
+  // Last point = actual current momentum
+  points[points.length - 1] = base;
+  return points;
+};
+
+const MomentumPanel = ({
   creator,
   market,
 }: {
   creator: CreatorMarketRecord;
   market: MarketModel;
 }) => {
+  const { t } = useI18n();
   const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
-  const priceHistory = useMemo(
-    () =>
-      createMockPriceHistory({
-        basePrice: market.priceSpump,
-        key: creator.id,
-      }),
-    [creator.id, market.priceSpump],
+  const momentumPoints = useMemo(
+    () => buildMomentumPoints(creator.momentumScore, creator.contentPool.length),
+    [creator.momentumScore, creator.contentPool.length],
   );
 
   if (!hasMarketProjection) {
@@ -385,11 +456,13 @@ const PriceHistoryPanel = ({
       <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
         <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
           <div>
-            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Market History</p>
-            <h3 className="mt-1 text-sm font-semibold text-white">Projection pending</h3>
+            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
+              {t("creator.momentumHeadline")}
+            </p>
+            <h3 className="mt-1 text-sm font-semibold text-white">{t("creator.noProjection")}</h3>
           </div>
           <span className="tone-state-warning rounded-full border px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">
-            Content only
+            {t("creator.contentOnly")}
           </span>
         </header>
         <div className="px-4 py-10 text-center text-xs leading-5 text-[#8ea0ba]">
@@ -404,24 +477,37 @@ const PriceHistoryPanel = ({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-            Price projection
+            {t("creator.momentumSubhead")}
           </p>
           <h2 className="mt-0.5 text-base font-semibold tracking-[-0.02em] text-white">
-            S1 market projection
+            {t("creator.momentumProjection")}
           </h2>
         </div>
-        <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-right">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#6f8099]">Current</p>
-          <p className="mt-0.5 text-xs font-semibold text-white">{market.priceSpump} SPUMP</p>
+        {/* Momentum score as primary headline number */}
+        <div className="flex items-end gap-3">
+          <div className="text-right">
+            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#6f8099]">
+              {t("creator.momentumHeadline")}
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em]" style={{ color: "var(--brand)" }}>
+              {creator.momentumScore}
+              <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">/100</span>
+            </p>
+          </div>
+          <MomentumMeter
+            className="w-24"
+            value={creator.momentumScore}
+            max={100}
+            tone="momentum"
+          />
         </div>
       </header>
 
-      <div className="mt-3">
-        <PriceHistoryChart
-          currencyLabel="SPUMP"
-          defaultRange="1M"
-          height={250}
-          points={priceHistory}
+      <div className="mt-4">
+        <MomentumLine
+          caption={t("creator.momentumChartCaption")}
+          height={180}
+          points={momentumPoints}
         />
       </div>
     </section>
@@ -445,6 +531,7 @@ const BuyPanel = ({
   onBuyAmountChange: (value: number) => void;
   onRequireAuth: () => boolean;
 }) => {
+  const { t } = useI18n();
   const [pulse, setPulse] = useState(false);
   const disabled = market.state !== "S1_DISCOVERY";
   const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
@@ -464,22 +551,22 @@ const BuyPanel = ({
       <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
         <div>
           <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-            S1 Position Access
+            {t("market.positionAccess")}
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-white">
-            {liveCreatorWallet ? "Seeded S1 Market" : !hasMarketProjection ? "Content Signals Only" : disabled ? "Preview Mode" : "Preview S1 Position"}
+            {liveCreatorWallet ? t("market.seededMarket") : !hasMarketProjection ? t("market.contentSignalsOnly") : disabled ? t("market.previewMode") : t("market.previewPosition")}
           </h3>
         </div>
         <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#8ea0ba]">
-          {hasMarketProjection ? `1 S1 ≈ ${market.priceSpump} SPUMP` : "Market projection pending"}
+          {hasMarketProjection ? `1 S1 ≈ ${market.priceSpump} SPUMP` : t("market.projectionPending")}
         </span>
       </header>
 
       <div className="space-y-3 px-4 py-4">
         <div>
           <div className="flex items-center justify-between text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#6f8099]">
-            <span>Amount</span>
-            <span className="text-[#8ea0ba]">Max 200</span>
+            <span>{t("market.amount")}</span>
+            <span className="text-[#8ea0ba]">{t("market.maxAmount")}</span>
           </div>
           <div className="mt-1.5 flex items-center gap-2">
             <button
@@ -530,11 +617,11 @@ const BuyPanel = ({
 
         <div className="space-y-1.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
           <SummaryRow label="平均投入" value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
-          <SummaryRow accent label="Estimated cost" value={hasMarketProjection ? `${buyPreview.cost} SPUMP` : "—"} />
+          <SummaryRow accent label={t("market.estCost")} value={hasMarketProjection ? `${buyPreview.cost} SPUMP` : "—"} />
           <SummaryRow
-            label="You will hold"
+            label={t("market.willHold")}
             value={hasMarketProjection ? `${futureHolding} S1` : "—"}
-            sublabel={hasMarketProjection ? `+${buyPreview.amount} new` : undefined}
+            sublabel={hasMarketProjection ? `+${buyPreview.amount} ${t("market.newHolding")}` : undefined}
           />
           <SummaryRow
             label="投入后档位"
@@ -558,7 +645,7 @@ const BuyPanel = ({
                 }
               }}
             >
-              Open seeded market
+              {t("market.openSeededMarket")}
             </Link>
             <Link
               className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
@@ -569,7 +656,7 @@ const BuyPanel = ({
                 }
               }}
             >
-              Open seeded buyout
+              {t("market.openSeededBuyout")}
             </Link>
           </div>
         ) : (
@@ -591,12 +678,12 @@ const BuyPanel = ({
               type="button"
             >
               {!hasMarketProjection
-                ? "Market Projection Pending"
+                ? t("market.projectionPending")
                 : disabled
                 ? market.state === "S1_BUYOUT"
-                  ? "毕业赞助进行中 · 应援暂停"
-                  : "Graduated · S2 Active"
-                : "Preview Buy"}
+                  ? t("creator.gradPaused")
+                  : t("market.graduatedS2")
+                : t("market.previewBack")}
             </button>
 
             <button
@@ -610,18 +697,23 @@ const BuyPanel = ({
               }}
               type="button"
             >
-              Add to Watchlist
+              {t("market.addWatchlist")}
             </button>
           </>
         )}
 
         {!liveCreatorWallet && !disabled ? (
           <p className="text-center text-[length:var(--fs-micro)] text-[#5a6b82]">
-            {hasMarketProjection
-              ? "Local preview only. Open a seeded market route for transaction builders."
-              : "Public content feed does not provide S1 势能/供应, holders, or graduation truth."}
+            {hasMarketProjection ? t("market.localPreviewNote") : t("market.contentOnlyNote")}
           </p>
         ) : null}
+
+        <p
+          className="rounded-xl px-3 py-2 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]"
+          style={{ background: "color-mix(in srgb, var(--brand) 6%, transparent)" }}
+        >
+          {t("market.cappedDisclaimer")}
+        </p>
       </div>
     </section>
   );
