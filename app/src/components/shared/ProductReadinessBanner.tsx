@@ -1,3 +1,5 @@
+import { useI18n } from "@/lib/i18n";
+
 export type ProductReadinessStatus =
   | "LIVE"
   | "SEEDED_DEMO"
@@ -24,6 +26,7 @@ const STATUS_TONES: Record<ProductReadinessStatus, string> = {
 };
 
 export function ProductReadinessBanner({ description, status, title }: ProductReadinessBannerProps) {
+  const { t } = useI18n();
   const showBanner = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_HINTS === "1";
 
   if (!showBanner) {
@@ -37,7 +40,7 @@ export function ProductReadinessBanner({ description, status, title }: ProductRe
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#6f8099]">Phase 0 readiness</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#6f8099]">{t("readiness.phaseLabel")}</p>
           <p className="mt-1 text-[length:var(--fs-caption)] font-semibold text-white">{title}</p>
           <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#9aabc4]">{description}</p>
         </div>
