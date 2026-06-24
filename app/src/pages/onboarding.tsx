@@ -7,6 +7,7 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { getAccountMe, updateAccountMe } from "@/lib/api/account";
 import { AccountMeRecord, AccountRole } from "@/lib/api/types";
 import { getStoredAuthSession } from "@/lib/auth-session";
+import { useI18n } from "@/lib/i18n";
 import { buildLoginHref } from "@/lib/routes";
 
 const TOTAL_SPUMP = 1_250_000;
@@ -19,34 +20,26 @@ type AccountLoadState =
   | { kind: "ready"; token: string; account: AccountMeRecord }
   | { kind: "error"; message: string };
 
-const ROLE_OPTIONS: Array<{
-  role: AccountRole;
-  label: string;
-  description: string;
-  badge: string;
-}> = [
+const ROLE_KEYS: Array<{ role: AccountRole; labelKey: string; descKey: string; badge: string }> = [
   {
     role: "FAN",
-    label: "Fan",
-    description: "Back creators with non-transferable utility SPUMP",
+    labelKey: "onboarding.roleFan",
+    descKey: "onboarding.roleFanDesc",
     badge: "S1",
   },
   {
     role: "CREATOR",
-    label: "Creator",
-    description: "Publish content and open sponsorship proposals",
+    labelKey: "onboarding.roleCreator",
+    descKey: "onboarding.roleCreatorDesc",
     badge: "CR",
   },
   {
     role: "SPONSOR",
-    label: "Sponsor",
-    description: "Fund campaigns and verify performance proof",
+    labelKey: "onboarding.roleSponsor",
+    descKey: "onboarding.roleSponsorDesc",
     badge: "USDC",
   },
 ];
-
-const roleDisplay = (role: AccountRole) =>
-  ROLE_OPTIONS.find((option) => option.role === role)?.label ?? "Fan";
 
 const defaultHandle = (account: AccountMeRecord | null) =>
   account?.profile?.handle ??
@@ -223,7 +216,38 @@ const OnboardingReadinessNotice = ({
   );
 };
 
+/** Presentational orientation block: "这不是投资，是发现" + 3 concept rows */
+function DiscoveryOrientationBlock() {
+  const { t } = useI18n();
+  const concepts = [
+    { emoji: "⚡", label: t("onboarding.earnLabel"), desc: t("onboarding.earnDesc") },
+    { emoji: "🎯", label: t("onboarding.backLabel"), desc: t("onboarding.backDesc") },
+    { emoji: "🏅", label: t("onboarding.graduateLabel"), desc: t("onboarding.graduateDesc") },
+  ] as const;
+
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 text-left">
+      <p className="text-[length:var(--fs-caption)] font-semibold leading-snug" style={{ color: "var(--brand)" }}>
+        {t("onboarding.notInvestment")}
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        {concepts.map(({ emoji, label, desc }) => (
+          <li key={label} className="flex items-start gap-2.5">
+            <span className="mt-0.5 shrink-0 text-base leading-none">{emoji}</span>
+            <span className="text-xs leading-5 text-[#9aabc4]">
+              <span className="font-semibold text-white">{label}</span>
+              {" — "}
+              {desc}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
+  const { t } = useI18n();
   const [currentStep, setCurrentStep] = useState(0);
   const [role, setRole] = useState<AccountRole>("FAN");
   const [displayName, setDisplayName] = useState("");
@@ -237,6 +261,11 @@ export default function OnboardingPage() {
   const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 3);
   const account = accountState.kind === "ready" ? accountState.account : null;
   const canWriteProfile = accountState.kind === "ready" && accountState.account.storageStatus === "LIVE";
+
+  // Resolve i18n role label for display
+  const roleDisplayLabel = ROLE_KEYS.find((opt) => opt.role === role)?.labelKey
+    ? t(ROLE_KEYS.find((opt) => opt.role === role)!.labelKey)
+    : "Fan";
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +343,7 @@ export default function OnboardingPage() {
   return (
     <>
       <Head>
-        <title>StreamPump | Get Started</title>
+        <title>{t("page.onboarding.title")}</title>
         <style>{`
           @keyframes draw-check {
             from { stroke-dashoffset: 30; }
@@ -353,7 +382,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-[#8ea0ba]">
-              Step {currentStep + 1} of {STEPS}
+              {t("onboarding.stepOf", { current: currentStep + 1, total: STEPS })}
             </div>
           </div>
 
@@ -375,21 +404,29 @@ export default function OnboardingPage() {
                     SP
                   </div>
                   <h1 className="type-h2 font-semibold">
-                    Welcome to StreamPump
+                    {t("onboarding.welcome")}
                   </h1>
                   <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
-                    Complete the account profile for your current session
+                    {t("onboarding.welcomeSubtitle")}
                   </p>
-                  <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
+
+                  {/* Discovery orientation block */}
+                  <div className="mt-5 text-left">
+                    <DiscoveryOrientationBlock />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
                     {accountState.kind === "checking"
-                      ? "Checking stored auth session..."
+                      ? t("onboarding.checkingSession")
                       : accountState.kind === "signed-out"
-                        ? "No auth session found. Sign in with email OTP or wallet signature before onboarding."
+                        ? t("onboarding.noSession")
                         : accountState.kind === "error"
                           ? accountState.message
                           : accountState.account.storageStatus === "LIVE"
-                            ? `Session wallet ${accountState.account.wallet.slice(0, 4)}...${accountState.account.wallet.slice(-4)} is ready for profile setup.`
-                            : "Session is valid, but AccountProfile storage needs the Prisma migration before writes are enabled."}
+                            ? t("onboarding.sessionReady", {
+                                shortWallet: `${accountState.account.wallet.slice(0, 4)}...${accountState.account.wallet.slice(-4)}`,
+                              })
+                            : t("onboarding.sessionMigrationNeeded")}
                   </div>
                   {accountState.kind === "signed-out" ? (
                     <Link
@@ -397,7 +434,7 @@ export default function OnboardingPage() {
                       href={buildLoginHref({ nextPath: "/onboarding" })}
                     >
                       <WalletIcon />
-                      Sign in to continue
+                      {t("onboarding.signInToContinue")}
                     </Link>
                   ) : (
                     <button
@@ -407,7 +444,7 @@ export default function OnboardingPage() {
                       type="button"
                     >
                       <WalletIcon />
-                      Continue with session
+                      {t("onboarding.continueWithSession")}
                     </button>
                   )}
                 </div>
@@ -424,14 +461,14 @@ export default function OnboardingPage() {
                     </svg>
                   </div>
                   <h1 className="type-h2 font-semibold">
-                    Choose Your Role
+                    {t("onboarding.chooseRole")}
                   </h1>
                   <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
-                    How will you use StreamPump?
+                    {t("onboarding.chooseRoleSubtitle")}
                   </p>
 
                   <div className="mt-6 grid gap-3">
-                    {ROLE_OPTIONS.map((option) => (
+                    {ROLE_KEYS.map((option) => (
                       <button
                         className={`relative cursor-pointer rounded-[20px] border p-5 text-left transition-all duration-200 ${
                           role === option.role
@@ -447,8 +484,8 @@ export default function OnboardingPage() {
                             {option.badge}
                           </div>
                           <div className="pr-8">
-                            <div className="text-[16px] font-semibold">{option.label}</div>
-                            <div className="mt-0.5 text-[length:var(--fs-caption)] text-[#8ea0ba]">{option.description}</div>
+                            <div className="text-[16px] font-semibold">{t(option.labelKey)}</div>
+                            <div className="mt-0.5 text-[length:var(--fs-caption)] text-[#8ea0ba]">{t(option.descKey)}</div>
                           </div>
                         </div>
                         {role === option.role && (
@@ -466,7 +503,7 @@ export default function OnboardingPage() {
 
                   <div className="mt-5 grid gap-3 text-left">
                     <label className="block space-y-1.5">
-                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Display name</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("onboarding.displayName")}</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={80}
@@ -476,7 +513,7 @@ export default function OnboardingPage() {
                       />
                     </label>
                     <label className="block space-y-1.5">
-                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Handle</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("onboarding.handle")}</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={30}
@@ -499,7 +536,7 @@ export default function OnboardingPage() {
                     onClick={() => void completeProfile()}
                     type="button"
                   >
-                    {saving ? "Saving profile..." : `Continue as ${roleDisplay(role)}`}
+                    {saving ? t("onboarding.savingProfile") : t("onboarding.continueAs", { role: roleDisplayLabel })}
                   </button>
                 </div>
               )}
@@ -508,23 +545,23 @@ export default function OnboardingPage() {
                 <div className="liquid-glass-shell p-8 text-center">
                   <CheckCircle animated />
                   <h1 className="type-h2 mt-4 font-semibold">
-                    Profile Saved
+                    {t("onboarding.profileSaved")}
                   </h1>
                   <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
                     {account?.profile?.handle
-                      ? `@${account.profile.handle} is now stored for this session.`
-                      : "Your account profile is now stored for this session."}
+                      ? t("onboarding.profileSavedSubtitle", { handle: account.profile.handle })
+                      : t("onboarding.profileSavedSubtitleDefault")}
                   </p>
 
                   <div
                     className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.08] px-5 py-2.5"
                     style={{ animation: "count-pop 500ms ease-out" }}
                   >
-                    <span className="text-[length:var(--fs-caption)] font-medium text-[#65ecaf]">Preview XP</span>
+                    <span className="text-[length:var(--fs-caption)] font-medium text-[#65ecaf]">{t("onboarding.previewXpLabel")}</span>
                     <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[#6f8099]">
-                    XP is still a preview animation. No SPUMP mint, reward ledger entry, or balance update happens here.
+                    {t("onboarding.previewXpNote")}
                   </p>
 
                   <button
@@ -532,7 +569,7 @@ export default function OnboardingPage() {
                     onClick={goNext}
                     type="button"
                   >
-                    Preview Reward
+                    {t("onboarding.previewReward")}
                   </button>
                 </div>
               )}
@@ -552,10 +589,10 @@ export default function OnboardingPage() {
                   </div>
 
                   <h1 className="type-h2 font-semibold">
-                    Preview SPUMP Ready
+                    {t("onboarding.previewSpumpReady")}
                   </h1>
                   <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
-                    Reward issuance is not live yet. This allocation remains a local onboarding preview.
+                    {t("onboarding.previewSpumpSubtitle")}
                   </p>
 
                   <div
@@ -565,14 +602,14 @@ export default function OnboardingPage() {
                     <div className="text-[48px] font-bold tabular-nums tracking-[-0.04em] text-white">
                       {spumpCount.toLocaleString()}
                     </div>
-                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">preview SPUMP</div>
+                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">{t("onboarding.previewSpumpUnit")}</div>
                   </div>
 
                   <Link
                     className="glass-button-primary mt-8 flex w-full items-center justify-center px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                     href="/explore"
                   >
-                    Start Exploring
+                    {t("onboarding.startExploring")}
                   </Link>
                 </div>
               )}
