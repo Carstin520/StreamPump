@@ -1,4 +1,5 @@
 import { CommentRecord, PostRecord } from "@/lib/api/types";
+import { findLocalCommentsByTitle } from "@/lib/mocks/discover";
 import { apiClient } from "./client";
 
 type PublicFeedAssetRecord = {
@@ -162,6 +163,10 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   const creatorName = post.creatorName?.trim() || "Imported Creator";
   const creatorKey = slugify(creatorName);
   const avatarSeed = `${creatorKey}:${post.slug}`;
+  const resolvedTitle = post.title?.trim() || post.slug;
+  // The public-feed projection does not carry comments yet; enrich with the
+  // seeded local comment thread when the (unique, stable) title matches.
+  const localComments = findLocalCommentsByTitle(resolvedTitle);
 
   return {
     id: post.postId,
@@ -170,14 +175,14 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     creatorName,
     creatorHandle: `@${creatorKey}`,
     creatorAvatarSrc: createAvatarDataUrl(avatarSeed, creatorName),
-    title: post.title?.trim() || post.slug,
+    title: resolvedTitle,
     excerpt: post.excerpt?.trim() || post.body?.trim() || "",
     body: post.body?.trim() || post.excerpt?.trim() || "",
     tags: post.tags,
     stage: stageFromMetadata(post.creatorStage),
     likes: 0,
     saves: 0,
-    commentsCount: 0,
+    commentsCount: localComments?.commentsCount ?? 0,
     timeLabel: post.publishTimeLabel?.trim() || "Imported",
     location: post.location?.trim() || "Unknown",
     mediaHeightClass: inferMediaHeightClass(post),
@@ -186,7 +191,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     ...(videoSrc ? { videoSrc } : {}),
     ...(gallerySrcs.length > 0 ? { gallerySrcs } : {}),
     hasMultipleImages: gallerySrcs.length > 1,
-    comments: [] as CommentRecord[],
+    comments: localComments?.comments ?? ([] as CommentRecord[]),
   };
 };
 
