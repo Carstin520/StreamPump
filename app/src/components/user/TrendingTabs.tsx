@@ -366,7 +366,7 @@ const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
                 <button
                   className={`rounded-full border px-3 py-1 text-[length:var(--fs-micro)] font-medium transition ${
                     activeNiche === niche
-                      ? "border-[color:var(--brand)]/40 bg-[color:var(--brand)]/[0.12] text-[color:var(--brand)]"
+                      ? "border-[color:color-mix(in_srgb,var(--brand)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--brand)_12%,transparent)] text-[color:var(--brand)]"
                       : "border-white/[0.08] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.14] hover:text-white"
                   }`}
                   key={niche}
@@ -477,14 +477,25 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
         ) : null}
       </div>
 
-      {/* ⚡ Back CTA — navigation Link only, no transaction */}
+      {/* CTA — navigation Link only, no transaction.
+          Backable creators (resolvable market wallet) -> ⚡ Back to the real /market.
+          Creators without a market wallet aren't backable yet -> honest 'view creator'. */}
       <div className="flex justify-end">
-        <Link
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--brand)]/30 bg-[color:var(--brand)]/[0.10] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[color:var(--brand)] transition hover:border-[color:var(--brand)]/50 hover:bg-[color:var(--brand)]/[0.18]"
-          href={marketHref}
-        >
-          {t("discover.backCta")}
-        </Link>
+        {liveWallet ? (
+          <Link
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[color:var(--brand)] transition border-[color:color-mix(in_srgb,var(--brand)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--brand)_10%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--brand)_18%,transparent)]"
+            href={`/market/${liveWallet}`}
+          >
+            {t("discover.backCta")}
+          </Link>
+        ) : (
+          <Link
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba] transition hover:border-white/[0.2] hover:text-white"
+            href={`/creators/${creator.id}`}
+          >
+            {t("backing.viewCreator")} →
+          </Link>
+        )}
       </div>
     </div>
   );
