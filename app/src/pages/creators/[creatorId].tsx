@@ -11,6 +11,7 @@ import { CreatorStageView } from "@/components/user/CreatorStageView";
 import { usePublicFeedViewModel } from "@/hooks/usePublicFeedViewModel";
 import { CreatorMarketRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
+import { isDemoCreatorRoute, resolveFallbackCreator } from "@/lib/s1-market-view";
 import {
   loadPublicFeedPageProps,
   PUBLIC_FEED_REVALIDATE_SECONDS,
@@ -76,7 +77,13 @@ export default function CreatorDetailPage({
     initialPosts,
   });
   const creatorId = String(router.query.creatorId ?? "");
-  const creator = resolveCreator(creators, creatorId);
+  // Demo-slug fallback: known seeded slugs (mika-zhou, luna-cai, …) resolve to
+  // their fixture record so the demo creator -> market/buyout entry works.
+  // Genuine unknown creators still fall through to the honest "not found" state.
+  const demoLookupKey = normalizeCreatorLookupKey(creatorId);
+  const creator =
+    resolveCreator(creators, creatorId) ??
+    (isDemoCreatorRoute(demoLookupKey) ? resolveFallbackCreator(demoLookupKey) : undefined);
   const creatorPosts = creator
     ? postsByCreator.get(creator.id) ?? []
     : [];

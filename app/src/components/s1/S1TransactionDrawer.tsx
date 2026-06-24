@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { CloseIcon } from "@/components/shared/AppIcons";
 import type { S1TransactionFlowState, S1TransactionFlowStatus } from "@/hooks/useS1TransactionFlow";
+import { useI18n } from "@/lib/i18n";
 import { shortenWallet } from "@/lib/s1-market-view";
 
 type S1TransactionDrawerProps = {
@@ -201,35 +202,36 @@ export const DemoCreatorBanner = ({
   creatorHref?: string;
   marketHref?: string;
 }) => {
+  const { t } = useI18n();
   const isDemoEnv = process.env.NEXT_PUBLIC_SHOW_DEMO_HINTS === "1" || process.env.NODE_ENV === "development";
   if (!isDemoEnv) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#67b8ff]/15 bg-[#0e1726]/60 px-3 py-2">
       <span className="h-1.5 w-1.5 rounded-full bg-[#67b8ff]" />
-      <span className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff]">Demo</span>
+      <span className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff]">{t("s1demo.badge")}</span>
       <span className="text-[length:var(--fs-micro)] text-[#7486a1]">
-        Creator: {shortenWallet(creatorWallet)}
+        {t("s1demo.creator")}: {shortenWallet(creatorWallet)}
       </span>
       <a
         className="ml-auto text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
         href={marketHref ?? `/market/${creatorWallet}`}
       >
-        Market ↗
+        {t("s1demo.market")}
       </a>
       {creatorHref ? (
         <a
           className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
           href={creatorHref}
         >
-          Profile ↗
+          {t("s1demo.profile")}
         </a>
       ) : null}
       <a
         className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
         href={buyoutHref ?? `/buyout/${creatorWallet}`}
       >
-        Buyout ↗
+        {t("s1demo.buyout")}
       </a>
     </div>
   );

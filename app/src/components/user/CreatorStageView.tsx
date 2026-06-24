@@ -455,18 +455,31 @@ const MomentumPanel = ({
     return (
       <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
         <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
-          <div>
-            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
-              {t("creator.momentumHeadline")}
-            </p>
-            <h3 className="mt-1 text-sm font-semibold text-white">{t("creator.noProjection")}</h3>
+          <div className="flex items-end gap-3">
+            <div>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">
+                {t("creator.momentumHeadline")}
+              </p>
+              <p className="mt-0.5 text-xl font-semibold tracking-[-0.03em]" style={{ color: "var(--brand)" }}>
+                {creator.momentumScore}
+                <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">/100</span>
+              </p>
+            </div>
+            <MomentumMeter className="w-20" value={creator.momentumScore} max={100} tone="momentum" />
           </div>
           <span className="tone-state-warning rounded-full border px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">
             {t("creator.contentOnly")}
           </span>
         </header>
-        <div className="px-4 py-10 text-center text-xs leading-5 text-[#8ea0ba]">
-          This public profile is derived from feed content. S1 势能/供应, holders, and graduation history require CreatorMarketProjection from the market API.
+        <div className="px-4 pt-4">
+          <MomentumLine
+            caption={t("creator.momentumChartCaption")}
+            height={150}
+            points={momentumPoints}
+          />
+        </div>
+        <div className="px-4 pb-5 pt-3 text-xs leading-5 text-[#8ea0ba]">
+          {t("creator.contentOnlyBody")}
         </div>
       </section>
     );

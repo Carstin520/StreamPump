@@ -586,7 +586,7 @@ function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
 
 function MarketPage() {
   const router = useRouter();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
@@ -719,7 +719,7 @@ function MarketPage() {
     return (
       <PageShell>
         <div className="mx-auto max-w-5xl space-y-4 py-6">
-          <S1ErrorState error={error} title={`Could not load market for ${fallbackCreator.name}`} />
+          <S1ErrorState error={error} title={t("market.loadError", { name: fallbackCreator.name })} />
           <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
         </div>
       </PageShell>
@@ -732,9 +732,9 @@ function MarketPage() {
       <PageShell>
         <div className="mx-auto max-w-5xl space-y-4">
           <ProductReadinessBanner
-            description="S1 market buy/sell builders are live for seeded devnet markets when a real wallet session is available. Demo slugs remain local previews, and rating provenance, cap usage, and open creator onboarding are not productized yet."
+            description={t("market.readinessBody")}
             status="SEEDED_DEMO"
-            title="S1 market is a seeded demo path"
+            title={t("market.readinessTitle")}
           />
           <MarketReadinessNotice isDemoRoute={isDemoRoute} />
 
