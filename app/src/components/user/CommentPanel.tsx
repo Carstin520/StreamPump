@@ -17,9 +17,13 @@ const ANONYMOUS_USER = {
 export const CommentPanel = ({
   post,
   variant = "sidebar",
+  showPostContent = true,
 }: {
   post: PostRecord;
   variant?: "sidebar" | "sheet";
+  // When false, the post title/body/tags/meta and the like/save/share bar are
+  // rendered elsewhere (the left media column); this panel shows comments only.
+  showPostContent?: boolean;
 }) => {
   const { t } = useI18n();
   const router = useRouter();
@@ -144,20 +148,24 @@ export const CommentPanel = ({
     </div>
 
     <div className="flex-1 overflow-y-auto px-5 py-5" data-post-scroll-region>
-      <h1 className="line-clamp-3 text-[24px] font-semibold leading-8 tracking-[-0.04em] text-white">{post.title}</h1>
-      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {post.tags.map((tag) => (
-          <span className="text-xs text-[#de725f]" key={tag}>
-            #{tag}
-          </span>
-        ))}
-      </div>
-      <p className="mt-3 text-xs text-[#7a8ba5]">
-        {post.timeLabel} · {post.location}
-      </p>
+      {showPostContent ? (
+        <>
+          <h1 className="line-clamp-3 text-[24px] font-semibold leading-8 tracking-[-0.04em] text-white">{post.title}</h1>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#d3dbe9]">{post.body}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {post.tags.map((tag) => (
+              <span className="text-xs text-[#de725f]" key={tag}>
+                #{tag}
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-[#7a8ba5]">
+            {post.timeLabel} · {post.location}
+          </p>
 
-      <div className="my-6 h-px bg-white/[0.045]" />
+          <div className="my-6 h-px bg-white/[0.045]" />
+        </>
+      ) : null}
 
       <p className="mb-5 text-sm font-semibold text-white">
         {t("feed.commentCount", { count: compactNumber(comments.length) })}
@@ -170,38 +178,40 @@ export const CommentPanel = ({
     </div>
 
     <div className="border-t border-white/[0.045] px-5 py-4">
-      <div className="mb-3 flex items-center gap-5 px-1">
-        <button
-          className={`flex items-center gap-1.5 text-sm transition hover:text-white ${
-            liked ? "text-[#ff9fc4]" : "text-[#c7d2e3]"
-          } ${highlightKey === "like" ? "tap-bounce-active" : ""}`}
-          onClick={toggleLike}
-          type="button"
-        >
-          {liked ? <HeartSolidIcon className="h-4 w-4" /> : <HeartOutlineIcon className="h-4 w-4" />}
-          <span>{compactNumber(post.likes + (liked ? 1 : 0))}</span>
-        </button>
-        <button
-          className={`flex items-center gap-1.5 text-sm transition hover:text-white ${
-            saved ? "text-[#93c8ff]" : "text-[#c7d2e3]"
-          } ${highlightKey === "save" ? "tap-bounce-active" : ""}`}
-          onClick={toggleSave}
-          type="button"
-        >
-          <span className="text-base">☆</span>
-          <span>{compactNumber(post.saves + (saved ? 1 : 0))}</span>
-        </button>
-        <button
-          className={`flex items-center gap-1.5 text-sm text-[#c7d2e3] transition hover:text-white ${
-            highlightKey === "share" ? "tap-bounce-active" : ""
-          }`}
-          onClick={() => triggerHighlight("share")}
-          type="button"
-        >
-          <span className="text-base">↗</span>
-          <span>{t("feed.share")}</span>
-        </button>
-      </div>
+      {showPostContent ? (
+        <div className="mb-3 flex items-center gap-5 px-1">
+          <button
+            className={`flex items-center gap-1.5 text-sm transition hover:text-white ${
+              liked ? "text-[#ff9fc4]" : "text-[#c7d2e3]"
+            } ${highlightKey === "like" ? "tap-bounce-active" : ""}`}
+            onClick={toggleLike}
+            type="button"
+          >
+            {liked ? <HeartSolidIcon className="h-4 w-4" /> : <HeartOutlineIcon className="h-4 w-4" />}
+            <span>{compactNumber(post.likes + (liked ? 1 : 0))}</span>
+          </button>
+          <button
+            className={`flex items-center gap-1.5 text-sm transition hover:text-white ${
+              saved ? "text-[#93c8ff]" : "text-[#c7d2e3]"
+            } ${highlightKey === "save" ? "tap-bounce-active" : ""}`}
+            onClick={toggleSave}
+            type="button"
+          >
+            <span className="text-base">☆</span>
+            <span>{compactNumber(post.saves + (saved ? 1 : 0))}</span>
+          </button>
+          <button
+            className={`flex items-center gap-1.5 text-sm text-[#c7d2e3] transition hover:text-white ${
+              highlightKey === "share" ? "tap-bounce-active" : ""
+            }`}
+            onClick={() => triggerHighlight("share")}
+            type="button"
+          >
+            <span className="text-base">↗</span>
+            <span>{t("feed.share")}</span>
+          </button>
+        </div>
+      ) : null}
       <div className="flex items-center gap-2">
         <div
           className={`liquid-pill flex-1 rounded-full px-4 py-1.5 text-sm ${

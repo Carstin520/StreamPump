@@ -1,5 +1,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 
 import { BackingCard } from "@/components/backing/BackingCard";
@@ -10,6 +11,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  HeartOutlineIcon,
+  HeartSolidIcon,
 } from "@/components/shared/AppIcons";
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import {
@@ -21,6 +24,8 @@ import { StagePill } from "@/components/shared/StagePill";
 import { usePostNavigator } from "@/hooks/usePostNavigator";
 import { PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
+import { requireInteractiveSession } from "@/lib/interaction-auth";
+import { compactNumber } from "@/lib/public-data";
 
 const DynamicCommentPanel = dynamic(
   () => import("@/components/user/CommentPanel").then((mod) => mod.CommentPanel),
@@ -188,21 +193,28 @@ export const PostDetailExperience = ({
             />
           </div>
 
-          <div className="relative z-10 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.045] pt-2.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <img alt={currentPost.creatorName} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/12" src={currentPost.creatorAvatarSrc} />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{currentPost.creatorName}</p>
-                <p className="truncate text-xs text-[#8ea0ba]">
-                  {currentPost.timeLabel} · {currentPost.location}
-                </p>
+          <div
+            className="relative z-10 mt-2 flex min-h-0 shrink-0 flex-col gap-3 overflow-y-auto border-t border-white/[0.045] pt-2.5"
+            style={{ maxHeight: "44%" }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Link className="flex min-w-0 items-center gap-3" href={`/creators/${currentPost.creatorId}`}>
+                <img alt={currentPost.creatorName} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/12" src={currentPost.creatorAvatarSrc} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{currentPost.creatorName}</p>
+                  <p className="truncate text-xs text-[#8ea0ba]">
+                    {currentPost.timeLabel} · {currentPost.location}
+                  </p>
+                </div>
+              </Link>
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[#93a5bd]">
+                <StagePill stage={currentPost.stage} />
+                {previousPost ? <RouteHint label={t("common.previous")} onClick={goPrevious} post={previousPost} /> : null}
+                {nextPost ? <RouteHint label={t("common.next")} onClick={goNext} post={nextPost} /> : null}
               </div>
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[#93a5bd]">
-              <StagePill stage={currentPost.stage} />
-              {previousPost ? <RouteHint label={t("common.previous")} onClick={goPrevious} post={previousPost} /> : null}
-              {nextPost ? <RouteHint label={t("common.next")} onClick={goNext} post={nextPost} /> : null}
-            </div>
+
+            <PostContentBlock post={currentPost} />
           </div>
 
           <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-[length:var(--fs-micro)] text-white/44">
@@ -527,7 +539,76 @@ const RouteHint = ({
   </button>
 );
 
-// Right column: BackingCard teaser + related posts + CommentPanel
+// Left column content under the media: title + meta actions + body + tags.
+// (Prototype content-page-c.html: title/简介/actions live in the left column;
+// the right column is backing + related + comments only.)
+const PostContentBlock = ({ post }: { post: PostRecord }) => {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const toggleLike = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+    setLiked((value) => !value);
+  };
+
+  const toggleSave = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+    setSaved((value) => !value);
+  };
+
+  return (
+    <div>
+      {post.title ? (
+        <h1 className="text-[19px] font-semibold leading-[1.32] tracking-[-0.03em] text-white">{post.title}</h1>
+      ) : null}
+
+      <div className="mt-2.5 flex items-center gap-5 text-sm">
+        <button
+          className={`flex items-center gap-1.5 transition hover:text-white ${liked ? "text-[#ff9fc4]" : "text-[#c7d2e3]"}`}
+          onClick={toggleLike}
+          type="button"
+        >
+          {liked ? <HeartSolidIcon className="h-4 w-4" /> : <HeartOutlineIcon className="h-4 w-4" />}
+          <span>{compactNumber(post.likes + (liked ? 1 : 0))}</span>
+        </button>
+        <button
+          className={`flex items-center gap-1.5 transition hover:text-white ${saved ? "text-[#93c8ff]" : "text-[#c7d2e3]"}`}
+          onClick={toggleSave}
+          type="button"
+        >
+          <span className="text-base">{saved ? "★" : "☆"}</span>
+          <span>{compactNumber(post.saves + (saved ? 1 : 0))}</span>
+        </button>
+        <span className="flex items-center gap-1.5 text-[#c7d2e3]">
+          <span className="text-base">↗</span>
+          <span>{t("feed.share")}</span>
+        </span>
+      </div>
+
+      {post.body ? (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#cfd8e7]">{post.body}</p>
+      ) : null}
+
+      {post.tags?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {post.tags.map((tag) => (
+            <span className="text-xs text-[#de725f]" key={tag}>
+              #{tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+// Right column: BackingCard teaser + related posts + comments-only panel
 const DetailRightColumn = ({
   currentPost,
   items,
@@ -592,9 +673,9 @@ const DetailRightColumn = ({
         <div className="my-1 h-px bg-white/[0.045]" />
       </div>
 
-      {/* CommentPanel fills remaining height */}
+      {/* Comments only — post title/body/actions live in the left media column */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        <DynamicCommentPanel post={currentPost} />
+        <DynamicCommentPanel post={currentPost} showPostContent={false} />
       </div>
     </div>
   );
