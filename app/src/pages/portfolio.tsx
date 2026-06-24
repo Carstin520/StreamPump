@@ -57,6 +57,15 @@ import {
 
 type LiveTab = "Portfolio" | "Claim queue" | "S2 Endorsements" | "Preview Holdings" | "Watchlist" | "Rewards";
 const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue", "S2 Endorsements", "Preview Holdings", "Watchlist", "Rewards"];
+// Stable English keys drive state (activeTab === ...); display label is localized.
+const TAB_LABEL_KEYS: Record<LiveTab, string> = {
+  "Portfolio": "portfolio.tab.portfolio",
+  "Claim queue": "portfolio.tab.claimQueue",
+  "S2 Endorsements": "portfolio.tab.endorsements",
+  "Preview Holdings": "portfolio.tab.previewHoldings",
+  "Watchlist": "portfolio.tab.watchlist",
+  "Rewards": "portfolio.tab.rewards",
+};
 type PortfolioPosition = S1PortfolioResponse["positions"][number];
 
 const isExpiredSessionError = (error: unknown) => {
@@ -75,7 +84,8 @@ const displayPortfolioCreatorName = (position: PortfolioPosition, locale: Locale
   return position.creator?.displayName || position.creator?.handle || shortenWallet(position.creatorWallet);
 };
 
-function TabBar({ active, onChange }: { active: LiveTab; onChange: (t: LiveTab) => void }) {
+function TabBar({ active, onChange }: { active: LiveTab; onChange: (tab: LiveTab) => void }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-5 border-b border-white/[0.06]">
       {LIVE_TABS.map((tab) => (
@@ -85,7 +95,7 @@ function TabBar({ active, onChange }: { active: LiveTab; onChange: (t: LiveTab) 
           onClick={() => onChange(tab)}
           type="button"
         >
-          {tab}
+          {t(TAB_LABEL_KEYS[tab])}
           {active === tab ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#de402a]" /> : null}
         </button>
       ))}
