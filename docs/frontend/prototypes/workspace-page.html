@@ -350,14 +350,14 @@
   function locked(t){return LV[state.plan]<LV[t];}
   function tierBadge(t){var c={starter:['#9fd0ff','rgba(103,184,255,.16)','rgba(103,184,255,.4)'],growth:['#ffd9a0','rgba(240,160,112,.16)','rgba(240,160,112,.4)'],studio:['#cbb3ff','rgba(184,144,255,.16)','rgba(184,144,255,.4)']}[t];return '<span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:'+c[0]+';background:'+c[1]+';border:1px solid '+c[2]+';border-radius:30px;padding:1px 7px">'+TIER_NAME[t].toUpperCase()+'</span>';}
   function lockEl(t){if(!locked(t))return '';return '<div class="lock" onclick="openPro()"><div style="font-size:20px">🔒</div><div class="pill">'+TIER_NAME[t]+' 解锁 · '+TIER_FROM[t]+'/月起</div></div>';}
-  function setPlan(t){state.plan=t;renderAnalytics();}
+  function setPlan(t){state.plan=t;if(state.view==='data')renderData();else renderAnalytics();}
   /* pricing modal */
   function fmtP(v){return v%1===0?'$'+v:'$'+v.toFixed(2);}
   function openPro(){renderPricing();document.getElementById('pmodal').classList.add('show');}
   function closePro(){document.getElementById('pmodal').classList.remove('show');}
   function setBilling(b){state.billing=b;renderPricing();}
   function togglePromo(){state.promo=!state.promo;renderPricing();}
-  function choosePlan(t){state.plan=t;closePro();flash(t==='free'?'已切换到免费版':'已选择 '+TIER_NAME[t]+'（演示，未接支付）');renderAnalytics();}
+  function choosePlan(t){state.plan=t;closePro();flash(t==='free'?'已切换到免费版':'已选择 '+TIER_NAME[t]+'（演示，未接支付）');if(state.view==='data')renderData();else renderAnalytics();}
   function renderPricing(){
     var an=state.billing==='annual',promo=state.promo;
     var promoBar=promo?'<div style="margin-top:14px;border-radius:12px;padding:10px 14px;background:rgba(222,64,42,.1);border:1px solid rgba(222,64,42,.3);display:flex;align-items:center;gap:12px">'
@@ -451,9 +451,46 @@
 
   /* ---------- DATA ---------- */
   function renderData(){
-    document.getElementById('view').innerHTML='<div style="font-size:24px;font-weight:800">数据 <span style="font-size:14px;color:#7486a1;font-weight:600">看一眼就好</span></div>'
-      +'<div style="display:flex;gap:12px;margin-top:18px"><div class="panel" style="flex:1;padding:18px"><div style="font-size:11px;color:#7486a1">势能 Momentum</div><div style="font-size:30px;font-weight:800">71 <span style="font-size:14px;color:#2fbf71">↗ +9</span></div><div style="margin-top:12px">'+svgArea(gen(3,22,30,92),'#2fbf71',110)+'</div><div style="font-size:10.5px;color:#7486a1;margin-top:8px">是发现信号，不是价格。</div></div>'
-      +'<div class="panel" style="flex:1;padding:18px"><div style="font-size:11px;color:#7486a1">应援人数</div><div style="font-size:30px;font-weight:800">312</div><div style="font-size:12px;color:#2fbf71;margin-top:4px">本周 +48</div><div style="font-size:11px;color:#7486a1;margin-top:14px;line-height:1.6">应援越多、势能越高，越接近触发赞助商出资助你毕业。保持稳定更新是关键。</div></div></div>';
+    var kpis=[['总粉丝','4.8万'],['本周播放','2.3万'],['本周新增应援','+48 ⚡'],['总应援','312'],['势能','71 ↗+9']];
+    var tr=[['推荐',58],['关注',26],['搜索',9],['外部',7]];
+    var fv=[];var v=52;for(var i=0;i<24;i++){v+=2+((i*5+6)%4);fv.push(v);}
+    var pub=state.posts.filter(function(x){return x.status==='published';});
+    var plays=['4.2万','1.1万','8.6千'],bks=['+37 ⚡','+12 ⚡','+6 ⚡'],eng=['9.2%','6.1%','7.4%'];
+
+    var head='<div style="display:flex;align-items:center"><div style="font-size:24px;font-weight:800">数据 <span style="font-size:14px;color:#7486a1;font-weight:600">账号总览</span></div>'
+      +'<div class="plan-sw"><span>演示档位</span>'+['free','starter','growth','studio'].map(function(t){return '<div class="pc'+(state.plan===t?' on':'')+'" onclick="setPlan(\''+t+'\')">'+TIER_NAME[t]+'</div>';}).join('')+'</div></div>'
+      +'<div class="kpis">'+kpis.map(function(k){return '<div class="kpi"><div class="k">'+k[0]+'</div><div class="v">'+k[1]+'</div></div>';}).join('')+'</div>';
+
+    var upsell=state.plan!=='free'?'':'<div class="upsell"><span style="font-size:22px">📊</span><div style="flex:1"><div style="font-size:13.5px;font-weight:700">StreamPump Pro · 创作者洞察 <span class="promo-badge">限时 6 折 · 早鸟</span></div><div style="font-size:11.5px;color:#d8c4a0;line-height:1.5">账号级涨粉 / 流量来源 / 同类排名 / 多内容对比 / 导出，单条内容点开还有更细的逐条分析</div></div>'
+      +'<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:#ffd9a0">$12.50<span style="font-size:11px;color:#c9b48f">/月起</span></div></div>'
+      +'<div class="cta sm" style="height:38px" onclick="openPro()">查看方案</div></div>';
+
+    var pMom='<div class="apanel wide"><h3>📈 账号势能趋势</h3>'+svgArea(gen(3,26,30,92),'#2fbf71',130)+'<div class="cap">势能来自粉丝增长、观看、互动质量 —— 是发现信号，不是价格。当前 71（↗ +9）· 距毕业 64%。</div></div>';
+    var pTop='<div class="apanel wide"><h3>🏆 内容排行 <span style="font-size:10.5px;color:#7486a1;font-weight:400">· 点开看单条深度分析</span></h3>'
+      +pub.map(function(p,i){return '<div class="post" style="cursor:pointer;border:1px solid rgba(255,255,255,.06);margin-top:8px" onclick="openAnalytics(\''+p.id+'\')">'
+        +'<div style="width:26px;text-align:center;font-weight:800;color:#7486a1">#'+(i+1)+'</div><div class="th" style="background:'+hero(p.a,p.b)+'"></div>'
+        +'<div style="flex:1;min-width:0"><div class="t">'+p.title+'</div><div class="m">播放 '+(plays[i]||'—')+' · 带来应援 '+(bks[i]||'—')+'</div></div>'
+        +'<div style="font-size:12px;color:#67b8ff;font-weight:700">看分析 →</div></div>';}).join('')+'</div>';
+    var pFol='<div class="apanel"><h3>👥 账号涨粉趋势 '+tierBadge('starter')+'</h3>'+svgArea(fv,'#67b8ff',120)+'<div class="cap">近 30 天 <b style="color:#fff">+1,240 粉丝</b> · 稳定上升，最近一条带动明显。</div>'+lockEl('starter')+'</div>';
+    var pTr='<div class="apanel"><h3>🌐 流量来源（账号）'+tierBadge('starter')+'</h3><div style="margin-top:6px">'
+      +tr.map(function(t){return '<div class="tr-row"><span class="lab">'+t[0]+'</span><div class="tb"><i style="width:'+t[1]+'%"></i></div><span style="width:36px;text-align:right;font-weight:700">'+t[1]+'%</span></div>';}).join('')+'</div><div class="cap">推荐流量占主导 —— 算法在助推你的账号。</div>'+lockEl('starter')+'</div>';
+    var pPct='<div class="apanel"><h3>🏅 同类账号排名 '+tierBadge('growth')+'</h3>'
+      +'<div style="font-size:11.5px;color:#93a2bb;margin-top:8px">对比同类目「插画」创作者</div>'
+      +pctRow('粉丝增速',81)+pctRow('互动率',88)+pctRow('应援转化',93)+'<div class="cap">应援转化 <b style="color:#7ce0b0">Top 7%</b> —— 你的粉丝特别愿意 Back 你。</div>'+lockEl('growth')+'</div>';
+    var pAud='<div class="apanel"><h3>🕗 粉丝活跃时段 '+tierBadge('growth')+'</h3>'
+      +'<div style="font-size:13px;margin-top:10px">最活跃：<b style="color:#fff">周五 20:00–22:00</b></div>'
+      +'<div style="display:flex;gap:3px;margin-top:12px;align-items:flex-end;height:56px">'+[30,42,55,38,60,88,74].map(function(x,i){var hot=i===5;return '<div style="flex:1;height:'+x+'%;border-radius:3px;background:'+(hot?'linear-gradient(180deg,#f0795f,#de402a)':'rgba(255,255,255,.12)')+'"></div>';}).join('')+'</div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:9.5px;color:#5d6b82;margin-top:5px"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>'+lockEl('growth')+'</div>';
+    var pStudio='<div class="apanel wide"><h3>🔁 多内容横向对比 & 导出 '+tierBadge('studio')+'</h3>'
+      +'<div style="display:grid;grid-template-columns:1.6fr .8fr .8fr .8fr;gap:10px;font-size:11px;color:#7486a1;margin-top:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)"><div>内容</div><div>播放</div><div>互动率</div><div>带来应援</div></div>'
+      +pub.map(function(p,i){return '<div style="display:grid;grid-template-columns:1.6fr .8fr .8fr .8fr;gap:10px;font-size:12.5px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer" onclick="openAnalytics(\''+p.id+'\')"><div style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:24px;height:16px;border-radius:4px;flex:none;background:'+hero(p.a,p.b)+'"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.title+'</span></div><div>'+(plays[i]||'—')+'</div><div>'+(eng[i]||'—')+'</div><div style="color:#f5b8ab;font-weight:700">'+(bks[i]||'—')+'</div></div>';}).join('')
+      +'<div style="display:flex;gap:8px;margin-top:12px"><div class="ghost" style="height:34px;font-size:12px" onclick="flash(\'导出 CSV（演示）\')">⬇️ 导出 CSV</div><div class="ghost" style="height:34px;font-size:12px" onclick="flash(\'全量历史（演示）\')">📚 全量历史</div></div>'+lockEl('studio')+'</div>';
+
+    document.getElementById('view').innerHTML=head+upsell+pMom
+      +'<div style="margin-top:14px">'+pTop+'</div>'
+      +'<div class="agrid" style="margin-top:14px">'+pFol+pTr+'</div>'
+      +'<div class="agrid" style="margin-top:14px">'+pPct+pAud+'</div>'
+      +'<div style="margin-top:14px">'+pStudio+'</div>';
   }
 
   /* ---------- dispatch ---------- */
