@@ -13,6 +13,38 @@ const stageGlow: Record<PostRecord["stage"], string> = {
   S2_ACTIVE: "shadow-[0_18px_44px_rgba(0,0,0,0.22),0_0_22px_rgba(101,236,175,0.05)]",
 };
 
+// Energy chip: ⚡S1 / ⚡S1 BUYOUT / ⚡S2 labels with stage color
+const stageTailColor: Record<Exclude<PostRecord["stage"], "NONE">, string> = {
+  S1_DISCOVERY: "var(--stage-s1)",
+  S1_BUYOUT: "var(--stage-buyout)",
+  S2_ACTIVE: "var(--stage-s2)",
+};
+
+const stageTailLabel: Record<Exclude<PostRecord["stage"], "NONE">, string> = {
+  S1_DISCOVERY: "S1",
+  S1_BUYOUT: "S1 ✦",
+  S2_ACTIVE: "S2",
+};
+
+const EnergyTailChip = ({ stage }: { stage: PostRecord["stage"] }) => {
+  if (stage === "NONE") return null;
+
+  const color = stageTailColor[stage];
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold"
+      style={{
+        color,
+        borderColor: `color-mix(in srgb, ${color} 34%, transparent)`,
+        background: `color-mix(in srgb, ${color} 13%, transparent)`,
+      }}
+    >
+      <span>⚡</span>
+      <span>{stageTailLabel[stage]}</span>
+    </span>
+  );
+};
+
 export const PostCard = ({
   post,
   priority = false,
@@ -63,9 +95,12 @@ export const PostCard = ({
               <img alt={post.creatorName} className="h-6 w-6 rounded-full object-cover" src={post.creatorAvatarSrc} />
               <span className="truncate text-[length:var(--fs-caption)] text-[#cbd7e8]">{post.creatorName}</span>
             </div>
-            <span className="shrink-0 text-[length:var(--fs-caption)] text-[#8ea0ba]">
-              {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : "metrics pending"}
-            </span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="text-[length:var(--fs-caption)] text-[#8ea0ba]">
+                {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : "metrics pending"}
+              </span>
+              <EnergyTailChip stage={post.stage} />
+            </div>
           </div>
         </div>
       </div>

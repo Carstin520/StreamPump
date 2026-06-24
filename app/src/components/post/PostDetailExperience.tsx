@@ -2,6 +2,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { BackingCard } from "@/components/backing/BackingCard";
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
@@ -209,8 +210,12 @@ export const PostDetailExperience = ({
           </div>
         </div>
 
-        <div className="min-h-[36vh] border-t border-white/[0.045] lg:min-h-0 lg:border-l lg:border-t-0">
-          <DynamicCommentPanel post={currentPost} />
+        <div className="flex min-h-[36vh] flex-col overflow-hidden border-t border-white/[0.045] lg:min-h-0 lg:border-l lg:border-t-0">
+          <DetailRightColumn
+            currentPost={currentPost}
+            items={items}
+            onChangePostId={onChangePostId}
+          />
         </div>
       </div>
     </section>
@@ -521,3 +526,108 @@ const RouteHint = ({
     {label}: {post.title}
   </button>
 );
+
+// Right column: BackingCard teaser + related posts + CommentPanel
+const DetailRightColumn = ({
+  currentPost,
+  items,
+  onChangePostId,
+}: {
+  currentPost: PostRecord;
+  items: PostRecord[];
+  onChangePostId?: (postId: string) => void;
+}) => {
+  const { t } = useI18n();
+
+  // Related posts: exclude current, up to 4
+  const related = items.filter((item) => item.id !== currentPost.id).slice(0, 4);
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Scrollable upper area: BackingCard + Related */}
+      <div className="overflow-y-auto">
+        {/* BackingCard teaser — uses only real PostRecord fields: creatorName, creatorAvatarSrc, stage, creatorId */}
+        <div className="px-3 pt-3">
+          <BackingCard
+            creatorAvatarSrc={currentPost.creatorAvatarSrc}
+            creatorName={currentPost.creatorName}
+            ctaHref={`/market/${currentPost.creatorId}`}
+            ctaLabel={t("backing.teaserCta")}
+            note={t("backing.teaserNote")}
+            readinessLabel={
+              currentPost.stage !== "NONE" ? t("backing.teaserReadiness") : undefined
+            }
+            stage={currentPost.stage}
+            variant="teaser"
+          />
+        </div>
+
+        {/* Related posts */}
+        {related.length > 0 ? (
+          <div className="mt-3 pb-2">
+            <p className="px-4 pb-2 text-[length:var(--fs-caption)] font-semibold text-[#8ea0ba]">
+              {t("backing.related")}
+            </p>
+            <div className="flex flex-col">
+              {related.map((item) => (
+                <RelatedPostRow key={item.id} onClick={onChangePostId} post={item} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="my-1 h-px bg-white/[0.045]" />
+      </div>
+
+      {/* CommentPanel fills remaining height */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <DynamicCommentPanel post={currentPost} />
+      </div>
+    </div>
+  );
+};
+
+const RelatedPostRow = ({
+  post,
+  onClick,
+}: {
+  post: PostRecord;
+  onClick?: (postId: string) => void;
+}) => {
+  const inner = (
+    <div className="flex items-center gap-3 px-4 py-2 transition hover:bg-white/[0.04]">
+      <div className="relative h-[58px] w-[88px] flex-none overflow-hidden rounded-[8px] bg-[#091019]">
+        <ProgressiveImage
+          alt={post.title}
+          className="object-cover"
+          fill
+          sizes="88px"
+          src={post.coverSrc}
+        />
+        {post.type === "VIDEO" ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <span className="text-[10px] text-white/80">▶</span>
+          </div>
+        ) : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-[length:var(--fs-caption)] leading-5 text-[#e0e8f4]">{post.title}</p>
+        <p className="mt-1 truncate text-[length:var(--fs-nano)] text-[#7a8ba5]">{post.creatorName}</p>
+      </div>
+    </div>
+  );
+
+  if (onClick) {
+    return (
+      <button className="w-full text-left" onClick={() => onClick(post.id)} type="button">
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={`/posts/${post.id}`}>
+      {inner}
+    </Link>
+  );
+};
