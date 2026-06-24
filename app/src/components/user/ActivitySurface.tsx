@@ -157,8 +157,23 @@ export const ActivitySurface = ({
                     return null;
                   }
 
+                  const isBigEvent = creator.state === "S1_BUYOUT" || creator.state === "S2_ACTIVE";
+                  const eventAccent = creator.state === "S2_ACTIVE" ? "var(--stage-s2)" : "var(--stage-buyout)";
+
                   return (
-                    <article className="liquid-glass-shell card-radius overflow-hidden px-4 py-3.5" key={item.id}>
+                    <article
+                      className="liquid-glass-shell card-radius overflow-hidden px-4 py-3.5"
+                      key={item.id}
+                      style={isBigEvent ? { borderLeft: `2px solid color-mix(in srgb, ${eventAccent} 60%, transparent)` } : undefined}
+                    >
+                      {isBigEvent ? (
+                        <p
+                          className="mb-2 inline-flex items-center gap-1 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.16em]"
+                          style={{ color: eventAccent }}
+                        >
+                          ⚡ {t("activity.bigEvent")}
+                        </p>
+                      ) : null}
                       <div className="flex items-center justify-between gap-3">
                         <Link className="flex min-w-0 items-center gap-2.5" href={`/creators/${creator.id}`}>
                           <img alt={creator.name} className="h-9 w-9 rounded-full object-cover" src={creator.avatarSrc} />
@@ -174,7 +189,7 @@ export const ActivitySurface = ({
                         </Link>
 
                         <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7f90ab]">
-                          {item.kind === "post" ? "POST" : "UPDATE"}
+                          {item.kind === "post" ? t("activity.kindPost") : t("activity.kindUpdate")}
                         </span>
                       </div>
 
@@ -351,13 +366,15 @@ export const ActivitySurface = ({
 };
 
 const ActivitySourceNotice = ({ error }: { error: string | null }) => {
+  const { t } = useI18n();
+
   if (!error) {
     return null;
   }
 
   return (
     <section className="tone-state-warning rounded-[14px] border px-4 py-3">
-      <p className="text-sm font-semibold text-white">Activity unavailable</p>
+      <p className="text-sm font-semibold text-white">{t("activity.unavailableTitle")}</p>
       <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{error}</p>
     </section>
   );
