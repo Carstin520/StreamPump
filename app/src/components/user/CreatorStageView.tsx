@@ -276,6 +276,7 @@ const ProfileHero = ({
 };
 
 const StatusBadge = ({ market }: { market: MarketModel }) => {
+  const { t } = useI18n();
   if (market.state === "S2_ACTIVE") {
     return (
       <span className="tone-stage-s2 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
@@ -291,7 +292,7 @@ const StatusBadge = ({ market }: { market: MarketModel }) => {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--stage-buyout)] opacity-60" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--stage-buyout)]" />
         </span>
-        Buyout Watch
+        {t("creator.statusBuyoutWatch")}
       </span>
     );
   }
@@ -339,9 +340,9 @@ const MarketStatsBar = ({
         </StatCell>
       </div>
       <div className="border-t border-white/[0.04] px-4 py-1.5 text-[length:var(--fs-micro)] text-[#6f8099]">
-        <span className="text-[#7486a1]">Niche</span>
+        <span className="text-[#7486a1]">{t("creator.niche")}</span>
         <span className="ml-2 text-[#c8d3e6]">{creator.niche}</span>
-        <span className="ml-4 text-[#7486a1]">Tags</span>
+        <span className="ml-4 text-[#7486a1]">{t("creator.tags")}</span>
         <span className="ml-2 text-[#c8d3e6]">{creator.tags.slice(0, 3).map((tag) => `#${tag}`).join("  ")}</span>
       </div>
     </section>
@@ -629,7 +630,7 @@ const BuyPanel = ({
         </div>
 
         <div className="space-y-1.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <SummaryRow label="平均投入" value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
+          <SummaryRow label={t("market.avgInput")} value={hasMarketProjection ? `${buyPreview.avgPrice} SPUMP` : "—"} />
           <SummaryRow accent label={t("market.estCost")} value={hasMarketProjection ? `${buyPreview.cost} SPUMP` : "—"} />
           <SummaryRow
             label={t("market.willHold")}
@@ -637,7 +638,7 @@ const BuyPanel = ({
             sublabel={hasMarketProjection ? `+${buyPreview.amount} ${t("market.newHolding")}` : undefined}
           />
           <SummaryRow
-            label="投入后档位"
+            label={t("market.priceAfterBuy")}
             value={hasMarketProjection ? `${buyPreview.priceAfter} SPUMP` : "—"}
             sublabel={
               hasMarketProjection
@@ -652,22 +653,12 @@ const BuyPanel = ({
             <Link
               className="block rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-3 py-2.5 text-center text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] transition hover:brightness-[1.05]"
               href={`/market/${creator.id}`}
-              onClick={(event) => {
-                if (!onRequireAuth()) {
-                  event.preventDefault();
-                }
-              }}
             >
               {t("market.openSeededMarket")}
             </Link>
             <Link
               className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
               href={`/buyout/${creator.id}`}
-              onClick={(event) => {
-                if (!onRequireAuth()) {
-                  event.preventDefault();
-                }
-              }}
             >
               {t("market.openSeededBuyout")}
             </Link>
@@ -754,11 +745,11 @@ const SummaryRow = ({
 
 /* ──────────────────────────  Lifecycle  ────────────────────────── */
 
-const LIFECYCLE_STEPS: Array<{ id: string; label: string; minProgress: number }> = [
-  { id: "discovery", label: "Discovery", minProgress: 0 },
-  { id: "growth", label: "Growth", minProgress: 30 },
-  { id: "buyout", label: "Buyout Watch", minProgress: 65 },
-  { id: "graduation", label: "Graduation", minProgress: 100 },
+const LIFECYCLE_STEPS: Array<{ id: string; labelKey: string; minProgress: number }> = [
+  { id: "discovery", labelKey: "lifecycle.discovery", minProgress: 0 },
+  { id: "growth", labelKey: "lifecycle.growth", minProgress: 30 },
+  { id: "buyout", labelKey: "lifecycle.buyoutWatch", minProgress: 65 },
+  { id: "graduation", labelKey: "lifecycle.graduation", minProgress: 100 },
 ];
 
 const LifecycleTimeline = ({
@@ -768,15 +759,16 @@ const LifecycleTimeline = ({
   creator: CreatorMarketRecord;
   market: MarketModel;
 }) => {
+  const { t } = useI18n();
   const activeIndex = useMemo(() => resolveLifecycleIndex(creator, market), [creator, market]);
 
   return (
     <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-4 py-3.5 md:px-5">
       <header className="flex items-center justify-between">
         <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">
-          S1 lifecycle projection
+          {t("creator.s1LifecycleProjection")}
         </p>
-        <span className="text-[length:var(--fs-micro)] text-[#7486a1]">{market.levelLabel}</span>
+        <span className="text-[length:var(--fs-micro)] text-[#7486a1]">{t(market.levelKey)}</span>
       </header>
 
       <div className="mt-3 flex items-center gap-2 md:gap-3">
@@ -804,7 +796,7 @@ const LifecycleTimeline = ({
                     isActive ? "text-white" : isPast ? "text-[#8df0c4]" : "text-[#6f8099]"
                   }`}
                 >
-                  {step.label}
+                  {t(step.labelKey)}
                 </p>
               </div>
               {idx < LIFECYCLE_STEPS.length - 1 ? (
@@ -836,7 +828,8 @@ const resolveLifecycleIndex = (creator: CreatorMarketRecord, market: MarketModel
 /* ──────────────────────────  Buyout offer card  ────────────────────────── */
 
 const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
-  const sponsor = creator.potentialSponsors[0] ?? "Sponsor TBD";
+  const { t } = useI18n();
+  const sponsor = creator.potentialSponsors[0] ?? t("buyout.sponsorTbd");
   const amount = creator.buyoutOfferUsd ?? 0;
   return (
     <section className="overflow-hidden rounded-[18px] border border-[#de402a]/20 bg-[linear-gradient(180deg,rgba(40,16,16,0.82)_0%,rgba(15,12,18,0.94)_100%)]">
@@ -847,32 +840,32 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#de402a]" />
           </span>
           <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#ff8a78]">
-            Buyout Offer Projection
+            {t("buyout.offerProjection")}
           </p>
         </div>
-        <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.18em] text-[#7486a1]">Seeded</span>
+        <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.18em] text-[#7486a1]">{t("buyout.seeded")}</span>
       </header>
       <div className="space-y-2.5 px-4 py-3">
         <div>
-          <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7486a1]">Sponsor</p>
+          <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7486a1]">{t("buyout.sponsor")}</p>
           <p className="mt-0.5 truncate text-xs font-semibold text-white">{sponsor}</p>
         </div>
         <div>
-          <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7486a1]">Latest offer</p>
+          <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-[#7486a1]">{t("buyout.latestOffer")}</p>
           <p className="mt-0.5 text-lg font-semibold tracking-[-0.02em] text-white">
             ${compactNumber(amount)}
           </p>
         </div>
         <div className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-white/[0.02] px-2.5 py-2">
           <div>
-            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#7486a1]">Deadline</p>
+            <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#7486a1]">{t("buyout.deadline")}</p>
             <p className="mt-0.5 text-xs font-medium text-white">36h 14m</p>
           </div>
           <Link
             className="rounded-full bg-[#de402a] px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-white transition hover:bg-[#ea523e]"
             href={`/buyout/${creator.id}`}
           >
-            Open buyout preview
+            {t("buyout.openPreview")}
           </Link>
         </div>
       </div>
@@ -882,12 +875,14 @@ const BuyoutOfferCard = ({ creator }: { creator: CreatorMarketRecord }) => {
 
 /* ──────────────────────────  Top holders  ────────────────────────── */
 
-const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
+const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const { t } = useI18n();
+  return (
   <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(16,22,33,0.86)_0%,rgba(10,15,23,0.86)_100%)]">
     <header className="flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
-      <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">Top holders</p>
+      <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[#7486a1]">{t("creator.topHolders")}</p>
       <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.16em] text-[#5a6b82]">
-        {compactNumber(creator.holderCount)} total
+        {t("creator.topHoldersTotal", { count: compactNumber(creator.holderCount) })}
       </span>
     </header>
     <div className="space-y-0.5 px-2.5 py-2">
@@ -904,12 +899,13 @@ const TopHoldersCard = ({ creator }: { creator: CreatorMarketRecord }) => (
         </div>
       )) : (
         <div className="rounded-lg px-2.5 py-3 text-xs leading-5 text-[#8ea0ba]">
-          Holder data is unavailable on content-only public profiles.
+          {t("creator.holderDataUnavailable")}
         </div>
       )}
     </div>
   </section>
-);
+  );
+};
 
 /* ──────────────────────────  Content surface  ────────────────────────── */
 
@@ -923,7 +919,9 @@ const ContentSurface = ({
   creator: CreatorMarketRecord;
   posts: PostRecord[];
   onTabChange: (tab: ProfileTab) => void;
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <section className="overflow-hidden rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,20,30,0.82)_0%,rgba(9,13,20,0.82)_100%)]">
     <div className="flex items-center gap-0.5 border-b border-white/[0.05] px-2.5">
       {TABS.map((tab) => (
@@ -935,7 +933,7 @@ const ContentSurface = ({
           onClick={() => onTabChange(tab)}
           type="button"
         >
-          {tab}
+          {t(TAB_I18N_KEYS[tab])}
           {activeTab === tab ? (
             <span className="absolute inset-x-2.5 bottom-0 h-[2px] rounded-full bg-[#de402a]" />
           ) : null}
@@ -949,7 +947,8 @@ const ContentSurface = ({
       {activeTab === "Signals" ? <SignalsPanel creator={creator} /> : null}
     </div>
   </section>
-);
+  );
+};
 
 const PostGrid = ({
   creator,
@@ -958,10 +957,11 @@ const PostGrid = ({
   creator: CreatorMarketRecord;
   posts: PostRecord[];
 }) => {
+  const { t } = useI18n();
   if (posts.length === 0) {
     return (
       <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-5 py-8 text-center text-sm text-[#7e90a8]">
-        No posts imported yet.
+        {t("creator.noPostsYet")}
       </div>
     );
   }
@@ -1008,30 +1008,33 @@ const PostGrid = ({
   );
 };
 
-const InvestmentFile = ({ creator }: { creator: CreatorMarketRecord }) => (
+const InvestmentFile = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const { t } = useI18n();
+  return (
   <div className="grid gap-4 lg:grid-cols-2">
     <FileBlock
-      label="Content pool"
+      label={t("creator.investmentFile.contentPool")}
       rows={creator.contentPool.map((item) => ({ key: item, value: item }))}
     />
     <FileBlock
-      label="Likely sponsors"
+      label={t("creator.investmentFile.likelySponsors")}
       rows={creator.potentialSponsors.map((item) => ({ key: item, value: item }))}
     />
     <FileBlock
-      label="Tags"
+      label={t("creator.tags")}
       rows={creator.tags.map((tag) => ({ key: tag, value: `#${tag}` }))}
     />
     <FileBlock
-      label="Signal"
+      label={t("creator.investmentFile.signal")}
       rows={[
-        { key: "momentum", value: `Momentum score · ${creator.momentumScore}` },
-        { key: "buyout", value: `Buyout status · ${creator.buyoutStatus}` },
+        { key: "momentum", value: t("creator.investmentFile.momentumScore", { score: creator.momentumScore }) },
+        { key: "buyout", value: t("creator.investmentFile.buyoutStatus", { status: creator.buyoutStatus }) },
         { key: "teaser", value: creator.teaser },
       ]}
     />
   </div>
-);
+  );
+};
 
 const FileBlock = ({
   label,
@@ -1052,10 +1055,12 @@ const FileBlock = ({
   </div>
 );
 
-const SignalsPanel = ({ creator }: { creator: CreatorMarketRecord }) => (
+const SignalsPanel = ({ creator }: { creator: CreatorMarketRecord }) => {
+  const { t } = useI18n();
+  return (
   <div className="grid gap-3 lg:grid-cols-2">
     <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
-      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Momentum</p>
+      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{t("creator.momentumHeadline")}</p>
       <p className="mt-1.5 text-2xl font-semibold tracking-[-0.03em] text-white">
         {creator.momentumScore}
         <span className="ml-1 text-[length:var(--fs-micro)] font-medium text-[#7486a1]">/100</span>
@@ -1068,15 +1073,16 @@ const SignalsPanel = ({ creator }: { creator: CreatorMarketRecord }) => (
       </div>
     </div>
     <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
-      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Activity</p>
+      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{t("signals.activity")}</p>
       <p className="mt-1.5 text-2xl font-semibold tracking-[-0.03em] text-white">
         {creator.activityScore ?? Math.round(creator.momentumScore * 0.92)}
       </p>
-      <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">Engagement velocity score</p>
+      <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">{t("signals.engagementVelocity")}</p>
     </div>
     <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3 lg:col-span-2">
-      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Teaser</p>
+      <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">{t("signals.teaser")}</p>
       <p className="mt-1.5 text-xs leading-5 text-[#cbd6e8]">{creator.teaser}</p>
     </div>
   </div>
-);
+  );
+};

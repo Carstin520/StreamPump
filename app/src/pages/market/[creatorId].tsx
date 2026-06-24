@@ -684,8 +684,8 @@ function MarketPage() {
       });
       setDemoSummary(
         side === "buy"
-          ? `Preview bought ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`
-          : `Preview sold ${amount} S1 for ~${estimatedCost.toFixed(3)} SPUMP.`,
+          ? t("market.previewBoughtMsg", { amount: String(amount), cost: estimatedCost.toFixed(3) })
+          : t("market.previewSoldMsg", { amount: String(amount), cost: estimatedCost.toFixed(3) }),
       );
     },
     [creatorWallet],
