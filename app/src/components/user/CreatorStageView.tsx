@@ -638,7 +638,7 @@ const BuyPanel = ({
           <div className="grid gap-2">
             <Link
               className="block rounded-xl bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-3 py-2.5 text-center text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] transition hover:brightness-[1.05]"
-              href={`/market/${liveCreatorWallet}`}
+              href={`/market/${creator.id}`}
               onClick={(event) => {
                 if (!onRequireAuth()) {
                   event.preventDefault();
@@ -649,7 +649,7 @@ const BuyPanel = ({
             </Link>
             <Link
               className="glass-button-ghost block px-3 py-2 text-center text-xs font-medium"
-              href={`/buyout/${liveCreatorWallet}`}
+              href={`/buyout/${creator.id}`}
               onClick={(event) => {
                 if (!onRequireAuth()) {
                   event.preventDefault();

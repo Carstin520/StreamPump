@@ -512,15 +512,16 @@ function MarketHeader({
 }
 
 function DemoRouteRail() {
+  const { t } = useI18n();
   const links = [
-    { href: DEMO_PATH, label: "Demo hub" },
-    { href: DEMO_S1_CREATOR_PATH, label: "Creator profile" },
-    { href: DEMO_S1_BUYOUT_PATH, label: "Buyout watch" },
+    { href: DEMO_PATH, label: t("market.demoHub") },
+    { href: DEMO_S1_CREATOR_PATH, label: t("market.demoCreatorProfile") },
+    { href: DEMO_S1_BUYOUT_PATH, label: t("market.demoBuyoutWatch") },
   ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
-      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 demo path</span>
+      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">{t("market.demoPathLabel")}</span>
       {links.map((link) => (
         <Link
           className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
@@ -548,17 +549,18 @@ function displayMarketTitle(
 }
 
 function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
+  const { t } = useI18n();
   const config = isDemoRoute
     ? {
         label: "MOCK_PREVIEW",
-        title: "Local S1 market preview",
-        body: "This demo slug uses fixture creator and portfolio state. Buy and sell controls update local UI only; they do not call S1 builders, request a wallet signature, burn SPUMP, or submit a Solana transaction.",
+        title: t("market.previewNoticeTitle"),
+        body: t("market.previewNoticeBody"),
         tone: "tone-state-warning",
       }
     : {
         label: "SEEDED_DEMO",
-        title: "Backend S1 market projection",
-        body: "This route reads the creator market projection from the backend. Buy and sell can build devnet transactions only with a real wallet session; rating provenance, daily cap usage, open onboarding, and full projection coverage are still roadmap work.",
+        title: t("market.projectionNoticeTitle"),
+        body: t("market.projectionNoticeBody"),
         tone: "tone-state-info",
       };
 
@@ -566,7 +568,7 @@ function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
     <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">Market data source</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">{t("market.dataSourceLabel")}</p>
           <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
         </div>
