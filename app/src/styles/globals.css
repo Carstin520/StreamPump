@@ -153,6 +153,14 @@
   --edge-opacity: 0.55; /* reflection layer opacity (was 0.72) */
   --glow-brand: rgba(222, 64, 42, 0.18); /* primary glow rest (was 0.28) */
   --glow-brand-strong: rgba(222, 64, 42, 0.24); /* primary glow hover (was 0.34) */
+
+  /* --- Landing primitives (additive) ------------------------------------- */
+  --energy: var(--brand);
+  --energy-soft: var(--brand-soft);
+  --tier-starter: var(--stage-s1);
+  --tier-growth: #f0a070;
+  --tier-studio: var(--accent-violet);
+  --momentum-line: var(--accent-green);
 }
 
 html,
