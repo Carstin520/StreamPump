@@ -201,7 +201,7 @@ const GraduationWatchRow = ({
   const liveWallet = resolveCreatorWalletForRoute(creator.id);
   const creatorPosts = postsByCreator.get(creator.id) ?? [];
   const trend = creatorPosts.map((p) => p.likes + p.saves);
-  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
+  const hasMarketProjection = creator.momentumScore > 0;
 
   return (
     <Link
@@ -218,8 +218,8 @@ const GraduationWatchRow = ({
       </div>
       <div className="hidden items-center gap-3 sm:flex">
         <div className="text-right">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">应援价</p>
-          <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.12em] text-[#5a6d87]">势能</p>
+          <p className="text-xs font-semibold text-white">{hasMarketProjection ? creator.momentumScore : "—"}</p>
         </div>
         <div className="w-20">
           <div className="flex items-center gap-1.5">
@@ -252,7 +252,7 @@ const GraduationWatchRow = ({
 const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
   const { t } = useI18n();
   const sorted = useMemo(
-    () => [...creators].sort((a, b) => b.tokenPrice - a.tokenPrice),
+    () => [...creators].sort((a, b) => b.momentumScore - a.momentumScore),
     [creators],
   );
 
@@ -285,12 +285,11 @@ const S1Tab = ({ creators }: { creators: CreatorMarketRecord[] }) => {
 
 const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
   const liveWallet = resolveCreatorWalletForRoute(creator.id);
-  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
+  const hasMarketProjection = creator.momentumScore > 0;
   const change24h = hasMarketProjection ? Number(((creator.momentumScore - 70) * 0.18).toFixed(2)) : 0;
   const isUp = change24h >= 0;
-  const volume24h = hasMarketProjection ? Math.round(creator.supply * creator.tokenPrice * 0.04) : 0;
   const trend = hasMarketProjection
-    ? creator.contentPool.map((_, i) => creator.tokenPrice * (0.88 + i * 0.06 + Math.random() * 0.04))
+    ? creator.contentPool.map((_, i) => creator.momentumScore * (0.9 + i * 0.03 + Math.random() * 0.03))
     : [];
 
   return (
@@ -310,14 +309,14 @@ const S1CreatorRow = ({ creator }: { creator: CreatorMarketRecord }) => {
       </div>
 
       <div className="lg:text-right">
-        <p className="text-xs font-semibold text-white">{hasMarketProjection ? formatUsd(creator.tokenPrice) : "Pending"}</p>
+        <p className="text-xs font-semibold text-white">{hasMarketProjection ? creator.momentumScore : "—"}</p>
         <p className={`text-[length:var(--fs-micro)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>
           {hasMarketProjection ? `${isUp ? "+" : ""}${change24h.toFixed(2)}%` : "content only"}
         </p>
       </div>
 
       <div className="hidden lg:block lg:text-right">
-        <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? formatUsd(volume24h) : "—"}</p>
+        <p className="text-xs text-[#cbd6e7]">{hasMarketProjection ? `${creator.graduationProgress}%` : "—"}</p>
       </div>
 
       <div className="hidden lg:block lg:text-right">

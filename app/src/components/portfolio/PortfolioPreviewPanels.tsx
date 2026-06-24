@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { SparklineChart } from "@/components/shared/SparklineChart";
 import { StagePill } from "@/components/shared/StagePill";
 import { CreatorMarketRecord, PortfolioHoldingRecord } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import {
   compactNumber,
   creators as mockCreators,
@@ -99,15 +100,18 @@ export const usePreviewPortfolio = (): PreviewPortfolioModel => useMemo(() => {
 
 /* ──────────────────────────────  Snapshot strip  ────────────────────────────── */
 
-export const PreviewSnapshotStrip = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => (
-  <section className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-    <SnapshotTile accent="#67b8ff" hint={`${portfolio.holdings.filter((h) => h.creator.state === "S1_DISCOVERY").length} discovery · ${portfolio.holdings.filter((h) => h.creator.state === "S1_BUYOUT").length} buyout`} label="Preview S1 Holdings" value={String(portfolio.s1HoldingsCount)} />
-    <SnapshotTile accent="#65ecaf" hint="Active campaigns" label="Preview S2 Exposure" value={portfolio.s2ExposureUsd > 0 ? formatUsd(portfolio.s2ExposureUsd) : "—"} />
-    <SnapshotTile accent="#ffb38a" hint={`${portfolioClaimWindows.length} ready · ${portfolioUpcomingClaims.length} pending`} label="Preview Claimable" tone="positive" value={formatUsd(portfolio.claimableRewardsUsd)} />
-    <SnapshotTile accent="#de402a" hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"} label="毕业赞助 · 可领发现奖励（封顶）" tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"} value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"} />
-    <SnapshotTile accent="#8ad0ff" hint={`+${portfolio.dailySpumpReward}/day streak`} label="Preview SPUMP" value={compactNumber(portfolio.spumpBalance)} />
-  </section>
-);
+export const PreviewSnapshotStrip = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => {
+  const { t } = useI18n();
+  return (
+    <section className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <SnapshotTile accent="#67b8ff" hint={`${portfolio.holdings.filter((h) => h.creator.state === "S1_DISCOVERY").length} discovery · ${portfolio.holdings.filter((h) => h.creator.state === "S1_BUYOUT").length} buyout`} label={t("portfolio.s1Holdings")} value={String(portfolio.s1HoldingsCount)} />
+      <SnapshotTile accent="#65ecaf" hint="Active campaigns" label={t("portfolio.s2Exposure")} value={portfolio.s2ExposureUsd > 0 ? formatUsd(portfolio.s2ExposureUsd) : "—"} />
+      <SnapshotTile accent="#ffb38a" hint={`${portfolioClaimWindows.length} ready · ${portfolioUpcomingClaims.length} pending`} label={t("portfolio.claimableRewards")} tone="positive" value={formatUsd(portfolio.claimableRewardsUsd)} />
+      <SnapshotTile accent="#de402a" hint={portfolio.claimableBuyoutUsd > 0 ? "Window approaching" : "No active windows"} label={t("portfolio.graduationDiscovery")} tone={portfolio.claimableBuyoutUsd > 0 ? "positive" : "neutral"} value={portfolio.claimableBuyoutUsd > 0 ? formatUsd(portfolio.claimableBuyoutUsd) : "—"} />
+      <SnapshotTile accent="#8ad0ff" hint={`+${portfolio.dailySpumpReward}/day streak`} label={t("portfolio.dailySpump")} value={compactNumber(portfolio.spumpBalance)} />
+    </section>
+  );
+};
 
 const SnapshotTile = ({ accent, hint, label, tone = "neutral", value }: { accent: string; hint: string; label: string; tone?: "neutral" | "positive" | "negative"; value: string }) => (
   <div className="rounded-xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.86)_0%,rgba(10,15,23,0.86)_100%)] px-3 py-2.5">
@@ -157,8 +161,10 @@ export const PreviewPortfolioHero = ({ portfolio }: { portfolio: PreviewPortfoli
 /* ──────────────────────────────  Preview Holdings  ────────────────────────────── */
 
 export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => {
+  const { t } = useI18n();
+
   if (rows.length === 0) {
-    return <EmptyState title="No preview holdings" cta="Browse Trending" href={TRENDING_PATH} />;
+    return <EmptyState title={t("portfolio.noHoldings")} cta={t("portfolio.browseTrending")} href={TRENDING_PATH} />;
   }
 
   return (
@@ -169,12 +175,12 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
       </div>
       <div className="overflow-hidden rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
         <div className="hidden border-b border-white/[0.04] px-3.5 py-2 text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.9fr_1fr] lg:items-center lg:gap-3">
-          <span>Creator</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Holding</span>
-          <span className="text-right">SPUMP used</span>
-          <span className="text-right">Signal delta</span>
-          <span>Graduation</span>
+          <span>{t("common.creator")}</span>
+          <span className="text-right">{t("portfolio.momentum")}</span>
+          <span className="text-right">{t("portfolio.holding")}</span>
+          <span className="text-right">{t("portfolio.avgEntry")}</span>
+          <span className="text-right">{t("portfolio.pnL")}</span>
+          <span>{t("portfolio.graduation")}</span>
         </div>
         <div className="divide-y divide-white/[0.04]">
           {rows.map((row) => {
@@ -199,7 +205,7 @@ export const PreviewHoldingsTable = ({ rows }: { rows: HoldingViewModel[] }) => 
                   </div>
                 </div>
                 <div className="lg:text-right">
-                  <p className="text-xs font-semibold text-white">{formatUsd(holding.currentPriceUsd ?? creator.tokenPrice)}</p>
+                  <p className="text-xs font-semibold text-white">{creator.momentumScore}</p>
                 </div>
                 <div className="lg:text-right">
                   <p className="text-xs font-semibold text-white">{holding.tokenCount} S1</p>
@@ -241,8 +247,10 @@ export const usePreviewWatchlist = (): CreatorMarketRecord[] => useMemo(() => {
 }, []);
 
 export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] }) => {
+  const { t } = useI18n();
+
   if (rows.length === 0) {
-    return <EmptyState title="Watchlist is empty" cta="Discover creators" href={EXPLORE_PATH} />;
+    return <EmptyState title={t("portfolio.noWatchlist")} cta={t("portfolio.discoverCreators")} href={EXPLORE_PATH} />;
   }
 
   return (
@@ -253,10 +261,10 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
       </div>
       <div className="overflow-hidden rounded-[20px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)]">
         <div className="hidden border-b border-white/[0.04] px-4 py-2.5 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099] lg:grid lg:grid-cols-[2.2fr_0.8fr_0.8fr_1.4fr] lg:items-center lg:gap-4">
-          <span>Creator</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Momentum</span>
-          <span>Latest signal</span>
+          <span>{t("common.creator")}</span>
+          <span className="text-right">{t("portfolio.momentum")}</span>
+          <span className="text-right">{t("portfolio.momentum")}</span>
+          <span>{t("portfolio.latestSignal")}</span>
         </div>
         <div className="divide-y divide-white/[0.04]">
           {rows.map((creator) => {
@@ -281,7 +289,7 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
                   </div>
                 </div>
                 <div className="lg:text-right">
-                  <p className="text-sm font-semibold text-white">{formatUsd(creator.tokenPrice)}</p>
+                  <p className="text-sm font-semibold text-white">{creator.momentumScore}</p>
                   <p className={`text-[length:var(--fs-micro)] ${isUp ? "text-[#8df0c4]" : "text-[#f67263]"}`}>{isUp ? "+" : ""}{change24hPct.toFixed(2)}% 24h</p>
                 </div>
                 <div className="hidden lg:block lg:text-right">
@@ -306,17 +314,19 @@ export const PreviewWatchlistPanel = ({ rows }: { rows: CreatorMarketRecord[] })
 
 /* ──────────────────────────────  Rewards  ────────────────────────────── */
 
-export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => (
+export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolioModel }) => {
+  const { t } = useI18n();
+  return (
   <div className="space-y-3">
     <div className="flex items-center gap-2">
       <span className="rounded border tone-state-warning px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">Preview</span>
       <span className="text-[length:var(--fs-micro)] text-[#6f8099]">Local preview only — real claims require the rewards ledger</span>
     </div>
     <div className="grid gap-3 md:grid-cols-2">
-      <RewardItem accent="#65ecaf" amount={`${compactNumber(portfolio.dailySpumpReward)} SPUMP`} label="Daily Engagement" status="Preview ready" />
-      <RewardItem accent="#ffb38a" amount={formatUsd(portfolio.claimableBuyoutUsd)} label="Buyout Pool" status="2d 0h preview" />
-      <RewardItem accent="#67b8ff" amount={formatUsd(portfolio.pendingCampaignUsd)} label="Campaign" status="Preview pending" />
-      <RewardItem accent="#de402a" amount={formatUsd(portfolio.realizedRewardsUsd)} label="Realized Rewards" status="Preview lifetime" />
+      <RewardItem accent="#65ecaf" amount={`${compactNumber(portfolio.dailySpumpReward)} SPUMP`} label={t("portfolio.dailyEngagement")} status="Preview ready" />
+      <RewardItem accent="#ffb38a" amount={formatUsd(portfolio.claimableBuyoutUsd)} label={t("portfolio.buyoutPool")} status="2d 0h preview" />
+      <RewardItem accent="#67b8ff" amount={formatUsd(portfolio.pendingCampaignUsd)} label={t("portfolio.campaign")} status="Preview pending" />
+      <RewardItem accent="#de402a" amount={formatUsd(portfolio.realizedRewardsUsd)} label={t("portfolio.realizedRewards")} status="Preview lifetime" />
     </div>
     <div className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] p-3.5 md:p-4">
       <div className="flex items-center justify-between gap-3">
@@ -326,12 +336,13 @@ export const PreviewRewardsPanel = ({ portfolio }: { portfolio: PreviewPortfolio
           <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7486a1]">3 rewards ready · 1 pending settlement</p>
         </div>
         <button className="rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-xs font-semibold text-white shadow-[0_14px_28px_rgba(222,64,42,0.32)] opacity-50 cursor-not-allowed" disabled type="button">
-          Preview Claim All
+          {t("portfolio.claimAll")}
         </button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 const RewardItem = ({ accent, amount, label, status }: { accent: string; amount: string; label: string; status: string }) => (
   <div className="flex items-center justify-between gap-2.5 rounded-[14px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(15,21,32,0.84)_0%,rgba(10,15,23,0.84)_100%)] px-3 py-2.5">

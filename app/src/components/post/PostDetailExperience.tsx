@@ -546,20 +546,33 @@ const DetailRightColumn = ({
     <div className="flex h-full flex-col overflow-hidden">
       {/* Scrollable upper area: BackingCard + Related */}
       <div className="overflow-y-auto">
-        {/* BackingCard teaser — uses only real PostRecord fields: creatorName, creatorAvatarSrc, stage, creatorId */}
+        {/* BackingCard teaser — uses only real PostRecord fields (no fabricated momentum).
+            Staged creators get a Back CTA → market; creators not yet in a backing
+            season get an honest "view creator" entry. A source notice is always shown. */}
         <div className="px-3 pt-3">
-          <BackingCard
-            creatorAvatarSrc={currentPost.creatorAvatarSrc}
-            creatorName={currentPost.creatorName}
-            ctaHref={`/market/${currentPost.creatorId}`}
-            ctaLabel={t("backing.teaserCta")}
-            note={t("backing.teaserNote")}
-            readinessLabel={
-              currentPost.stage !== "NONE" ? t("backing.teaserReadiness") : undefined
-            }
-            stage={currentPost.stage}
-            variant="teaser"
-          />
+          {currentPost.stage !== "NONE" ? (
+            <BackingCard
+              creatorAvatarSrc={currentPost.creatorAvatarSrc}
+              creatorName={currentPost.creatorName}
+              ctaHref={`/market/${currentPost.creatorId}`}
+              ctaLabel={t("backing.teaserCta")}
+              note={t("backing.teaserNote")}
+              readinessLabel={t("backing.teaserReadiness")}
+              stage={currentPost.stage}
+              variant="teaser"
+            />
+          ) : (
+            <BackingCard
+              creatorAvatarSrc={currentPost.creatorAvatarSrc}
+              creatorName={currentPost.creatorName}
+              ctaHref={`/creators/${currentPost.creatorId}`}
+              ctaLabel={t("backing.viewCreator")}
+              note={t("backing.notInSeason")}
+              readinessLabel={t("backing.teaserSource")}
+              stage={currentPost.stage}
+              variant="teaser"
+            />
+          )}
         </div>
 
         {/* Related posts */}

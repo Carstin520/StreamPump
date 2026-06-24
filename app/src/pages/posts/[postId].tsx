@@ -4,7 +4,7 @@ import type {
   GetStaticProps,
 } from "next";
 import { useRouter } from "next/router";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { PostDetailExperience } from "@/components/post/PostDetailExperience";
 import { useI18n } from "@/lib/i18n";
@@ -19,9 +19,16 @@ export default function PostDetailPage({
   initialError,
   mediaOrigins,
   post,
+  relatedPosts,
 }: PublicPostPageProps) {
   const router = useRouter();
   const { t } = useI18n();
+
+  // Current post + siblings drive the related rail and prev/next paging.
+  const items = useMemo(
+    () => (post ? [post, ...relatedPosts] : []),
+    [post, relatedPosts],
+  );
 
   const handleClose = useCallback(() => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -64,7 +71,8 @@ export default function PostDetailPage({
       {!initialError && post ? (
         <PostDetailExperience
           closeLabel={t("common.back")}
-          items={[post]}
+          currentPostId={post.id}
+          items={items}
           onClose={handleClose}
           syncRoute
         />

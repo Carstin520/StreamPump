@@ -139,15 +139,16 @@ function WalletHeader({
 /* ------------------------------------------------------------------ */
 
 function MetricsStrip({ portfolio }: { portfolio: S1PortfolioResponse }) {
+  const { t } = useI18n();
   const totalS1 = portfolio.positions.reduce((s, p) => s + Number(p.internalTokenBalance || 0), 0);
   const claimableCount = portfolio.positions.filter((p) => hasClaimableUsdc(p.estimatedClaimableUsdc)).length;
   const totalClaimable = portfolio.positions.reduce((s, p) => s + Number(p.estimatedClaimableUsdc || 0), 0);
 
   const items = [
-    { label: "Positions", value: String(portfolio.positions.length), color: "text-white" },
-    { label: "S1 balance", value: formatS1Amount(String(totalS1)), color: "text-white" },
-    { label: "Claim queue", value: String(claimableCount), color: claimableCount > 0 ? "text-[#65ecaf]" : "text-white" },
-    { label: "Capped rewards", value: formatUsdcAmount(String(totalClaimable)), color: "text-[#65ecaf]" },
+    { label: t("portfolio.positions"), value: String(portfolio.positions.length), color: "text-white" },
+    { label: t("portfolio.s1Backing"), value: formatS1Amount(String(totalS1)), color: "text-white" },
+    { label: t("portfolio.claimQueue"), value: String(claimableCount), color: claimableCount > 0 ? "text-[#65ecaf]" : "text-white" },
+    { label: t("portfolio.cappedRewards"), value: formatUsdcAmount(String(totalClaimable)), color: "text-[#65ecaf]" },
   ];
 
   return (
@@ -175,7 +176,7 @@ function PositionRow({
   onRefresh: () => Promise<void>;
   position: S1PortfolioResponse["positions"][number];
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const name = displayPortfolioCreatorName(position, locale);
   const claimable = hasClaimableUsdc(position.estimatedClaimableUsdc);
   const hasPositionBalance = Number(position.internalTokenBalance || 0) > 0;
@@ -206,7 +207,7 @@ function PositionRow({
           <p className="mt-0.5 truncate font-mono text-[length:var(--fs-micro)] text-[#6f8099]">{shortenWallet(position.creatorWallet)}</p>
         </div>
         <MetricCell label="S1" value={formatS1Amount(position.internalTokenBalance)} />
-        <MetricCell label="SPUMP used" value={formatSpump(position.spumpCostBasis)} />
+        <MetricCell label={t("portfolio.avgEntry")} value={formatSpump(position.spumpCostBasis)} />
         <MetricCell label="Discovery reward" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
         <MetricCell label={rewardState.label} value={rewardState.value} color={rewardState.color} />
         <MetricCell label="Updated" value={new Date(position.updatedAt).toLocaleDateString()} />
@@ -248,7 +249,7 @@ function PositionRow({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <MobileMetric label="S1" value={formatS1Amount(position.internalTokenBalance)} />
-          <MobileMetric label="SPUMP used" value={formatSpump(position.spumpCostBasis)} />
+          <MobileMetric label={t("portfolio.avgEntry")} value={formatSpump(position.spumpCostBasis)} />
           <MobileMetric label="Discovery reward" value={formatUsdcAmount(position.estimatedClaimableUsdc)} color={claimable ? "text-[#65ecaf]" : undefined} />
           <MobileMetric label={rewardState.label} value={rewardState.value} color={rewardState.color} />
           <MobileMetric label="Updated" value={new Date(position.updatedAt).toLocaleDateString()} />

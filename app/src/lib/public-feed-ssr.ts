@@ -20,6 +20,7 @@ export type PublicPostPageProps = {
   initialError: string | null;
   mediaOrigins: string[];
   post: PostRecord | null;
+  relatedPosts: PostRecord[];
 };
 
 export const loadPublicFeedPageProps = async (): Promise<PublicFeedPageProps> => {
@@ -50,10 +51,24 @@ export const loadPublicPostPageProps = async (
   try {
     const post = await getPublicFeedPostById(postId);
 
+    // Sibling posts power the detail "related" rail and up/down paging on the
+    // standalone /posts/[postId] page (parity with the explore-modal experience).
+    let relatedPosts: PostRecord[] = [];
+    try {
+      const feed = await listPublicFeedPosts({
+        limit: 24,
+        timeoutMs: PUBLIC_FEED_SSR_TIMEOUT_MS,
+      });
+      relatedPosts = feed.filter((item) => item.id !== post.id);
+    } catch {
+      relatedPosts = [];
+    }
+
     return {
       initialError: null,
-      mediaOrigins: extractPublicMediaOrigins([post]),
+      mediaOrigins: extractPublicMediaOrigins([post, ...relatedPosts]),
       post,
+      relatedPosts,
     };
   } catch (error) {
     return {
@@ -61,6 +76,7 @@ export const loadPublicPostPageProps = async (
         error instanceof Error ? error.message : "Failed to load public post",
       mediaOrigins: [],
       post: null,
+      relatedPosts: [],
     };
   }
 };
