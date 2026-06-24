@@ -60,11 +60,11 @@ import {
 
 type BuyoutPhase = "none" | "offers_open" | "offer_accepted" | "rage_quit" | "graduated";
 
-const PHASES: { key: BuyoutPhase; label: string }[] = [
-  { key: "offers_open", label: "Offers open" },
-  { key: "offer_accepted", label: "Accepted" },
-  { key: "rage_quit", label: "Rage quit window" },
-  { key: "graduated", label: "Graduated" },
+const PHASES: { key: BuyoutPhase; i18nKey: string }[] = [
+  { key: "offers_open", i18nKey: "buyout.phase.offersOpen" },
+  { key: "offer_accepted", i18nKey: "buyout.phase.accepted" },
+  { key: "rage_quit", i18nKey: "buyout.phase.rageQuitWindow" },
+  { key: "graduated", i18nKey: "buyout.phase.graduated" },
 ];
 
 function phaseFromStatus(status: S1BuyoutStatus | undefined | null): BuyoutPhase {
@@ -80,6 +80,7 @@ function phaseFromStatus(status: S1BuyoutStatus | undefined | null): BuyoutPhase
 /* ------------------------------------------------------------------ */
 
 function PhaseStepper({ current }: { current: BuyoutPhase }) {
+  const { t } = useI18n();
   const idx = Math.max(0, PHASES.findIndex((p) => p.key === current));
 
   return (
@@ -115,7 +116,7 @@ function PhaseStepper({ current }: { current: BuyoutPhase }) {
                   active ? "text-white" : done ? "text-[#8df0c4]/80" : "text-[#5a6d87]"
                 }`}
               >
-                {phase.label}
+                {t(phase.i18nKey)}
               </span>
             </div>
           </div>
@@ -126,22 +127,23 @@ function PhaseStepper({ current }: { current: BuyoutPhase }) {
 }
 
 function DemoRouteRail() {
+  const { t } = useI18n();
   const links = [
-    { href: DEMO_PATH, label: "Demo hub" },
-    { href: DEMO_S1_MARKET_PATH, label: "S1 market" },
-    { href: PORTFOLIO_PATH, label: "Portfolio" },
+    { href: DEMO_PATH, labelKey: "buyout.demoHub" },
+    { href: DEMO_S1_MARKET_PATH, labelKey: "buyout.demoS1Market" },
+    { href: PORTFOLIO_PATH, labelKey: "buyout.demoPortfolio" },
   ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#67b8ff]/15 bg-[#0e1726]/55 px-3 py-2">
-      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">S1 buyout path</span>
+      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">{t("buyout.demoRoutePath")}</span>
       {links.map((link) => (
         <Link
           className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
           href={link.href}
           key={link.href}
         >
-          {link.label}
+          {t(link.labelKey)}
         </Link>
       ))}
     </div>
@@ -153,49 +155,50 @@ function DemoRouteRail() {
 /* ------------------------------------------------------------------ */
 
 function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buyout"]; phase: BuyoutPhase }) {
+  const { t } = useI18n();
   if (!buyout || phase === "none") return null;
 
-  const items: { label: string; value: string; color?: string }[] = [];
+  const items: { labelKey: string; value: string; color?: string }[] = [];
 
   if (buyout.acceptedOfferUsdc) {
-    items.push({ label: "Accepted offer", value: formatUsdcAmount(buyout.acceptedOfferUsdc), color: "text-[#65ecaf]" });
+    items.push({ labelKey: "buyout.metric.acceptedOffer", value: formatUsdcAmount(buyout.acceptedOfferUsdc), color: "text-[#65ecaf]" });
   } else if (buyout.latestOfferUsdc) {
-    items.push({ label: "Latest offer", value: formatUsdcAmount(buyout.latestOfferUsdc) });
+    items.push({ labelKey: "buyout.metric.latestOffer", value: formatUsdcAmount(buyout.latestOfferUsdc) });
   }
 
   if (buyout.winningSponsorWallet) {
-    items.push({ label: "Winning sponsor", value: shortenWallet(buyout.winningSponsorWallet) });
+    items.push({ labelKey: "buyout.metric.winningSponsor", value: shortenWallet(buyout.winningSponsorWallet) });
   }
 
   if (buyout.usdcDeposited) {
-    items.push({ label: "USDC deposited", value: formatUsdcAmount(buyout.usdcDeposited), color: "text-[#67b8ff]" });
+    items.push({ labelKey: "buyout.metric.usdcDeposited", value: formatUsdcAmount(buyout.usdcDeposited), color: "text-[#67b8ff]" });
   }
 
   if (buyout.creatorPayoutUsdc) {
-    items.push({ label: "Creator payout", value: formatUsdcAmount(buyout.creatorPayoutUsdc), color: "text-[#65ecaf]" });
+    items.push({ labelKey: "buyout.metric.creatorPayout", value: formatUsdcAmount(buyout.creatorPayoutUsdc), color: "text-[#65ecaf]" });
   }
 
   const discoveryPool = buyout.discoveryPoolRemaining ?? buyout.claimableUsdcRemaining;
   if (discoveryPool) {
-    items.push({ label: "Discovery pool left", value: formatUsdcAmount(discoveryPool), color: "text-[#67b8ff]" });
+    items.push({ labelKey: "buyout.metric.discoveryPoolLeft", value: formatUsdcAmount(discoveryPool), color: "text-[#67b8ff]" });
   }
 
   if (typeof buyout.eligibleHolderCount === "number") {
-    items.push({ label: "Eligible backers", value: String(buyout.eligibleHolderCount) });
+    items.push({ labelKey: "buyout.metric.eligibleBackers", value: String(buyout.eligibleHolderCount) });
   } else if (buyout.claimableS1SupplyRemaining) {
-    items.push({ label: "Eligible snapshot", value: formatS1Amount(buyout.claimableS1SupplyRemaining) });
+    items.push({ labelKey: "buyout.metric.eligibleSnapshot", value: formatS1Amount(buyout.claimableS1SupplyRemaining) });
   }
 
   if (buyout.graduatedAt) {
-    items.push({ label: "Graduated", value: new Date(buyout.graduatedAt).toLocaleDateString() });
+    items.push({ labelKey: "buyout.metric.graduated", value: new Date(buyout.graduatedAt).toLocaleDateString() });
   }
 
   if (buyout.residualSwept) {
-    items.push({ label: "Residual", value: "Swept", color: "text-[#f3b33e]" });
+    items.push({ labelKey: "buyout.metric.residualLabel", value: t("buyout.metric.residualSwept"), color: "text-[#f3b33e]" });
   }
 
   if (buyout.vaultClosed) {
-    items.push({ label: "Vault", value: "Closed", color: "text-[#f3b33e]" });
+    items.push({ labelKey: "buyout.metric.vaultLabel", value: t("buyout.metric.vaultClosed"), color: "text-[#f3b33e]" });
   }
 
   if (items.length === 0) return null;
@@ -203,8 +206,8 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {items.map((it) => (
-        <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={it.label}>
-          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{it.label}</p>
+        <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5" key={it.labelKey}>
+          <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{t(it.labelKey)}</p>
           <p className={`mt-1 text-sm font-semibold tracking-[-0.02em] ${it.color ?? "text-white"}`}>{it.value}</p>
         </div>
       ))}
@@ -213,17 +216,19 @@ function BuyoutMetrics({ buyout, phase }: { buyout: S1MarketProfileResponse["buy
 }
 
 function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["buyout"] }) {
+  const { t } = useI18n();
   if (!buyout) return null;
 
   if (buyout.residualSwept) {
     return (
       <section className="rounded-[14px] border tone-state-warning px-4 py-3">
         <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">
-          Discovery reward window swept
+          {t("buyout.lifecycle.sweptTitle")}
         </p>
         <p className="mt-1 text-xs leading-5">
-          The unclaimed discovery pool has been swept by an authorized operator
-          {buyout.residualSweptAt ? ` on ${new Date(buyout.residualSweptAt).toLocaleString()}` : ""}. Later claims are no longer expected to succeed because the vault is closed or emptied.
+          {buyout.residualSweptAt
+            ? t("buyout.lifecycle.sweptBody", { date: new Date(buyout.residualSweptAt).toLocaleString() })
+            : t("buyout.lifecycle.sweptBodyNoDate")}
         </p>
       </section>
     );
@@ -233,10 +238,10 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
     return (
       <section className="rounded-[14px] border tone-state-warning px-4 py-3">
         <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">
-          Buyout vault closed
+          {t("buyout.lifecycle.vaultClosedTitle")}
         </p>
         <p className="mt-1 text-xs leading-5">
-          The buyout vault no longer holds USDC. Portfolio rows may still show historical reward state until projections finish syncing.
+          {t("buyout.lifecycle.vaultClosedBody")}
         </p>
       </section>
     );
@@ -246,10 +251,10 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
     return (
       <section className="rounded-[14px] border border-[#67b8ff]/15 bg-[#0d1b2a]/45 px-4 py-3">
         <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
-          Discovery claim window
+          {t("buyout.lifecycle.claimWindowTitle")}
         </p>
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
-          This buyout graduated on {new Date(buyout.graduatedAt).toLocaleString()}. The reward estimate is capped and eligibility-based; the claim window can be swept after the configured protocol window by oracle/admin only.
+          {t("buyout.lifecycle.claimWindowBody", { date: new Date(buyout.graduatedAt).toLocaleString() })}
         </p>
       </section>
     );
@@ -259,13 +264,14 @@ function BuyoutLifecycleNotice({ buyout }: { buyout: S1MarketProfileResponse["bu
 }
 
 function DiscoveryProgressCard({ profile }: { profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
   const progress = formatGraduationProgressPercent(profile.creator.graduationProgressBps);
 
   return (
     <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-left">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">
-          S1 discovery progress
+          {t("buyout.discoveryProgress")}
         </span>
         <span className="text-sm font-semibold text-white">{progress}%</span>
       </div>
@@ -281,6 +287,7 @@ function DiscoveryProgressCard({ profile }: { profile: S1MarketProfileResponse }
 /* ------------------------------------------------------------------ */
 
 function Countdown({ deadline }: { deadline: string | null | undefined }) {
+  const { t } = useI18n();
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -291,7 +298,7 @@ function Countdown({ deadline }: { deadline: string | null | undefined }) {
   if (!deadline) {
     return (
       <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-5 text-center text-xs text-[#8ea0ba]">
-        No active rage quit deadline.
+        {t("buyout.countdown.noDeadline")}
       </div>
     );
   }
@@ -310,7 +317,7 @@ function Countdown({ deadline }: { deadline: string | null | undefined }) {
         {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
       </span>
       <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#8ea0ba]">
-        {expired ? "Rage quit window expired" : "Rage quit deadline"}
+        {expired ? t("buyout.countdown.expired") : t("buyout.countdown.deadline")}
       </span>
     </div>
   );
@@ -321,19 +328,27 @@ function Countdown({ deadline }: { deadline: string | null | undefined }) {
 /* ------------------------------------------------------------------ */
 
 function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["offers"]; acceptedPda: string | null }) {
+  const { t } = useI18n();
   if (offers.length === 0) {
     return (
       <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.015] p-4 text-center text-xs text-[#8ea0ba]">
-        No sponsor offers yet.
+        {t("buyout.offers.none")}
       </div>
     );
   }
+
+  const headers = [
+    t("buyout.offers.sponsor"),
+    t("buyout.offers.amount"),
+    t("buyout.offers.status"),
+    t("buyout.offers.expires"),
+  ];
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-white/[0.05]">
       {/* Header row */}
       <div className="grid grid-cols-[1fr_1fr_90px_80px] gap-2 border-b border-white/[0.04] bg-white/[0.015] px-3.5 py-2">
-        {["Sponsor", "Amount", "Status", "Expires"].map((h) => (
+        {headers.map((h) => (
           <span className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.14em] text-[#5a6d87]" key={h}>{h}</span>
         ))}
       </div>
@@ -349,7 +364,7 @@ function OffersList({ offers, acceptedPda }: { offers: S1MarketProfileResponse["
             <span className="truncate font-mono text-[length:var(--fs-micro)] font-medium text-white">{shortenWallet(offer.sponsorWallet)}</span>
             <span className="text-[length:var(--fs-overline)] font-semibold text-white">{formatUsdcAmount(offer.usdcAmount)}</span>
             <span className={`text-[length:var(--fs-micro)] font-medium ${isAccepted ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
-              {isAccepted ? "Accepted" : offer.status}
+              {isAccepted ? t("buyout.offers.accepted") : offer.status}
             </span>
             <span className="text-[length:var(--fs-micro)] text-[#6f8099]">
               {offer.sponsorCancelAfterAt ? new Date(offer.sponsorCancelAfterAt).toLocaleDateString() : "—"}
@@ -386,6 +401,7 @@ function RageQuitPanel({
   positionBalance: string;
   sessionWallet: string | null;
 }) {
+  const { t } = useI18n();
   const maxTokens = Math.max(0, Number(positionBalance || 0));
   const [amount, setAmount] = useState(maxTokens > 0 ? 1 : 0);
   const demoFlow = useDemoActionFlow();
@@ -433,16 +449,16 @@ function RageQuitPanel({
   return (
     <div className={`rounded-[14px] border p-5 ${active ? "border-[#de402a]/25 bg-[#1a120e]/50" : "border-white/[0.05] bg-white/[0.015] opacity-70"}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#de402a]">Rage Quit</h3>
-        <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{formatS1Amount(positionBalance)} S1 held</span>
+        <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#de402a]">{t("buyout.rageQuit.title")}</h3>
+        <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{t("buyout.rageQuit.heldLabel", { amount: formatS1Amount(positionBalance) })}</span>
       </div>
 
       {maxTokens <= 0 ? (
-        <p className="mt-3 text-xs text-[#6f8099]">No S1 position to rage quit.</p>
+        <p className="mt-3 text-xs text-[#6f8099]">{t("buyout.rageQuit.noPosition")}</p>
       ) : (
         <>
           <div className="mt-3 flex items-baseline justify-between gap-3">
-            <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#5a6d87]">Exit amount</span>
+            <span className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#5a6d87]">{t("buyout.rageQuit.exitAmount")}</span>
             <div className="flex items-center gap-2">
               <input
                 className="w-16 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-right text-sm font-bold text-white outline-none transition focus:border-white/[0.16]"
@@ -459,7 +475,7 @@ function RageQuitPanel({
                 onClick={() => { setAmount(maxTokens); demoFlow.reset(); }}
                 type="button"
               >
-                Max
+                {t("buyout.rageQuit.max")}
               </button>
             </div>
           </div>
@@ -511,21 +527,21 @@ function RageQuitPanel({
                 type="button"
               >
                 {demoBusy
-                  ? "Previewing..."
+                  ? t("buyout.rageQuit.previewingBtn")
                   : demoFlow.state.status === "success"
-                    ? "Preview exited"
-                    : "Preview Exit Position"}
+                    ? t("buyout.rageQuit.previewExited")
+                    : t("buyout.rageQuit.previewExitBtn")}
               </button>
               <DemoActionStatusCard
                 amountLabel={`${amount} S1`}
-                confirmLabel="Confirm preview exit"
-                description="Confirm this local preview. The local S1 position decreases, but no backend builder, wallet signature, or Solana transaction is used."
+                confirmLabel={t("buyout.rageQuit.previewConfirmLabel")}
+                description={t("buyout.rageQuit.previewConfirmDesc")}
                 onCancel={demoFlow.reset}
                 onConfirm={executeDemoExit}
                 onRetry={demoFlow.retry}
                 state={demoFlow.state}
-                successLabel="Preview exited"
-                title="Preview rage quit confirmation"
+                successLabel={t("buyout.rageQuit.previewSuccessLabel")}
+                title={t("buyout.rageQuit.previewConfirmTitle")}
               />
             </>
           ) : !signedIn ? (
@@ -535,7 +551,7 @@ function RageQuitPanel({
                 className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
                 href={`/login?next=/buyout/${creatorWallet}`}
               >
-                {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
+                {walletMismatch ? t("buyout.rageQuit.signInAgain") : t("buyout.rageQuit.signInWithWallet")}
               </Link>
             </div>
           ) : (
@@ -549,7 +565,7 @@ function RageQuitPanel({
               onClick={() => void execute()}
               type="button"
             >
-              {busy ? "Processing..." : "Exit position"}
+              {busy ? t("buyout.rageQuit.processing") : t("buyout.rageQuit.exitPosition")}
             </button>
           )}
         </>
@@ -557,7 +573,7 @@ function RageQuitPanel({
 
       <div className="mt-3">
         <S1TransactionDrawer
-          actionLabel="Rage Quit"
+          actionLabel={t("buyout.rageQuit.drawerAction")}
           amountLabel={`${amount} S1`}
           flow={flow.state}
           onClose={flow.reset}
@@ -597,6 +613,7 @@ function ClaimPanel({
   sponsorWallet: string | null;
   vaultClosed?: boolean;
 }) {
+  const { t } = useI18n();
   const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
@@ -615,18 +632,18 @@ function ClaimPanel({
     ? Boolean(sponsorWallet && hasOpenVault && eligiblePosition && (hasPositiveReward || canFinalizeZeroReward))
     : Boolean(signedIn && sponsorWallet && hasOpenVault && eligiblePosition && (hasPositiveReward || canFinalizeZeroReward));
   const claimStatus = residualSwept
-    ? "Window swept; later claims are expected to fail"
+    ? t("buyout.claim.statusWindowSwept")
     : vaultClosed
-      ? "Vault closed"
+      ? t("buyout.claim.statusVaultClosed")
       : discoveryRewardEligible === false
-        ? "Not eligible for discovery reward"
+        ? t("buyout.claim.statusNotEligible")
         : !hasPosition
-          ? "No active eligible position"
+          ? t("buyout.claim.statusNoPosition")
           : canClaim
             ? canFinalizeZeroReward
-              ? "Eligible zero-amount finalize"
-              : "Ready to claim capped reward"
-            : "Watch only";
+              ? t("buyout.claim.statusZeroFinalize")
+              : t("buyout.claim.statusReady")
+            : t("buyout.claim.statusWatchOnly");
 
   const execute = useCallback(async () => {
     if (!sponsorWallet) return;
@@ -651,15 +668,15 @@ function ClaimPanel({
 
   return (
     <div className="rounded-[14px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 p-5">
-      <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">Claim Discovery Reward</h3>
+      <h3 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] text-[#65ecaf]">{t("buyout.claim.title")}</h3>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#f3b33e]">Your position</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#f3b33e]">{t("buyout.claim.yourPosition")}</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatS1Amount(positionBalance)} S1</p>
         </div>
         <div className="rounded-[10px] border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
-          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#67b8ff]">Discovery reward</p>
+          <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#67b8ff]">{t("buyout.claim.discoveryReward")}</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{formatUsdcAmount(claimableUsdc)}</p>
         </div>
       </div>
@@ -667,7 +684,7 @@ function ClaimPanel({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-white/[0.04] bg-white/[0.015] px-3 py-2.5">
         <div className="min-w-0">
           <p className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{claimStatus}</p>
-          <p className="mt-0.5 font-mono text-[length:var(--fs-micro)] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : "No winning sponsor"}</p>
+          <p className="mt-0.5 font-mono text-[length:var(--fs-micro)] font-medium text-white">{sponsorWallet ? shortenWallet(sponsorWallet) : t("buyout.claim.noWinningSponsor")}</p>
         </div>
         {isDemoRoute ? (
           <button
@@ -677,12 +694,12 @@ function ClaimPanel({
             type="button"
           >
             {demoBusy
-              ? "Previewing..."
+              ? t("buyout.claim.previewingBtn")
               : demoFlow.state.status === "success"
-                ? "Preview finalized"
+                ? t("buyout.claim.previewFinalized")
                 : canFinalizeZeroReward
-                  ? "Preview Finalize"
-                  : "Preview Claim"}
+                  ? t("buyout.claim.previewFinalizeBtn")
+                  : t("buyout.claim.previewClaimBtn")}
           </button>
         ) : signedIn ? (
           <button
@@ -691,7 +708,7 @@ function ClaimPanel({
             onClick={() => void execute()}
             type="button"
           >
-            {busy ? "Processing..." : canFinalizeZeroReward ? "Finalize" : "Claim"}
+            {busy ? t("buyout.claim.processing") : canFinalizeZeroReward ? t("buyout.claim.finalize") : t("buyout.claim.claim")}
           </button>
         ) : (
           <div className="space-y-2">
@@ -700,7 +717,7 @@ function ClaimPanel({
               className="block text-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
               href={`/login?next=/buyout/${creatorWallet}`}
             >
-              {walletMismatch ? "Sign in again" : "Sign in with wallet session"}
+              {walletMismatch ? t("buyout.claim.signInAgain") : t("buyout.claim.signInWithWallet")}
             </Link>
           </div>
         )}
@@ -711,20 +728,20 @@ function ClaimPanel({
       {isDemoRoute ? (
         <DemoActionStatusCard
           amountLabel={formatUsdcAmount(claimableUsdc)}
-          confirmLabel="Confirm preview claim"
-          description="Confirm this local preview. The capped discovery reward clears locally, but no claim builder, wallet signature, USDC transfer, or Solana transaction is used."
+          confirmLabel={t("buyout.claim.previewConfirmLabel")}
+          description={t("buyout.claim.previewConfirmDesc")}
           onCancel={demoFlow.reset}
           onConfirm={executeDemoClaim}
           onRetry={demoFlow.retry}
           state={demoFlow.state}
-          successLabel="Preview claimed"
-          title="Preview claim confirmation"
+          successLabel={t("buyout.claim.previewSuccessLabel")}
+          title={t("buyout.claim.previewConfirmTitle")}
         />
       ) : null}
 
       <div className="mt-3">
         <S1TransactionDrawer
-          actionLabel="Claim USDC"
+          actionLabel={t("buyout.claim.drawerAction")}
           amountLabel={canFinalizeZeroReward ? "0 USDC" : formatUsdcAmount(claimableUsdc)}
           flow={flow.state}
           onClose={flow.reset}
@@ -749,17 +766,18 @@ function displayBuyoutTitle(
 }
 
 function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
+  const { t } = useI18n();
   const config = isDemoRoute
     ? {
         label: "MOCK_PREVIEW",
-        title: "Local S1 buyout preview",
-        body: "This demo slug uses fixture buyout and portfolio state. Rage quit and claim controls update local UI only; they do not call S1 builders, request a wallet signature, move USDC, or submit a Solana transaction.",
+        titleKey: "buyout.readiness.demoTitle",
+        bodyKey: "buyout.readiness.demoBody",
         tone: "tone-state-warning",
       }
     : {
         label: "SEEDED_DEMO + OPERATOR_REQUIRED",
-        title: "Seeded buyout projection",
-        body: "This route reads backend S1 market and buyout projections. Rage quit and claim can build devnet transactions only with a real wallet session and prepared buyout state; offer creation, creator acceptance, graduation, reclaim, and full lifecycle projection remain operator/productization work.",
+        titleKey: "buyout.readiness.seededTitle",
+        bodyKey: "buyout.readiness.seededBody",
         tone: "tone-state-info",
       };
 
@@ -768,8 +786,8 @@ function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">毕业赞助数据来源</p>
-          <p className="mt-1 text-sm font-semibold text-white">{config.title}</p>
-          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{config.body}</p>
+          <p className="mt-1 text-sm font-semibold text-white">{t(config.titleKey)}</p>
+          <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t(config.bodyKey)}</p>
         </div>
         <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
           {config.label}
@@ -785,7 +803,7 @@ function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
 
 function BuyoutPage() {
   const router = useRouter();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const creatorId = String(router.query.creatorId ?? "");
   const fallbackCreator = useMemo(() => resolveFallbackCreator(creatorId || "luna-cai"), [creatorId]);
   const creatorWallet = useMemo(() => (creatorId ? resolveCreatorWalletForRoute(creatorId) : ""), [creatorId]);
@@ -913,9 +931,10 @@ function BuyoutPage() {
         };
       });
 
-      setDemoSummary(`Preview rage quit ${amount} S1 -> received ~${spumpReturnedLabel} SPUMP (local state only).`);
+      setDemoSummary(t("buyout.demoExitSummary", { amount: String(amount), spump: spumpReturnedLabel }));
     },
     [
+      t,
       creatorWallet,
       position?.estimatedClaimableUsdc,
       position?.internalTokenBalance,
@@ -937,8 +956,8 @@ function BuyoutPage() {
         ),
       };
     });
-    setDemoSummary(`Preview claimed ${claimedLabel}; local capped discovery reward cleared.`);
-  }, [creatorWallet, position?.estimatedClaimableUsdc]);
+    setDemoSummary(t("buyout.demoClaimSummary", { amount: claimedLabel }));
+  }, [t, creatorWallet, position?.estimatedClaimableUsdc]);
 
   if (!creatorId || loading) {
     return (
@@ -955,8 +974,8 @@ function BuyoutPage() {
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4 py-6">
           <S1ErrorState
-            error="This route is a local creator preview slug, not a live S1 wallet address."
-            title={`No live buyout for ${title}`}
+            error={t("buyout.errorNoLive")}
+            title={t("buyout.errorNoLiveTitle", { title })}
           />
           <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
         </div>
@@ -968,7 +987,7 @@ function BuyoutPage() {
     return (
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4 py-6">
-          <S1ErrorState error={error} title={`Could not load buyout for ${title}`} />
+          <S1ErrorState error={error} title={t("buyout.errorLoadTitle", { title })} />
           <DemoCreatorBanner creatorWallet={DEMO_S1_CREATOR_WALLET} />
         </div>
       </PageShell>
@@ -981,9 +1000,9 @@ function BuyoutPage() {
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4">
           <ProductReadinessBanner
-            description="S1 buyout rage quit and claim builders are usable only for prepared seeded buyout state with a real wallet session. Demo slugs remain local previews; offer creation, creator acceptance, graduation execution, reclaim, and complete projection coverage are still roadmap work."
+            description={t("buyout.banner.description")}
             status="SEEDED_DEMO"
-            title="S1 buyout is seeded and operator-gated"
+            title={t("buyout.banner.title")}
           />
           <BuyoutReadinessNotice isDemoRoute={isDemoRoute} />
 
@@ -1022,19 +1041,26 @@ function BuyoutPage() {
           <BuyoutMetrics buyout={profile.buyout} phase={phase} />
           <BuyoutLifecycleNotice buyout={profile.buyout} />
 
+          {/* (B1) Capped/non-proportional disclaimer — standalone note */}
+          {phase !== "none" ? (
+            <p className="text-[length:var(--fs-micro)] leading-5 text-[#6f8099]">
+              {t("buyout.cappedDisclaimerStandalone")}
+            </p>
+          ) : null}
+
           {/* No buyout state */}
           {phase === "none" ? (
             <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.015] p-8 text-center">
-              <p className="text-base font-semibold text-white">No active buyout</p>
+              <p className="text-base font-semibold text-white">{t("buyout.noBuyout.title")}</p>
               <p className="mt-1.5 text-xs text-[#8ea0ba]">
-                This creator is in S1 discovery. Buyout offers may appear when the market matures.
+                {t("buyout.noBuyout.body")}
               </p>
               <DiscoveryProgressCard profile={profile} />
               <Link
                 className="mt-4 inline-flex items-center text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
                 href={isDemoRoute ? DEMO_S1_MARKET_PATH : `/market/${creatorWallet}`}
               >
-                ← Back to market
+                {t("buyout.noBuyout.backToMarket")}
               </Link>
             </div>
           ) : null}
@@ -1048,7 +1074,7 @@ function BuyoutPage() {
               {/* Offers */}
               <section className="space-y-2">
                 <h2 className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.14em] text-[#8ea0ba]">
-                  Sponsor offers
+                  {t("buyout.sponsorOffers")}
                 </h2>
                 <OffersList
                   acceptedPda={profile.buyout?.acceptedOfferPda ?? null}
@@ -1096,16 +1122,21 @@ function BuyoutPage() {
 
                 {/* Position summary */}
                 <div className="rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
-                  <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">Your S1 position</p>
+                  <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{t("buyout.yourS1Position")}</p>
                   <p className="mt-1 text-lg font-bold text-white">{formatS1Amount(positionBalance)} S1</p>
                   {position?.estimatedClaimableUsdc && hasClaimableUsdc(position.estimatedClaimableUsdc) ? (
                     <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#65ecaf]">
-                      Discovery reward: {formatUsdcAmount(position.estimatedClaimableUsdc)}
+                      {t("buyout.discoveryRewardLine", { amount: formatUsdcAmount(position.estimatedClaimableUsdc) })}
                     </p>
                   ) : null}
-                  {position?.discoveryRewardEligible === false ? (
-                    <p className="mt-0.5 text-[length:var(--fs-micro)]">
-                      Not eligible for this discovery reward snapshot.
+                  {/* (B2) Eligibility identity chip */}
+                  {position?.discoveryRewardEligible === true ? (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[#65ecaf]/30 bg-[#65ecaf]/10 px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold text-[#65ecaf]">
+                      {t("buyout.eligibleBacker")}
+                    </span>
+                  ) : position?.discoveryRewardEligible === false ? (
+                    <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#6f8099]">
+                      {t("buyout.notEligibleSnapshot")}
                     </p>
                   ) : null}
                 </div>
