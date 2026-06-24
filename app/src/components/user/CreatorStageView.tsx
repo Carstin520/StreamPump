@@ -299,7 +299,7 @@ const StatusBadge = ({ market }: { market: MarketModel }) => {
   return (
     <span className="tone-stage-s1 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
       <span className="h-1.5 w-1.5 rounded-full bg-[var(--stage-s1)]" />
-      S1 Profile · {market.graduationPct}%
+      {t("creator.s1ProfileEyebrow")} · {market.graduationPct}%
     </span>
   );
 };

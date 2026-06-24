@@ -688,7 +688,7 @@ function MarketPage() {
           : t("market.previewSoldMsg", { amount: String(amount), cost: estimatedCost.toFixed(3) }),
       );
     },
-    [creatorWallet],
+    [creatorWallet, t],
   );
 
   if (!creatorId || loading) {

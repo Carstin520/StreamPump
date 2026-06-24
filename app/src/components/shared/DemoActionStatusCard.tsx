@@ -1,4 +1,5 @@
 import { DemoActionState } from "@/hooks/useDemoActionFlow";
+import { useI18n } from "@/lib/i18n";
 
 type DemoActionStatusCardProps = {
   amountLabel?: string;
@@ -23,6 +24,7 @@ export function DemoActionStatusCard({
   onConfirm,
   onRetry,
 }: DemoActionStatusCardProps) {
+  const { t } = useI18n();
   if (state.status === "idle") return null;
 
   return (
@@ -54,20 +56,20 @@ export function DemoActionStatusCard({
             onClick={() => onConfirm({ fail: true })}
             type="button"
           >
-            Simulate failure
+            {t("demoAction.simulateFailure")}
           </button>
           <button
             className="rounded-full px-3 py-2 text-[length:var(--fs-micro)] font-medium text-[#7e90aa] transition hover:text-white"
             onClick={onCancel}
             type="button"
           >
-            Cancel
+            {t("demoAction.cancel")}
           </button>
         </div>
       ) : null}
 
       {state.status === "submitted" ? (
-        <p className="mt-3 text-[length:var(--fs-overline)] font-medium text-[#f3b33e]">Submitting...</p>
+        <p className="mt-3 text-[length:var(--fs-overline)] font-medium text-[#f3b33e]">{t("demoAction.submitting")}</p>
       ) : null}
 
       {state.status === "success" ? (
@@ -78,7 +80,7 @@ export function DemoActionStatusCard({
             onClick={onCancel}
             type="button"
           >
-            Done
+            {t("demoAction.done")}
           </button>
         </div>
       ) : null}
@@ -86,14 +88,14 @@ export function DemoActionStatusCard({
       {state.status === "failed" ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="max-w-[240px] text-[length:var(--fs-overline)] text-[#ff8a78]">
-            {state.error ?? "Demo action failed."}
+            {state.error ?? t("demoAction.failed")}
           </p>
           <button
             className="rounded-full bg-white/10 px-3 py-1.5 text-[length:var(--fs-micro)] font-semibold text-white transition hover:bg-white/15"
             onClick={onRetry}
             type="button"
           >
-            Retry
+            {t("demoAction.retry")}
           </button>
         </div>
       ) : null}
