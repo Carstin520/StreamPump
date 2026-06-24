@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 
-import { BackingCard } from "@/components/backing/BackingCard";
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
@@ -11,6 +10,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  FollowCheckIcon,
+  FollowPlusIcon,
   HeartOutlineIcon,
   HeartSolidIcon,
 } from "@/components/shared/AppIcons";
@@ -608,7 +609,145 @@ const PostContentBlock = ({ post }: { post: PostRecord }) => {
   );
 };
 
-// Right column: BackingCard teaser + related posts + comments-only panel
+// Stage-aware backing panel: one creator header (avatar + Follow at top) plus a
+// stage-specific action — S1 discovery → back/energy on /market, Buyout → a
+// graduation-funding prompt → /buyout, S2 → a campaign entry. NONE → honest
+// "view creator". No fabricated momentum numbers; real value lives on /market.
+const STAGE_ACCENT: Record<PostRecord["stage"], string> = {
+  NONE: "var(--stage-s1)",
+  S1_DISCOVERY: "var(--stage-s1)",
+  S1_BUYOUT: "var(--stage-buyout)",
+  S2_ACTIVE: "var(--stage-s2)",
+};
+
+const CreatorBackingPanel = ({ post }: { post: PostRecord }) => {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  const toggleFollow = () => {
+    if (!requireInteractiveSession(router)) {
+      return;
+    }
+    setIsFollowing((value) => !value);
+  };
+
+  const accent = STAGE_ACCENT[post.stage];
+
+  const action = ((): { eyebrow?: string; badge?: string; cta: string; href: string; note: string; source?: string } => {
+    switch (post.stage) {
+      case "S1_DISCOVERY":
+        return {
+          eyebrow: t("backing.s1Eyebrow"),
+          cta: t("backing.teaserCta"),
+          href: `/market/${post.creatorId}`,
+          note: t("backing.teaserNote"),
+          source: t("backing.teaserReadiness"),
+        };
+      case "S1_BUYOUT":
+        return {
+          badge: t("backing.buyoutBadge"),
+          cta: t("backing.buyoutCta"),
+          href: `/buyout/${post.creatorId}`,
+          note: t("backing.buyoutNote"),
+          source: t("backing.teaserReadiness"),
+        };
+      case "S2_ACTIVE":
+        return {
+          eyebrow: t("backing.s2Eyebrow"),
+          cta: t("backing.s2Cta"),
+          href: `/creators/${post.creatorId}`,
+          note: t("backing.s2Note"),
+          source: t("backing.teaserReadiness"),
+        };
+      default:
+        return {
+          cta: t("backing.viewCreator"),
+          href: `/creators/${post.creatorId}`,
+          note: t("backing.notInSeason"),
+          source: t("backing.teaserSource"),
+        };
+    }
+  })();
+
+  return (
+    <div
+      className="rounded-[16px] border p-4"
+      style={{
+        background: `linear-gradient(160deg, color-mix(in srgb, ${accent} 10%, transparent), color-mix(in srgb, ${accent} 3%, transparent))`,
+        borderColor: `color-mix(in srgb, ${accent} 28%, transparent)`,
+      }}
+    >
+      {/* Creator header with Follow at the top */}
+      <div className="flex items-center justify-between gap-3">
+        <Link className="flex min-w-0 items-center gap-3" href={`/creators/${post.creatorId}`}>
+          <img alt={post.creatorName} className="h-10 w-10 flex-none rounded-full object-cover ring-1 ring-white/10" src={post.creatorAvatarSrc} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-semibold text-white">{post.creatorName}</p>
+              <StagePill compact stage={post.stage} />
+            </div>
+            <p className="truncate text-xs text-[#8799b3]">{post.creatorHandle}</p>
+          </div>
+        </Link>
+        <button
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition hover:scale-[1.02] ${
+            isFollowing ? "border-[#90efac]/30 bg-[#13291f]/70 text-[#90efac]" : "border-white/14 bg-white/[0.05] text-white hover:bg-white/10"
+          }`}
+          onClick={toggleFollow}
+          type="button"
+        >
+          {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
+          {isFollowing ? t("feed.following") : t("feed.follow")}
+        </button>
+      </div>
+
+      {/* Stage eyebrow / buyout badge */}
+      {action.badge ? (
+        <p className="mt-3 inline-flex items-center rounded-full border px-2.5 py-1 text-[length:var(--fs-nano)] font-semibold" style={{ color: accent, borderColor: `color-mix(in srgb, ${accent} 34%, transparent)`, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}>
+          {action.badge}
+        </p>
+      ) : action.eyebrow ? (
+        <p className="mt-3 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }}>
+          {action.eyebrow}
+        </p>
+      ) : null}
+
+      {/* Stage-aware CTA */}
+      <Link
+        className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98]"
+        href={action.href}
+        style={{
+          background: post.stage === "NONE" || post.stage === "S1_DISCOVERY"
+            ? "linear-gradient(180deg, var(--brand-strong, #f05540) 0%, var(--brand) 100%)"
+            : `color-mix(in srgb, ${accent} 18%, transparent)`,
+          borderColor: `color-mix(in srgb, ${accent} 40%, transparent)`,
+        }}
+      >
+        {action.cta}
+      </Link>
+
+      <p className="mt-2 text-center text-[length:var(--fs-micro)] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+        {action.note}
+      </p>
+
+      {action.source ? (
+        <p
+          className="mt-2 rounded-full border px-3 py-1 text-center text-[length:var(--fs-nano)]"
+          style={{
+            color: "color-mix(in srgb, var(--state-warning) 80%, var(--text-muted))",
+            borderColor: "color-mix(in srgb, var(--state-warning) 26%, transparent)",
+            background: "color-mix(in srgb, var(--state-warning) 10%, transparent)",
+          }}
+        >
+          {action.source}
+        </p>
+      ) : null}
+    </div>
+  );
+};
+
+// Right column: stage-aware backing panel + related posts + comments-only panel
 const DetailRightColumn = ({
   currentPost,
   items,
@@ -625,35 +764,11 @@ const DetailRightColumn = ({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Scrollable upper area: BackingCard + Related */}
+      {/* Scrollable upper area: creator + Follow + stage-aware backing + Related.
+          Creator/Follow live ONLY here (the comments panel no longer repeats them). */}
       <div className="overflow-y-auto">
-        {/* BackingCard teaser — uses only real PostRecord fields (no fabricated momentum).
-            Staged creators get a Back CTA → market; creators not yet in a backing
-            season get an honest "view creator" entry. A source notice is always shown. */}
         <div className="px-3 pt-3">
-          {currentPost.stage !== "NONE" ? (
-            <BackingCard
-              creatorAvatarSrc={currentPost.creatorAvatarSrc}
-              creatorName={currentPost.creatorName}
-              ctaHref={`/market/${currentPost.creatorId}`}
-              ctaLabel={t("backing.teaserCta")}
-              note={t("backing.teaserNote")}
-              readinessLabel={t("backing.teaserReadiness")}
-              stage={currentPost.stage}
-              variant="teaser"
-            />
-          ) : (
-            <BackingCard
-              creatorAvatarSrc={currentPost.creatorAvatarSrc}
-              creatorName={currentPost.creatorName}
-              ctaHref={`/creators/${currentPost.creatorId}`}
-              ctaLabel={t("backing.viewCreator")}
-              note={t("backing.notInSeason")}
-              readinessLabel={t("backing.teaserSource")}
-              stage={currentPost.stage}
-              variant="teaser"
-            />
-          )}
+          <CreatorBackingPanel post={currentPost} />
         </div>
 
         {/* Related posts */}

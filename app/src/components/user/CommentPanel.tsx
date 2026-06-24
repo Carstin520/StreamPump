@@ -112,40 +112,42 @@ export const CommentPanel = ({
         : "bg-transparent"
     }`}
   >
-    <div className="border-b border-white/[0.045] px-5 py-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link href={`/creators/${post.creatorId}`}>
-            <img
-              alt={post.creatorName}
-              className="h-10 w-10 cursor-pointer rounded-full object-cover ring-1 ring-white/16"
-              src={post.creatorAvatarSrc}
-            />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <Link className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
-                {post.creatorName}
-              </Link>
-              <StagePill compact stage={post.stage} />
+    {showPostContent ? (
+      <div className="border-b border-white/[0.045] px-5 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link href={`/creators/${post.creatorId}`}>
+              <img
+                alt={post.creatorName}
+                className="h-10 w-10 cursor-pointer rounded-full object-cover ring-1 ring-white/16"
+                src={post.creatorAvatarSrc}
+              />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <Link className="text-sm font-semibold text-white hover:underline" href={`/creators/${post.creatorId}`}>
+                  {post.creatorName}
+                </Link>
+                <StagePill compact stage={post.stage} />
+              </div>
+              <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
             </div>
-            <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
           </div>
+          <button
+            className={`liquid-glass-btn rounded-full px-4 py-2 text-xs font-semibold text-white transition hover:scale-[1.02] hover:bg-white/10 ${
+              highlightKey === "follow" ? "tap-bounce-active" : ""
+            } ${isFollowing ? "border-[#90efac]/30 bg-[#13291f]/70 text-[#90efac]" : ""}`}
+            onClick={toggleFollow}
+            type="button"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
+              {isFollowing ? t("feed.following") : t("feed.follow")}
+            </span>
+          </button>
         </div>
-        <button
-          className={`liquid-glass-btn rounded-full px-4 py-2 text-xs font-semibold text-white transition hover:scale-[1.02] hover:bg-white/10 ${
-            highlightKey === "follow" ? "tap-bounce-active" : ""
-          } ${isFollowing ? "border-[#90efac]/30 bg-[#13291f]/70 text-[#90efac]" : ""}`}
-          onClick={toggleFollow}
-          type="button"
-        >
-          <span className="inline-flex items-center gap-1.5">
-            {isFollowing ? <FollowCheckIcon className="h-4 w-4" /> : <FollowPlusIcon className="h-4 w-4" />}
-            {isFollowing ? t("feed.following") : t("feed.follow")}
-          </span>
-        </button>
       </div>
-    </div>
+    ) : null}
 
     <div className="flex-1 overflow-y-auto px-5 py-5" data-post-scroll-region>
       {showPostContent ? (
