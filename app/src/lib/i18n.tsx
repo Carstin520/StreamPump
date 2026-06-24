@@ -928,6 +928,11 @@ const zh: Record<string, string> = {
   "endorse.demoBrief": "Nova Screen 的赞助测评视频在活动窗口内达到 1 万点赞。",
   "endorse.demoDeadline": "2026年5月15日",
   "endorse.trackBase": "基础",
+  "feed.shortsTitle": "短视频",
+  "feed.shortsHint": "竖屏 · 上下滑看下一条",
+  "feed.shortBack": "应援",
+  "feed.shortViewCreator": "看创作者",
+  "feed.shortComments": "评论",
 };
 
 const en: Record<string, string> = {
@@ -1837,6 +1842,11 @@ const en: Record<string, string> = {
   "endorse.demoBrief": "Nova Screen's sponsored review video reaches 10,000 likes within the campaign window.",
   "endorse.demoDeadline": "May 15, 2026",
   "endorse.trackBase": "Base",
+  "feed.shortsTitle": "Shorts",
+  "feed.shortsHint": "Vertical · swipe for next",
+  "feed.shortBack": "Back",
+  "feed.shortViewCreator": "View creator",
+  "feed.shortComments": "Comments",
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { en, zh };

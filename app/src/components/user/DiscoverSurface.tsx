@@ -10,6 +10,8 @@ import { useI18n } from "@/lib/i18n";
 
 import { PageShell } from "@/components/layout/PageShell";
 import { PostCard } from "./PostCard";
+import { ShortImmersiveOverlay } from "./ShortImmersiveOverlay";
+import { ShortsShelf } from "./ShortsShelf";
 import { TrendingTabsView } from "./TrendingTabs";
 
 let postDetailExperiencePromise:
@@ -82,15 +84,26 @@ export const DiscoverSurface = ({
 }) => {
   const { t } = useI18n();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedShortId, setSelectedShortId] = useState<string | null>(null);
   const viewModel = useExploreFeedViewModel({
     initialError,
     initialPosts,
   });
   const { posts } = viewModel;
 
+  const shorts = useMemo(
+    () => viewModel.posts.filter((p) => p.type === "VIDEO"),
+    [viewModel.posts],
+  );
+
   return (
     <PageShell topbarMode="scroll-reveal">
-      <ExploreView onOpenPost={setSelectedPostId} viewModel={viewModel} />
+      <ExploreView
+        onOpenPost={setSelectedPostId}
+        onOpenShort={setSelectedShortId}
+        shorts={shorts}
+        viewModel={viewModel}
+      />
       {selectedPostId && posts.length > 0 ? (
         <DynamicPostDetailExperience
           currentPostId={selectedPostId}
@@ -102,15 +115,27 @@ export const DiscoverSurface = ({
           syncRoute={false}
         />
       ) : null}
+      {selectedShortId ? (
+        <ShortImmersiveOverlay
+          currentPostId={selectedShortId}
+          onChangePostId={setSelectedShortId}
+          onClose={() => setSelectedShortId(null)}
+          shorts={shorts}
+        />
+      ) : null}
     </PageShell>
   );
 };
 
 const ExploreView = ({
   onOpenPost,
+  onOpenShort,
+  shorts,
   viewModel,
 }: {
   onOpenPost: (postId: string) => void;
+  onOpenShort: (postId: string) => void;
+  shorts: PostRecord[];
   viewModel: ReturnType<typeof useExploreFeedViewModel>;
 }) => {
   const { t } = useI18n();
@@ -172,6 +197,7 @@ const ExploreView = ({
         </div>
       </section>
 
+      <ShortsShelf onOpenShort={onOpenShort} shorts={shorts} />
       <PostsSection onOpenPost={onOpenPost} posts={visiblePosts} viewModel={viewModel} />
     </div>
   );
