@@ -155,6 +155,7 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
   }
 
   const failures: string[] = [];
+  const warnings: string[] = [];
 
   if (runtimeConfig.auth.sessionSecret === DEFAULT_AUTH_SESSION_SECRET) {
     failures.push("AUTH_SESSION_SECRET must be set to a non-default value");
@@ -191,17 +192,21 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   const databaseUrl = process.env.DATABASE_URL ?? "";
   if (!databaseUrl.includes("-pooler.")) {
-    failures.push("DATABASE_URL must use the Neon pooled endpoint host containing -pooler");
+    warnings.push("DATABASE_URL should use the Neon pooled endpoint host containing -pooler");
   }
   if (!/[?&]connection_limit=([5-9]|10)(&|$)/.test(databaseUrl)) {
-    failures.push("DATABASE_URL must include connection_limit=5-10 for the Render demo backend");
+    warnings.push("DATABASE_URL should include connection_limit=5-10 for the Render demo backend");
   }
   if (!/[?&]pool_timeout=([5-9]|10)(&|$)/.test(databaseUrl)) {
-    failures.push("DATABASE_URL must include pool_timeout=5-10 for the Render demo backend");
+    warnings.push("DATABASE_URL should include pool_timeout=5-10 for the Render demo backend");
   }
 
   if (failures.length > 0) {
     throw new Error(`Invalid production configuration: ${failures.join("; ")}`);
+  }
+
+  if (warnings.length > 0) {
+    console.warn(`Production configuration warning: ${warnings.join("; ")}`);
   }
 };
 

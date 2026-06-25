@@ -12,11 +12,11 @@ Do not commit `.env*`, keypairs, treasury keys, generated dumps, or funded walle
 
 Render backend must use paid compute for the live demo and run migrations before startup.
 
-Production startup now fails fast unless:
+Production startup fails fast for security/runtime prerequisites and warns for capacity tuning gaps:
 
 - `SOLANA_TX_RPC_ENDPOINT` is a dedicated devnet RPC, not `https://api.devnet.solana.com`.
 - If `INDEXER_ENABLED=true`, `SOLANA_INDEXER_RPC_ENDPOINT` is set to a separate RPC from `SOLANA_TX_RPC_ENDPOINT`.
-- `DATABASE_URL` uses the Neon `-pooler` host and includes `connection_limit=5-10` plus `pool_timeout=5-10`.
+- `DATABASE_URL` uses the Neon `-pooler` host and includes `connection_limit=5-10` plus `pool_timeout=5-10` for demo-day load readiness. The backend warns rather than exits when these tuning params are missing so an existing Render service can still boot; `npm run demo:managed-wallet:check` should remain the operator gate before a capacity run.
 - `MANAGED_WALLET_ENCRYPTION_KEY` is a 64-char hex secret in Render.
 
 Recommended demo env:
