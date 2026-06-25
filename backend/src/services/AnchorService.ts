@@ -562,7 +562,7 @@ export class AnchorService {
   readonly protocolAdmin: Keypair | null;
 
   private constructor() {
-    this.connection = new Connection(config.solana.rpcEndpoint, PROGRAM_COMMITMENT);
+    this.connection = new Connection(config.solana.txRpcEndpoint, PROGRAM_COMMITMENT);
     this.oracleAuthority = loadOracleAuthorityKeypair();
     this.contentAnchorSigner = loadOptionalContentAnchorSigner();
     this.protocolAdmin = loadOptionalProtocolAdminKeypair();

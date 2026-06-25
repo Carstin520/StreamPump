@@ -123,6 +123,9 @@ describe("s1ActionController helpers", () => {
           buildEndorseProposalInstruction: async () => {
             throw new Error("unexpected endorse build");
           },
+          buildClaimS1BuyoutUsdcInstruction: async () => {
+            throw new Error("unexpected buyout claim build");
+          },
           buildClientSignedTransaction: async (params: any) => {
             capturedBuild = params;
             return {
@@ -216,6 +219,9 @@ describe("s1ActionController helpers", () => {
               data: Buffer.alloc(0),
             });
           },
+          buildClaimS1BuyoutUsdcInstruction: async () => {
+            throw new Error("unexpected buyout claim build");
+          },
           buildClientSignedTransaction: async (params: any) => {
             capturedBuild = params;
             return {
@@ -240,5 +246,152 @@ describe("s1ActionController helpers", () => {
       amount: 1000n,
     });
     expect(capturedBuild.payerWallet).to.equal(oracle.publicKey.toBase58());
+  });
+
+  it("uses oracle as fee payer for managed S1 buyout USDC claims", async () => {
+    const managed = Keypair.generate();
+    const oracle = Keypair.generate();
+    const creator = Keypair.generate().publicKey;
+    const sponsor = Keypair.generate().publicKey;
+    const instruction = new TransactionInstruction({
+      keys: [],
+      programId: PublicKey.default,
+      data: Buffer.alloc(0),
+    });
+    let capturedBuild: any = null;
+    let capturedClaim: any = null;
+
+    const result = await executeManagedWalletActionForSession(
+      {
+        userWallet: managed.publicKey.toBase58(),
+        action: "claim-s1-buyout-usdc",
+        rawParams: {
+          creatorWallet: creator.toBase58(),
+          sponsorWallet: sponsor.toBase58(),
+        },
+      },
+      {
+        loadManagedWalletKeypair: async () => managed,
+        getAnchorService: (() => ({
+          oracleAuthority: oracle,
+          buildClaimDailySpumpInstruction: async () => {
+            throw new Error("unexpected daily build");
+          },
+          buildClaimEngagementRewardInstruction: async () => {
+            throw new Error("unexpected engagement build");
+          },
+          buildEndorseProposalInstruction: async () => {
+            throw new Error("unexpected endorse build");
+          },
+          buildClaimS1BuyoutUsdcInstruction: async (params: any) => {
+            capturedClaim = params;
+            return instruction;
+          },
+          buildClientSignedTransaction: async (params: any) => {
+            capturedBuild = params;
+            return {
+              transactionBase64: "tx-base64",
+              recentBlockhash: "blockhash",
+              lastValidBlockHeight: 123n,
+            };
+          },
+          sendAndConfirmVersionedTransaction: async () => "sig-managed-buyout-claim",
+        })) as never,
+        syncSubmittedS1Projection: async () => ({
+          status: "SYNCED",
+          instructionCount: 1,
+          indexerStatus: "SYNCED",
+        }),
+      }
+    );
+
+    expect(result.signature).to.equal("sig-managed-buyout-claim");
+    expect(capturedClaim).to.deep.equal({
+      userWallet: managed.publicKey.toBase58(),
+      creatorWallet: creator.toBase58(),
+      sponsorWallet: sponsor.toBase58(),
+    });
+    expect(capturedBuild.payerWallet).to.equal(oracle.publicKey.toBase58());
+    expect(capturedBuild.instructions).to.deep.equal([instruction]);
+    expect(capturedBuild.backendSigners.map((keypair: Keypair) => keypair.publicKey.toBase58())).to.deep.equal([
+      managed.publicKey.toBase58(),
+      oracle.publicKey.toBase58(),
+    ]);
+  });
+
+  it("uses oracle as fee payer for managed S1 buys and can skip projection sync", async () => {
+    const managed = Keypair.generate();
+    const oracle = Keypair.generate();
+    const creator = Keypair.generate().publicKey;
+    const instruction = new TransactionInstruction({
+      keys: [],
+      programId: PublicKey.default,
+      data: Buffer.alloc(0),
+    });
+    let capturedBuild: any = null;
+    let capturedBuy: any = null;
+    let projectionSyncCalled = false;
+
+    const result = await executeManagedWalletActionForSession(
+      {
+        userWallet: managed.publicKey.toBase58(),
+        action: "buy_s1_token",
+        rawParams: {
+          creatorWallet: creator.toBase58(),
+          amount: "5",
+        },
+        syncProjection: false,
+      },
+      {
+        loadManagedWalletKeypair: async () => managed,
+        getAnchorService: (() => ({
+          oracleAuthority: oracle,
+          buildClaimDailySpumpInstruction: async () => {
+            throw new Error("unexpected daily build");
+          },
+          buildClaimEngagementRewardInstruction: async () => {
+            throw new Error("unexpected engagement build");
+          },
+          buildEndorseProposalInstruction: async () => {
+            throw new Error("unexpected endorse build");
+          },
+          buildClaimS1BuyoutUsdcInstruction: async () => {
+            throw new Error("unexpected buyout claim build");
+          },
+          buildBuyS1TokenInstruction: async (params: any) => {
+            capturedBuy = params;
+            return instruction;
+          },
+          buildClientSignedTransaction: async (params: any) => {
+            capturedBuild = params;
+            return {
+              transactionBase64: "tx-base64",
+              recentBlockhash: "blockhash",
+              lastValidBlockHeight: 123n,
+            };
+          },
+          sendAndConfirmVersionedTransaction: async () => "sig-managed-buy",
+        })) as never,
+        syncSubmittedS1Projection: async () => {
+          projectionSyncCalled = true;
+          return {
+            status: "SYNCED",
+            instructionCount: 1,
+            indexerStatus: "SYNCED",
+          };
+        },
+      }
+    );
+
+    expect(result.signature).to.equal("sig-managed-buy");
+    expect(result.projectionSync).to.equal(undefined);
+    expect(projectionSyncCalled).to.equal(false);
+    expect(capturedBuy).to.deep.equal({
+      userWallet: managed.publicKey.toBase58(),
+      creatorWallet: creator.toBase58(),
+      amount: 5n,
+    });
+    expect(capturedBuild.payerWallet).to.equal(oracle.publicKey.toBase58());
+    expect(capturedBuild.instructions).to.deep.equal([instruction]);
   });
 });

@@ -2,9 +2,10 @@
  * CN: S1 action 控制器，生成需要用户钱包签名的链上交易。
  * EN: S1 action controller that builds user-wallet-signed on-chain transactions.
  */
-import { PublicKey, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 
 import {
+  ensureIdempotencyKey,
   HttpError,
   ok,
   parseNonEmptyString,
@@ -15,17 +16,27 @@ import {
   withController,
 } from "./http";
 import { getAnchorService, UserMissionTypeName } from "../services/AnchorService";
-import { ingestConfirmedProgramTransaction } from "../services/indexer";
 import {
-  loadManagedWalletKeypair,
-  ManagedWalletSecretMissingError,
-} from "../services/managedWalletService";
+  enqueueManagedWalletExecutionJob,
+  getManagedWalletExecutionJobForWallet,
+  toApiJobStatus,
+} from "../services/managedWalletJobs";
+import { getClientIp } from "../services/rateLimiter";
+import {
+  syncSubmittedS1Projection,
+} from "../services/managedWalletExecution";
 import {
   buildMockS1SubmitResponse,
   buildMockS1Transaction,
   DEMO_S1_CREATOR_WALLET,
   isS1MockWallet,
 } from "../services/s1MockContract";
+
+export type { S1ProjectionSyncResponse } from "../services/managedWalletExecution";
+export {
+  executeManagedWalletActionForSession,
+  syncSubmittedS1Projection,
+} from "../services/managedWalletExecution";
 
 const USER_ROLE_FAN = 1 << 0;
 const ZERO_SIGNATURE = new Uint8Array(64);
@@ -78,26 +89,6 @@ const parseDigestHex = (value: unknown, fieldName: string): string => {
   }
 
   return parsed;
-};
-
-const parseParamsRecord = (value: unknown): Record<string, unknown> => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-};
-
-const parseManagedAction = (value: unknown): "claim-daily-spump" | "claim-engagement-reward" | "endorse-proposal" => {
-  const action = parseNonEmptyString(value, "action");
-  switch (action) {
-    case "claim-daily-spump":
-    case "claim-engagement-reward":
-    case "endorse-proposal":
-      return action;
-    default:
-      throw new HttpError(400, "UNSUPPORTED_MANAGED_ACTION", "managed wallet action is not supported");
-  }
 };
 
 export const assertS1TransactionSignedByWallet = (
@@ -205,136 +196,6 @@ const buildResponse = async (params: {
     lastValidBlockHeight: built.lastValidBlockHeight.toString(),
     requiredSigners: params.requiredSigners,
     derived: params.derived,
-  };
-};
-
-export type S1ProjectionSyncResponse =
-  | {
-      status: "SYNCED";
-      instructionCount: number;
-      indexerStatus: string;
-    }
-  | {
-      status: "FAILED";
-      instructionCount?: number;
-      indexerStatus?: string;
-      error?: string;
-    };
-
-export const syncSubmittedS1Projection = async (
-  signature: string,
-  ingest: typeof ingestConfirmedProgramTransaction = ingestConfirmedProgramTransaction
-): Promise<S1ProjectionSyncResponse> => {
-  try {
-    const projectionSync = await ingest(signature, {
-      updateCursor: false,
-    });
-
-    return {
-      status: projectionSync.status === "SYNCED" ? "SYNCED" : "FAILED",
-      instructionCount: projectionSync.instructionCount,
-      indexerStatus: projectionSync.status,
-    };
-  } catch (error) {
-    return {
-      status: "FAILED",
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-};
-
-type ManagedWalletExecutionDeps = {
-  getAnchorService: typeof getAnchorService;
-  loadManagedWalletKeypair: typeof loadManagedWalletKeypair;
-  syncSubmittedS1Projection: typeof syncSubmittedS1Projection;
-};
-
-const defaultManagedWalletExecutionDeps: ManagedWalletExecutionDeps = {
-  getAnchorService,
-  loadManagedWalletKeypair,
-  syncSubmittedS1Projection,
-};
-
-export const executeManagedWalletActionForSession = async (
-  params: {
-    userWallet: string;
-    action: unknown;
-    rawParams: unknown;
-  },
-  deps: ManagedWalletExecutionDeps = defaultManagedWalletExecutionDeps
-) => {
-  let managedKeypair: Awaited<ReturnType<typeof loadManagedWalletKeypair>>;
-  try {
-    managedKeypair = await deps.loadManagedWalletKeypair(params.userWallet);
-  } catch (error) {
-    if (error instanceof ManagedWalletSecretMissingError) {
-      throw new HttpError(
-        400,
-        "MANAGED_WALLET_KEY_MISSING",
-        "managed wallet is missing encrypted key material"
-      );
-    }
-
-    throw error;
-  }
-  if (!managedKeypair) {
-    throw new HttpError(400, "NOT_MANAGED_WALLET", "current session wallet is not a managed wallet");
-  }
-
-  const action = parseManagedAction(params.action);
-  const actionParams = parseParamsRecord(params.rawParams);
-  const anchorService = deps.getAnchorService();
-  const oracleSigner = anchorService.oracleAuthority;
-
-  let instruction: TransactionInstruction;
-  let payerWallet = oracleSigner.publicKey.toBase58();
-  let backendSigners = [managedKeypair, oracleSigner];
-
-  if (action === "claim-daily-spump") {
-    instruction = await anchorService.buildClaimDailySpumpInstruction({
-      userWallet: params.userWallet,
-    });
-  } else if (action === "claim-engagement-reward") {
-    const reward = await anchorService.buildClaimEngagementRewardInstruction({
-      userWallet: params.userWallet,
-      missionType: parseMissionType(actionParams.missionType),
-      rewardAmount: parseNonNegativeBigInt(actionParams.rewardAmount, "rewardAmount"),
-      xpGain: parseNonNegativeBigInt(actionParams.xpGain, "xpGain"),
-      newLevel: parseOptionalPositiveInt(actionParams.newLevel, "newLevel"),
-      reportIdHex: parseDigestHex(actionParams.reportIdHex, "reportIdHex"),
-      reportDigestHex: parseDigestHex(actionParams.reportDigestHex, "reportDigestHex"),
-      observedAtUnix: parseNonNegativeBigInt(actionParams.observedAtUnix, "observedAtUnix"),
-    });
-    instruction = reward.instruction;
-    backendSigners = [managedKeypair, reward.oracleSigner];
-    payerWallet = reward.oracleSigner.publicKey.toBase58();
-  } else {
-    const proposalPda = parseWallet(actionParams.proposalPda, "proposalPda");
-    const amount = parsePositiveBigInt(actionParams.amount, "amount");
-    instruction = await anchorService.buildEndorseProposalInstruction({
-      userWallet: params.userWallet,
-      proposalPda,
-      amount,
-    });
-    payerWallet = oracleSigner.publicKey.toBase58();
-    backendSigners = [managedKeypair, oracleSigner];
-  }
-
-  const built = await anchorService.buildClientSignedTransaction({
-    payerWallet,
-    instructions: [instruction],
-    backendSigners,
-  });
-  const signature = await anchorService.sendAndConfirmVersionedTransaction({
-    serializedTxBase64: built.transactionBase64,
-    recentBlockhash: built.recentBlockhash,
-    lastValidBlockHeight: built.lastValidBlockHeight,
-  });
-
-  return {
-    signature,
-    action,
-    projectionSync: await deps.syncSubmittedS1Projection(signature),
   };
 };
 
@@ -741,14 +602,48 @@ export const managedWalletExecute = withController(
   "S1_MANAGED_WALLET_EXECUTE_FAILED",
   async (req, res) => {
     const userWallet = requireSessionWallet(req);
-    ok(
-      res,
-      await executeManagedWalletActionForSession({
-        userWallet,
-        action: req.body.action,
-        rawParams: req.body.params,
-      })
-    );
+    const job = await enqueueManagedWalletExecutionJob({
+      wallet: userWallet,
+      sessionId: req.auth?.sessionId ?? null,
+      idempotencyKey: ensureIdempotencyKey(req),
+      action: req.body.action,
+      jobParams: req.body.params,
+      ip: getClientIp(req),
+    });
+
+    res.status(202).json({
+      jobId: job.id,
+      status: "queued",
+    });
+  }
+);
+
+export const getManagedWalletJob = withController(
+  "GET_S1_MANAGED_WALLET_JOB_FAILED",
+  async (req, res) => {
+    const userWallet = requireSessionWallet(req);
+    const job = await getManagedWalletExecutionJobForWallet({
+      wallet: userWallet,
+      jobId: parseNonEmptyString(req.params.jobId, "jobId"),
+    });
+
+    if (!job) {
+      throw new HttpError(404, "MANAGED_WALLET_JOB_NOT_FOUND", "managed wallet job not found");
+    }
+
+    res.status(200).json({
+      status: toApiJobStatus(job.status),
+      ...(job.signature ? { signature: job.signature } : {}),
+      ...(job.projectionSync ? { projectionSync: job.projectionSync } : {}),
+      ...(job.errorMessage
+        ? {
+            error: {
+              code: job.errorCode ?? "MANAGED_WALLET_JOB_FAILED",
+              message: job.errorMessage,
+            },
+          }
+        : {}),
+    });
   }
 );
 

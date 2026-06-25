@@ -18,6 +18,11 @@ import {
 } from "../services/auth";
 import { config } from "../../config/default";
 import {
+  buildEphemeralSubjectRateLimitKey,
+  createEphemeralSessionFromPool,
+} from "../services/ephemeralSessionService";
+import { assertRateLimit, getClientIp } from "../services/rateLimiter";
+import {
   createSponsorDocumentUpload,
   submitSponsorProfile,
 } from "../services/sponsorProfile";
@@ -238,6 +243,39 @@ export const exchangeProviderSession = async (req: Request, res: Response) => {
     });
   } catch (error) {
     handleControllerError(res, error, "EXCHANGE_PROVIDER_SESSION_FAILED");
+  }
+};
+
+export const createEphemeralSession = async (req: Request, res: Response) => {
+  try {
+    const subject = parseNonEmptyString(req.body.subject, "subject");
+    const ip = getClientIp(req);
+
+    assertRateLimit({
+      key: `ephemeral-ip:${ip}`,
+      limit: config.managedWallet.ephemeralIpLimit,
+      windowMs: config.managedWallet.ephemeralIpWindowMs,
+      code: "EPHEMERAL_SESSION_IP_RATE_LIMITED",
+      message: "too many ephemeral session attempts from this IP",
+    });
+    assertRateLimit({
+      key: buildEphemeralSubjectRateLimitKey(subject),
+      limit: config.managedWallet.ephemeralSubjectLimit,
+      windowMs: config.managedWallet.ephemeralSubjectWindowMs,
+      code: "EPHEMERAL_SESSION_SUBJECT_RATE_LIMITED",
+      message: "too many ephemeral session attempts for this subject",
+    });
+
+    const session = await createEphemeralSessionFromPool({ subject });
+    res.status(session.created ? 201 : 200).json({
+      accessToken: session.accessToken,
+      wallet: session.wallet,
+      identity: {
+        managedWalletAddress: session.identity.managedWalletAddress,
+      },
+    });
+  } catch (error) {
+    handleControllerError(res, error, "CREATE_EPHEMERAL_SESSION_FAILED");
   }
 };
 

@@ -16,6 +16,7 @@ import {
   buildSellS1Transaction,
   buildSweepS1BuyoutResidualTransaction,
   buildSubmitBuyoutOfferTransaction,
+  getManagedWalletJob,
   getS1TransactionStatus,
   managedWalletExecute,
   submitS1Transaction,
@@ -40,6 +41,7 @@ router.post("/buyout/graduation/build", requireSessionAuth, buildExecuteS1Gradua
 router.post("/buyout/claim-usdc/build", requireSessionAuth, buildClaimS1BuyoutUsdcTransaction);
 router.post("/buyout/sweep-residual/build", requireSessionAuth, buildSweepS1BuyoutResidualTransaction);
 router.post("/managed/execute", requireSessionAuth, managedWalletExecute);
+router.get("/managed/jobs/:jobId", requireSessionAuth, getManagedWalletJob);
 router.post("/transactions/submit", requireSessionAuth, submitS1Transaction);
 router.get("/transactions/:signature/status", requireSessionAuth, getS1TransactionStatus);
 

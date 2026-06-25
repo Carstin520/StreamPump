@@ -444,7 +444,7 @@ export const ingestConfirmedProgramTransaction = async (
     updateCursor?: boolean;
   } = {}
 ): Promise<IngestConfirmedProgramTransactionResult> => {
-  const connection = options.connection ?? new Connection(config.solana.rpcEndpoint, "confirmed");
+  const connection = options.connection ?? new Connection(config.solana.indexerRpcEndpoint, "confirmed");
   const targetProgram = options.targetProgram ?? new PublicKey(config.solana.programId);
   const shouldUpdateCursor = options.updateCursor ?? false;
   const response = await fetchParsedTransactionWithRetry(connection, signature);
