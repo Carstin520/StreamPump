@@ -12,6 +12,6 @@ When a creator approaches graduation, sponsors can initiate a buyout. We open Bu
 
 During the rage quit window, early fans can choose to exit part of their S1 position. This window protects fans from repricing risk before the creator moves into the sponsored campaign market.
 
-Finally, I will demonstrate claim. After graduation, fans who still hold eligible S1 positions can claim pro-rata USDC. Once the claim is confirmed, the claimable balance clears, representing completion of the buyout payout.
+Finally, I will demonstrate claim. After graduation, fans who still hold eligible S1 positions can claim a capped, non-proportional discovery reward — a bounded supporter reward that does not scale with how much SPUMP they staked, not a share of the buyout. Once the claim is confirmed, the claimable balance clears, representing completion of the discovery-reward payout.
 
 Back in Portfolio, we can see the S1 position, claim queue, and buyout entry points. The complete S1 loop is: discover a creator, build a position, adjust exposure through the curve, enter buyout, then either exit or claim USDC.

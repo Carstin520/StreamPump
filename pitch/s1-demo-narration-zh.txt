@@ -10,6 +10,6 @@ StreamPump 的 S1 是一个创作者发现市场。粉丝不是买可转让的 m
 
 在 rage quit window 里，早期粉丝可以选择退出部分 S1 position；这个窗口保护粉丝在创作者进入赞助市场前重新定价风险。
 
-最后演示 claim。毕业后，仍持有 eligible S1 position 的粉丝可以领取 pro-rata USDC。确认 claim 之后，claimable balance 清零，代表 buyout payout 已完成。
+最后演示 claim。毕业后，仍持有 eligible S1 position 的粉丝可以领取一笔封顶、非比例的 discovery reward——金额与质押的 SPUMP 多少无关，不是按比例分得的 buyout 份额。确认 claim 之后，claimable balance 清零，代表 discovery reward 发放完成。
 
 回到 Portfolio，可以看到 S1 持仓、claim queue 和 buyout 入口。完整的 S1 闭环是：发现创作者、建立 position、根据曲线调整仓位、进入 buyout、退出或领取 USDC。

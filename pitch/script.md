@@ -72,7 +72,7 @@ There are three roles in the system.
 
 **Creators** get cold-start funding through fan backing, then graduate into structured sponsorship deals with guaranteed base pay and performance upside.
 
-**Fans and backers** support creators early using SPUMP tokens. When a sponsor buys out a creator they believed in, they earn real USDC. They can also endorse campaigns and earn from reward pools.
+**Fans and backers** support creators early using SPUMP tokens. When a sponsor buys out a creator they believed in, early backers earn permanent founding status plus a capped, sponsor-funded discovery reward — never a stake-proportional cut of the deal. They can also endorse campaigns and earn capped curation rewards.
 
 **Sponsors** get direct access to creators — no agency middlemen. They choose from three flexible budget tracks: fixed, performance-based, or cost-per-sale. And they pay in USDC.
 
@@ -104,9 +104,9 @@ The creator has 48 hours to review and choose an offer.
 
 Once accepted, there's a rage-quit window for backers. If you don't like the deal, you can exit at full curve price with zero exit tax. No forced lock-in. That's important — we protect backers.
 
-After the window closes, graduation executes. The creator moves to S2 — the sponsored campaign market. And the remaining backers? They claim their share of the buyout USDC, proportional to their position. Early supporters even get a capped bonus share.
+After the window closes, graduation executes. The creator moves to S2 — the sponsored campaign market. The creator receives the majority of the buyout USDC — it's their deal. The remaining backers claim a capped, non-proportional discovery reward from a bounded pool: early supporters get a slightly higher fixed tier than regular backers, but it never scales with how much SPUMP you staked, and it's hard-capped per person. The headline reward is permanent founding status, not the USDC.
 
-So the full loop is: you back a creator early with SPUMP, a sponsor pays real USDC to buy them out, and you get paid. That's the value prop.
+So the full loop is: you back a creator early with SPUMP, a sponsor pays real USDC to buy them out, the creator gets paid, and you earn founding-supporter status plus a bounded thank-you reward for spotting them first. That's the value prop.
 
 ---
 
@@ -118,7 +118,7 @@ We designed a three-track budget model that gives sponsors granular control whil
 
 **Track 1** is a fixed base pay. Guaranteed creator compensation, settled unconditionally. This is the "you definitely get paid" part.
 
-**Track 2** is performance-driven. The budget is tied to verified metrics — views, clicks, saves. There's a cliff threshold: if the campaign doesn't hit the minimum, the sponsor gets a full refund. Above the cliff, 80% goes to the creator and 20% goes into a fan endorsement pool. Fans burn SPUMP to endorse campaigns and earn pro-rata USDC rewards from that pool.
+**Track 2** is performance-driven. The budget is tied to verified metrics — views, clicks, saves. There's a cliff threshold: if the campaign doesn't hit the minimum, the sponsor gets a full refund. Above the cliff, 80% goes to the creator and 20% goes into a fan endorsement pool. Fans burn SPUMP to endorse campaigns and earn a capped, flat curation reward from that pool — decoupled from endorsement size, not a pro-rata return. Failed-campaign refunds return only the fan's own consumed principal.
 
 **Track 3** is CPS — cost per sale — with a delayed settlement window. The sponsor pre-funds an estimated budget. After the refund period closes, the approved payout goes to the creator. Unused balance returns to the sponsor. If actual sales exceed the pre-funded amount, an overflow invoice is generated.
 
