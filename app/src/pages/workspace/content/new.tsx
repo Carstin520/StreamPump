@@ -44,9 +44,6 @@ const FLOW_STEPS: { id: FlowStep; labelKey: string }[] = [
 
 const STEP_INDEX: Record<FlowStep, number> = { details: 0, media: 1, checks: 2, publish: 3, sponsorship: 4 };
 
-const CONTENT_CREATE_READINESS_DESCRIPTION =
-  "This route calls live content manifest APIs, R2 presign/upload, asset-complete, and finalize endpoints. It still depends on an authenticated session plus backend storage/R2/Mux configuration; interrupted uploads can leave a recoverable draft that must be resumed from the content detail page.";
-
 const TYPE_OPTIONS: { type: ContentType; labelKey: string; descKey: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { type: "IMAGE_CAROUSEL", labelKey: "workspace.imageCarousel", descKey: "workspace.imageCarouselDesc", icon: ImageIcon },
   { type: "SHORT_VIDEO", labelKey: "workspace.shortVideo", descKey: "workspace.shortVideoDesc", icon: VideoIcon },
@@ -266,9 +263,9 @@ export default function NewContentPage() {
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
           <ProductReadinessBanner
-            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            description={t("workspace.contentReadinessDesc")}
             status="SEEDED_DEMO"
-            title="Content creation is API/R2-wired with recovery gaps"
+            title={t("workspace.contentReadinessTitle")}
           />
           <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
@@ -285,12 +282,12 @@ export default function NewContentPage() {
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
           <ProductReadinessBanner
-            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            description={t("workspace.contentReadinessDesc")}
             status="SEEDED_DEMO"
-            title="Content creation is API/R2-wired with recovery gaps"
+            title={t("workspace.contentReadinessTitle")}
           />
           <div className="liquid-card card-radius px-6 py-8">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.loginRequired")}</p>
+            <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.loginRequired")}</p>
             <h2 className="mt-2 text-lg font-semibold text-white">{t("workspace.loginToCreate")}</h2>
             <a className="glass-button-primary mt-4 inline-flex px-5 py-2.5 text-sm font-semibold" href={loginHref}>
               {t("common.login")}
@@ -314,7 +311,7 @@ export default function NewContentPage() {
             </span>
           )}
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_50%,rgba(8,17,28,0.6)_100%)]" />
-          <span className="absolute right-2 top-2 rounded-full bg-white/[0.08] px-2 py-0.5 text-[9px] text-[#93a2bb]">
+          <span className="absolute right-2 top-2 rounded-full bg-white/[0.08] px-2 py-0.5 text-[length:var(--fs-nano)] text-[#93a2bb]">
             {t(getContentTypeLabelKey(contentType))}
           </span>
         </div>
@@ -324,7 +321,7 @@ export default function NewContentPage() {
           {parsedTags.length > 0 && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {parsedTags.slice(0, 5).map((tag) => (
-                <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[9px] text-[#7486a1]" key={tag}>#{tag}</span>
+                <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[length:var(--fs-nano)] text-[#7486a1]" key={tag}>#{tag}</span>
               ))}
             </div>
           )}
@@ -333,7 +330,7 @@ export default function NewContentPage() {
 
       {/* Status summary */}
       <div className="liquid-card card-radius p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentCheck")}</p>
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentCheck")}</p>
         <div className="mt-3 space-y-2">
           <CheckRow label={t("workspace.title")} ok={!!title.trim()} />
           <CheckRow label={t("workspace.contentType")} ok={!!contentType} />
@@ -350,9 +347,9 @@ export default function NewContentPage() {
       <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
       <WorkspaceShell aside={previewPanel}>
         <ProductReadinessBanner
-          description={CONTENT_CREATE_READINESS_DESCRIPTION}
+          description={t("workspace.contentReadinessDesc")}
           status="SEEDED_DEMO"
-          title="Content creation is API/R2-wired with recovery gaps"
+          title={t("workspace.contentReadinessTitle")}
         />
 
         {/* Top bar with save status */}
@@ -385,7 +382,7 @@ export default function NewContentPage() {
             <div className="section-enter space-y-5">
               {/* Content type selector */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentType")}</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentType")}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {TYPE_OPTIONS.map((opt) => {
                     const Icon = opt.icon;
@@ -416,7 +413,7 @@ export default function NewContentPage() {
 
               {/* Title & Caption */}
               <label className="block space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.title")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.title")}</span>
                 <input
                   className="input-glass w-full rounded-2xl px-4 py-3 text-sm text-white outline-none placeholder:text-[#3a4556]"
                   onChange={(e) => setTitle(e.target.value)}
@@ -426,7 +423,7 @@ export default function NewContentPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.body")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.body")}</span>
                 <textarea
                   className="input-glass min-h-[140px] w-full resize-none rounded-3xl px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-[#3a4556]"
                   onChange={(e) => setCaptionText(e.target.value)}
@@ -436,7 +433,7 @@ export default function NewContentPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.tags")}</span>
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.tags")}</span>
                 <input
                   className="input-glass w-full rounded-2xl px-4 py-3 text-sm text-white outline-none placeholder:text-[#3a4556]"
                   onChange={(e) => setTagsInput(e.target.value)}
@@ -446,7 +443,7 @@ export default function NewContentPage() {
                 {parsedTags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {parsedTags.map((tag) => (
-                      <span className="liquid-pill rounded-full px-2.5 py-1 text-[11px] text-[#dce6f8]" key={tag}>#{tag}</span>
+                      <span className="liquid-pill rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] text-[#dce6f8]" key={tag}>#{tag}</span>
                     ))}
                   </div>
                 )}
@@ -456,7 +453,7 @@ export default function NewContentPage() {
 
           {step === "media" && (
             <div className="section-enter space-y-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.uploadAssets")}</p>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.uploadAssets")}</p>
 
               {/* Upload zone */}
               <label className="block cursor-pointer">
@@ -465,7 +462,7 @@ export default function NewContentPage() {
                     <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
                   </div>
                   <p className="text-sm text-[#8ea0ba]">{t("workspace.uploadDrag")}</p>
-                  <p className="text-[11px] text-[#4a5568]">{t("workspace.uploadSupported")}</p>
+                  <p className="text-[length:var(--fs-micro)] text-[#4a5568]">{t("workspace.uploadSupported")}</p>
                 </div>
                 <input
                   accept={ACCEPTED_UPLOAD_TYPES}
@@ -493,9 +490,9 @@ export default function NewContentPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm text-white">{file.name}</p>
-                        <p className="text-[11px] text-[#5a6b82]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                        <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
                       </div>
-                      <span className="rounded-full bg-[#65ecaf]/12 px-2 py-0.5 text-[9px] font-semibold text-[#65ecaf]">{t("workspace.fileQueued")}</span>
+                      <span className="rounded-full bg-[#65ecaf]/12 px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold text-[#65ecaf]">{t("workspace.fileQueued")}</span>
                       <button className="text-[#5a6b82] hover:text-white" onClick={() => removeFile(index)} type="button">
                         <CloseIcon className="h-3.5 w-3.5" />
                       </button>
@@ -503,13 +500,13 @@ export default function NewContentPage() {
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-[#4a5568]">{t("workspace.filesUploadAfterDraft")}</p>
+              <p className="text-[length:var(--fs-micro)] text-[#4a5568]">{t("workspace.filesUploadAfterDraft")}</p>
             </div>
           )}
 
           {step === "checks" && (
             <div className="section-enter space-y-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentCheck")}</p>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.contentCheck")}</p>
               <div className="space-y-3">
                 <CheckCard label={t("workspace.contentIntegrity")} desc={t("workspace.titleBodyTagsFilled")} ok={!!title.trim() && !!captionText.trim()} />
                 <CheckCard label={t("workspace.mediaReady")} desc={selectedFiles.length > 0 ? t("workspace.filesSelected", { count: selectedFiles.length }) : t("workspace.noFileSelected")} ok={selectedFiles.length > 0} />
@@ -521,7 +518,7 @@ export default function NewContentPage() {
 
           {step === "publish" && (
             <div className="section-enter space-y-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishSettings")}</p>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishSettings")}</p>
               <div className="space-y-3">
                 <VisibilityOption label={t("common.public")} desc={t("workspace.publicDesc")} active />
                 <VisibilityOption label={t("workspace.followersOnly")} desc={t("workspace.followersOnlyDesc")} />
@@ -532,7 +529,7 @@ export default function NewContentPage() {
 
           {step === "sponsorship" && (
             <div className="section-enter space-y-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorshipOptional")}</p>
+              <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorshipOptional")}</p>
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
                 <p className="text-sm text-[#8ea0ba]">
                   {t("workspace.sponsorshipAfterDraft")}
@@ -589,7 +586,7 @@ export default function NewContentPage() {
             <p>{message}</p>
             {recoveryManifestId && (
               <Link
-                className="mt-2 inline-flex rounded-full border border-[#f67263]/25 px-3 py-1 text-[11px] font-semibold text-[#ff9a88] transition hover:border-[#f67263]/45 hover:text-white"
+                className="mt-2 inline-flex rounded-full border border-[#f67263]/25 px-3 py-1 text-[length:var(--fs-micro)] font-semibold text-[#ff9a88] transition hover:border-[#f67263]/45 hover:text-white"
                 href={`/workspace/content/${recoveryManifestId}`}
               >
                 Open recoverable draft
@@ -616,7 +613,7 @@ const CheckCard = ({ label, desc, ok }: { label: string; desc: string; ok: boole
     </div>
     <div>
       <p className={`text-sm font-medium ${ok ? "text-white" : "text-[#6b7d96]"}`}>{label}</p>
-      <p className="text-[11px] text-[#5a6b82]">{desc}</p>
+      <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">{desc}</p>
     </div>
   </div>
 );
@@ -632,7 +629,7 @@ const VisibilityOption = ({ label, desc, active = false }: { label: string; desc
     </div>
     <div>
       <p className="text-sm font-medium text-white">{label}</p>
-      <p className="text-[11px] text-[#5a6b82]">{desc}</p>
+      <p className="text-[length:var(--fs-micro)] text-[#5a6b82]">{desc}</p>
     </div>
   </div>
 );

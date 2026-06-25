@@ -674,3 +674,39 @@ export const findCreatorStrict = (creatorId: string | null | undefined) => {
 
 export const findCreator = (creatorId: string) => findCreatorStrict(creatorId) ?? creators[0];
 export const findPost = (postId: string) => postIndex.get(postId) ?? posts[0];
+
+// Seeded comment threads keyed by normalized post title. The backend public-feed
+// projection does not (yet) carry comments, so the feed mapper enriches posts
+// with these local seeded threads by matching the (stable, unique) title.
+const normalizePostTitleKey = (value: string) =>
+  value.trim().replace(/\s+/g, " ").toLowerCase();
+
+type LocalEngagement = {
+  comments: CommentRecord[];
+  commentsCount: number;
+  likes: number;
+  saves: number;
+};
+
+const localEngagementByTitle = new Map<string, LocalEngagement>(
+  posts.map((post) => [
+    normalizePostTitleKey(post.title),
+    {
+      comments: post.comments,
+      commentsCount: post.commentsCount,
+      likes: post.likes,
+      saves: post.saves,
+    },
+  ]),
+);
+
+// Engagement (comments + like/save counts) seeded per post, joined by title so
+// the backend public-feed projection (which omits these) can be enriched.
+export const findLocalEngagementByTitle = (
+  title: string | null | undefined,
+): LocalEngagement | null => {
+  if (!title) {
+    return null;
+  }
+  return localEngagementByTitle.get(normalizePostTitleKey(title)) ?? null;
+};

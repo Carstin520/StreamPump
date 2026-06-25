@@ -1,11 +1,17 @@
-const ORB_CONFIG = [
+// Restrained ambient field: 3 orbs (was 6) for a calmer, more focused backdrop.
+type OrbConfig = {
+  className: string;
+  size: number;
+  top: string;
+  left?: string;
+  right?: string;
+};
+
+const ORB_CONFIG: readonly OrbConfig[] = [
   { className: "backdrop-orb-1", size: 700, left: "5%", top: "-5%" },
-  { className: "backdrop-orb-2", size: 600, right: "-2%", top: "8%" },
   { className: "backdrop-orb-3", size: 800, left: "30%", top: "35%" },
-  { className: "backdrop-orb-4", size: 550, right: "10%", top: "55%" },
   { className: "backdrop-orb-5", size: 650, left: "8%", top: "72%" },
-  { className: "backdrop-orb-1", size: 500, right: "20%", top: "90%" },
-] as const;
+];
 
 export const AnimatedFeedBackdrop = ({
   className = "",
@@ -22,8 +28,8 @@ export const AnimatedFeedBackdrop = ({
         style={{
           width: orb.size,
           height: orb.size,
-          left: "left" in orb ? orb.left : undefined,
-          right: "right" in orb ? orb.right : undefined,
+          left: orb.left,
+          right: orb.right,
           top: orb.top,
         }}
       />

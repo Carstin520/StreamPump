@@ -239,7 +239,7 @@ export const PriceHistoryChart = ({
             style={tooltipStyle}
           >
             <p className="whitespace-nowrap text-xs font-semibold text-white">{formatPrice(activePoint.price, currencyLabel)}</p>
-            <p className="mt-0.5 whitespace-nowrap text-[10px] text-[#8ea0ba]">{formatTime(activePoint.timestamp, range)}</p>
+            <p className="mt-0.5 whitespace-nowrap text-[length:var(--fs-micro)] text-[#8ea0ba]">{formatTime(activePoint.timestamp, range)}</p>
           </div>
         ) : null}
       </div>
@@ -248,7 +248,7 @@ export const PriceHistoryChart = ({
         {RANGES.map((option) => (
           <button
             aria-pressed={range === option}
-            className={`h-8 min-w-12 rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition ${
+            className={`h-8 min-w-12 rounded-full px-3 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em] transition ${
               range === option
                 ? "bg-white text-[#090d14] shadow-[0_10px_24px_rgba(255,255,255,0.12)]"
                 : "border border-white/[0.06] bg-white/[0.03] text-[#8ea0ba] hover:bg-white/[0.07] hover:text-white"

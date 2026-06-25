@@ -175,7 +175,7 @@ const requestManagedWalletDevnetAirdrop = async (walletAddress: string): Promise
   }
 
   try {
-    const connection = new Connection(config.solana.rpcEndpoint);
+    const connection = new Connection(config.solana.txRpcEndpoint);
     const signature = await connection.requestAirdrop(
       new PublicKey(walletAddress),
       Math.floor(0.01 * LAMPORTS_PER_SOL)
@@ -189,7 +189,7 @@ const requestManagedWalletDevnetAirdrop = async (walletAddress: string): Promise
   }
 };
 
-const ensureFanAccountProfile = async (
+export const ensureFanAccountProfile = async (
   wallet: string,
   displayName?: string | null,
   walletType: WalletType = WalletType.EXTERNAL,
@@ -319,7 +319,7 @@ const sendEmailOtp = async (email: string, code: string): Promise<void> => {
   }
 };
 
-const createWalletSession = async (wallet: string) => {
+export const createWalletSession = async (wallet: string) => {
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   const accessToken = buildSessionToken({

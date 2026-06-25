@@ -69,7 +69,7 @@ export default function LoginPage() {
               <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]">
                 <div className="hidden px-6 lg:block">
                   <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">{t("auth.accessEyebrow")}</p>
-                  <h1 className="mt-5 max-w-[520px] text-[56px] font-semibold leading-[0.94] tracking-[-0.06em] text-white">
+                  <h1 className="type-display mt-5 max-w-[520px] font-semibold leading-[0.94] text-white">
                     {t("auth.accessTitle")}
                   </h1>
                   <p className="mt-6 max-w-[440px] text-base leading-8 text-[#95a6bf]">

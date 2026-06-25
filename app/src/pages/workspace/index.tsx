@@ -7,11 +7,11 @@ import { StagePill } from "@/components/shared/StagePill";
 import {
   ConsoleAuthRequired,
   ConsoleLoading,
-  OverviewAside,
   OverviewConsole,
 } from "@/components/workspace/OverviewConsole";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { CreatorSeasonState } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import {
   WorkspaceOverviewResponse,
   getWorkspaceOverview,
@@ -46,6 +46,7 @@ type WorkspaceState =
 
 export default function WorkspacePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [state, setState] = useState<WorkspaceState>({ status: "loading" });
   const [activeStage, setActiveStage] = useState<CreatorSeasonState>(WORKSPACE_DEMO_STAGE);
   const isDemoMode = router.isReady && router.query.demo === "1";
@@ -72,7 +73,7 @@ export default function WorkspacePage() {
           setState({
             status: "preview",
             tone: "info",
-            message: "Preview session · showing demo data while the workspace API is offline.",
+            message: t("ws.preview.offline"),
           });
           return;
         }
@@ -80,7 +81,7 @@ export default function WorkspacePage() {
           setState({
             status: "preview",
             tone: "warn",
-            message: "Session expired — sign in again to load your live console.",
+            message: t("ws.preview.expired"),
             loginHref: clearAuthAndBuildLoginHref(WORKSPACE_PATH),
           });
           return;
@@ -88,14 +89,14 @@ export default function WorkspacePage() {
         setState({
           status: "preview",
           tone: "info",
-          message: `${getErrorMessage(error, "Workspace API unavailable")} · showing demo data.`,
+          message: t("ws.preview.apiError", { error: getErrorMessage(error, t("ws.preview.apiUnavailable")) }),
         });
       });
 
     return () => {
       isMounted = false;
     };
-  }, [isDemoMode, router.isReady]);
+  }, [isDemoMode, router.isReady, t]);
 
   const persona = useMemo<WorkspacePersona>(() => {
     if (isDemoMode) return workspacePersonas[activeStage];
@@ -107,13 +108,13 @@ export default function WorkspacePage() {
   return (
     <>
       <Head>
-        <title>StreamPump | Operating Console</title>
+        <title>{t("ws.pageTitle")}</title>
       </Head>
-      <WorkspaceShell aside={<OverviewAside persona={persona} />} stage={persona.stage} wallet={persona.wallet}>
+      <WorkspaceShell stage={persona.stage} wallet={persona.wallet}>
         <ProductReadinessBanner
-          description="This console loads live workspace manifests, proposal intents, and campaign summaries when an authenticated session is available. Demo mode and preview sessions still use seeded persona data; claimable balances and production operator states are not part of this overview API yet."
+          description={t("ws.readinessDesc")}
           status="SEEDED_DEMO"
-          title="Workspace overview mixes live workflow reads with labeled preview fallback"
+          title={t("ws.readinessTitle")}
         />
 
         {isDemoMode ? <StageSwitcher activeStage={activeStage} onChange={setActiveStage} /> : null}
@@ -147,6 +148,7 @@ const WorkspacePreviewNotice = ({
   message: string;
   tone: PreviewTone;
 }) => {
+  const { t } = useI18n();
   const toneClass =
     tone === "warn"
       ? "border-[#de402a]/22 bg-[#1f120e]/70"
@@ -159,17 +161,17 @@ const WorkspacePreviewNotice = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-          <p className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
-            {tone === "warn" ? "Session" : "Preview"}
+          <p className={`text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
+            {tone === "warn" ? t("ws.preview.sessionTag") : t("ws.preview.previewTag")}
           </p>
-          <p className="truncate text-[11px] text-[#9aabc4]">{message}</p>
+          <p className="truncate text-[length:var(--fs-micro)] text-[#9aabc4]">{message}</p>
         </div>
         {loginHref ? (
           <a
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
             href={loginHref}
           >
-            Sign in again
+            {t("ws.console.signInAgain")}
           </a>
         ) : null}
       </div>
@@ -183,14 +185,16 @@ const StageSwitcher = ({
 }: {
   activeStage: CreatorSeasonState;
   onChange: (stage: CreatorSeasonState) => void;
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-    <span className="px-2 text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
-      Demo stage
+    <span className="px-2 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+      {t("ws.demoStage")}
     </span>
     {WORKSPACE_STAGE_ORDER.map((stage) => (
       <button
-        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition ${
+        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] transition ${
           activeStage === stage
             ? "bg-white/[0.06] text-white"
             : "text-[#7e90aa] hover:bg-white/[0.04] hover:text-white"
@@ -203,4 +207,5 @@ const StageSwitcher = ({
       </button>
     ))}
   </div>
-);
+  );
+};

@@ -23,8 +23,9 @@ const PROGRAM_SO_PATH = path.resolve(process.cwd(), "target/deploy/streampump_co
 const ADMIN_KEYPAIR_PATH = path.resolve(process.cwd(), ".local/devnet-admin-keypair.json");
 const BUFFER_KEYPAIR_PATH = path.resolve(process.cwd(), ".local/devnet-upgrade-buffer-keypair.json");
 const BUFFER_HEADER_LEN = 37;
-const WRITE_CHUNK_SIZE = 900;
-const WRITE_BATCH_SIZE = 5;
+const WRITE_CHUNK_SIZE = Number(process.env.DEVNET_UPGRADE_WRITE_CHUNK_SIZE ?? 900);
+const WRITE_BATCH_SIZE = Number(process.env.DEVNET_UPGRADE_WRITE_BATCH_SIZE ?? 1);
+const WRITE_SLEEP_MS = Number(process.env.DEVNET_UPGRADE_WRITE_SLEEP_MS ?? 0);
 
 const log = (message: string) => console.log(`[devnet-upgrade] ${message}`);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -182,8 +183,26 @@ const sendWriteBatch = async (
   const lastOffset = offsets[offsets.length - 1];
   const lastEnd = Math.min(lastOffset + WRITE_CHUNK_SIZE, programData.length);
   log(`write ${lastEnd}/${programData.length}`);
-  await sleep(250);
+  if (WRITE_SLEEP_MS > 0) {
+    await sleep(WRITE_SLEEP_MS);
+  }
   return lastEnd;
+};
+
+const matchingProgramPrefixLen = (bufferAccountData: Buffer, programData: Buffer): number => {
+  const onChainProgramData = bufferAccountData.subarray(
+    BUFFER_HEADER_LEN,
+    BUFFER_HEADER_LEN + programData.length
+  );
+
+  const maxLen = Math.min(onChainProgramData.length, programData.length);
+  for (let index = 0; index < maxLen; index += 1) {
+    if (onChainProgramData[index] !== programData[index]) {
+      return index;
+    }
+  }
+
+  return maxLen;
 };
 
 const main = async () => {
@@ -211,6 +230,7 @@ const main = async () => {
   log(`programBytes=${programData.length}`);
 
   const existingBuffer = await connection.getAccountInfo(buffer.publicKey, "confirmed");
+  let writeOffset = 0;
   if (!existingBuffer) {
     log(`creating buffer account with ${bufferSpace} bytes`);
     await send(
@@ -230,9 +250,14 @@ const main = async () => {
     );
   } else {
     log(`reusing existing buffer account length=${existingBuffer.data.length}`);
+    const prefixLen = matchingProgramPrefixLen(existingBuffer.data, programData);
+    writeOffset = Math.max(0, Math.floor(prefixLen / WRITE_CHUNK_SIZE) * WRITE_CHUNK_SIZE);
+    if (writeOffset > 0) {
+      log(`resuming buffer write from ${writeOffset}/${programData.length}`);
+    }
   }
 
-  for (let offset = 0; offset < programData.length; ) {
+  for (let offset = writeOffset; offset < programData.length; ) {
     offset = await sendWriteBatch(connection, admin, buffer.publicKey, programData, offset);
   }
 

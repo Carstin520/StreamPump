@@ -22,6 +22,28 @@ export const exchangeProviderSession = (input: ExchangeProviderSessionInput) =>
     body: input,
   });
 
+// Demo-day scan entry: provision a per-user ephemeral managed-wallet session from
+// the backend wallet pool (B0 contract: POST /auth/ephemeral-session {subject} →
+// atomically assigns one pre-funded managed wallet). Until that endpoint ships we
+// fall back to the existing (shared) platform-wallet provider-exchange so /try
+// still works locally — the fallback is single-wallet and NOT safe for 100
+// concurrent; the real per-user path comes from the pool endpoint.
+export const provisionEphemeralSession = async (subject: string): Promise<AuthSessionRecord> => {
+  try {
+    return await apiClient.post<AuthSessionRecord>("/auth/ephemeral-session", {
+      body: { subject },
+      timeoutMs: 15000,
+    });
+  } catch (_error) {
+    return exchangeProviderSession({
+      provider: "EMAIL",
+      providerSubject: subject,
+      email: subject,
+      displayName: "Demo Guest",
+    });
+  }
+};
+
 export const requestEmailLoginCode = (email: string) =>
   apiClient.post<EmailAuthChallengeRecord>("/auth/email/request-code", {
     body: { email },

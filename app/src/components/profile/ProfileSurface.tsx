@@ -96,7 +96,7 @@ export const ProfileTabBar = ({
     <div className="mx-auto flex max-w-[420px] items-center justify-center gap-10 pt-5">
         {PROFILE_TABS.map((tab) => (
           <button
-            className={`relative pb-4 text-[15px] font-medium transition ${
+            className={`relative pb-4 text-[length:var(--fs-sm)] font-medium transition ${
               activeTab === tab ? "text-white" : "text-[#8394ad] hover:text-white"
             }`}
             key={tab}

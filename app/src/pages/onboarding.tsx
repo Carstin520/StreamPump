@@ -7,11 +7,38 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { getAccountMe, updateAccountMe } from "@/lib/api/account";
 import { AccountMeRecord, AccountRole } from "@/lib/api/types";
 import { getStoredAuthSession } from "@/lib/auth-session";
-import { buildLoginHref } from "@/lib/routes";
+import { useI18n } from "@/lib/i18n";
+import {
+  EXPLORE_PATH,
+  WORKSPACE_CONTENT_NEW_PATH,
+  WORKSPACE_SPONSOR_ONBOARDING_PATH,
+  buildLoginHref,
+} from "@/lib/routes";
 
 const TOTAL_SPUMP = 1_250_000;
 const XP_REWARD = 20;
-const STEPS = 4;
+const STEPS = 3;
+
+const roleDestination = (role: AccountRole) =>
+  role === "CREATOR"
+    ? WORKSPACE_CONTENT_NEW_PATH
+    : role === "SPONSOR"
+      ? WORKSPACE_SPONSOR_ONBOARDING_PATH
+      : EXPLORE_PATH;
+
+const roleCtaKey = (role: AccountRole) =>
+  role === "CREATOR"
+    ? "onboarding.ctaCreator"
+    : role === "SPONSOR"
+      ? "onboarding.ctaSponsor"
+      : "onboarding.startExploring";
+
+const roleNextKey = (role: AccountRole) =>
+  role === "CREATOR"
+    ? "onboarding.nextCreator"
+    : role === "SPONSOR"
+      ? "onboarding.nextSponsor"
+      : "onboarding.nextFan";
 
 type AccountLoadState =
   | { kind: "checking" }
@@ -19,34 +46,26 @@ type AccountLoadState =
   | { kind: "ready"; token: string; account: AccountMeRecord }
   | { kind: "error"; message: string };
 
-const ROLE_OPTIONS: Array<{
-  role: AccountRole;
-  label: string;
-  description: string;
-  badge: string;
-}> = [
+const ROLE_KEYS: Array<{ role: AccountRole; labelKey: string; descKey: string; badge: string }> = [
   {
     role: "FAN",
-    label: "Fan",
-    description: "Back creators with non-transferable utility SPUMP",
+    labelKey: "onboarding.roleFan",
+    descKey: "onboarding.roleFanDesc",
     badge: "S1",
   },
   {
     role: "CREATOR",
-    label: "Creator",
-    description: "Publish content and open sponsorship proposals",
+    labelKey: "onboarding.roleCreator",
+    descKey: "onboarding.roleCreatorDesc",
     badge: "CR",
   },
   {
     role: "SPONSOR",
-    label: "Sponsor",
-    description: "Fund campaigns and verify performance proof",
+    labelKey: "onboarding.roleSponsor",
+    descKey: "onboarding.roleSponsorDesc",
     badge: "USDC",
   },
 ];
-
-const roleDisplay = (role: AccountRole) =>
-  ROLE_OPTIONS.find((option) => option.role === role)?.label ?? "Fan";
 
 const defaultHandle = (account: AccountMeRecord | null) =>
   account?.profile?.handle ??
@@ -192,30 +211,31 @@ const OnboardingReadinessNotice = ({
 }: {
   accountState: AccountLoadState;
 }) => {
+  const { t } = useI18n();
   const signedIn = accountState.kind === "ready";
   const storageStatus = signedIn ? accountState.account.storageStatus : null;
 
   return (
-  <section className="rounded-[14px] border border-[#f3b33e]/25 bg-[#1f1708]/65 px-4 py-3 text-[#f8d48a]">
+  <section className="rounded-[14px] border tone-state-warning px-4 py-3">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Onboarding data source</p>
+        <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">{t("onboarding.dataSource.header")}</p>
         <p className="mt-1 text-sm font-semibold text-white">
           {signedIn && storageStatus === "LIVE"
-            ? "Session-backed account profile"
+            ? t("onboarding.dataSource.titleLive")
             : signedIn
-              ? "Account profile migration required"
-              : "Sign-in required before profile creation"}
+              ? t("onboarding.dataSource.titleMigration")
+              : t("onboarding.dataSource.titleSignin")}
         </p>
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
           {signedIn && storageStatus === "LIVE"
-            ? "This flow reads and writes the current session's account profile. SPUMP rewards remain preview-only until the reward ledger is productized."
+            ? t("onboarding.dataSource.descLive")
             : signedIn
-              ? "The backend session is valid, but AccountProfile storage has not been migrated in this environment. Apply the Prisma migration before production onboarding writes are available."
-              : "Use email OTP or wallet signature login first. Local preview rewards are still shown only after a real session-backed profile can be saved."}
+              ? t("onboarding.dataSource.descMigration")
+              : t("onboarding.dataSource.descSignin")}
         </p>
       </div>
-      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[10px] font-semibold">
+      <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
         {signedIn && storageStatus === "LIVE" ? "SEEDED_DEMO" : signedIn ? "BACKEND_READY_UI_GAP" : "MOCK_PREVIEW"}
       </span>
     </div>
@@ -223,7 +243,38 @@ const OnboardingReadinessNotice = ({
   );
 };
 
+/** Presentational orientation block: "这不是投资，是发现" + 3 concept rows */
+function DiscoveryOrientationBlock() {
+  const { t } = useI18n();
+  const concepts = [
+    { emoji: "⚡", label: t("onboarding.earnLabel"), desc: t("onboarding.earnDesc") },
+    { emoji: "🎯", label: t("onboarding.backLabel"), desc: t("onboarding.backDesc") },
+    { emoji: "🏅", label: t("onboarding.graduateLabel"), desc: t("onboarding.graduateDesc") },
+  ] as const;
+
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 text-left">
+      <p className="text-[length:var(--fs-caption)] font-semibold leading-snug" style={{ color: "var(--brand)" }}>
+        {t("onboarding.notInvestment")}
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        {concepts.map(({ emoji, label, desc }) => (
+          <li key={label} className="flex items-start gap-2.5">
+            <span className="mt-0.5 shrink-0 text-base leading-none">{emoji}</span>
+            <span className="text-xs leading-5 text-[#9aabc4]">
+              <span className="font-semibold text-white">{label}</span>
+              {" — "}
+              {desc}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
+  const { t } = useI18n();
   const [currentStep, setCurrentStep] = useState(0);
   const [role, setRole] = useState<AccountRole>("FAN");
   const [displayName, setDisplayName] = useState("");
@@ -234,9 +285,14 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   const xpCount = useCountUp(XP_REWARD, 800, currentStep === 2);
-  const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 3);
+  const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 2);
   const account = accountState.kind === "ready" ? accountState.account : null;
   const canWriteProfile = accountState.kind === "ready" && accountState.account.storageStatus === "LIVE";
+
+  // Resolve i18n role label for display
+  const roleDisplayLabel = ROLE_KEYS.find((opt) => opt.role === role)?.labelKey
+    ? t(ROLE_KEYS.find((opt) => opt.role === role)!.labelKey)
+    : "Fan";
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +370,7 @@ export default function OnboardingPage() {
   return (
     <>
       <Head>
-        <title>StreamPump | Get Started</title>
+        <title>{t("page.onboarding.title")}</title>
         <style>{`
           @keyframes draw-check {
             from { stroke-dashoffset: 30; }
@@ -353,15 +409,15 @@ export default function OnboardingPage() {
             </div>
 
             <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-[#8ea0ba]">
-              Step {currentStep + 1} of {STEPS}
+              {t("onboarding.stepOf", { current: currentStep + 1, total: STEPS })}
             </div>
           </div>
 
           <div className="mx-auto mt-4 w-full max-w-[720px] space-y-2">
             <ProductReadinessBanner
-              description="Onboarding now reads the stored auth session and writes AccountProfile when the migration is applied. Reward animation remains preview-only until real SPUMP issuance and anti-abuse gates are live."
+              description={t("onboarding.readiness.bannerDesc")}
               status={canWriteProfile ? "SEEDED_DEMO" : "BACKEND_READY_UI_GAP"}
-              title="Onboarding is session-backed; rewards are still preview-only"
+              title={t("onboarding.readiness.bannerTitle")}
             />
             <OnboardingReadinessNotice accountState={accountState} />
           </div>
@@ -374,40 +430,48 @@ export default function OnboardingPage() {
                   <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#de402a] text-2xl font-bold shadow-[0_20px_50px_rgba(222,64,42,0.36)]">
                     SP
                   </div>
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
-                    Welcome to StreamPump
+                  <h1 className="type-h2 font-semibold">
+                    {t("onboarding.welcome")}
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Complete the account profile for your current session
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
+                    {t("onboarding.welcomeSubtitle")}
                   </p>
-                  <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
+
+                  {/* Discovery orientation block */}
+                  <div className="mt-5 text-left">
+                    <DiscoveryOrientationBlock />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">
                     {accountState.kind === "checking"
-                      ? "Checking stored auth session..."
+                      ? t("onboarding.checkingSession")
                       : accountState.kind === "signed-out"
-                        ? "No auth session found. Sign in with email OTP or wallet signature before onboarding."
+                        ? t("onboarding.noSession")
                         : accountState.kind === "error"
                           ? accountState.message
                           : accountState.account.storageStatus === "LIVE"
-                            ? `Session wallet ${accountState.account.wallet.slice(0, 4)}...${accountState.account.wallet.slice(-4)} is ready for profile setup.`
-                            : "Session is valid, but AccountProfile storage needs the Prisma migration before writes are enabled."}
+                            ? t("onboarding.sessionReady", {
+                                shortWallet: `${accountState.account.wallet.slice(0, 4)}...${accountState.account.wallet.slice(-4)}`,
+                              })
+                            : t("onboarding.sessionMigrationNeeded")}
                   </div>
                   {accountState.kind === "signed-out" ? (
                     <Link
-                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold"
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                       href={buildLoginHref({ nextPath: "/onboarding" })}
                     >
                       <WalletIcon />
-                      Sign in to continue
+                      {t("onboarding.signInToContinue")}
                     </Link>
                   ) : (
                     <button
-                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                      className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold disabled:opacity-45"
                       disabled={!canWriteProfile}
                       onClick={goNext}
                       type="button"
                     >
                       <WalletIcon />
-                      Continue with session
+                      {t("onboarding.continueWithSession")}
                     </button>
                   )}
                 </div>
@@ -423,15 +487,15 @@ export default function OnboardingPage() {
                       <path d="M16 3.13a4 4 0 010 7.75" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
-                    Choose Your Role
+                  <h1 className="type-h2 font-semibold">
+                    {t("onboarding.chooseRole")}
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    How will you use StreamPump?
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
+                    {t("onboarding.chooseRoleSubtitle")}
                   </p>
 
                   <div className="mt-6 grid gap-3">
-                    {ROLE_OPTIONS.map((option) => (
+                    {ROLE_KEYS.map((option) => (
                       <button
                         className={`relative cursor-pointer rounded-[20px] border p-5 text-left transition-all duration-200 ${
                           role === option.role
@@ -443,12 +507,12 @@ export default function OnboardingPage() {
                         type="button"
                       >
                         <div className="flex items-start gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-[11px] font-bold text-[#ffb2a6]">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#de402a]/10 text-[length:var(--fs-micro)] font-bold text-[#ffb2a6]">
                             {option.badge}
                           </div>
                           <div className="pr-8">
-                            <div className="text-[16px] font-semibold">{option.label}</div>
-                            <div className="mt-0.5 text-[13px] text-[#8ea0ba]">{option.description}</div>
+                            <div className="text-[16px] font-semibold">{t(option.labelKey)}</div>
+                            <div className="mt-0.5 text-[length:var(--fs-caption)] text-[#8ea0ba]">{t(option.descKey)}</div>
                           </div>
                         </div>
                         {role === option.role && (
@@ -466,7 +530,7 @@ export default function OnboardingPage() {
 
                   <div className="mt-5 grid gap-3 text-left">
                     <label className="block space-y-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Display name</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("onboarding.displayName")}</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={80}
@@ -476,7 +540,7 @@ export default function OnboardingPage() {
                       />
                     </label>
                     <label className="block space-y-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">Handle</span>
+                      <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("onboarding.handle")}</span>
                       <input
                         className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
                         maxLength={30}
@@ -488,92 +552,73 @@ export default function OnboardingPage() {
                   </div>
 
                   {saveMessage ? (
-                    <div className="mt-4 rounded-2xl border border-[#f3b33e]/20 bg-[#1f1708]/40 px-4 py-3 text-left text-xs text-[#f8d48a]">
+                    <div className="mt-4 rounded-2xl border tone-state-warning px-4 py-3 text-left text-xs">
                       {saveMessage}
                     </div>
                   ) : null}
 
                   <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold disabled:opacity-45"
+                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold disabled:opacity-45"
                     disabled={!canWriteProfile || saving}
                     onClick={() => void completeProfile()}
                     type="button"
                   >
-                    {saving ? "Saving profile..." : `Continue as ${roleDisplay(role)}`}
+                    {saving ? t("onboarding.savingProfile") : t("onboarding.continueAs", { role: roleDisplayLabel })}
                   </button>
                 </div>
               )}
 
               {currentStep === 2 && (
-                <div className="liquid-glass-shell p-8 text-center">
-                  <CheckCircle animated />
-                  <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.05em]">
-                    Profile Saved
-                  </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    {account?.profile?.handle
-                      ? `@${account.profile.handle} is now stored for this session.`
-                      : "Your account profile is now stored for this session."}
-                  </p>
-
-                  <div
-                    className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.08] px-5 py-2.5"
-                    style={{ animation: "count-pop 500ms ease-out" }}
-                  >
-                    <span className="text-[13px] font-medium text-[#65ecaf]">Preview XP</span>
-                    <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-[#6f8099]">
-                    XP is still a preview animation. No SPUMP mint, reward ledger entry, or balance update happens here.
-                  </p>
-
-                  <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[15px] font-semibold"
-                    onClick={goNext}
-                    type="button"
-                  >
-                    Preview Reward
-                  </button>
-                </div>
-              )}
-
-              {currentStep === 3 && (
                 <div className="liquid-glass-shell relative overflow-hidden p-8 text-center">
                   <TokenRain active />
 
-                  <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-[#de402a]/20 bg-[#de402a]/10">
-                    <svg className="h-10 w-10 text-[#de402a]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                      <path
-                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-
-                  <h1 className="text-[28px] font-semibold tracking-[-0.05em]">
-                    Preview SPUMP Ready
+                  <CheckCircle animated />
+                  <h1 className="type-h2 mt-4 font-semibold">
+                    {t("onboarding.profileSaved")}
                   </h1>
-                  <p className="mt-2 text-[15px] text-[#8ea0ba]">
-                    Reward issuance is not live yet. This allocation remains a local onboarding preview.
+                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
+                    {account?.profile?.handle
+                      ? t("onboarding.profileSavedSubtitle", { handle: account.profile.handle })
+                      : t("onboarding.profileSavedSubtitleDefault")}
                   </p>
 
+                  {/* Combined reward: XP + welcome SPUMP in one compact card */}
                   <div
-                    className="mt-6"
-                    style={{ animation: "count-pop 600ms ease-out" }}
+                    className="mx-auto mt-6 flex w-full max-w-[320px] items-center justify-between gap-3 rounded-2xl border border-[#65ecaf]/18 bg-[#65ecaf]/[0.06] px-5 py-3.5"
+                    style={{ animation: "count-pop 500ms ease-out" }}
                   >
-                    <div className="text-[48px] font-bold tabular-nums tracking-[-0.04em] text-white">
-                      {spumpCount.toLocaleString()}
+                    <div className="text-left">
+                      <p className="text-[length:var(--fs-micro)] font-medium text-[#65ecaf]">{t("onboarding.previewXpLabel")}</p>
+                      <p className="text-lg font-bold tabular-nums text-[#65ecaf]">+{xpCount}</p>
                     </div>
-                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">preview SPUMP</div>
+                    <div className="h-8 w-px bg-white/[0.1]" />
+                    <div className="text-right">
+                      <p className="text-[length:var(--fs-micro)] font-medium text-[#8ea0ba]">{t("onboarding.previewSpumpUnit")}</p>
+                      <p className="text-lg font-bold tabular-nums text-white">{spumpCount.toLocaleString()}</p>
+                    </div>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-[#6f8099]">
+                    {t("onboarding.previewXpNote")}
+                  </p>
 
+                  {/* Role-based next step + primary exit */}
+                  <p className="mt-6 text-[length:var(--fs-caption)] text-[#9aabc4]">
+                    {t(roleNextKey(role))}
+                  </p>
                   <Link
-                    className="glass-button-primary mt-8 flex w-full items-center justify-center px-6 py-3.5 text-[15px] font-semibold"
-                    href="/explore"
+                    className="glass-button-primary mt-3 flex w-full items-center justify-center px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
+                    href={roleDestination(role)}
                   >
-                    Start Exploring
+                    {t(roleCtaKey(role))}
                   </Link>
+                  {role !== "FAN" ? (
+                    <Link
+                      className="mt-3 inline-block text-[length:var(--fs-micro)] text-[#8ea0ba] transition hover:text-white"
+                      href={EXPLORE_PATH}
+                    >
+                      {t("onboarding.startExploring")}
+                    </Link>
+                  ) : null}
                 </div>
               )}
             </div>

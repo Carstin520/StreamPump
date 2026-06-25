@@ -709,6 +709,9 @@ When blocked, continue with adjacent safe work: improve state visibility, add id
 | `docs/backend/account-wallet-model.md` | Account and wallet data model |
 | `docs/backend/prisma-migration-content-manifest.md` | Content manifest migration notes |
 | `docs/frontend/design.md` | Frontend design system |
+| `docs/frontend/design-system-handoff-2026-06.md` | **Design-system token/elevation/type/tone foundation + conventions, gotchas, TODOs (read first for any frontend styling work)** |
+| `docs/frontend/design-system-audit-2026-06.md` | Original design-system audit (token gaps, glass duplication, upgrade plan) |
+| `docs/frontend/texture-upgrade-plan-2026-06.md` | Glass/texture refinement plan (sheen/edge/glow/orb dials) |
 | `docs/frontend/user-surface-ui-spec.md` | UI specification |
 | `docs/frontend/phase1-frontend-development-plan.md` | Frontend development plan |
 | `docs/progress-review-2026-04.md` | Previous progress review |

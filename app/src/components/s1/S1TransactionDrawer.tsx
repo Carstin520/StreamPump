@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { CloseIcon } from "@/components/shared/AppIcons";
 import type { S1TransactionFlowState, S1TransactionFlowStatus } from "@/hooks/useS1TransactionFlow";
+import { useI18n } from "@/lib/i18n";
 import { shortenWallet } from "@/lib/s1-market-view";
 
 type S1TransactionDrawerProps = {
@@ -52,14 +53,14 @@ export const S1TransactionDrawer = ({
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.96)_0%,rgba(8,12,20,0.96)_100%)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
             {actionLabel}
           </p>
-          <p className={`mt-0.5 text-[13px] font-semibold ${step.tone === "error" ? "text-[#ff8a78]" : step.tone === "success" ? "text-[#8df0c4]" : "text-white"}`}>
+          <p className={`mt-0.5 text-[length:var(--fs-caption)] font-semibold ${step.tone === "error" ? "text-[color:var(--state-danger)]" : step.tone === "success" ? "text-[color:var(--state-success)]" : "text-white"}`}>
             {step.label}
           </p>
           {amountLabel ? (
-            <p className="mt-0.5 text-[11px] text-[#9aabc4]">{amountLabel}</p>
+            <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#9aabc4]">{amountLabel}</p>
           ) : null}
         </div>
         {isTerminal ? (
@@ -98,12 +99,12 @@ export const S1TransactionDrawer = ({
                 />
               </div>
               <span
-                className={`text-[9px] font-medium ${
+                className={`text-[length:var(--fs-nano)] font-medium ${
                   isDone
-                    ? "text-[#8df0c4]"
+                    ? "text-[color:var(--state-success)]"
                     : isCurrent
                       ? isFailed
-                        ? "text-[#ff8a78]"
+                        ? "text-[color:var(--state-danger)]"
                         : "text-white"
                       : "text-[#5a6b82]"
                 }`}
@@ -117,9 +118,9 @@ export const S1TransactionDrawer = ({
 
       {flow.signature ? (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-white/[0.04] bg-white/[0.02] px-2.5 py-1.5">
-          <span className="text-[10px] text-[#7486a1]">Tx signature</span>
+          <span className="text-[length:var(--fs-micro)] text-[#7486a1]">Tx signature</span>
           <a
-            className="font-mono text-[10px] font-medium text-[#67b8ff] transition hover:text-white"
+            className="font-mono text-[length:var(--fs-micro)] font-medium text-[#67b8ff] transition hover:text-white"
             href={`${DEVNET_EXPLORER}/${flow.signature}?cluster=devnet`}
             rel="noreferrer"
             target="_blank"
@@ -130,13 +131,13 @@ export const S1TransactionDrawer = ({
       ) : null}
 
       {projectionLag ? (
-        <p className="mt-2 rounded-lg border border-[#f3b33e]/20 bg-[#1a1408]/60 px-2.5 py-1.5 text-[10px] text-[#f3c66e]">
+        <p className="mt-2 rounded-lg border tone-state-warning px-2.5 py-1.5 text-[length:var(--fs-micro)]">
           Transaction confirmed on-chain. Read model may lag until the indexer catches up.
         </p>
       ) : null}
 
       {flow.error ? (
-        <p className="mt-2 rounded-lg border border-[#f67263]/20 bg-[#1a1115]/60 px-2.5 py-1.5 text-[10px] text-[#ff8a78]">
+        <p className="mt-2 rounded-lg border border-[#f67263]/20 bg-[#1a1115]/60 px-2.5 py-1.5 text-[length:var(--fs-micro)] text-[color:var(--state-danger)]">
           {flow.error}
         </p>
       ) : null}
@@ -145,7 +146,7 @@ export const S1TransactionDrawer = ({
         <div className="mt-3 flex items-center gap-2">
           {flow.status === "failed" && onRetry ? (
             <button
-              className="flex-1 rounded-xl bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-2 text-[11px] font-semibold text-white/90 transition hover:brightness-110"
+              className="flex-1 rounded-xl bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-2 text-[length:var(--fs-micro)] font-semibold text-white/90 transition hover:brightness-110"
               onClick={onRetry}
               type="button"
             >
@@ -153,7 +154,7 @@ export const S1TransactionDrawer = ({
             </button>
           ) : null}
           <button
-            className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] py-2 text-[11px] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
+            className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] py-2 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.14] hover:text-white"
             onClick={onClose}
             type="button"
           >
@@ -180,9 +181,9 @@ export const WalletSessionAlert = ({
   if (connectedWallet === sessionWallet) return null;
 
   return (
-    <div className="rounded-lg border border-[#f3b33e]/25 bg-[#1a1408]/70 px-3 py-2">
-      <p className="text-[11px] font-semibold text-[#f3c66e]">Wallet mismatch</p>
-      <p className="mt-0.5 text-[10px] leading-relaxed text-[#c9a044]">
+    <div className="rounded-lg border tone-state-warning px-3 py-2">
+      <p className="text-[length:var(--fs-micro)] font-semibold">Wallet mismatch</p>
+      <p className="mt-0.5 text-[length:var(--fs-micro)] leading-relaxed text-[#c9a044]">
         Connected wallet ({shortenWallet(connectedWallet)}) differs from your signed-in session ({shortenWallet(sessionWallet)}).
         Switch wallets or sign in again to trade.
       </p>
@@ -201,35 +202,36 @@ export const DemoCreatorBanner = ({
   creatorHref?: string;
   marketHref?: string;
 }) => {
+  const { t } = useI18n();
   const isDemoEnv = process.env.NEXT_PUBLIC_SHOW_DEMO_HINTS === "1" || process.env.NODE_ENV === "development";
   if (!isDemoEnv) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#67b8ff]/15 bg-[#0e1726]/60 px-3 py-2">
       <span className="h-1.5 w-1.5 rounded-full bg-[#67b8ff]" />
-      <span className="text-[10px] font-medium text-[#8ad0ff]">Demo</span>
-      <span className="text-[10px] text-[#7486a1]">
-        Creator: {shortenWallet(creatorWallet)}
+      <span className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff]">{t("s1demo.badge")}</span>
+      <span className="text-[length:var(--fs-micro)] text-[#7486a1]">
+        {t("s1demo.creator")}: {shortenWallet(creatorWallet)}
       </span>
       <a
-        className="ml-auto text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
+        className="ml-auto text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
         href={marketHref ?? `/market/${creatorWallet}`}
       >
-        Market ↗
+        {t("s1demo.market")}
       </a>
       {creatorHref ? (
         <a
-          className="text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
+          className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
           href={creatorHref}
         >
-          Profile ↗
+          {t("s1demo.profile")}
         </a>
       ) : null}
       <a
-        className="text-[10px] font-medium text-[#8ad0ff] transition hover:text-white"
+        className="text-[length:var(--fs-micro)] font-medium text-[#8ad0ff] transition hover:text-white"
         href={buyoutHref ?? `/buyout/${creatorWallet}`}
       >
-        Buyout ↗
+        {t("s1demo.buyout")}
       </a>
     </div>
   );
@@ -255,7 +257,7 @@ export const S1ErrorState = ({
   title?: string;
 }) => (
   <div className="rounded-[16px] border border-[#f67263]/20 bg-[#1a1115]/70 px-4 py-3.5">
-    <p className="text-[12px] font-semibold text-[#ff8a78]">{title}</p>
-    {error ? <p className="mt-1 text-[11px] text-[#c97065]">{error}</p> : null}
+    <p className="text-[length:var(--fs-overline)] font-semibold text-[color:var(--state-danger)]">{title}</p>
+    {error ? <p className="mt-1 text-[length:var(--fs-micro)] text-[#c97065]">{error}</p> : null}
   </div>
 );

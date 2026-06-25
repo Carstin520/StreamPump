@@ -1,21 +1,21 @@
 export type StatusTone = "success" | "active" | "warning" | "error" | "muted" | "processing";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
-  success: "bg-[#65ecaf]",
-  active: "bg-[#de402a]",
-  warning: "bg-[#f3b33e]",
-  error: "bg-[#f67263]",
+  success: "bg-[var(--state-success)]",
+  active: "bg-[var(--brand)]",
+  warning: "bg-[var(--state-warning)]",
+  error: "bg-[var(--state-danger)]",
   muted: "bg-[#4a5568]",
-  processing: "bg-[#67b8ff]",
+  processing: "bg-[var(--state-info)]",
 };
 
 const PULSE_CLASSES: Record<StatusTone, string> = {
-  success: "bg-[#65ecaf]/40",
-  active: "bg-[#de402a]/40",
-  warning: "bg-[#f3b33e]/40",
-  error: "bg-[#f67263]/40",
+  success: "bg-[color:color-mix(in_srgb,var(--state-success)_40%,transparent)]",
+  active: "bg-[color:color-mix(in_srgb,var(--brand)_40%,transparent)]",
+  warning: "bg-[color:color-mix(in_srgb,var(--state-warning)_40%,transparent)]",
+  error: "bg-[color:color-mix(in_srgb,var(--state-danger)_40%,transparent)]",
   muted: "",
-  processing: "bg-[#67b8ff]/40",
+  processing: "bg-[color:color-mix(in_srgb,var(--state-info)_40%,transparent)]",
 };
 
 export const StatusDot = ({

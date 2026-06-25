@@ -1,3 +1,770 @@
+# StreamPump Progress Review - 2026-06-26 Demo Day Managed Wallet Capacity Path
+
+## Scope
+- This review covers the new demo-day capacity and admission-control layer built on top of the previously recorded managed portfolio wallet claim path.
+- The latest committed `HEAD` is still `482882b` (`fix(frontend): brighten sidebar energy chip + drop duplicate topbar profile entry`), so the material new evidence is the current working tree: ephemeral managed-wallet sessions, a managed-wallet execution job queue, wallet-pool schema/scripts, `/try` QR landing, demo-day capacity runbook/loadtest, and pitch/script collateral.
+- This is a backend/API, Prisma, frontend demo-entry, and documentation/collateral pass. It does not promote production readiness, does not change SPUMP transferability, does not change S1/S2 settlement economics, and does not make managed custody production-ready.
+- Existing staged/unstaged frontend preview files, the prior managed-wallet claim path changes, and the untracked economics workbook remain user-owned. Protected files were not edited.
+
+## Completed Work
+- Added `POST /api/v1/auth/ephemeral-session` for demo visitors to receive a managed-wallet-backed `WalletSession` from a pre-generated wallet pool, keyed by an HMAC subject instead of storing the raw subject.
+- Added Prisma support for `ManagedWalletPoolStatus`, `ManagedWalletJobStatus`, pool fields on `AccountWallet`, and `ManagedWalletExecutionJob` with wallet/idempotency uniqueness plus status/queue indexes.
+- Added `backend/scripts/seed-managed-wallet-pool.ts` and `npm run demo:managed-wallet:pool` so operators can pre-generate encrypted managed wallets without printing secret keys.
+- Refactored managed wallet execution into `managedWalletExecution.ts` and `managedWalletJobs.ts`: `/api/v1/s1/managed/execute` now enqueues an idempotent async job, and `GET /api/v1/s1/managed/jobs/:jobId` returns queued/running/succeeded/failed state, signature, projection sync, or error details.
+- Added in-memory rate limits and daily wallet quotas for ephemeral admission and managed execution, plus configurable worker concurrency and optional projection sync after job success.
+- Split Solana RPC settings into transaction and indexer endpoints; production startup now fails fast when demo-day managed transactions use the public devnet RPC, indexer RPC is not separated while enabled, or Neon pooled connection settings are missing.
+- Added `/try`, a mobile QR landing page that provisions an ephemeral managed-wallet session with optional admission jitter before routing visitors into the app.
+- Added `docs/demo-day-p0-capacity-runbook.md` and `scripts/loadtest-demo-day.js` for Render/Neon/RPC settings, wallet pool preparation, k6 load-test gates, and demo-day capacity checks.
+- Updated pitch/demo scripts and images to keep S1/S2 reward language capped, flat, and decoupled from stake size.
+
+## Not Completed Or Blocked
+- The migration is present but not applied to production; Neon migration approval and environment ownership remain required.
+- The load-test script and runbook are present, but no k6 load test against the deployed backend was run by this recorder.
+- This remains a devnet/demo-day path. It still depends on preview/ephemeral admission, encrypted local/application-managed wallet custody, funded pool wallets, dedicated RPC configuration, and operator preparation.
+- KMS/MPC custody, recovery/export controls, production OAuth/passkey/Web3Auth verification, KYC/legal/audit gates, production funding policy, and custodial-to-personal USDC withdrawal remain blockers.
+- No browser smoke was run for `/try` after the passing Next build.
+
+## Backend Alignment
+- New API behavior is limited to demo-day managed-wallet admission and async execution: `/auth/ephemeral-session`, `/s1/managed/execute`, and `/s1/managed/jobs/:jobId`.
+- Product workflow state remains DB-first through `AuthIdentity`, `AccountProfile`, `AccountWallet`, `WalletSession`, and `ManagedWalletExecutionJob`.
+- Chain/financial truth remains Solana/Anchor truth: queued jobs only become financial facts after a signed transaction confirms and, when enabled, projection sync observes it.
+
+## Frontend Alignment
+- `/try` is a demo-entry surface for QR visitors. It creates/stores a backend session and then routes into the normal app experience.
+- Portfolio and S1 transaction client changes support queued managed-wallet execution state without claiming personal-wallet withdrawal is ready.
+- Readiness stays `SEEDED_DEMO` / demo-day operator-prepared; the visitor entry flow is not production auth or production custody.
+
+## Chain Alignment
+- No new Anchor instruction, PDA seed, Token-2022 transfer rule, S1 buyout reward formula, S2 settlement split, treasury rule, or program ID changed in this capacity pass.
+- Managed actions still use existing Anchor instruction builders; backend/oracle signing is used only for managed-wallet demo execution.
+- `SPUMP` remains non-transferable, S1 creator positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains chain-first.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow ledger row because API behavior, Prisma schema, production startup blockers, and demo-day smoke expectations changed.
+- The new runbook records required Render/Neon/RPC/wallet-pool settings but does not claim those operations have been completed.
+- Pitch collateral now avoids pro-rata reward language and keeps the capped/non-proportional discovery/curation reward boundary.
+
+## Implemented And Verified
+- Implemented/observed paths in this pass:
+  - `backend/prisma/migrations/20260626110000_demo_day_wallet_pool_jobs/migration.sql`
+  - `backend/src/services/ephemeralSessionService.ts`
+  - `backend/src/services/managedWalletExecution.ts`
+  - `backend/src/services/managedWalletJobs.ts`
+  - `backend/src/services/rateLimiter.ts`
+  - `backend/src/controllers/authController.ts`
+  - `backend/src/controllers/s1ActionController.ts`
+  - `backend/src/routes/v1/authRoutes.ts`
+  - `backend/src/routes/v1/s1Routes.ts`
+  - `backend/scripts/seed-managed-wallet-pool.ts`
+  - `app/src/pages/try.tsx`
+  - `docs/demo-day-p0-capacity-runbook.md`
+  - `scripts/loadtest-demo-day.js`
+  - `pitch/demo-day-presentation-script.md`
+  - `pitch/demo-day-script-en-optimized.md`
+- Recorder verification:
+  - `git status --short --branch` showed `codex/post-deadline-phase-0` still ahead of origin by 9, with dirty user-owned frontend/backend/docs/pitch/demo-day work and untracked demo capacity artifacts.
+  - Required canonical context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - `npm run build --prefix backend` passed.
+  - `npm run build --prefix app` passed and included static generation for `/try`.
+  - `npx ts-mocha --exit --timeout 20000 -p backend/tsconfig.test.json backend/tests/s1ActionController.spec.ts` passed 9 tests.
+  - No deployed k6 load test, production migration, browser smoke, or devnet transaction smoke was run by this recorder.
+
+# StreamPump Progress Review - 2026-06-25 Managed Portfolio Wallet Devnet Claim Path
+
+## Scope
+- This review covers the backend/frontend/devnet-script work to move `/portfolio` platform-wallet browsing and S1 discovery-reward claim from the local S1 mock token toward a real seeded devnet managed-wallet session.
+- The assigned managed wallet is `HTso2VWboA92KSKbHRXR5vvGjwGqcZtSD4rKSD4hAn7W`. Its private key was recovered from local agent session artifacts and written only to ignored local env; it was not committed or intentionally printed.
+- The work keeps DB-first product workflow and chain-first financial truth: session/profile/wallet binding lives in the backend DB; USDC claim execution remains Solana/Anchor truth through `/api/v1/s1/managed/execute`.
+- No Anchor program ID, PDA seed, Token-2022 non-transferability, S1 anti-speculation guardrail, settlement math, or production auth/custody semantics changed.
+
+## Completed Work
+- Added `backend/scripts/provision-managed-demo-wallet.ts`, a dev-only idempotent provisioning script that reads the assigned wallet secret from env, encrypts it with `walletEncryption`, upserts `AccountWallet(walletType=MANAGED, encryptedSecretKey)`, binds `AccountProfile` and `AuthIdentity`, and verifies `isManagedWallet`.
+- Added `npm run demo:managed-wallet:provision` as the explicit script entrypoint.
+- Extended `scripts/devnet-s1-buyout-claim-seed.ts` so `DEMO_MANAGED_WALLET_SECRET_BASE58` / `DEMO_MANAGED_WALLET_SECRET_KEY` can inject the assigned managed wallet as unclaimed early fan index 1 without persisting its secret into `.local/devnet-s1-buyout-claim-seed.json`.
+- Added `claim-s1-buyout-usdc` to the managed-wallet execution whitelist and wired it to the existing `AnchorService.buildClaimS1BuyoutUsdcInstruction` with backend co-signing from the managed wallet and oracle.
+- Updated `/portfolio` so "Continue with platform wallet" calls backend provider exchange for a real managed `WalletSession` instead of storing `S1_MOCK_ACCESS_TOKEN`, treats that managed session as active without an external wallet, and passes a managed claim action into the existing `useS1TransactionFlow` path.
+- Moved the visible `/portfolio` source notice for this path to `SEEDED_DEMO` and changed withdrawal copy to say claim lands in the custodial wallet first; transfer to a personal wallet remains next-step work.
+- Updated local ignored env files with a generated `MANAGED_WALLET_ENCRYPTION_KEY`, devnet RPC, demo managed wallet public address/provider subject, and frontend `NEXT_PUBLIC_DEMO_MANAGED_WALLET` values. No secret was printed or committed.
+- Recovered local devnet admin/oracle authority key material into ignored `.local`/env files, upgraded the devnet program with a narrow legacy `ProtocolConfig` migration compatibility patch, and migrated the devnet `protocol_config` account from its historical 242-byte layout to the current layout.
+- Ran the devnet S1 buyout seed with the assigned managed wallet injected as fan index 1, executed oracle-gated graduation, and completed a real backend `/api/v1/s1/managed/execute` claim through a real managed-wallet session.
+
+## Not Completed Or Blocked
+- Custodial-to-personal USDC withdrawal is not implemented; the UI now labels it as next-step work instead of claiming it is ready.
+- This remains devnet/seeded only and still uses preview provider exchange for demo session issuance. Production OAuth/passkey/Web3Auth verification, KMS/MPC custody, recovery, KYC/legal/audit gates, and production migration/deployment approval remain blockers.
+- The devnet seed script still has non-idempotent fan registration/reward steps; recovery from a partially completed seed required a fresh forced state and a direct oracle graduation call.
+
+## Verification
+- Code-level coverage added in `backend/tests/s1ActionController.spec.ts` for managed S1 buyout claim payer/signers.
+- Devnet program upgrade signature: `3FGX3nasG3t5MZgoKFeRcHuR8W4EHY1bZeAj9NMSQBmKrJd1k6tVRgK9s7LR8A7rD7NwmxktZB5ApL4fHp92nuyx`.
+- Devnet protocol migration signature: `216BtGN68EE1jCSsx7ZkKW1qJejHFbmBoJBeKNC4xL7EoTEEfis2yscd9He9aP1nVCGXVmCneFoHSYtVGnTvVCpk`.
+- Devnet oracle graduation signature: `4DCKwwnJmUMYh5V8NECQaLk83LWbXy1ZeJhRQ3ACTMFjuji8mDXvWv53sv8bp6STdwhdB8gVRFzGZNfAJE7t4CLD`.
+- Real managed claim signature: `2f5zuHmoV2s7fzzhp7iGfD259ZBuhhWvd963yM55sLgnbivus3ryXRssVLoUrcR9avSS325naMvom2bA2QytRHGn`; response action `claim-s1-buyout-usdc`, projection sync `SYNCED`.
+- Checks passed: `cargo test -p streampump-core pre_endorsement_limit -- --nocapture`; `npm run build:anchor`; `npm run build --prefix backend`; focused `s1ActionController` + `managedWalletService` tests; `npm run build --prefix app`; `git diff --check`; protected-file diff check.
+
+# StreamPump Progress Review - 2026-06-25 Shell Explore And Scout Preview Pass
+
+## Scope
+- This review covers new frontend product-surface and demo-collateral work after the latest recorded Content Feed And Endorsement Surface Pass.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` advanced from the previously recorded `c584802` (`feat(frontend): energy-language sidebar nav + explore 推荐/关注 tabs (content prototype)`) to `482882b` (`fix(frontend): brighten sidebar energy chip + drop duplicate topbar profile entry`), with intermediate commits for the consumer shell rebuild and `/explore` polish.
+- The current working tree also contains user-owned staged/unstaged preview work for the discover board, scout portfolio scoreboard, platform-wallet demo path, seeded market projection mock, and new demo-day script artifacts. This entry records those visible preview/docs additions without staging or committing them.
+- The material change is frontend route/copy/display behavior on `/explore`, `/trending`, `/portfolio`, shared consumer shell/topbar/feed cards, and pitch demo collateral. It is not a backend, Prisma, Anchor, settlement, production-readiness, or financial-semantics change.
+- The previously recorded `StreamPump-economics-breakeven-model.xlsx` remains untracked and user-owned. No protected files were edited.
+
+## Completed Work
+- Rebuilt the consumer sidebar toward the content prototype: StreamPump mark, Feed/Discover/Backings/Energy/Creator Studio navigation, a seeded SPUMP energy chip, compact language switch, profile shortcut, and removal of the duplicate topbar profile entry.
+- Moved `/explore` recommended/following tabs into the topbar via a `PageShell` leading slot while keeping the following tab honestly preview-labeled because no real follow graph is wired.
+- Polished feed cards with video duration badges, centered play affordance, multi-image count labels, localized pending-metric text, and seeded local engagement enrichment by title for imported public-feed rows.
+- Added a new `DiscoverBoard` preview surface for `/trending` with featured creator, momentum movers, fixed category chips, seeded market-projection joins, and "view/back" routing that avoids pretending every imported creator is backable.
+- Added a `ScoutScoreboard` preview block to `/portfolio` with an explicit `MOCK_PREVIEW` notice, seeded scout/backing rows, claimable-count labels, and rediscovery CTA while leaving real claimable discovery rewards in the existing claim queue.
+- Added a platform-managed wallet demo path/copy on `/portfolio`: browsing can use the demo managed wallet session, while USDC withdrawal remains framed as requiring the user's own wallet. The backend managed-wallet executor/secret path is not implemented by this frontend pass.
+- Added demo-day collateral under `pitch/`: Chinese and English 5-minute scripts plus a standalone HTML deck page. These are collateral artifacts, not product/runtime changes.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The seeded SPUMP energy chip, discover-board market projection seed, and scout scoreboard are preview/seeded display context, not Solana/Anchor financial truth.
+- The following feed still has no follow graph; seeded engagement still does not add persisted comments/likes/saves; category/market seed joins do not add backend recommendation, ranking, market, or portfolio APIs.
+- The platform-wallet demo path does not implement a backend managed-wallet signing service, custody secret handling, S1 managed execution route, USDC withdrawal flow, KYC/legal approval, or production account recovery.
+- No new backend route, Prisma schema, migration, auth/session contract, indexer behavior, settlement API, merchant integration, or operator dashboard was added.
+- No Anchor program, PDA, Token-2022, vault, oracle, treasury, settlement, or financial semantics changed.
+- No browser smoke was run by this recorder after the passing app build.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, settlement, indexer, media, deployment, or proposal/S1 projection contract changed in this recorded pass.
+- Frontend seeded joins in `app/src/lib/mocks/marketSeed.ts` and `app/src/lib/mocks/discover.ts` are local display helpers only. Product truth remains the backend DB workflow state plus Solana/Anchor financial state.
+
+## Frontend Alignment
+- `/explore` keeps its public-feed source model but moves feed tabs into the app topbar and improves media card affordances.
+- `/trending` is moving from the older tabbed creator list toward a discovery-board surface with seeded projection/category labels that remain visually distinct from live chain truth.
+- `/portfolio` now has a scout-profile/track-record preview above the existing portfolio/claim queue and a clearer platform-wallet browsing story, but live claimability still depends on existing seeded/API portfolio state.
+- Shared shell navigation now better matches the energy/backing language while preserving route boundaries and readiness labels.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- Any visible energy, momentum, category, scout-score, or claim-count value introduced here is frontend seeded/preview context unless backed by an existing S1/S2 API projection.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because shell, explore, trending, and portfolio route behavior changed on user-facing surfaces.
+- The demo-day scripts were recorded as collateral only; they do not change product readiness, protocol semantics, or settlement truth.
+- Canonical readiness labels remain unchanged: public product shell stays mixed `LIVE` + `SEEDED_DEMO`; S1 market buy/sell stays `SEEDED_DEMO`; S1 portfolio/claim stays `SEEDED_DEMO`; S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`; rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`; Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented/observed paths in this pass:
+  - `app/src/components/layout/PageShell.tsx`
+  - `app/src/components/user/UserShell.tsx`
+  - `app/src/components/user/UserTopbar.tsx`
+  - `app/src/components/user/DiscoverSurface.tsx`
+  - `app/src/components/user/DiscoverBoard.tsx`
+  - `app/src/components/user/PostCard.tsx`
+  - `app/src/components/portfolio/ScoutScoreboard.tsx`
+  - `app/src/hooks/usePublicFeedViewModel.ts`
+  - `app/src/lib/api/feed.ts`
+  - `app/src/lib/api/types.ts`
+  - `app/src/lib/i18n.tsx`
+  - `app/src/lib/mocks/discover.ts`
+  - `app/src/lib/mocks/marketSeed.ts`
+  - `app/src/lib/mocks/portfolio.ts`
+  - `app/src/pages/portfolio.tsx`
+  - `pitch/demo-day-script.md`
+  - `pitch/demo-day-script-en.md`
+  - `pitch/demo-day.html`
+- Recorder verification:
+  - `git status --short --branch` returned `## codex/post-deadline-phase-0...origin/codex/post-deadline-phase-0 [ahead 9]` plus staged/unstaged user-owned frontend/docs work and the pre-existing untracked economics workbook.
+  - `git log --format='%h %cI %s' c584802..HEAD` showed three frontend commits ending at `482882b`.
+  - `git diff --stat --find-renames c584802..HEAD` showed frontend-only committed changes and no backend/Prisma/Anchor files.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed on the current working tree.
+
+# StreamPump Progress Review - 2026-06-25 Content Feed And Endorsement Surface Pass
+
+## Scope
+- This review covers committed frontend product-surface work after the latest recorded Market And Buyout Truth-Copy Pass.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` advanced from the previously recorded `857a685` (`feat(frontend): B3d /buyout — full zh + standalone capped disclaimer + eligibility chip`) to `c584802` (`feat(frontend): energy-language sidebar nav + explore 推荐/关注 tabs (content prototype)`), with intermediate commits for B3e campaign/endorsement localization and data-truth copy, B4 activity weighting, post-detail layout, seeded local comments, `/explore` shorts, and sidebar navigation language.
+- The material current change is frontend route/copy behavior on `/campaigns/[proposalId]`, `/campaigns/[proposalId]/endorse`, `/activity`, `/posts/[postId]`, `/explore`, and shared consumer navigation. It is not a backend, Prisma, Anchor, settlement, production-readiness, or financial-semantics change.
+- The previously recorded `StreamPump-economics-breakeven-model.xlsx` remains untracked and user-owned. Existing uncommitted `progress.md` and roadmap entries from prior recorder passes were preserved and extended. No protected files were edited.
+
+## Completed Work
+- Updated campaign detail and endorsement surfaces with full Chinese/localized labels for campaign status, oracle/sync state, metric labels, track labels, wallet/managed endorsement states, claim states, and demo/seeded projection notices.
+- Tightened endorsement truth copy: live seeded campaigns are labeled as API/wallet-wired but still `SEEDED_DEMO`; local fallback routes remain local simulators; Track 3 is visually gated; fan rewards are described as capped/flat/non-stake-proportional rather than earnings.
+- Reworked `/activity` so S1 buyout and S2 active items get stronger "major backing event" visual weight, with localized activity kind and unavailable-state labels.
+- Reworked post detail toward the `content-page-c` prototype: title/body/actions moved into the media column, the right column now holds a single creator/follow/stage-aware backing panel plus related posts and comments-only panel, and seeded local comments attach to imported feed posts by title.
+- Added `/explore` shorts behavior: video posts appear in a shorts shelf and can open an immersive vertical overlay with keyboard navigation, like state gated by interactive session, comments, share, and creator/backing links.
+- Updated consumer navigation language toward the energy/backing model: Feed/Discover/Backings/Energy/Creator Studio labeling and a workspace entry in primary navigation.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The endorsement UI change does not verify a new devnet endorsement smoke, devnet SPUMP balances/ATAs, indexer projection sync, reward-claim lifecycle, oracle settlement run, or production campaign endorsement readiness.
+- The shorts overlay and post-detail layout changes do not add a backend recommendation API, follow graph, account-specific feed, comment persistence, share service, or media/reconciliation reliability improvement.
+- No new backend route, Prisma schema, migration, auth flow, indexer behavior, settlement API, merchant integration, or operator dashboard was added.
+- No Anchor program, PDA, vault, Token-2022, oracle, treasury, or financial semantics changed.
+- No browser smoke was run by this recorder after the passing app build.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, settlement, indexer, media, deployment, or proposal projection contract changed in this recorded pass.
+- `app/src/lib/api/feed.ts` remains a frontend API adapter/client-shape change only in this diff; the product truth remains whatever the backend feed/proposal APIs and chain projections return.
+
+## Frontend Alignment
+- `/campaigns/[proposalId]` and `/campaigns/[proposalId]/endorse` now make live API/seeded/demo/fallback states more visible while preserving the existing seeded/local distinction.
+- `/activity` now gives buyout/graduation and S2 campaign events more visual priority without claiming account-specific notification infrastructure.
+- `/posts/[postId]` and the feed detail overlay better separate content, creator/backing action, related posts, and comments.
+- `/explore` now has recommended/following tabs and a shorts shelf/overlay, but the following tab remains preview-labeled and currently uses the loaded recommended feed model because a real follow graph is not wired.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- S2 endorsement copy remains capped/flat and readiness-labeled. The UI copy/layout change does not make endorsement rewards live for public real-money use.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because campaign/endorsement, activity, post-detail, explore, and navigation route behavior changed on user-facing surfaces.
+- The prior Market And Buyout Truth-Copy entry remains valid for the B3d S1 route/copy slice; this entry records the subsequent B3e/B4/content-feed implementation slice.
+- Canonical readiness labels remain unchanged: S2 endorsement stays `SEEDED_DEMO` + `BACKEND_READY_UI_GAP`, S1 market buy/sell stays `SEEDED_DEMO`, S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the committed range:
+  - `app/src/components/post/PostDetailExperience.tsx`
+  - `app/src/components/user/ActivitySurface.tsx`
+  - `app/src/components/user/CommentPanel.tsx`
+  - `app/src/components/user/DiscoverSurface.tsx`
+  - `app/src/components/user/ShortImmersiveOverlay.tsx`
+  - `app/src/components/user/ShortsShelf.tsx`
+  - `app/src/components/user/UserShell.tsx`
+  - `app/src/lib/api/feed.ts`
+  - `app/src/lib/i18n.tsx`
+  - `app/src/lib/routes.ts`
+  - `app/src/pages/campaigns/[proposalId].tsx`
+  - `app/src/pages/campaigns/[proposalId]/endorse.tsx`
+- Recorder verification:
+  - `git status --short --branch` returned `## codex/post-deadline-phase-0...origin/codex/post-deadline-phase-0 [ahead 6]` plus modified `progress.md` / roadmap entries and the pre-existing untracked economics workbook.
+  - `git log --format=%h%x09%cI%x09%s 857a685..HEAD` showed ten frontend commits ending at `c584802`.
+  - `git diff --stat --find-renames 857a685..HEAD` showed frontend-only changes and no backend/Prisma/Anchor files.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed on the current `c584802` head.
+
+# StreamPump Progress Review - 2026-06-25 Market And Buyout Truth-Copy Pass
+
+## Scope
+- This review covers committed frontend product-surface work after the latest recorded Onboarding And Discovery Board Pass.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` advanced from the previously recorded `bef53c7` (`feat(frontend): B3b discover board (发现榜) — slogan + niche chips + momentum movers + Back CTA`) to `857a685` (`feat(frontend): B3d /buyout — full zh + standalone capped disclaimer + eligibility chip`), with intermediate commits for B3b CTA semantics, CreatorStageView momentum framing, `/market` i18n and price-truth copy, demo-route links, and verifier localization fixes.
+- The material current change is frontend route/copy behavior on `/creators/[creatorId]`, `/market/[creatorId]`, `/buyout/[creatorId]`, `/trending`, demo action status, and the shared S1 demo banner. It is not a backend, Prisma, Anchor, settlement, production-readiness, or financial-semantics change.
+- The previously recorded `StreamPump-economics-breakeven-model.xlsx` remains untracked and user-owned. Existing uncommitted `progress.md` and roadmap entries from prior recorder passes were preserved and extended. No protected files were edited.
+
+## Completed Work
+- Reframed `CreatorStageView` away from fabricated price-history/investment-file language toward momentum-led creator discovery: `MomentumLine`/`MomentumMeter`, localized creator tabs and CTA copy, S1 profile/buyout status labels, and content-only momentum proof states.
+- Updated `/market/[creatorId]` with localized market, trade, demo-route, readiness, and transaction-copy strings while preserving the existing seeded devnet transaction builder path and local preview branch for demo slugs.
+- Added explicit market-page source notices: the current S1 price is on-chain/projection-backed for seeded markets while the visible price-history curve is synthetic display context, and any buyout reward is capped/non-proportional rather than stake-proportional.
+- Updated `/buyout/[creatorId]` with full Chinese/localized copy, a standalone capped/non-proportional discovery-reward disclaimer, eligibility-chip language, and clearer seeded/demo vs local preview claim-state wording.
+- Localized shared demo/action affordances (`DemoActionStatusCard`, `DemoCreatorBanner`) and tightened `/trending` Back CTA semantics without changing transaction behavior.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The changed S1 market and buyout wording does not productize open creator onboarding, sponsor offer creation, creator acceptance, graduation, reclaim, re-entry, reward ledger views, KYC, legal approval, audit clearance, or program deployment.
+- No new backend route, Prisma schema, migration, auth flow, indexer behavior, S1 projection contract, claim API, or settlement API was added.
+- No Anchor program, PDA, vault, Token-2022, buyout settlement, oracle, treasury, or financial semantics changed.
+- No browser smoke was run by this recorder after the app build.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, settlement, indexer, media, deployment, or S1 projection behavior changed in this recorded pass.
+- `/market/[creatorId]` and `/buyout/[creatorId]` continue to depend on the existing S1 API/projection and wallet-session behavior for seeded devnet paths; demo slugs remain local previews.
+
+## Frontend Alignment
+- `/creators/[creatorId]` now presents creator momentum and content signals as the primary discovery surface instead of investment/price-history framing.
+- `/market/[creatorId]` keeps the live seeded transaction path distinct from local preview actions, adds the price-history truth note, and keeps the capped-discovery-reward disclaimer visible near trade controls.
+- `/buyout/[creatorId]` makes claim eligibility and capped/non-proportional reward boundaries more explicit while preserving current seeded/demo source labeling.
+- Shared demo UI strings now flow through the app i18n dictionary, reducing English residuals on Chinese surfaces.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- S1 buyout USDC language remains capped and decoupled from stake size. The UI copy change does not make rewards live for public real-money use.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because `/creators`, `/market`, `/buyout`, `/trending`, and shared demo-route copy changed on user-facing S1 surfaces.
+- The prior onboarding/discovery-board entry remains valid for the B3b slice; this entry records the subsequent B3c/B3d market, creator-stage, and buyout truth-copy implementation slice.
+- Canonical readiness labels remain unchanged: S1 market buy/sell stays `SEEDED_DEMO`, S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S1 portfolio/claim stays `SEEDED_DEMO`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the committed range:
+  - `app/src/components/s1/S1TransactionDrawer.tsx`
+  - `app/src/components/shared/DemoActionStatusCard.tsx`
+  - `app/src/components/user/CreatorStageView.tsx`
+  - `app/src/components/user/TrendingTabs.tsx`
+  - `app/src/lib/i18n.tsx`
+  - `app/src/pages/buyout/[creatorId].tsx`
+  - `app/src/pages/creators/[creatorId].tsx`
+  - `app/src/pages/market/[creatorId].tsx`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git log --format='%h %cI %s' bef53c7..HEAD` showed eight commits ending at `857a685`.
+  - `git diff --stat --find-renames bef53c7..HEAD` showed frontend-only changes and no backend/Prisma/Anchor files.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed on the current `857a685` head.
+
+# StreamPump Progress Review - 2026-06-24 Onboarding And Discovery Board Pass
+
+## Scope
+- This review covers committed frontend product-surface work after the latest recorded Content Surface Energy And Backing Pass.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` advanced from the previously recorded `2122b3c` (`feat(frontend): B2 content surface — energy chip + detail BackingCard teaser/related/comments`) to `bef53c7` (`feat(frontend): B3b discover board (发现榜) — slogan + niche chips + momentum movers + Back CTA`), with intermediate commits for portfolio wording, onboarding copy/i18n, readiness banner localization, and the B3 backing landing plan.
+- The material current change is frontend route/copy behavior on `/onboarding`, `/trending`, `/portfolio`, and standalone `/posts/[postId]` detail loading. It is not a backend, Prisma, Anchor, settlement, production-readiness, or financial-semantics change.
+- The previously recorded `StreamPump-economics-breakeven-model.xlsx` remains untracked and user-owned. No protected files were edited.
+
+## Completed Work
+- Added `docs/frontend/landing/b3-backing-plan-2026-06.md` as a B3 landing/backing safety contract that explicitly protects signing-chain/session-write paths, readiness banners, real SPUMP/USDC/momentum truth boundaries, and the staged B3a-B3e frontend rollout.
+- Updated `/onboarding` with localized session-backed readiness copy, role copy, account-profile data-source states, and a "discovery, not investment" orientation block while preserving the existing AccountProfile write gate and preview-only reward/SPUMP language.
+- Localized `ProductReadinessBanner`'s Phase 0 eyebrow via the existing i18n dictionary instead of hard-coded English.
+- Refined `/portfolio` and preview portfolio panels to replace residual price/position wording with backing, momentum, energy-basis, and capped-reward language while preserving seeded/demo and preview distinctions.
+- Reworked the `/trending` S1 creator tab into a discovery board: slogan/subcopy, niche chips, top momentum movers, momentum/backer/graduation columns, deterministic `MomentumLine`, and a `Back` navigation CTA into existing market/creator routes.
+- Updated standalone `/posts/[postId]` SSR props to load related feed posts through the existing public feed API helper so the page can show the same related-post context as the feed/detail experience.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The `Back` CTA is navigation only; it does not add new transaction behavior, creator onboarding, sponsor buyout offer creation, claim/reward UI, billing, or reward-ledger productization.
+- No new backend route, Prisma schema, migration, auth flow, indexer behavior, recommendation service, category/search API, or settlement API was added.
+- No Anchor program, PDA, vault, Token-2022, settlement, oracle, treasury, or financial semantics changed.
+- No browser smoke was run by this recorder after the passing app build.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, billing, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+- `/posts/[postId]` now asks the existing public feed helper for sibling posts during SSR; it does not introduce a new recommendation endpoint or persistence contract.
+
+## Frontend Alignment
+- `/onboarding` keeps the existing session-backed AccountProfile workflow and migration gate while making the user-facing framing clearer about SPUMP non-transferability, preview rewards, and discovery/not-investment boundaries.
+- `/trending` now emphasizes creator momentum and backing intent rather than token price language, with category chips and top movers computed from the currently loaded creator/feed model.
+- `/portfolio` copy is better aligned with the energy/backing model, but live S1 balances and claimable values still depend on the existing seeded/API projection path.
+- Readiness/source notices keep their product meaning: the UI framing changed, product truth did not.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- Momentum, energy, and backing copy remains presentation/discovery language, not a transferable value claim, token price, or production fee/treasury change.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because `/trending`, `/onboarding`, and standalone post-detail route behavior/copy changed.
+- The prior content-surface entry remains valid for the B2 feed/post-detail backing-card slice; this entry records the subsequent B3 onboarding/discovery-board implementation slice.
+- Canonical readiness labels remain unchanged: S1 market buy/sell stays `SEEDED_DEMO`, S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the committed range:
+  - `app/src/components/portfolio/PortfolioPreviewPanels.tsx`
+  - `app/src/components/post/PostDetailExperience.tsx`
+  - `app/src/components/shared/ProductReadinessBanner.tsx`
+  - `app/src/components/user/TrendingTabs.tsx`
+  - `app/src/lib/i18n.tsx`
+  - `app/src/lib/public-feed-ssr.ts`
+  - `app/src/pages/onboarding.tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/pages/posts/[postId].tsx`
+  - `docs/frontend/landing/b3-backing-plan-2026-06.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git log --format='%h %cI %s' 2122b3c..HEAD` showed eight commits ending at `bef53c7`.
+  - `git diff --stat --find-renames 2122b3c..HEAD` showed frontend/docs-only changes and no backend/Prisma/Anchor files.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - `npm run build --prefix app` passed on the current `bef53c7` head.
+
+# StreamPump Progress Review - 2026-06-24 Content Surface Energy And Backing Pass
+
+## Scope
+- This review covers committed frontend product-surface work after the latest recorded Economics Model And Prototype Expansion entry.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` advanced from the previously recorded `e6872a3` (`feat(frontend): enable explore category filters`) to `2122b3c` (`feat(frontend): B2 content surface — energy chip + detail BackingCard teaser/related/comments`), with intermediate commits for prototype docs, landing foundation, shared primitives, and energy-model copy alignment.
+- The material current change is feed/post-detail interaction and product-copy alignment around energy/backing/graduation language. It is not a backend, Prisma, Anchor, settlement, production-readiness, or financial-semantics change.
+- The previously recorded `StreamPump-economics-breakeven-model.xlsx` remains untracked and user-owned. No protected files were edited.
+
+## Completed Work
+- Added shared frontend primitives for the energy/backing design language: `EnergyAmount`, `MomentumMeter`, `MomentumLine`, `TierBadge`, `ScarcityBar`, and `LockedPanel`, plus additive CSS token aliases for energy, tier, and momentum-line color semantics.
+- Added `BackingCard` as a reusable creator-backing teaser/full card that links to `/market/:creatorId`, displays the creator/stage context, and keeps seeded/devnet readiness copy visible instead of implying production backing readiness.
+- Updated feed and post detail surfaces:
+  - `PostCard` now shows stage-aware energy tail chips on feed cards.
+  - `PostDetailExperience` now includes a right-column backing teaser, related-post rows, and the existing comment panel in a stable layout.
+  - `/posts/[postId]` inherits the updated detail experience without adding a new backend API.
+- Aligned early frontend copy/i18n toward support-rate, energy/backing, and graduation-sponsorship language while preserving the existing S1/S2 mechanics and readiness boundaries.
+- Added/committed frontend design artifacts and contracts, including the landing foundation contract and the standalone content/activity/backing/workspace prototype HTML files.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The backing teaser routes users to the existing S1 market route; it does not implement new creator onboarding, open S1 readiness, sponsor offer creation, S1 buyout lifecycle productization, or a new reward ledger.
+- No backend category/search API, post recommendation API, analytics entitlement API, billing route, Prisma migration, or wallet/auth change was added.
+- No Anchor program, PDA, vault, Token-2022, settlement, oracle, treasury, or financial semantics changed.
+- No browser smoke was run by this recorder after the passing app build.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, billing, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+- The related-post list is derived client-side from the currently loaded post collection, not from a new recommendation endpoint.
+
+## Frontend Alignment
+- The live frontend now has a first implementation slice of the energy/backing copy system on feed cards and post detail, while the S1 market route remains the place where real seeded/devnet backing transactions are initiated.
+- The new shared primitives are additive and reuse the existing token/glass system instead of introducing a second component system.
+- Readiness/source notices keep their product meaning: the UI framing changed, product truth did not.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- Any user-facing "energy" copy is presentation language for backing/support intent, not a transferable value claim or production fee/treasury change.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because feed/post-detail route behavior changed.
+- The prior economics workbook/prototype expansion entry remains valid for the untracked workbook and planning artifacts; this entry records the subsequent committed frontend implementation slice.
+- Canonical readiness labels remain unchanged: S1 market buy/sell stays `SEEDED_DEMO`, S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the committed range:
+  - `app/src/components/backing/BackingCard.tsx`
+  - `app/src/components/post/PostDetailExperience.tsx`
+  - `app/src/components/user/PostCard.tsx`
+  - `app/src/components/shared/EnergyAmount.tsx`
+  - `app/src/components/shared/MomentumMeter.tsx`
+  - `app/src/components/shared/MomentumLine.tsx`
+  - `app/src/components/shared/TierBadge.tsx`
+  - `app/src/components/shared/ScarcityBar.tsx`
+  - `app/src/components/shared/LockedPanel.tsx`
+  - `app/src/lib/i18n.tsx`
+  - `docs/frontend/landing/landing-foundation-2026-06.md`
+  - `docs/frontend/prototypes/content-page-c.html`
+  - `docs/frontend/prototypes/activity-page.html`
+  - `docs/frontend/prototypes/backing-page.html`
+  - `docs/frontend/prototypes/workspace-page.html`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git log --format='%h %cI %s' e6872a3..HEAD` showed seven commits ending at `2122b3c`.
+  - `git diff --stat --find-renames e6872a3..HEAD` showed frontend/docs-only changes and no backend/Prisma/Anchor files.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed on the current `2122b3c` head.
+  - One read-only `rg` probe initially failed because zsh globbed bracketed Next.js route paths, then succeeded with quoted route paths.
+
+# StreamPump Progress Review - 2026-06-24 Economics Model And Prototype Expansion
+
+## Scope
+- This review covers new untracked planning/prototype artifacts observed after the 2026-06-23 Explore Filters And Design Handoff recorder entry.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `e6872a3` (`feat(frontend): enable explore category filters`), the top `progress.md` entry already records the Explore filter/design handoff scope, and the current untracked delta adds an economics workbook plus additional frontend HTML prototypes.
+- The material current change is business-model analysis and design exploration, not backend, chain, settlement, production-readiness, or deployed route behavior.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added `StreamPump-economics-breakeven-model.xlsx`, a workbook with README, Assumptions, Model, Breakeven_Chart, Plan, Ramp, and Other_Revenue sheets for modeling platform costs, chain transaction/rent assumptions, fee/take-rate scenarios, ramp scenarios, and breakeven conditions.
+- The workbook explicitly distinguishes current protocol behavior from hypothetical monetization: current on-chain code has no USDC platform-fee layer, `SPUMP` remains non-transferable utility, and any S2/S1 take-rate assumptions are model inputs rather than implemented code/config.
+- Added standalone frontend prototype artifacts for activity, backing, and workspace surfaces:
+  - `docs/frontend/prototypes/activity-page.html`
+  - `docs/frontend/prototypes/backing-page.html`
+  - `docs/frontend/prototypes/workspace-page.html`
+- These artifacts expand the design exploration beyond the previously recorded content-page prototype without changing the live Next.js app.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- No fee layer, treasury field, sponsor billing path, payout micro-fee, subscription product, Ramp integration, or monetization route was implemented.
+- The workbook contains planning assumptions, including fee/take-rate scenarios, that require product/legal review before becoming protocol or backend requirements.
+- The added HTML files are standalone prototypes only; they are not wired into the app, API clients, auth, wallet flows, or production routes.
+- No browser smoke, app build, backend build, or chain test was run by this recorder for these planning/prototype artifacts.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, billing, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+- Any platform-fee or monetization concept remains planning-only until backend schema/routes and product/legal policy are explicitly implemented.
+
+## Frontend Alignment
+- The new prototypes explore activity, backing, and workspace UX direction using standalone HTML/CSS files.
+- The live frontend remains the Next.js implementation already recorded by prior entries; no page implementation, API adapter, readiness banner, or wallet flow changed in this pass.
+
+## Chain Alignment
+- No Anchor program, PDA, Token-2022, event, vault, treasury, settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+- The economics workbook treats fee/take-rate ideas as hypothetical planning inputs, not current on-chain truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because this pass did not change product readiness, route/API behavior, smoke status, or implemented blocker state.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented/planning paths observed in the working tree:
+  - `StreamPump-economics-breakeven-model.xlsx`
+  - `docs/frontend/prototypes/activity-page.html`
+  - `docs/frontend/prototypes/backing-page.html`
+  - `docs/frontend/prototypes/workspace-page.html`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git log --oneline -12 --decorate` showed `HEAD` at `e6872a3`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Workbook structure was inspected with `unzip`; visible sheets are README, Assumptions, Model, Breakeven_Chart, Plan, Ramp, and Other_Revenue.
+  - Protected-file diff check returned no protected-file changes.
+  - `git diff --check` passed before this entry.
+
+# StreamPump Progress Review - 2026-06-23 Explore Filters And Design Handoff
+
+## Scope
+- This review covers new frontend product-surface work observed after the latest recorder entry for the `e8685e9` token-cleanup follow-up.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` is now `e6872a3` (`feat(frontend): enable explore category filters`), the prior top `progress.md` entry still described `HEAD` at `e8685e9`, and the current tree also includes user-owned frontend cleanup plus new frontend design handoff/prototype docs.
+- The material current change is `/explore` category-filter behavior plus frontend design-system handoff/dead-code cleanup, not a backend, chain, settlement, or production-readiness change.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Enabled clickable `/explore` category filters using the loaded feed's real tags/title/location/stage fields, with a deterministic Creator Watch fallback when imported feed rows lack stage metadata.
+- Added empty-state copy for categories with no matching posts and updated feed count display to reflect the active category.
+- Added `docs/frontend/design-system-handoff-2026-06.md` as the design-system continuation brief covering token/elevation/type/tone conventions, Tailwind CSS-variable gotchas, remaining cleanup, and product-copy boundaries.
+- Added `docs/frontend/prototypes/content-page-c.html` as a standalone high-fidelity content-page prototype artifact for future frontend iteration.
+- Removed the unused legacy `PortfolioSections.tsx` component and continued small semantic tone/type cleanup on portfolio, S1 market/buyout, campaign, workspace, onboarding, and account surfaces.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- No browser smoke was run by this recorder after the build passed.
+- Explore filtering is client-side over the currently loaded feed model; it does not add a backend category/search API, persisted user preferences, or production ranking/search infrastructure.
+- The pass does not complete production auth, media recovery, S1 buyout productization, S2 endorsement claim/reward UI, Track3 merchant reconciliation, or operator dashboards.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- `/explore` now has functional category tabs instead of disabled category chips, while retaining the existing public-feed data source and modal post-detail flow.
+- Frontend handoff docs make the current token/tone/type system easier to continue without drifting readiness labels or SPUMP/S1/S2 product boundaries.
+- The deleted portfolio component was unused; the live `/portfolio` implementation remains the page-local version that distinguishes signed-out, live seeded, mock preview, and fallback states.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because `/explore` route behavior changed.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the current repo state:
+  - `app/src/components/user/DiscoverSurface.tsx`
+  - `app/src/lib/i18n.tsx`
+  - `docs/frontend/design-system-handoff-2026-06.md`
+  - `docs/frontend/prototypes/content-page-c.html`
+  - `app/src/components/portfolio/PortfolioPreviewPanels.tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/pages/market/[creatorId].tsx`
+  - `app/src/pages/buyout/[creatorId].tsx`
+  - `CLAUDE.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed the committed Explore-filter head plus user-owned frontend/docs dirt, including `progress.md`.
+  - `git log --oneline -12 --decorate` showed `HEAD` at `e6872a3`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed.
+
+# StreamPump Progress Review - 2026-06-23 Frontend Token Cleanup Follow-Up
+
+## Scope
+- This review covers a small uncommitted frontend design-system follow-up observed after the committed design-system migration record at `e8685e9`.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` is `e8685e9`, `progress.md` and the roadmap already record the broader 2026-06-22 token/texture/navigation migration, and the remaining dirty diff is limited to 10 `app/src` frontend files.
+- The material current change is presentation cleanup: replacing remaining hard-coded state/type styling with existing token and tone classes on consumer, profile, S1, portfolio, and rewards surfaces.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Continued migrating visible headings and captions toward shared typography tokens (`type-h3`, `--fs-caption`) on profile, activity, trending, feed cards, and creator-stage surfaces.
+- Replaced additional hard-coded warning/info/success/danger badge and notice colors with semantic tone classes such as `tone-state-warning`, `tone-state-info`, `tone-state-success`, `tone-state-danger`, `tone-state-neutral`, plus stage token classes for S1/S2/buyout badges.
+- Normalized S1 market, S1 buyout, portfolio, and rewards source/readiness notices so their visual color semantics come from design tokens while preserving the exact readiness labels and existing copy.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- No browser smoke or production frontend build was run by this recorder after the small follow-up diff.
+- The pass does not complete production auth, media recovery, S1 buyout productization, S2 endorsement UI/productization, Track3 merchant reconciliation, or operator dashboards.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- The frontend design-system migration now reaches a few remaining consumer/S1/account surfaces that still carried local color/type styling after the broader token migration.
+- Readiness/source notices keep their product meaning: styling changed, product truth did not.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because this follow-up does not materially affect product readiness, route/API behavior, smoke status, or known blocker state.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed `SEEDED_DEMO`/`MOCK_PREVIEW`, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `app/src/components/me/MeSurface.tsx`
+  - `app/src/components/portfolio/PortfolioSections.tsx`
+  - `app/src/components/user/ActivitySurface.tsx`
+  - `app/src/components/user/CreatorStageView.tsx`
+  - `app/src/components/user/DiscoverSurface.tsx`
+  - `app/src/components/user/PostCard.tsx`
+  - `app/src/pages/buyout/[creatorId].tsx`
+  - `app/src/pages/market/[creatorId].tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/pages/rewards.tsx`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed only the 10 modified frontend files before this entry was added.
+  - `git log --format='%h %cI %s' -n 8` showed `HEAD` at `e8685e9` (`docs: record frontend design system migration`).
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `git diff --check` passed before this entry.
+
+# StreamPump Progress Review - 2026-06-22 Frontend Design-System Migration And Texture Pass
+
+## Scope
+- This review covers additional uncommitted frontend design-system migration work observed after the latest existing `progress.md` entry for the design-system audit and token scaffold.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `6fb5cc6`, `progress.md` was already modified by prior recorder entries, many `app/src` components/pages are now modified, and `docs/frontend/texture-upgrade-plan-2026-06.md` is untracked.
+- The material current change is a frontend visual-system and navigation/IA cleanup pass, not a backend, chain, route/API contract, settlement, or production-readiness change.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Extended `app/src/styles/globals.css` beyond the initial token scaffold into token-driven typography classes, semantic status/stage tone classes, canonical `surface-0` through `surface-3` elevation surfaces, legacy glass-class aliases, and texture controls for sheen, edge reflection, brand glow, ambient orbs, and mesh background intensity.
+- Migrated representative shared components and major surfaces toward the new token layer, including readiness/status banners, stage pills, demo action status cards, workspace shell/sidebar, portfolio, market, buyout, campaign, rewards, onboarding, login, pitch, and workspace content/intent pages.
+- Decoupled readiness/status color presentation from brand red by routing `LIVE`, `SEEDED_DEMO`, `MOCK_PREVIEW`, `BACKEND_READY_UI_GAP`, `OPERATOR_REQUIRED`, and `NOT_STARTED` through semantic tone classes while preserving the exact readiness labels.
+- Cleaned route/navigation metadata so consumer primary navigation no longer includes `/demo`, route labels rely on `labelKey`, and disabled workspace items are grouped as a muted "soon" section instead of occupying equal weight with active tools.
+- Added `docs/frontend/texture-upgrade-plan-2026-06.md`, a Chinese follow-up plan for restrained glass/texture polish covering ambient background reduction, unified highlight/reflection dials, glass-material convergence, and calmer glow/micro-interaction rules.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- No browser smoke was run by this recorder after the production frontend build passed.
+- The pass does not complete productized S1 buyout formation, S2 endorsement, Track3 merchant reconciliation, production auth, media recovery, or operator dashboards.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, indexer, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- The frontend now has broader token consumption across shared components and route surfaces, plus a calmer visual texture direction documented for follow-up.
+- `/demo` remains available as a route, but it is no longer listed in the consumer primary nav by the current route metadata.
+- Readiness labels remain visible and exact; this styling pass changes presentation, not product truth.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/frontend/texture-upgrade-plan-2026-06.md` was added as design-system planning documentation.
+- `docs/streamPump-long-term-roadmap.md` was updated with a narrow progress-ledger row because the frontend build smoke status changed from the prior recorder's TypeScript blocker to a passing production app build.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain preview/seeded by surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree include:
+  - `app/src/styles/globals.css`
+  - `app/src/lib/routes.ts`
+  - `app/src/components/shared/ProductReadinessBanner.tsx`
+  - `app/src/components/shared/StagePill.tsx`
+  - `app/src/components/shared/AnimatedFeedBackdrop.tsx`
+  - `app/src/components/workspace/WorkspaceShell.tsx`
+  - `app/src/pages/portfolio.tsx`
+  - `app/src/pages/market/[creatorId].tsx`
+  - `app/src/pages/workspace/content/new.tsx`
+  - `docs/frontend/texture-upgrade-plan-2026-06.md`
+- Recorder verification:
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified frontend components/pages, modified `app/src/styles/globals.css`, modified `progress.md`, and untracked `docs/frontend/design-system-audit-2026-06.md` plus `docs/frontend/texture-upgrade-plan-2026-06.md`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+  - `npm run build --prefix app` passed.
+
+# StreamPump Progress Review - 2026-06-22 Frontend Design-System Audit And Token Scaffold
+
+## Scope
+- This review covers current uncommitted frontend design-system work observed after the latest existing `progress.md` entry for whitepaper and demo collateral alignment.
+- Comparison evidence is the working tree on `codex/post-deadline-phase-0`: `HEAD` remains `6fb5cc6`, `progress.md` was already modified by the prior recorder entry, `app/src/styles/globals.css` is modified, and `docs/frontend/design-system-audit-2026-06.md` is untracked.
+- The material current change is a frontend style-system audit plus an additive global CSS token scaffold, not a new route/API/backend/chain product workflow.
+- Uncommitted changes are treated as user-owned. No protected files were edited.
+
+## Completed Work
+- Added a Chinese frontend design-system audit at `docs/frontend/design-system-audit-2026-06.md` covering token gaps, glass-container duplication, brand-red semantic overload, navigation/information-architecture debt, type scale drift, readiness-state presentation, and a staged consumer-first upgrade path.
+- Added a documented `:root` design-token scaffold in `app/src/styles/globals.css` for background/surface ramps, text levels, brand/accent colors, semantic state colors, S1/buyout/S2 stage colors, glass fills/lines, radius, type scale, tracking, motion, and elevation presets.
+- Preserved existing variable names through aliases, including `--primary`, `--radius-card`, and existing glass variables, so current pages can keep rendering while later batches migrate duplicated glass/type styles onto shared tokens.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The token scaffold does not by itself complete the proposed glass-container consolidation, type-class migration, navigation cleanup, presentation/internal readiness-mode split, or browser-verified page redesign.
+- The audit notes that pitch-language touching S1 buyout rewards still needs follow-up before public use where it conflicts with the capped/decoupled reward model; current product claims should continue to follow the README, roadmap, and compliance/value-model wording.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- Shared CSS now has a first-pass canonical token layer for future UI migration.
+- No page route, API client, wallet flow, readiness banner, or product workflow behavior changed.
+- No browser smoke was run for this recorder; validation was limited to the production app build.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` was not edited because the change does not materially affect product readiness, route/API behavior, smoke status, or known blocker state.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain preview/seeded by surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in the working tree:
+  - `app/src/styles/globals.css`
+  - `docs/frontend/design-system-audit-2026-06.md`
+- Recorder verification:
+  - `pwd` returned `/Users/jamesli/Developer/Sol Projects/StreamPump`.
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed modified `app/src/styles/globals.css`, modified `progress.md`, and untracked `docs/frontend/design-system-audit-2026-06.md`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - `npm run build --prefix app` passed.
+
+# StreamPump Progress Review - 2026-06-22 Whitepaper And Demo Collateral Alignment
+
+## Scope
+- This review covers committed docs/collateral work observed after the latest existing `progress.md` entry for the 2026-06-21 demo-day Howey fix execution prompts.
+- Comparison evidence is local commit range `689c23c..6fb5cc6` on `codex/post-deadline-phase-0`; the material commit is `89a1ecb` (`docs: add whitepaper and demo day collateral`), followed by merge/sync commit `6fb5cc6`.
+- The material current change is documentation, whitepaper, and investor/demo collateral alignment, not a new route/API/chain implementation change.
+- Current working tree before this recorder edit had only `demo-day/~$StreamPump-DemoDay-zh.pptx` untracked. No protected files were edited.
+
+## Completed Work
+- Added `whitepaper/index.html`, a single-page HTML whitepaper using the StreamPump dark-glass visual language and covering the product problem, protocol model, S1/S2 mechanics, utility-only `SPUMP`, level/scout reputation, settlement architecture, Web2.5 architecture, GTM/status/risk framing, and disclaimers.
+- Committed the demo-day collateral package under `demo-day/`, including the feasibility/GTM note, demo script, Solana skills checklist, two Howey/reward execution prompts, and English/Chinese pitch deck artifacts.
+- Updated `README.md` and `README.zh-CN.md` to align the public repo overview with capped/decoupled S1 buyout rewards, flat capped Track2 endorsement rewards, refreshed badges, current instruction/migration counts, and the compliance note that the reward redesign is code-level but still gated.
+- Synced `AGENTS.md`, `CLAUDE.md`, and `docs/streamPump-long-term-roadmap.md` with the current instruction set, error/state inventory, branch/status language, and product-boundary wording.
+
+## Not Completed Or Blocked
+- No readiness promotion was made.
+- The collateral is not legal sign-off, audit evidence, production migration approval, upgraded program deployment, or wallet-backed devnet smoke evidence.
+- Existing blockers still stand: legal token-classification opinion, jurisdiction/KYC decisions, Anchor audit, production migration approval, upgraded program deployment, wallet-level devnet smoke, holder-counter backfill for pre-counter buyouts, and operator/audit validation.
+- The untracked `demo-day/~$StreamPump-DemoDay-zh.pptx` file appears to be a local Office lock/temp artifact and was not treated as product progress.
+
+## Backend Alignment
+- No backend route, controller, service, Prisma schema, migration, auth, media, settlement, or deployment behavior changed in this recorded pass.
+
+## Frontend Alignment
+- No Next.js route, API client, readiness banner, wallet flow, or browser-smoked product UI behavior changed.
+- The whitepaper is a static collateral artifact, not a product workflow or readiness promotion.
+
+## Chain Alignment
+- No Anchor program, PDA, event, Token-2022, S1/S2 settlement, oracle, or financial semantics changed in this recorded pass.
+- `SPUMP` remains non-transferable, S1 positions remain internal virtual positions, sponsors remain marketing spenders, and financial truth remains Solana/Anchor truth.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` already contains a matching 2026-06-21 progress-ledger row for the whitepaper, investor/demo collateral, and doc alignment work, so this recorder did not edit the roadmap.
+- Canonical readiness labels remain unchanged: S1 buyout formation stays `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED`, S2 endorsement stays mixed `SEEDED_DEMO`/`BACKEND_READY_UI_GAP`, rewards remain mixed/preview depending on surface, and Track3 CPS remains `MOCK_PREVIEW` + `OPERATOR_REQUIRED`.
+
+## Implemented And Verified
+- Implemented paths observed in local commit range `689c23c..6fb5cc6` include:
+  - `whitepaper/index.html`
+  - `demo-day/01-feasibility-and-gtm.md`
+  - `demo-day/02-demo-script.md`
+  - `demo-day/03-solana-skills-checklist.md`
+  - `demo-day/04-howey-fix-execution-prompt.md`
+  - `demo-day/05-howey-fix-round2-prompt.md`
+  - `demo-day/StreamPump-DemoDay.pptx`
+  - `demo-day/StreamPump-DemoDay-zh.pptx`
+  - `README.md`
+  - `README.zh-CN.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/streamPump-long-term-roadmap.md`
+  - `progress.md`
+- Verification recorded in the roadmap ledger:
+  - `git diff --check`
+  - protected files untouched
+  - no code/schema/financial-semantics changed
+  - deck visual QA and whitepaper structure validation completed in the producing work
+- Recorder verification before this edit:
+  - `pwd` returned `/Users/jamesli/Developer/Sol Projects/StreamPump`.
+  - `git branch --show-current` returned `codex/post-deadline-phase-0`.
+  - `git status --short` showed only `?? demo-day/~$StreamPump-DemoDay-zh.pptx`.
+  - `git log --oneline -n 12` showed `HEAD` at `6fb5cc6`.
+  - Required context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+  - Protected-file diff check returned no protected-file changes.
+
 # StreamPump Progress Review - 2026-06-21 Demo Day Howey Fix Execution Prompts
 
 ## Scope

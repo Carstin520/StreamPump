@@ -725,6 +725,19 @@ enum WalletType {
   EXTERNAL
 }
 
+enum ManagedWalletPoolStatus {
+  AVAILABLE
+  ASSIGNED
+  USED
+}
+
+enum ManagedWalletJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 /// CN: 账户多钱包关联表，支持托管钱包和外部钱包绑定。
 /// EN: Multi-wallet join table for accounts, supporting both managed and external wallet bindings.
 model AccountWallet {
@@ -737,11 +750,44 @@ model AccountWallet {
   label              String?
   /// Encrypted secret key bytes (only for MANAGED wallets; null for EXTERNAL)
   encryptedSecretKey Bytes?
+  /// CN: Demo day 托管钱包池状态；null 表示不是池内钱包。
+  /// EN: Demo-day managed wallet pool state; null means this wallet is not in the pool.
+  poolStatus         ManagedWalletPoolStatus?
+  /// CN: HMAC 后的 ephemeral subject，用于扫码幂等复用且不存明文 subject。
+  /// EN: HMACed ephemeral subject for idempotent assignment without storing the raw subject.
+  poolSubjectHash    String?        @unique
+  poolAssignedAt     DateTime?
+  poolUsedAt         DateTime?
   boundAt            DateTime       @default(now())
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
   @@index([accountProfileId])
+  @@index([walletType, poolStatus])
+}
+
+model ManagedWalletExecutionJob {
+  id             String                 @id @default(cuid())
+  wallet         String
+  sessionId      String?
+  idempotencyKey String
+  action         String
+  params         Json?
+  status         ManagedWalletJobStatus @default(QUEUED)
+  signature      String?
+  projectionSync Json?
+  errorCode      String?
+  errorMessage   String?
+  attempts       Int                    @default(0)
+  queuedAt       DateTime               @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([wallet, idempotencyKey])
+  @@index([status, queuedAt])
+  @@index([wallet, createdAt])
 }
 
 model SponsorProfile {

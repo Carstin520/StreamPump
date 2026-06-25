@@ -85,7 +85,7 @@ const DailyHero = ({ persona }: { persona: WorkspacePersona }) => (
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StagePill compact stage={persona.stage} />
-            <span className="rounded-full border border-[#65ecaf]/20 bg-[#0e1f17]/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8df0c4]">
+            <span className="rounded-full border border-[#65ecaf]/20 bg-[#0e1f17]/70 px-2.5 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.14em] text-[#8df0c4]">
               Creator desk
             </span>
           </div>
@@ -95,7 +95,7 @@ const DailyHero = ({ persona }: { persona: WorkspacePersona }) => (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#9aabc4]">
             <span className="font-medium text-white">{persona.displayName}</span>
             <span>{persona.handle}</span>
-            <span className="rounded-full border border-white/[0.07] bg-white/[0.04] px-2.5 py-1 font-mono text-[11px] text-[#cbd6e7]">
+            <span className="rounded-full border border-white/[0.07] bg-white/[0.04] px-2.5 py-1 font-mono text-[length:var(--fs-micro)] text-[#cbd6e7]">
               {walletLabel(persona.wallet)}
             </span>
           </div>
@@ -125,10 +125,10 @@ const TodayActions = ({ actions }: { actions: WorkspaceActionItem[] }) => (
   <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.94)_0%,rgba(8,12,20,0.94)_100%)] p-4">
     <div className="mb-3 flex items-center justify-between gap-3">
       <div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Today</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Today</p>
         <h2 className="mt-1 text-lg font-semibold text-white">今日动作</h2>
       </div>
-      <span className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] text-[#7e90aa]">
+      <span className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] text-[#7e90aa]">
         {actions.length} queued
       </span>
     </div>
@@ -162,11 +162,11 @@ const ActionRow = ({ action }: { action: WorkspaceActionItem }) => {
       </span>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{action.title}</p>
-        <p className="mt-0.5 line-clamp-1 text-[11px] text-[#7e90aa]">{action.subtitle}</p>
+        <p className="mt-0.5 line-clamp-1 text-[length:var(--fs-micro)] text-[#7e90aa]">{action.subtitle}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span
-          className={`hidden rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] sm:inline-flex ${
+          className={`hidden rounded-full border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] sm:inline-flex ${
             action.disabled
               ? "border-white/[0.06] text-[#5a6b82]"
               : action.tone === "urgent"
@@ -220,7 +220,7 @@ const SummaryPanel = ({ persona }: { persona: WorkspacePersona }) => {
   return (
     <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.94)_0%,rgba(8,12,20,0.94)_100%)] p-4">
       <div className="mb-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Snapshot</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Snapshot</p>
         <h2 className="mt-1 text-lg font-semibold text-white">合作与结算摘要</h2>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -232,9 +232,9 @@ const SummaryPanel = ({ persona }: { persona: WorkspacePersona }) => {
               </span>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: tile.accent }} />
             </div>
-            <p className="text-[10px] text-[#7e90aa]">{tile.label}</p>
+            <p className="text-[length:var(--fs-micro)] text-[#7e90aa]">{tile.label}</p>
             <p className="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-white">{tile.value}</p>
-            <p className="mt-0.5 truncate text-[10px] text-[#6f8099]">{tile.hint}</p>
+            <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#6f8099]">{tile.hint}</p>
           </div>
         ))}
       </div>
@@ -288,24 +288,24 @@ const StageProgressCompact = ({ persona }: { persona: WorkspacePersona }) => (
   <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.9)_0%,rgba(8,12,20,0.9)_100%)] p-4">
     <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
       <div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Flow</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Flow</p>
         <h2 className="mt-1 text-lg font-semibold text-white">S2 工作进度</h2>
       </div>
-      <p className="text-[11px] text-[#7486a1]">内容准备 → 合作条款 → 双方签名 → 结算领取</p>
+      <p className="text-[length:var(--fs-micro)] text-[#7486a1]">内容准备 → 合作条款 → 双方签名 → 结算领取</p>
     </div>
     <div className="grid gap-2 md:grid-cols-4">
       {buildCompactSteps(persona).map((step, index) => (
         <div className={`rounded-2xl border p-3 ${stepClass(step.status)}`} key={step.label}>
           <div className="mb-3 flex items-center justify-between">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-[11px] font-semibold">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-[length:var(--fs-micro)] font-semibold">
               {index + 1}
             </span>
-            <span className="text-[9px] font-semibold uppercase tracking-[0.14em] opacity-75">
+            <span className="text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] opacity-75">
               {step.status}
             </span>
           </div>
           <p className="text-sm font-semibold text-white">{step.label}</p>
-          <p className="mt-1 text-[11px] leading-relaxed opacity-75">{step.detail}</p>
+          <p className="mt-1 text-[length:var(--fs-micro)] leading-relaxed opacity-75">{step.detail}</p>
         </div>
       ))}
     </div>
@@ -316,10 +316,10 @@ const RecentContent = ({ persona }: { persona: WorkspacePersona }) => (
   <section className="rounded-[18px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(12,17,26,0.92)_0%,rgba(8,12,20,0.92)_100%)] p-4">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Assets</p>
+        <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#6f8099]">Assets</p>
         <h2 className="mt-1 text-lg font-semibold text-white">最近内容资产</h2>
       </div>
-      <Link className="text-[12px] font-medium text-[#cbd6e7] hover:text-white" href={WORKSPACE_CONTENT_NEW_PATH}>
+      <Link className="text-[length:var(--fs-overline)] font-medium text-[#cbd6e7] hover:text-white" href={WORKSPACE_CONTENT_NEW_PATH}>
         新建内容
       </Link>
     </div>
@@ -337,13 +337,13 @@ const RecentContent = ({ persona }: { persona: WorkspacePersona }) => (
             </div>
             <div className="p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${MANIFEST_STATUS_TONES[item.status]}`}>
+                <span className={`rounded border px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${MANIFEST_STATUS_TONES[item.status]}`}>
                   {MANIFEST_STATUS_LABELS[item.status]}
                 </span>
-                <span className="text-[10px] text-[#6f8099]">{CONTENT_TYPE_LABELS[item.contentType]}</span>
+                <span className="text-[length:var(--fs-micro)] text-[#6f8099]">{CONTENT_TYPE_LABELS[item.contentType]}</span>
               </div>
               <p className="line-clamp-2 min-h-[38px] text-sm font-semibold leading-snug text-white">{item.title}</p>
-              <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
+              <div className="mt-3 flex items-center justify-between gap-2 text-[length:var(--fs-micro)]">
                 <span className="text-[#7e90aa]">{item.assetCount} assets</span>
                 <span className={campaignReady ? "text-[#8df0c4]" : "text-[#7e90aa]"}>
                   {campaignReady ? "可用于合作" : "处理中"}

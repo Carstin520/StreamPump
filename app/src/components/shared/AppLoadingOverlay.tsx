@@ -28,7 +28,7 @@ export const AppLoadingOverlay = () => {
         </div>
         <div className="text-center">
           <p className="text-lg font-semibold tracking-[-0.05em] text-white">StreamPump</p>
-          <p className="mt-2 text-[11px] uppercase tracking-[0.28em] text-[#8ea0ba]">Loading interface</p>
+          <p className="mt-2 text-[length:var(--fs-micro)] uppercase tracking-[0.28em] text-[#8ea0ba]">Loading interface</p>
         </div>
       </div>
     </div>

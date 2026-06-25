@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StreamPump · Backing 原型 v1</title>
+<style>
+  :root{
+    --text:#f5f7fb; --muted:#93a2bb; --faint:#7486a1;
+    --brand:#de402a; --s1:#67b8ff; --buyout:#de402a; --s2:#65ecaf;
+    --energy:#f0a070; --energy-soft:#f5b8ab; --back-ok:#7ce0b0; --up:#2fbf71;
+    --pill:80px; --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:
+      radial-gradient(circle at 18% 6%, rgba(64,90,150,.18), transparent 26%),
+      radial-gradient(circle at 82% 4%, rgba(34,74,140,.12), transparent 22%),
+      radial-gradient(circle at 60% 96%, rgba(222,64,42,.07), transparent 22%),
+      linear-gradient(180deg,#090d14,#0a1018);
+    color:var(--text);min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  .muted{color:var(--muted)} .faint{color:var(--faint)} .num{font-variant-numeric:tabular-nums}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:20px}
+
+  /* sidebar */
+  .side{position:fixed;top:16px;left:16px;bottom:16px;width:236px;z-index:40;border-radius:22px;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(20,27,40,.92),rgba(11,16,24,.94));border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(22px)}
+  .side-top{display:flex;align-items:center;gap:11px;padding:18px 18px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(150deg,#de402a,#f0795f);display:grid;place-items:center;font-weight:800;font-size:15px;box-shadow:0 8px 22px rgba(222,64,42,.34)}
+  .side-top b{font-size:17px;font-weight:800}
+  .side-nav{flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:3px}
+  .nav-i{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:13px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;transition:.16s}
+  .nav-i:hover{background:rgba(255,255,255,.05);color:#fff}
+  .nav-i.on{background:rgba(255,255,255,.09);color:#fff}
+  .nav-i .g{width:22px;text-align:center;font-size:15px;opacity:.9}
+  .nav-sub{font-size:11px;color:#7486a1;font-weight:500;margin-left:4px}
+  .nav-sep{height:1px;background:rgba(255,255,255,.06);margin:10px 6px}
+  .side-bot{padding:12px;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:8px}
+  .energy{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;background:rgba(222,64,42,.12);border:1px solid rgba(222,64,42,.3)}
+  .energy .lab{font-size:11px;color:var(--energy-soft)} .energy b{margin-left:auto;font-size:16px;font-weight:800;color:var(--energy-soft)}
+  .av{border-radius:50%;flex:none;background:linear-gradient(135deg,#2a3346,#161f2c);border:1px solid rgba(255,255,255,.12)}
+  .profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:13px;cursor:pointer}
+  .profile:hover{background:rgba(255,255,255,.05)} .profile .av{width:34px;height:34px}
+  .profile .nm{font-size:13px;font-weight:600} .profile .h{font-size:11px;color:var(--faint)}
+
+  .main{margin-left:268px;min-height:100vh}
+  .topbar{position:sticky;top:0;z-index:20;backdrop-filter:blur(20px);background:rgba(9,13,20,.7);border-bottom:1px solid rgba(255,255,255,.05)}
+  .topbar-in{max-width:1280px;margin:0 auto;padding:13px 26px;display:flex;align-items:center;gap:16px}
+  .search{width:280px;max-width:34vw;height:38px;border-radius:var(--pill);background:rgba(17,24,39,.74);border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;padding:0 16px;gap:8px;color:var(--faint);font-size:13px}
+  .claim{margin-left:auto;display:flex;align-items:center;gap:9px;padding:7px 14px;border-radius:var(--pill);cursor:pointer;transition:.16s}
+  .claim small{font-size:9px;color:var(--muted);display:block;line-height:1.1}
+  .claim b{font-size:13px;font-weight:700;line-height:1.1}
+  .me{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:linear-gradient(135deg,#2a3346,#161f2c)}
+  .wrap{max-width:1280px;margin:0 auto;padding:26px 26px 80px}
+
+  .sb{font-size:10px;font-weight:600;padding:2px 9px;border-radius:30px;white-space:nowrap;border:1px solid}
+  .sb.s1{color:var(--s1);border-color:rgba(103,184,255,.4);background:rgba(103,184,255,.12)}
+  .sb.buyout{color:#ff9d8c;border-color:rgba(222,64,42,.45);background:rgba(222,64,42,.13)}
+  .sb.s2{color:var(--s2);border-color:rgba(101,236,175,.4);background:rgba(101,236,175,.12)}
+  .delta{font-size:13px;font-weight:700;color:var(--up)}
+  .delta.s2{color:var(--back-ok)}
+
+  .d-head h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+  .d-head .sub{font-size:14px;color:var(--muted);margin-top:4px}
+  .tabs{display:flex;gap:8px;margin:18px 0}
+  .tb{padding:8px 16px;border-radius:var(--pill);font-size:13.5px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#c8d2e3;transition:.16s}
+  .tb.on{background:rgba(222,64,42,.16);border-color:rgba(222,64,42,.4);color:var(--energy-soft)}
+  .tb small{opacity:.55;font-size:11px}
+
+  .feat-row{display:flex;gap:16px;margin-bottom:18px}
+  .feat{flex:1.55;border-radius:24px;padding:20px;cursor:pointer;position:relative;overflow:hidden;
+    background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 60px rgba(0,0,0,.3)}
+  .feat .por{width:150px;height:150px;border-radius:16px;flex:none;border:1px solid rgba(255,255,255,.1);position:relative;overflow:hidden}
+  .feat .por .h{position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(255,255,255,.05),rgba(255,255,255,.05) 8px,transparent 8px,transparent 16px)}
+  .feat .teaser{font-size:13.5px;color:#c8d2e3;margin-top:8px;font-style:italic}
+  .stat .k{font-size:11px;color:var(--faint)}
+  .stat .v{font-size:26px;font-weight:800;line-height:1}
+  .back-cta{padding:0 24px;height:46px;border-radius:var(--pill);display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#fff;
+    background:linear-gradient(180deg,#f05540,#de402a);box-shadow:0 14px 30px rgba(222,64,42,.3);white-space:nowrap}
+  .movers{flex:1;border-radius:24px;padding:18px;background:linear-gradient(180deg,rgba(20,28,41,.84),rgba(11,16,25,.8));border:1px solid rgba(255,255,255,.06)}
+  .movers h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:12px}
+  .mv{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
+  .mv:hover{opacity:.85} .mv .av{width:30px;height:30px}
+  .mv .nm{font-size:13.5px;font-weight:600} .mv .ni{font-size:11px;color:var(--faint)}
+
+  .cats{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+  .chip{padding:5px 14px;border-radius:var(--pill);font-size:12.5px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#c8d2e3;transition:.16s}
+  .chip.on{background:#f5f7fb;border-color:#f5f7fb;color:#0a0f17}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:1180px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}}
+  .card{border-radius:18px;overflow:hidden;cursor:pointer;background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.025));
+    border:1px solid rgba(255,255,255,.1);box-shadow:0 14px 40px rgba(0,0,0,.26);transition:transform .18s var(--ease),border-color .18s}
+  .card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.22)}
+  .card .cap{height:84px;position:relative}
+  .card .cap .h{position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(255,255,255,.04),rgba(255,255,255,.04) 7px,transparent 7px,transparent 14px)}
+  .card .cap .grd{position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(15,21,32,.85))}
+  .card .cap .sb{position:absolute;left:10px;top:10px}
+  .card .b{padding:12px}
+  .card .nm{font-size:14px;font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .ni{font-size:11px;color:var(--faint)}
+  .bar{height:6px;border-radius:30px;background:rgba(255,255,255,.09);overflow:hidden}
+  .bar>i{display:block;height:100%;border-radius:30px}
+  .cbtn{margin-top:12px;height:36px;border-radius:var(--pill);display:flex;align-items:center;justify-content:center;gap:6px;font-size:13.5px;font-weight:700}
+
+  .back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;margin-bottom:18px}
+  .det{display:flex;gap:20px;align-items:flex-start}
+  .det-l{flex:1.6;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel{border-radius:20px;padding:18px;background:linear-gradient(180deg,rgba(20,28,41,.84),rgba(11,16,25,.8));border:1px solid rgba(255,255,255,.06)}
+  .chart{display:block;width:100%}
+  .lc{display:flex;align-items:center;gap:6px}
+  .lc .seg{font-size:10px;font-weight:700;white-space:nowrap}
+  .lc .lb{height:8px;border-radius:30px;background:rgba(255,255,255,.09);overflow:hidden}
+  .lc .lb>i{display:block;height:100%}
+  .scout{flex:1;display:flex;align-items:center;gap:8px}
+  .scout .av{width:26px;height:26px}
+  .det-r{flex:1;min-width:330px;position:sticky;top:84px}
+  .bpanel{border-radius:22px;padding:20px;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.4)}
+  .amt-box{border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:13px 16px;margin-top:5px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.18)}
+  .amt-box b{font-size:27px;font-weight:800}
+  .chips-amt{display:flex;gap:7px;margin-top:9px}
+  .chips-amt .c{flex:1;text-align:center;padding:8px 0;border-radius:var(--pill);font-size:12.5px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#c8d2e3}
+  .chips-amt .c.on{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff}
+  .rowline{display:flex;justify-content:space-between;font-size:13px;padding:1px 0}
+  .disclaim{margin-top:13px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.16);padding:11px 13px;font-size:11px;color:var(--muted);line-height:1.55}
+  .disclaim b{color:#c8d2e3}
+  .confirm{margin-top:14px;height:52px;border-radius:var(--pill);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(180deg,#f05540,#de402a);box-shadow:0 16px 34px rgba(222,64,42,.34)}
+  .streak-note{margin-top:11px;border:1px dashed rgba(222,64,42,.4);border-radius:12px;background:rgba(222,64,42,.08);padding:9px 12px;font-size:12px;color:#f0a08f}
+  .ready{margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;color:#e6c98a;background:rgba(224,162,58,.1);border:1px solid rgba(224,162,58,.26);border-radius:var(--pill);padding:5px 0}
+
+  .pf-sum{display:flex;gap:14px;margin:20px 0}
+  .pf-c{flex:1;border-radius:16px;padding:16px 18px}
+  .pf-c .k{font-size:11px;color:var(--faint)} .pf-c .v{font-size:24px;font-weight:800;margin-top:3px}
+  .pf-c.plain{background:linear-gradient(180deg,rgba(20,28,41,.84),rgba(11,16,25,.8));border:1px solid rgba(255,255,255,.06)}
+  .pf-c.blue{background:rgba(103,184,255,.1);border:1px solid rgba(103,184,255,.3)} .pf-c.blue .k,.pf-c.blue .v{color:#9fd0ff}
+  .pf-c.red{background:rgba(222,64,42,.1);border:1px dashed rgba(222,64,42,.4)} .pf-c.red .k{color:#f0a08f} .pf-c.red .v{color:var(--energy-soft);font-size:16px;margin-top:5px}
+  .pf-tbl{border-radius:20px;overflow:hidden;background:linear-gradient(180deg,rgba(20,28,41,.7),rgba(11,16,25,.66));border:1px solid rgba(255,255,255,.06)}
+  .pf-tr{display:grid;grid-template-columns:1.8fr 1fr 1.2fr .9fr 1fr 100px;gap:10px;padding:14px 18px;align-items:center;border-bottom:1px solid rgba(255,255,255,.045)}
+  .pf-h{padding:13px 18px;font-size:11px;color:var(--faint);border-bottom:1px solid rgba(255,255,255,.07)}
+  .pf-tr.row{cursor:pointer} .pf-tr.row:hover{background:rgba(255,255,255,.03)}
+  .pf-act{height:30px;border-radius:var(--pill);display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:700}
+  .rediscover{margin-top:16px;border-radius:14px;border:1px dashed rgba(103,184,255,.35);background:rgba(103,184,255,.07);padding:14px 16px;display:flex;align-items:center;gap:12px}
+
+  .overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(6,9,14,.78);backdrop-filter:blur(10px)}
+  .ob{width:100%;max-width:720px;border-radius:26px;padding:34px;background:linear-gradient(180deg,rgba(18,25,37,.96),rgba(10,15,23,.96));border:1px solid rgba(255,255,255,.1);box-shadow:0 40px 120px rgba(0,0,0,.5)}
+  .ob h2{font-size:30px;font-weight:800;letter-spacing:-.5px;text-align:center}
+  .ob-steps{display:flex;gap:14px;margin-top:28px}
+  .ob-s{flex:1;border-radius:16px;padding:18px;text-align:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+  .ob-s .ic{width:50px;height:50px;margin:0 auto;border-radius:50%;display:grid;place-items:center;font-size:23px}
+  .ob-s h4{font-size:15px;font-weight:700;margin-top:12px}
+  .ob-s p{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.5}
+  .ob-s p b{color:#c8d2e3}
+  .ob-shield{margin-top:20px;border-radius:14px;border:1px solid rgba(103,184,255,.3);background:rgba(103,184,255,.08);padding:14px 16px;text-align:center;font-size:13.5px;color:#cfe2f5;line-height:1.55}
+  .ob-foot{display:flex;gap:12px;align-items:center;margin-top:18px}
+
+  .toast{position:fixed;bottom:32px;left:calc(50% + 134px);transform:translateX(-50%);z-index:90;padding:13px 22px;border-radius:var(--pill);
+    background:linear-gradient(180deg,rgba(28,38,54,.96),rgba(16,22,33,.96));border:1px solid rgba(255,255,255,.14);box-shadow:0 20px 50px rgba(0,0,0,.5);
+    font-size:14px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:.3s var(--ease)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  @media(max-width:1080px){.side{display:none}.main{margin-left:0}.feat-row,.det,.pf-sum{flex-direction:column}.grid{grid-template-columns:repeat(2,1fr)}.det-r{position:static}.toast{left:50%}}
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="side-top"><div class="mark">S</div><b>StreamPump</b></div>
+  <nav class="side-nav">
+    <div class="nav-i"><span class="g">▦</span> 内容 <span class="nav-sub">Feed</span></div>
+    <div class="nav-i"><span class="g">◉</span> 动态</div>
+    <div class="nav-i" id="nav-discover" onclick="goDiscover()"><span class="g">✦</span> 发现榜 <span class="nav-sub">Discover</span></div>
+    <div class="nav-i" id="nav-portfolio" onclick="goPortfolio()"><span class="g">◈</span> 应援组合 <span class="nav-sub">伯乐档案</span></div>
+    <div class="nav-i"><span class="g">⚡</span> 能量站 <span class="nav-sub">每日领取</span></div>
+    <div class="nav-sep"></div>
+    <div class="nav-i"><span class="g">✎</span> 创作者工作台</div>
+  </nav>
+  <div class="side-bot">
+    <div class="energy"><span>⚡</span><span class="lab">SPUMP 能量</span><b class="num" id="spump">240</b></div>
+    <div class="profile"><span class="av"></span><div><div class="nm">@you</div><div class="h">伯乐 Lv.3 · 应援 8 位</div></div></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar"><div class="topbar-in">
+    <div class="search"><span style="opacity:.7">⌕</span> 搜索创作者…</div>
+    <div class="claim" id="claim" onclick="claimDaily()"><span style="font-size:15px">🔥</span><div><small>连续 <span id="streak">6</span> 天</small><b id="claim-label"></b></div></div>
+    <div class="me"></div>
+  </div></div>
+  <div class="wrap" id="view"></div>
+</div>
+
+<div id="onboarding"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var STAGE={S1:{k:'s1',short:'S1 发现',long:'S1 发现'},BUYOUT:{k:'buyout',short:'毕业赞助',long:'赞助商助力毕业中'},S2:{k:'s2',short:'S2 赞助',long:'S2 赞助'}};
+  var CREATORS=[
+    {id:'neon_kid',name:'@neon_kid',niche:'电子音乐',city:'上海',stage:'BUYOUT',mom:92,delta:12,backers:'1,204',grad:88,friends:3,rank:313,joined:'4 个月',teaser:'下一张专辑想众筹一支 MV',a:'rgba(222,64,42,.4)',b:'rgba(74,108,212,.35)',cat:'music',seed:2},
+    {id:'court_vision',name:'@court_vision',niche:'街球',city:'洛杉矶',stage:'S1',mom:84,delta:17,backers:'540',grad:81,friends:2,rank:541,joined:'2 个月',teaser:'想拍一部社区球场纪录片',a:'rgba(101,236,175,.32)',b:'rgba(74,108,212,.3)',cat:'fitness',seed:5},
+    {id:'studio_haru',name:'@studio_haru',niche:'插画',city:'京都',stage:'S1',mom:71,delta:9,backers:'312',grad:64,friends:1,rank:313,joined:'6 周',teaser:'在做一套四季主题绘本',a:'rgba(184,144,255,.32)',b:'rgba(63,182,168,.3)',cat:'art',seed:3},
+    {id:'indie_mochi',name:'@indie_mochi',niche:'独立游戏',city:'台北',stage:'S2',mom:96,delta:0,backers:'2,140',grad:100,friends:4,rank:12,joined:'1 年',teaser:'像素 RPG 第二章开发中',a:'rgba(101,236,175,.36)',b:'rgba(74,108,212,.3)',cat:'game',seed:7},
+    {id:'lo_fi_tom',name:'@lo_fi_tom',niche:'Lo-fi',city:'柏林',stage:'S1',mom:38,delta:4,backers:'88',grad:22,friends:0,rank:89,joined:'3 周',teaser:'每天发一段卧室录音',a:'rgba(74,108,212,.32)',b:'rgba(184,144,255,.28)',cat:'music',seed:11},
+    {id:'pixel_sora',name:'@pixel_sora',niche:'像素艺术',city:'首尔',stage:'S1',mom:66,delta:28,backers:'410',grad:58,friends:1,rank:411,joined:'5 周',teaser:'像素城市系列，每周更新',a:'rgba(184,144,255,.34)',b:'rgba(222,64,42,.26)',cat:'art',seed:4},
+    {id:'chef_lin',name:'@chef_lin',niche:'美食',city:'成都',stage:'S1',mom:52,delta:11,backers:'196',grad:41,friends:0,rank:197,joined:'7 周',teaser:'记录川菜老师傅的手艺',a:'rgba(222,64,42,.34)',b:'rgba(63,182,168,.28)',cat:'food',seed:6},
+    {id:'fit_maya',name:'@fit_maya',niche:'健身',city:'多伦多',stage:'S1',mom:74,delta:6,backers:'623',grad:70,friends:2,rank:624,joined:'3 个月',teaser:'零器械居家训练计划',a:'rgba(63,182,168,.34)',b:'rgba(74,108,212,.28)',cat:'fitness',seed:8}
+  ];
+  var CATS=[['all','全部'],['music','🎵 音乐'],['game','🎮 游戏'],['art','🎨 艺术'],['fitness','💪 健身'],['food','🍳 美食']];
+  var TABS=[['trending','发现榜','Trending'],['new','新人','New'],['grad','冲刺毕业','Graduating'],['s2','S2 已赞助','']];
+
+  var state={view:'discover',activeId:null,onboarding:true,spump:240,streak:6,claimedToday:true,tab:'trending',cat:'all',backAmount:25,backed:{},endorsed:{},buyoutChoice:{},dailyUsed:40};
+  function cr(id){return CREATORS.find(function(c){return c.id===id;});}
+  function hero(c){return 'linear-gradient(135deg,'+c.a+','+c.b+')';}
+  function sb(stage,long){var s=STAGE[stage];return '<span class="sb '+s.k+'">● '+(long?s.long:s.short)+'</span>';}
+  function deltaEl(stage,d){return stage==='S2'?'<span class="delta s2">赞助中</span>':'<span class="delta">↗ +'+d+'</span>';}
+  var _svgN=0;
+  function trendPoints(seed,n,lo,hi){var v=42,out=[];for(var i=0;i<n;i++){v+=(((i*9+seed)%7)-2.4)*((hi-lo)/26);v=Math.max(lo,Math.min(hi,v));out.push(v);}return out;}
+  function sparkEl(seed){
+    var n=16,pts=trendPoints(seed,n,18,92),W=100,H=28;
+    var co=pts.map(function(p,i){return [(W*i/(n-1)).toFixed(1),(H-(p/100)*(H-4)-2).toFixed(1)];});
+    var line=co.map(function(c){return c[0]+','+c[1];}).join(' ');var last=co[co.length-1];
+    return '<svg viewBox="0 0 100 28" preserveAspectRatio="none" style="width:100%;height:26px;display:block">'
+      +'<polyline points="'+line+'" fill="none" stroke="#2fbf71" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>'
+      +'<circle cx="'+last[0]+'" cy="'+last[1]+'" r="2.6" fill="#2fbf71"/></svg>';
+  }
+  function chartEl(seed){
+    var n=26,pts=trendPoints(seed,n,16,90),W=300,H=100;
+    var co=pts.map(function(p,i){return [(W*i/(n-1)).toFixed(1),(H-(p/100)*(H-10)-5).toFixed(1)];});
+    var line=co.map(function(c){return c[0]+','+c[1];}).join(' ');var last=co[co.length-1];
+    var area='0,'+H+' '+line+' '+W+','+H;_svgN++;var id='cg'+_svgN;
+    return '<svg viewBox="0 0 300 100" preserveAspectRatio="none" style="width:100%;height:140px;display:block">'
+      +'<defs><linearGradient id="'+id+'" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2fbf71" stop-opacity="0.26"/><stop offset="1" stop-color="#2fbf71" stop-opacity="0"/></linearGradient></defs>'
+      +'<polygon points="'+area+'" fill="url(#'+id+')"/>'
+      +'<polyline points="'+line+'" fill="none" stroke="#2fbf71" stroke-width="2.4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>'
+      +'<circle cx="'+last[0]+'" cy="'+last[1]+'" r="3.2" fill="#2fbf71" vector-effect="non-scaling-stroke"/></svg>';
+  }
+  function progEl(pct,color){return '<div class="bar"><i style="width:'+pct+'%;background:'+color+'"></i></div>';}
+  function lifecycleEl(stage,grad){
+    var seg=function(l,col,on){return '<span class="seg" style="color:'+(on?col:'#7486a1')+'">'+l+'</span>';};
+    var lb=function(flex,pct,fill){return '<div class="lb" style="flex:'+flex+'"><i style="width:'+pct+'%;background:'+fill+'"></i></div>';};
+    return '<div class="lc">'+seg('S1 发现','#67b8ff',true)+lb(3,Math.min(100,grad),'linear-gradient(90deg,#67b8ff,#de402a)')
+      +seg('毕业赞助','#de402a',stage==='BUYOUT'||stage==='S2')+lb(1,stage==='S2'?100:0,'linear-gradient(90deg,#de402a,#65ecaf)')+seg('S2','#65ecaf',stage==='S2')+'</div>';
+  }
+
+  /* ---------- DISCOVER ---------- */
+  function filtered(){
+    var list=CREATORS.slice();
+    if(state.cat!=='all')list=list.filter(function(c){return c.cat===state.cat;});
+    if(state.tab==='new')list=list.filter(function(c){return c.stage==='S1';}).sort(function(a,b){return b.delta-a.delta;});
+    else if(state.tab==='grad')list=list.filter(function(c){return c.grad>=60&&c.stage!=='S2';}).sort(function(a,b){return b.grad-a.grad;});
+    else if(state.tab==='s2')list=list.filter(function(c){return c.stage==='S2';});
+    else list=list.sort(function(a,b){return b.mom-a.mom;});
+    return list;
+  }
+  function cardCta(c){var backed=(state.backed[c.id]||0)>0;
+    if(c.stage==='S2')return ['看赞助活动','rgba(255,255,255,.05)','rgba(255,255,255,.16)','#f5f7fb'];
+    if(backed)return ['✓ 已应援','rgba(101,236,175,.14)','rgba(101,236,175,.36)','#7ce0b0'];
+    return ['⚡ Back','linear-gradient(180deg,#f05540,#de402a)','rgba(255,255,255,.08)','#fff'];
+  }
+  function renderDiscover(){
+    var f=CREATORS[0];
+    var movers=CREATORS.slice().sort(function(a,b){return b.delta-a.delta;}).slice(0,4);
+    var html='<div class="d-head"><h1>发现下一个值得陪跑的人</h1>'
+      +'<div class="sub">Spot them early. Back them with conviction, not cash. · 用 ⚡ 应援，不是用钱</div></div>'
+      +'<div class="tabs">'+TABS.map(function(t){return '<div class="tb'+(state.tab===t[0]?' on':'')+'" onclick="setTab(\''+t[0]+'\')">'+t[1]+(t[2]?' <small>'+t[2]+'</small>':'')+'</div>';}).join('')+'</div>'
+      +'<div class="feat-row"><div class="feat" onclick="openCreator(\''+f.id+'\')"><div style="display:flex;gap:18px">'
+        +'<div class="por" style="background:'+hero(f)+'"><div class="h"></div></div>'
+        +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:10px"><span style="width:7px;height:7px;border-radius:50%;background:#de402a;box-shadow:0 0 10px #de402a"></span>'
+          +'<span style="font-size:12px;color:#f0a08f;font-weight:600">🔥 本周冲刺毕业 #1</span>'+sb(f.stage,false)+'</div>'
+        +'<div style="font-size:30px;font-weight:800;letter-spacing:-.5px;margin-top:6px">'+f.name+'</div><div class="sub" style="font-size:13.5px">'+f.niche+' · '+f.city+'</div>'
+        +'<div class="teaser">“'+f.teaser+'”</div>'
+        +'<div style="display:flex;gap:26px;align-items:flex-end;margin-top:18px">'
+          +'<div class="stat"><div class="k">势能 Momentum</div><div style="display:flex;align-items:baseline;gap:8px"><span class="v">'+f.mom+'</span>'+deltaEl(f.stage,f.delta)+'</div></div>'
+          +'<div class="stat"><div class="k">应援人数</div><div class="v">'+f.backers+'</div></div>'
+          +'<div style="flex:1;min-width:90px"><div class="k" style="margin-bottom:5px">毕业进度 '+f.grad+'%</div>'+progEl(f.grad,'#de402a')+'</div>'
+          +'<div class="back-cta" onclick="event.stopPropagation();openCreator(\''+f.id+'\')">⚡ Back 应援</div>'
+        +'</div></div></div></div>'
+      +'<div class="movers"><h3>📈 本周势能上升最快</h3>'+movers.map(function(m){
+        return '<div class="mv" onclick="openCreator(\''+m.id+'\')"><span class="av"></span><div style="flex:1;min-width:0"><div class="nm">'+m.name+'</div><div class="ni">'+m.niche+'</div></div>'+deltaEl(m.stage,m.delta)+'</div>';
+      }).join('')+'</div></div>'
+      +'<div class="cats"><span style="font-size:12px;color:#7486a1">分类</span>'+CATS.map(function(c){return '<div class="chip'+(state.cat===c[0]?' on':'')+'" onclick="setCat(\''+c[0]+'\')">'+c[1]+'</div>';}).join('')+'</div>'
+      +'<div class="grid">'+filtered().map(function(c){var cta=cardCta(c);
+        return '<div class="card" onclick="openCreator(\''+c.id+'\')"><div class="cap" style="background:'+hero(c)+'"><div class="h"></div><div class="grd"></div>'+sb(c.stage,false)+'</div>'
+          +'<div class="b"><div style="display:flex;gap:9px;align-items:center"><span style="width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,#2a3346,#161f2c);border:1px solid rgba(255,255,255,.12)"></span>'
+            +'<div style="min-width:0"><div class="nm">'+c.name+'</div><div class="ni">'+c.niche+'</div></div></div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:11px"><div><div class="ni">势能</div><div style="font-size:20px;font-weight:800;line-height:1">'+c.mom+'</div></div>'
+            +'<div style="text-align:right"><div class="ni">本周</div>'+deltaEl(c.stage,c.delta)+'</div></div>'
+          +'<div style="margin-top:10px">'+sparkEl(c.seed)+'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#7486a1;margin-top:10px"><span>👥 '+c.backers+' 应援</span><span>毕业 '+c.grad+'%</span></div>'
+          +'<div style="margin-top:5px">'+progEl(c.grad,c.stage==='S2'?'#65ecaf':'#de402a')+'</div>'
+          +'<div class="cbtn" style="color:'+cta[3]+';background:'+cta[1]+';border:1px solid '+cta[2]+'" onclick="event.stopPropagation();cardBack(\''+c.id+'\')">'+cta[0]+'</div>'
+          +'</div></div>';
+      }).join('')+'</div>';
+    document.getElementById('view').innerHTML=html;
+  }
+
+  /* ---------- CREATOR DETAIL ---------- */
+  function renderCreator(){
+    var c=cr(state.activeId);var amt=state.backed[c.id]||0;var isBacked=amt>0;
+    var detail=c.stage==='BUYOUT'?'已有赞助商出资助 TA 毕业、赞助接下来几期内容。创作者接受后会有退出窗口（不想继续可原价退出、零摩擦），之后毕业、发放发现奖励。'
+      :(c.stage==='S2'?'创作者已毕业，正在履行赞助活动。早期应援者的创始身份永久保留。':'继续积累势能，达到临界点后会有赞助商出资助 TA 毕业。');
+    var note=c.stage==='S2'?'已毕业，赞助活动进行中':(c.stage==='BUYOUT'?'距离毕业进入 S2 赞助还差一点':'在 S1 发现阶段积累势能');
+    var scouts=[['@early_bird','🥇 金牌伯乐','#f5b8ab','rgba(222,64,42,.5)'],['@m_collector','星探','#9fd0ff','rgba(255,255,255,.14)'],['@sound_dao','星探','#9fd0ff','rgba(255,255,255,.14)']];
+    var left='<div class="det-l">'
+      +'<div style="display:flex;gap:14px;align-items:center"><span style="width:60px;height:60px;border-radius:16px;flex:none;background:'+hero(c)+';border:1px solid rgba(255,255,255,.14)"></span>'
+        +'<div style="flex:1"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:26px;font-weight:800;letter-spacing:-.5px">'+c.name+'</span>'+sb(c.stage,true)+'</div>'
+        +'<div style="font-size:13px;color:#93a2bb;margin-top:2px">'+c.niche+' · '+c.city+' · 加入 '+c.joined+'</div></div>'
+        +'<div style="padding:8px 18px;border-radius:80px;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);cursor:pointer">+ 关注</div></div>'
+      +'<div class="panel"><div style="display:flex;align-items:flex-end;gap:16px"><div><div style="font-size:11px;color:#7486a1">势能 Momentum <span style="opacity:.7">· oracle 综合评分</span></div><div style="font-size:32px;font-weight:800;line-height:1">'+c.mom+'</div></div>'
+        +'<div style="padding-bottom:4px">'+deltaEl(c.stage,c.delta)+'</div><div style="margin-left:auto;display:flex;gap:10px;font-size:11px;color:#7486a1"><span>1周</span><span style="color:#f5f7fb;font-weight:700;border-bottom:2px solid #de402a;padding-bottom:2px">1月</span><span>全部</span></div></div>'
+        +'<div style="margin-top:14px">'+chartEl(c.seed)+'</div><div style="font-size:10.5px;color:#7486a1;margin-top:8px">势能来自粉丝增长、观看、互动质量等 —— 是发现信号，不是价格。</div></div>'
+      +'<div class="panel"><div style="font-size:12px;color:#93a2bb;margin-bottom:12px">生命周期 · '+note+'</div>'+lifecycleEl(c.stage,c.grad)+'<div style="font-size:11px;color:#7486a1;margin-top:10px;line-height:1.5">'+detail+'</div></div>'
+      +'<div class="panel"><div style="display:flex;justify-content:space-between;font-size:12px;color:#93a2bb;margin-bottom:14px"><span>👥 '+c.backers+' 人已应援 · <b style="color:#f5f7fb">你的 '+c.friends+' 位好友在内</b></span><span style="color:#7486a1">Top 星探</span></div>'
+        +'<div style="display:flex;gap:12px">'+scouts.map(function(s){return '<div class="scout"><span class="av" style="border-color:'+s[3]+'"></span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s[0]+'</div><div style="font-size:10px;color:'+s[2]+'">'+s[1]+'</div></div></div>';}).join('')+'</div></div>'
+      +'</div>';
+
+    var right='<div class="det-r"><div class="bpanel">';
+    if(isBacked){
+      right+='<div style="text-align:center;padding:6px 0 4px"><div style="font-size:34px">✦</div><div style="font-size:17px;font-weight:800;margin-top:4px">已应援 '+c.name+'</div>'
+        +'<div style="font-size:13px;color:#93a2bb;margin-top:4px">你投入了 <b style="color:#f5b8ab">⚡ '+amt+'</b> · 当前第 <b style="color:#f5f7fb">'+c.rank+'</b> 位应援者</div>'
+        +'<div style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 14px;border-radius:80px;background:rgba(103,184,255,.14);border:1px solid rgba(103,184,255,.34);font-size:12px;color:#9fd0ff">🐦 早鸟应援者 已解锁</div>'
+        +'<div class="confirm" style="height:46px;font-size:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);box-shadow:none;color:#f5f7fb" onclick="addMore()">⚡ 再加码</div></div>';
+    } else {
+      right+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:16px;font-weight:800">⚡ 应援 '+c.name+'</div><div style="font-size:11px;color:#f0a08f">我的能量 '+state.spump+' ⚡</div></div>'
+        +'<div style="font-size:11px;color:#7486a1">投入能量</div><div class="amt-box"><b>'+state.backAmount+' ⚡</b><span style="font-size:13px;color:#7486a1">SPUMP</span></div>'
+        +'<div class="chips-amt">'+[10,25,50,60].map(function(n,i){var l=i===3?'上限':String(n);return '<div class="c'+(state.backAmount===n?' on':'')+'" onclick="setAmount('+n+')">'+l+'</div>';}).join('')+'</div>'
+        +'<div style="font-size:10.5px;color:#7486a1;margin-top:8px">今日可投 <b style="color:#f5b8ab">'+state.dailyUsed+' / 100 ⚡</b> · 上限随你对 TA 的忠诚度增长（防刷）</div>'
+        +'<div style="border-top:1px solid rgba(255,255,255,.08);margin-top:14px;padding-top:13px;display:flex;flex-direction:column;gap:10px">'
+          +'<div class="rowline"><span class="muted">你的位置</span><span style="font-weight:700">第 '+c.rank+' 位应援者</span></div>'
+          +'<div class="rowline"><span class="muted">解锁身份</span><span style="font-weight:700;color:#9fd0ff">🐦 早鸟应援者</span></div>'
+          +'<div class="rowline"><span class="muted">毕业时</span><span style="font-weight:700;color:#7ce0b0">★ 创始应援者</span></div></div>'
+        +'<div class="disclaim">身份与声誉是主要回报。若 TA 毕业，早期应援者可分享一份<b>由赞助商出资、有上限</b>的发现奖励 —— <b>与你投入多少无关</b>，不是收益。</div>'
+        +'<div class="confirm" onclick="confirmBack()">⚡ 确认应援 →</div>'
+        +'<div class="streak-note">🔥 完成后 Scout 连续打卡 +1（共 '+state.streak+' 天）</div>'
+        +'<div class="ready">● SEEDED · devnet · 应援为链上 SPUMP（预览）</div>';
+    }
+    right+='</div></div>';
+    document.getElementById('view').innerHTML='<div class="back-link" onclick="goDiscover()">← 返回发现榜</div><div class="det">'+left+right+'</div>';
+  }
+
+  /* ---------- shared header ---------- */
+  function headerEl(c){return '<div style="display:flex;gap:14px;align-items:center"><span style="width:60px;height:60px;border-radius:16px;flex:none;background:'+hero(c)+';border:1px solid rgba(255,255,255,.14)"></span>'
+    +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:26px;font-weight:800;letter-spacing:-.5px">'+c.name+'</span>'+sb(c.stage,true)+'</div>'
+    +'<div style="font-size:13px;color:#93a2bb;margin-top:2px">'+c.niche+' · '+c.city+' · 加入 '+c.joined+'</div></div>'
+    +'<div style="padding:8px 18px;border-radius:80px;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);cursor:pointer">+ 关注</div></div>';}
+
+  /* ---------- BUYOUT 赎回页 ---------- */
+  function renderBuyout(){
+    var c=cr(state.activeId);var choice=state.buyoutChoice[c.id];
+    var offer='$48,000 USDC',sponsor='Aurora Labs';
+    var left='<div class="det-l">'+headerEl(c)
+      +'<div class="panel" style="background:linear-gradient(160deg,rgba(222,64,42,.12),rgba(255,255,255,.03));border-color:rgba(222,64,42,.3)">'
+        +'<div style="display:flex;align-items:center;gap:10px"><span style="width:7px;height:7px;border-radius:50%;background:#de402a;box-shadow:0 0 10px #de402a"></span><span style="font-size:12px;color:#f0a08f;font-weight:700;letter-spacing:.4px">毕业赞助进行中 · GRADUATION SPONSORSHIP</span></div>'
+        +'<div style="font-size:22px;font-weight:800;margin-top:10px;line-height:1.3">赞助商 <b style="color:#a9bdf2">'+sponsor+'</b> 出资 <b>'+offer+'</b>，助 '+c.name+' 毕业 · 赞助接下来 <b>3 期内容</b></div>'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap"><span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:80px;background:rgba(101,236,175,.13);border:1px solid rgba(101,236,175,.34);font-size:12px;color:#7ce0b0">✓ 创作者已接受</span>'
+          +'<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:80px;background:rgba(224,162,58,.12);border:1px solid rgba(224,162,58,.34);font-size:12px;color:#e6c98a">⏳ 退出窗口剩 41h 12m</span></div>'
+        +'<div style="font-size:11.5px;color:#93a2bb;margin-top:12px;line-height:1.6">创作者接受后，所有应援者进入 <b style="color:#c8d2e3">rage-quit 退出窗口</b>：你可以选择留到毕业、领取一份封顶的发现奖励，或原价退出、零摩擦。窗口结束后执行毕业。</div></div>'
+      +'<div class="panel"><div style="font-size:12px;color:#93a2bb;margin-bottom:12px">你的位置</div>'
+        +'<div style="display:flex;gap:26px;flex-wrap:wrap"><div><div style="font-size:11px;color:#7486a1">应援名次</div><div style="font-size:22px;font-weight:800">第 '+c.rank+' 位</div></div>'
+        +'<div><div style="font-size:11px;color:#7486a1">你的身份</div><div style="font-size:15px;font-weight:700;color:#9fd0ff;margin-top:5px">🐦 早鸟应援者</div></div>'
+        +'<div><div style="font-size:11px;color:#7486a1">已投入</div><div style="font-size:22px;font-weight:800">⚡ 60</div></div></div></div>'
+      +'<div class="panel"><div style="font-size:12px;color:#93a2bb;margin-bottom:8px">毕业 & 奖励怎么分</div>'
+        +lifecycleEl('BUYOUT',c.grad)
+        +'<div style="font-size:11.5px;color:#7486a1;margin-top:12px;line-height:1.6">创作者获得这笔毕业赞助 USDC 的<b style="color:#c8d2e3">大头</b>，用来产出接下来的内容。早期应援者按 <b style="color:#c8d2e3">身份层级（早鸟/创始）</b> 分享一份 <b style="color:#c8d2e3">封顶、非比例、与投入无关</b> 的发现奖励；残值归创作者/赞助商。<b style="color:#c8d2e3">这不是按出资比例的分红，也不是收益。</b></div></div>'
+      +'</div>';
+
+    var right='<div class="det-r"><div class="bpanel">';
+    if(!choice){
+      right+='<div style="font-size:16px;font-weight:800;margin-bottom:4px">轮到你做选择</div>'
+        +'<div style="font-size:11.5px;color:#93a2bb;line-height:1.5;margin-bottom:14px">退出窗口内二选一，窗口结束自动视为"留到毕业"。</div>'
+        +'<div style="border:1px solid rgba(101,236,175,.34);border-radius:14px;padding:14px;background:rgba(101,236,175,.07)">'
+          +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">★</span><b style="font-size:14px">留到毕业</b><span style="margin-left:auto;font-size:10px;color:#7ce0b0;border:1px solid rgba(101,236,175,.4);border-radius:30px;padding:1px 8px">推荐</span></div>'
+          +'<div style="font-size:11.5px;color:#93a2bb;margin-top:8px;line-height:1.6">保留应援，毕业后领取一份 <b style="color:#c8d2e3">封顶 · 按身份层级</b> 的发现奖励（与投入无关）。永久 <b style="color:#7ce0b0">创始应援者</b> 身份。</div>'
+          +'<div class="confirm" style="height:44px;font-size:14px;margin-top:12px" onclick="setBuyout(\'keep\')">★ 留到毕业</div></div>'
+        +'<div style="border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:14px;margin-top:10px">'
+          +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">↩</span><b style="font-size:14px">原价退出 Rage-quit</b></div>'
+          +'<div style="font-size:11.5px;color:#93a2bb;margin-top:8px;line-height:1.6">原价退回你的 <b style="color:#f5b8ab">⚡ 60</b> 能量，零摩擦。不参与发现奖励，放弃创始身份。</div>'
+          +'<div class="confirm" style="height:44px;font-size:14px;margin-top:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);box-shadow:none;color:#f5f7fb" onclick="setBuyout(\'rage\')">↩ 原价退出</div></div>'
+        +'<div class="ready">● SEEDED · devnet · OPERATOR_REQUIRED（buyout 形成未在 UI 自助 · 预览）</div>';
+    } else if(choice==='keep'){
+      right+='<div style="text-align:center;padding:6px 0"><div style="font-size:34px">★</div><div style="font-size:17px;font-weight:800;margin-top:4px">已选择留到毕业</div>'
+        +'<div style="font-size:13px;color:#93a2bb;margin-top:6px;line-height:1.6">毕业执行后，你将领取一份 <b style="color:#7ce0b0">封顶发现奖励</b>（按创始层级，与投入无关），并永久保留 <b style="color:#7ce0b0">创始应援者</b> 身份。</div>'
+        +'<div style="display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:6px 14px;border-radius:80px;background:rgba(101,236,175,.14);border:1px solid rgba(101,236,175,.34);font-size:12px;color:#7ce0b0">★ 创始应援者 锁定中</div>'
+        +'<div class="confirm" style="height:44px;font-size:14px;margin-top:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);box-shadow:none;color:#f5f7fb" onclick="setBuyout(null)">← 重新选择</div></div>';
+    } else {
+      right+='<div style="text-align:center;padding:6px 0"><div style="font-size:34px">↩</div><div style="font-size:17px;font-weight:800;margin-top:4px">已原价退出</div>'
+        +'<div style="font-size:13px;color:#93a2bb;margin-top:6px;line-height:1.6">你的 <b style="color:#f5b8ab">⚡ 60</b> 能量已原价退回，零摩擦。不参与本次发现奖励。</div>'
+        +'<div class="confirm" style="height:44px;font-size:14px;margin-top:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);box-shadow:none;color:#f5f7fb" onclick="setBuyout(null)">← 重新选择</div></div>';
+    }
+    right+='</div></div>';
+    document.getElementById('view').innerHTML='<div class="back-link" onclick="goDiscover()">← 返回发现榜</div><div class="det">'+left+right+'</div>';
+  }
+  function setBuyout(v){if(v===null){delete state.buyoutChoice[state.activeId];}else{state.buyoutChoice[state.activeId]=v;flash(v==='keep'?'✦ 已选择留到毕业 · 创始身份锁定':'↩ 已原价退出 · ⚡60 退回');}renderBuyout();}
+
+  /* ---------- S2 CAMPAIGN 赞助活动页 ---------- */
+  var CAMPAIGNS={indie_mochi:{
+    title:'像素 RPG《MOCHI QUEST》第二章 · 发售联动',titleEn:'Chapter 2 Launch Collab',
+    sponsor:'NovaPlay',sponsorType:'游戏发行商',manifestTitle:'第二章预告短片 + 幕后图文',manifestState:'ANCHORED 已锚定',
+    metricLabel:'B站 + YouTube 总播放',metricTarget:'50 万',metricCurrent:'38 万',metricPct:76,vault:'$10,000 USDC',endorserBase:412,
+    tracks:[['Track 1 · 基础 Base','$4,000','无条件基础费 —— 创作者一定拿到','已结算 ✓','#7ce0b0','#de402a','1'],
+      ['Track 2 · 表现 Performance','$6,000','达 50万播放解锁 · 80% 创作者 / 20% 粉丝背书池','进行中','#f5b8ab','#f0795f','1'],
+      ['Track 3 · CPS','—','按销售付费 · 待商户对接','未启用 GATED','#7486a1','#7486a1','0.5']],
+    proof:[['提案 Proposal PDA','PRP_8f3a…2c1'],['内容锚 Content anchor','0x9d4e…ab27'],['注资交易 Funding tx','5KJp…q7Hn ↗'],['金库 Vault (PDA)','$10,000 USDC']]
+  }};
+  function renderCampaign(){
+    var c=cr(state.activeId);var d=CAMPAIGNS[c.id]||CAMPAIGNS.indie_mochi;var amt=state.endorsed[c.id]||0;var done=amt>0;
+    var left='<div class="det-l">'+headerEl(c)
+      +'<div class="panel" style="background:linear-gradient(160deg,rgba(101,236,175,.08),rgba(255,255,255,.03));border-color:rgba(101,236,175,.22)">'
+        +'<div style="display:flex;align-items:center;gap:10px"><span style="width:7px;height:7px;border-radius:50%;background:#65ecaf;box-shadow:0 0 10px #65ecaf"></span><span style="font-size:12px;color:#7ce0b0;font-weight:600;letter-spacing:.4px">进行中的赞助活动 · LIVE CAMPAIGN</span></div>'
+        +'<div style="font-size:22px;font-weight:800;margin-top:10px;line-height:1.2">'+d.title+'</div><div style="font-size:12.5px;color:#93a2bb;margin-top:3px">'+d.titleEn+'</div>'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap"><span style="font-size:12.5px;color:#93a2bb">由</span>'
+          +'<span style="display:inline-flex;align-items:center;gap:7px;padding:5px 13px;border-radius:80px;background:rgba(74,108,212,.16);border:1px solid rgba(74,108,212,.4);font-size:13px;font-weight:700;color:#a9bdf2"><span style="width:16px;height:16px;border-radius:5px;background:linear-gradient(135deg,#4a6cd4,#67b8ff)"></span>'+d.sponsor+'</span>'
+          +'<span style="font-size:11.5px;color:#7486a1">'+d.sponsorType+' 赞助</span>'
+          +'<span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:80px;background:rgba(63,182,168,.14);border:1px solid rgba(63,182,168,.36);font-size:11.5px;color:#7fe3d3">✓ 链上可验证</span></div>'
+        +'<div style="display:flex;gap:12px;align-items:center;margin-top:16px;padding:12px;border-radius:14px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.06)">'
+          +'<div style="width:84px;height:54px;border-radius:9px;flex:none;background:'+hero(c)+';display:grid;place-items:center;font-size:18px">▶</div>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">'+d.manifestTitle+'</div><div style="font-size:11px;color:#7486a1;margin-top:2px">交付内容 Content manifest · 状态 '+d.manifestState+'</div></div></div>'
+        +'<div style="margin-top:16px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;color:#93a2bb">表现指标 · '+d.metricLabel+'</span>'
+          +'<span style="font-size:13px"><b style="font-size:17px">'+d.metricCurrent+'</b> <span style="color:#7486a1">/ 目标 '+d.metricTarget+' · '+d.metricPct+'%</span></span></div>'
+          +'<div style="margin-top:7px">'+progEl(d.metricPct,'linear-gradient(90deg,#f0795f,#65ecaf)')+'</div>'
+          +'<div style="font-size:11px;color:#7486a1;margin-top:6px">达标即解锁 Track 2 表现奖金（80% 创作者 / 20% 粉丝背书池）。未达标则赞助商按规则获得退款。</div></div></div>'
+      +'<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:13px;color:#93a2bb;font-weight:600">三轨结算 · 赞助商预算（USDC）</span><span style="font-size:11.5px;color:#7486a1">金库 '+d.vault+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;gap:10px">'+d.tracks.map(function(t){
+          return '<div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);opacity:'+t[6]+';border-left:3px solid '+t[5]+'">'
+            +'<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700">'+t[0]+'</div><div style="font-size:11px;color:#7486a1;margin-top:2px">'+t[2]+'</div></div>'
+            +'<div style="font-size:16px;font-weight:800;white-space:nowrap">'+t[1]+'</div>'
+            +'<div style="font-size:11px;font-weight:600;color:'+t[4]+';white-space:nowrap;min-width:64px;text-align:right">'+t[3]+'</div></div>';
+        }).join('')
+        +'<div style="display:flex;align-items:center;gap:6px;margin-top:14px;flex-wrap:wrap;font-size:10.5px;color:#7486a1">'
+          +['内容','提案','双方签名','注资金库'].map(function(s){return '<span style="padding:4px 10px;border-radius:30px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)">'+s+'</span>→';}).join('')
+          +'<span style="padding:4px 10px;border-radius:30px;background:rgba(101,236,175,.14);border:1px solid rgba(101,236,175,.34);color:#7ce0b0">分轨结算</span></div></div></div>'
+      +'<div class="panel"><div style="font-size:13px;color:#93a2bb;font-weight:600;margin-bottom:12px">链上凭证 · Verifiable proof <span style="color:#7486a1;font-weight:400">（赞助商在 Web2 拿不到的东西）</span></div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px">'+d.proof.map(function(p){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:10px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.05)"><span style="font-size:12px;color:#93a2bb">'+p[0]+'</span><span style="font-size:12px;font-family:monospace;color:#9fd0ff">'+p[1]+'</span></div>';}).join('')+'</div></div>'
+      +'</div>';
+
+    var right='<div class="det-r"><div class="bpanel">';
+    if(done){
+      right+='<div style="text-align:center;padding:6px 0 4px"><div style="font-size:34px">✦</div><div style="font-size:17px;font-weight:800;margin-top:4px">已为活动背书</div>'
+        +'<div style="font-size:13px;color:#93a2bb;margin-top:4px">你投入了 <b style="color:#f5b8ab">⚡ '+amt+'</b> · 第 <b style="color:#f5f7fb">'+(d.endorserBase+1)+'</b> 位背书者</div>'
+        +'<div style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 14px;border-radius:80px;background:rgba(101,236,175,.14);border:1px solid rgba(101,236,175,.34);font-size:12px;color:#7ce0b0">🎖️ 活动背书者 已解锁</div>'
+        +'<div class="confirm" style="height:46px;font-size:14px;margin-top:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);box-shadow:none;color:#f5f7fb" onclick="addMoreEndorse()">⚡ 再背书</div></div>';
+    } else {
+      right+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:16px;font-weight:800">⚡ 背书这个活动</div><div style="font-size:11px;color:#f0a08f">我的能量 '+state.spump+' ⚡</div></div>'
+        +'<div style="font-size:11.5px;color:#93a2bb;line-height:1.5;margin-bottom:12px">燃烧 SPUMP 为活动背书，加入 <b style="color:#c8d2e3">Track 2 粉丝背书池</b>。这是有成本的真诚信号，会增强活动势能。</div>'
+        +'<div style="font-size:11px;color:#7486a1">投入能量</div><div class="amt-box"><b>'+state.backAmount+' ⚡</b><span style="font-size:13px;color:#7486a1">SPUMP</span></div>'
+        +'<div class="chips-amt">'+[10,25,50,60].map(function(n,i){var l=i===3?'上限':String(n);return '<div class="c'+(state.backAmount===n?' on':'')+'" onclick="setAmount('+n+')">'+l+'</div>';}).join('')+'</div>'
+        +'<div style="border-top:1px solid rgba(255,255,255,.08);margin-top:14px;padding-top:13px;display:flex;flex-direction:column;gap:10px">'
+          +'<div class="rowline"><span class="muted">你的位置</span><span style="font-weight:700">第 '+(d.endorserBase+1)+' 位背书者</span></div>'
+          +'<div class="rowline"><span class="muted">解锁身份</span><span style="font-weight:700;color:#7ce0b0">🎖️ 活动背书者</span></div>'
+          +'<div class="rowline"><span class="muted">达标时</span><span style="font-weight:700;color:#7ce0b0">分享封顶背书奖励</span></div></div>'
+        +'<div class="disclaim">背书奖励为<b>封顶、平摊</b>（与你投入多少无关）。若活动未达标，赞助商按规则获得退款 —— <b>这不是投资</b>。</div>'
+        +'<div class="confirm" onclick="confirmEndorse()">⚡ 确认背书 →</div>'
+        +'<div class="streak-note">🔥 完成后 Scout 连续打卡 +1（共 '+state.streak+' 天）</div>'
+        +'<div class="ready">● SEEDED · devnet · 背书为链上 SPUMP burn（预览）</div>';
+    }
+    right+='</div></div>';
+    document.getElementById('view').innerHTML='<div class="back-link" onclick="goDiscover()">← 返回发现榜</div><div class="det">'+left+right+'</div>';
+  }
+  function confirmEndorse(){
+    if(state.backAmount>state.spump){flash('能量不足 · 去领每日 SPUMP ⚡');return;}
+    state.spump-=state.backAmount;state.endorsed[state.activeId]=(state.endorsed[state.activeId]||0)+state.backAmount;
+    document.getElementById('spump').innerText=state.spump;flash('✦ 已背书！加入粉丝背书池 · Scout 打卡 +1');renderCampaign();
+  }
+  function addMoreEndorse(){delete state.endorsed[state.activeId];renderCampaign();}
+
+  /* ---------- ONBOARDING ---------- */
+  function renderOnboarding(){
+    var el=document.getElementById('onboarding');
+    if(!state.onboarding){el.innerHTML='';return;}
+    el.innerHTML='<div class="overlay"><div class="ob"><h2>早一步发现，陪 TA 长大</h2><div style="font-size:14px;color:#93a2bb;margin-top:6px;text-align:center">Spot creators early. Grow with them.</div>'
+      +'<div class="ob-steps">'
+        +'<div class="ob-s"><div class="ic" style="border:2px solid rgba(222,64,42,.5);background:rgba(222,64,42,.12)">⚡</div><h4>攒能量 Earn</h4><p>每天来逛、互动，赚到 SPUMP 能量。它<b>买不到</b>，只能靠参与攒。</p></div>'
+        +'<div class="ob-s"><div class="ic" style="border:2px solid rgba(101,236,175,.5);background:rgba(101,236,175,.12)">✦</div><h4>看好就 Back</h4><p>把能量投给你早早看好的人。<b>花得有成本，所以是真诚的一票。</b></p></div>'
+        +'<div class="ob-s"><div class="ic" style="border:2px solid rgba(103,184,255,.5);background:rgba(103,184,255,.12)">★</div><h4>TA 毕业，你留名</h4><p>TA 被赞助 / 毕业时，你是<b>创始应援者</b>，声誉上升。</p></div>'
+      +'</div>'
+      +'<div class="ob-shield">🛡️ <b>这不是投资，是发现。</b> SPUMP 能量买不到、卖不掉、不能提现，没有币价、没有涨跌。你赢的是「眼光」和「身份」。</div>'
+      +'<div class="ob-foot"><div style="flex:1;font-size:12.5px;color:#f0a08f">🎁 新手礼：已送你 <b>50 ⚡</b> — 挑一个喜欢的创作者投 10⚡ 试一次。</div>'
+        +'<div style="font-size:13px;color:#7486a1;cursor:pointer;padding:10px 14px" onclick="dismissOnboarding()">先逛逛</div>'
+        +'<div class="back-cta" onclick="startFirstBack()">⚡ 试一次 →</div></div></div></div>';
+  }
+
+  /* ---------- actions ---------- */
+  function renderView(){
+    var inDetail=['discover','creator','buyout'].indexOf(state.view)>=0;
+    document.getElementById('nav-discover').classList.toggle('on',inDetail||state.view==='campaign');
+    document.getElementById('nav-portfolio').classList.toggle('on',state.view==='portfolio');
+    if(state.view==='discover')renderDiscover();
+    else if(state.view==='creator')renderCreator();
+    else if(state.view==='buyout')renderBuyout();
+    else if(state.view==='campaign')renderCampaign();
+    else if(state.view==='portfolio')renderPortfolio();
+    window.scrollTo({top:0});
+  }
+  function renderCurrent(){
+    if(state.view==='creator')renderCreator();
+    else if(state.view==='buyout')renderBuyout();
+    else if(state.view==='campaign')renderCampaign();
+  }
+  function goDiscover(){state.view='discover';renderView();}
+  function goPortfolio(){state.view='portfolio';renderView();}
+  function openCreator(id){var c=cr(id);state.activeId=id;state.view=c.stage==='S2'?'campaign':(c.stage==='BUYOUT'?'buyout':'creator');renderView();}
+  function setTab(t){state.tab=t;renderDiscover();}
+  function setCat(c){state.cat=c;renderDiscover();}
+  function setAmount(n){state.backAmount=n;renderCurrent();}
+  function cardBack(id){openCreator(id);}
+  function addMore(){delete state.backed[state.activeId];renderCreator();}
+  function confirmBack(){
+    if(state.backAmount>state.spump){flash('能量不足 · 去领每日 SPUMP ⚡');return;}
+    state.spump-=state.backAmount;state.backed[state.activeId]=(state.backed[state.activeId]||0)+state.backAmount;
+    state.dailyUsed=Math.min(100,state.dailyUsed+state.backAmount);
+    document.getElementById('spump').innerText=state.spump;
+    flash('✦ 已应援！Scout 打卡 +1 · 解锁早鸟身份');renderCreator();
+  }
+  function claimDaily(){
+    if(state.claimedToday){flash('今天已经领过啦 · 明天再来 🔥');return;}
+    state.spump+=20;state.claimedToday=true;state.streak+=1;
+    document.getElementById('spump').innerText=state.spump;document.getElementById('streak').innerText=state.streak;
+    renderClaim();flash('+20 ⚡ 已领取 · 连续打卡 +1 🔥');
+  }
+  function dismissOnboarding(){state.onboarding=false;renderOnboarding();}
+  function startFirstBack(){state.onboarding=false;state.view='creator';state.activeId='studio_haru';state.backAmount=10;renderOnboarding();renderView();}
+  function renderClaim(){
+    var el=document.getElementById('claim');
+    document.getElementById('claim-label').innerText=state.claimedToday?'已领 ✓':'领 +20⚡';
+    el.style.background=state.claimedToday?'rgba(255,255,255,.04)':'rgba(222,64,42,.16)';
+    el.style.border='1px solid '+(state.claimedToday?'rgba(255,255,255,.08)':'rgba(222,64,42,.4)');
+    document.getElementById('claim-label').style.color=state.claimedToday?'#93a2bb':'#f5b8ab';
+  }
+
+  /* ---------- PORTFOLIO ---------- */
+  function renderPortfolio(){
+    var rows=[['neon_kid','3 个月前',42,'🐦','claim'],['studio_haru','6 周前',210,'','add'],['indie_mochi','5 个月前',12,'★','view'],['fit_maya','3 个月前',624,'','add']];
+    var actMap={claim:['🎁 领取','#fff','linear-gradient(180deg,#f05540,#de402a)','rgba(255,255,255,.08)'],add:['⚡ 加码','#c8d2e3','rgba(255,255,255,.04)','rgba(255,255,255,.16)'],view:['看活动','#c8d2e3','transparent','rgba(255,255,255,.16)']};
+    var html='<div style="font-size:28px;font-weight:800;letter-spacing:-.5px">伯乐档案 <span style="font-size:16px;color:#7486a1;font-weight:600">Portfolio</span></div>'
+      +'<div style="font-size:14px;color:#93a2bb;margin-top:4px">这里比的不是钱，是眼光。Your scout track record, not a balance sheet.</div>'
+      +'<div class="pf-sum"><div class="pf-c plain"><div class="k">在应援</div><div class="v">8 位</div></div>'
+        +'<div class="pf-c blue"><div class="k">命中 · 已毕业</div><div class="v">3 位 ★</div></div>'
+        +'<div class="pf-c plain"><div class="k">星探声誉</div><div class="v" style="font-size:17px;margin-top:5px">观察者 → 星探</div></div>'
+        +'<div class="pf-c red"><div class="k">🎁 可领发现奖励</div><div class="v">2 笔 · 还剩 18h</div></div></div>'
+      +'<div class="pf-tbl"><div class="pf-h" style="display:grid;grid-template-columns:1.8fr 1fr 1.2fr .9fr 1fr 100px;gap:10px"><div>创作者</div><div>应援于</div><div>我的入场</div><div>当前势能</div><div>状态</div><div></div></div>'
+      +rows.map(function(r){var c=cr(r[0]);var a=actMap[r[4]];var rb=r[3]?'<span style="font-size:10px;color:'+(r[3]==='★'?'#7ce0b0':'#f5b8ab')+'">'+(r[3]==='★'?'★创始':'🐦早鸟')+'</span>':'';
+        return '<div class="pf-tr row" onclick="openCreator(\''+c.id+'\')"><div style="display:flex;gap:10px;align-items:center"><span style="width:32px;height:32px;border-radius:9px;flex:none;background:'+hero(c)+';border:1px solid rgba(255,255,255,.12)"></span><span style="font-size:14px;font-weight:700">'+c.name+'</span></div>'
+          +'<div style="font-size:12.5px;color:#93a2bb">'+r[1]+'</div><div style="font-size:12.5px">第 <b>'+r[2]+'</b> 位 '+rb+'</div><div style="font-size:14px;font-weight:700">'+c.mom+'</div><div>'+sb(c.stage,false)+'</div>'
+          +'<div class="pf-act" style="color:'+a[1]+';background:'+a[2]+';border:1px solid '+a[3]+'" onclick="event.stopPropagation();flash(\''+(r[4]==='claim'?'领取发现奖励（预览）':r[4]==='add'?'去加码（预览）':'看赞助活动（下一步）')+'\')">'+a[0]+'</div></div>';
+      }).join('')+'</div>'
+      +'<div class="rediscover"><span style="font-size:18px">👀</span><div style="flex:1;font-size:12.5px;color:#9fd0ff">你关注过 <b>@court_vision</b>，本周势能 ↗ +17、冲刺毕业中。要趁早鸟位还在时应援吗？</div>'
+        +'<div style="font-size:12.5px;font-weight:700;border:1px solid rgba(103,184,255,.5);color:#9fd0ff;border-radius:80px;padding:7px 16px;cursor:pointer" onclick="openCreator(\'court_vision\')">去看看</div></div>';
+    document.getElementById('view').innerHTML=html;
+  }
+
+  var toastT;
+  function flash(m){var el=document.getElementById('toast');el.innerText=m;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){el.classList.remove('show');},2600);}
+
+  renderClaim();renderView();renderOnboarding();
+</script>
+</body>
+</html>

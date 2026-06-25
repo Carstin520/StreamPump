@@ -32,6 +32,27 @@ export const config = {
   },
   managedWallet: {
     encryptionKey: env.readString(process.env.MANAGED_WALLET_ENCRYPTION_KEY, ""),
+    jobWorkerConcurrency: env.readNumber(process.env.MANAGED_WALLET_JOB_CONCURRENCY, 5),
+    jobWorkerPollMs: env.readNumber(process.env.MANAGED_WALLET_JOB_POLL_MS, 500),
+    maxJobsPerWalletPerDay: env.readNumber(process.env.MANAGED_WALLET_MAX_JOBS_PER_DAY, 4),
+    executeIpWindowMs: env.readNumber(process.env.MANAGED_WALLET_EXECUTE_IP_WINDOW_MS, 60_000),
+    executeIpLimit: env.readNumber(process.env.MANAGED_WALLET_EXECUTE_IP_LIMIT, 60),
+    executeWalletWindowMs: env.readNumber(
+      process.env.MANAGED_WALLET_EXECUTE_WALLET_WINDOW_MS,
+      60_000
+    ),
+    executeWalletLimit: env.readNumber(process.env.MANAGED_WALLET_EXECUTE_WALLET_LIMIT, 10),
+    ephemeralIpWindowMs: env.readNumber(process.env.EPHEMERAL_SESSION_IP_WINDOW_MS, 60_000),
+    ephemeralIpLimit: env.readNumber(process.env.EPHEMERAL_SESSION_IP_LIMIT, 30),
+    ephemeralSubjectWindowMs: env.readNumber(
+      process.env.EPHEMERAL_SESSION_SUBJECT_WINDOW_MS,
+      60_000
+    ),
+    ephemeralSubjectLimit: env.readNumber(process.env.EPHEMERAL_SESSION_SUBJECT_LIMIT, 5),
+    syncProjectionOnJobSuccess: env.readBoolean(
+      process.env.MANAGED_WALLET_JOB_SYNC_PROJECTION,
+      false
+    ),
   },
   email: {
     deliveryMode: env.readString(process.env.EMAIL_DELIVERY_MODE, "console"),
@@ -43,6 +64,14 @@ export const config = {
   },
   solana: {
     rpcEndpoint: env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com"),
+    txRpcEndpoint: env.readString(
+      process.env.SOLANA_TX_RPC_ENDPOINT,
+      env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com")
+    ),
+    indexerRpcEndpoint: env.readString(
+      process.env.SOLANA_INDEXER_RPC_ENDPOINT,
+      env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com")
+    ),
     isDevnet: env.readBoolean(
       process.env.SOLANA_IS_DEVNET,
       (process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com").includes("devnet")
@@ -143,6 +172,32 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     failures.push(
       "MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars; generate with `openssl rand -hex 32` and store it in Render Environment or a secret manager"
     );
+  }
+
+  if (runtimeConfig.solana.txRpcEndpoint.includes("api.devnet.solana.com")) {
+    failures.push(
+      "SOLANA_TX_RPC_ENDPOINT must use a dedicated devnet RPC for demo-day managed transactions"
+    );
+  }
+
+  if (
+    runtimeConfig.indexer.enabled &&
+    runtimeConfig.solana.indexerRpcEndpoint === runtimeConfig.solana.txRpcEndpoint
+  ) {
+    failures.push(
+      "SOLANA_INDEXER_RPC_ENDPOINT must be separate from SOLANA_TX_RPC_ENDPOINT when INDEXER_ENABLED=true"
+    );
+  }
+
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+  if (!databaseUrl.includes("-pooler.")) {
+    failures.push("DATABASE_URL must use the Neon pooled endpoint host containing -pooler");
+  }
+  if (!/[?&]connection_limit=([5-9]|10)(&|$)/.test(databaseUrl)) {
+    failures.push("DATABASE_URL must include connection_limit=5-10 for the Render demo backend");
+  }
+  if (!/[?&]pool_timeout=([5-9]|10)(&|$)/.test(databaseUrl)) {
+    failures.push("DATABASE_URL must include pool_timeout=5-10 for the Render demo backend");
   }
 
   if (failures.length > 0) {

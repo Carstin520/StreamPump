@@ -27,9 +27,12 @@ export const formatUsdcAtomic = (value: string | number | bigint | null | undefi
   return formatUsd(numeric / USDC_DECIMALS);
 };
 
-export const formatIsoLabel = (value: string | null | undefined) => {
+export const formatIsoLabel = (
+  value: string | null | undefined,
+  locale: string = "en-US",
+) => {
   if (!value) {
-    return "Pending";
+    return locale.startsWith("zh") ? "待定" : "Pending";
   }
 
   const date = new Date(value);
@@ -37,7 +40,7 @@ export const formatIsoLabel = (value: string | null | undefined) => {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     hour: "numeric",

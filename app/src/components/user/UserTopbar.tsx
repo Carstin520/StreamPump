@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
-import { currentUser } from "@/lib/public-data";
+import { WORKSPACE_CONTENT_NEW_PATH } from "@/lib/routes";
 
 export type TopbarMode = "sticky" | "scroll-reveal";
 
@@ -17,21 +17,23 @@ export const UserTopbar = ({
   mode = "sticky",
   searchPlaceholder,
   hideSearch = false,
+  leading,
 }: {
   mode?: TopbarMode;
   searchPlaceholder?: string;
   hideSearch?: boolean;
+  leading?: ReactNode;
 }) => {
   const { t } = useI18n();
   const resolvedSearchPlaceholder = searchPlaceholder ?? t("shell.searchPlaceholder");
 
   if (mode === "scroll-reveal") {
-    return <ScrollRevealTopbar searchPlaceholder={resolvedSearchPlaceholder} />;
+    return <ScrollRevealTopbar leading={leading} searchPlaceholder={resolvedSearchPlaceholder} />;
   }
 
   return (
     <header className="sticky top-0 z-30 pt-4">
-      <TopbarInner hideSearch={hideSearch} searchPlaceholder={resolvedSearchPlaceholder} />
+      <TopbarInner hideSearch={hideSearch} leading={leading} searchPlaceholder={resolvedSearchPlaceholder} />
     </header>
   );
 };
@@ -40,8 +42,10 @@ type RevealState = "visible" | "hidden";
 
 const ScrollRevealTopbar = ({
   searchPlaceholder,
+  leading,
 }: {
   searchPlaceholder: string;
+  leading?: ReactNode;
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
   const barH = useRef(FALLBACK_BAR_HEIGHT);
@@ -253,7 +257,7 @@ const ScrollRevealTopbar = ({
         }}
       >
         <div className="mx-auto max-w-[1480px] px-4 lg:px-6">
-          <TopbarInner searchPlaceholder={searchPlaceholder} />
+          <TopbarInner leading={leading} searchPlaceholder={searchPlaceholder} />
         </div>
       </header>
     </>
@@ -263,14 +267,17 @@ const ScrollRevealTopbar = ({
 const TopbarInner = ({
   hideSearch = false,
   searchPlaceholder,
+  leading,
 }: {
   hideSearch?: boolean;
   searchPlaceholder: string;
+  leading?: ReactNode;
 }) => {
   const { t } = useI18n();
 
   return (
     <div className="glass-toolbar flex min-h-[56px] items-center justify-between gap-4 px-3 py-2.5 lg:px-4">
+      {leading ? <div className="shrink-0">{leading}</div> : null}
       {hideSearch ? (
         <div className="flex-1" />
       ) : (
@@ -291,16 +298,9 @@ const TopbarInner = ({
       <div className="ml-4 flex items-center gap-3">
         <Link
           className="glass-button-primary px-5 py-2.5 text-sm font-semibold"
-          href="/workspace"
+          href={WORKSPACE_CONTENT_NEW_PATH}
         >
-          + {t("shell.workspaceCenter")}
-        </Link>
-        <Link
-          className="glass-button-ghost flex items-center gap-2 px-2.5 py-1.5 text-sm text-[#c4d0e3] transition duration-200 hover:text-white"
-          href="/me"
-        >
-          <img alt={currentUser.name} className="h-7 w-7 rounded-full object-cover" src={currentUser.avatarSrc} />
-          <span className="hidden max-w-[140px] truncate sm:inline">{currentUser.handle}</span>
+          ↑ {t("shell.upload")}
         </Link>
       </div>
     </div>

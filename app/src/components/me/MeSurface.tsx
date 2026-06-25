@@ -63,7 +63,7 @@ export const MeSurface = ({
           >
             {tab.label}
             {tab.count != null ? (
-              <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-[#8ea0ba]">
+              <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[length:var(--fs-micro)] font-semibold text-[#8ea0ba]">
                 {tab.count}
               </span>
             ) : null}
@@ -116,15 +116,15 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
           />
           <div className="min-w-0 flex-1 pb-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-bold tracking-[-0.03em] text-white sm:text-2xl">{currentUser.name}</h1>
+              <h1 className="type-h3 truncate font-bold text-white">{currentUser.name}</h1>
               {influence ? <InfluenceChip influence={influence} /> : null}
               {currentUser.sessionMode ? (
-                <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
+                <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.1em] text-[#8ea0ba]">
                   {currentUser.sessionMode}
                 </span>
               ) : null}
             </div>
-            <p className="mt-0.5 truncate text-xs text-[#7e90aa]">@{currentUser.handle}</p>
+            <p className="mt-0.5 truncate text-xs text-[#7e90aa]">@{currentUser.handle.replace(/^@+/, "")}</p>
           </div>
           <Link
             className="hidden shrink-0 items-center rounded-full border border-white/[0.1] bg-white/[0.04] px-4 py-2 text-xs font-medium text-white transition hover:bg-white/[0.08] sm:inline-flex"
@@ -134,28 +134,28 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
           </Link>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-[#8ea0ba]">
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-[length:var(--fs-overline)] text-[#8ea0ba]">
           <span className="flex items-center gap-1">
-            <strong className="text-white">{compactNumber(currentUser.followingCount)}</strong> following
+            <strong className="text-white">{compactNumber(currentUser.followingCount)}</strong> {t("me.following")}
           </span>
           <span className="flex items-center gap-1">
-            <strong className="text-white">{compactNumber(currentUser.followersCount)}</strong> followers
+            <strong className="text-white">{compactNumber(currentUser.followersCount)}</strong> {t("me.followers")}
           </span>
           <span className="flex items-center gap-1">
-            <strong className="text-white">{compactNumber(currentUser.totalLikesAndSavesCount)}</strong> likes & saves
+            <strong className="text-white">{compactNumber(currentUser.totalLikesAndSavesCount)}</strong> {t("me.likesSaves")}
           </span>
           {truncatedWallet ? (
-            <span className="flex items-center gap-1 font-mono text-[10px] text-[#5a6d87]">
+            <span className="flex items-center gap-1 font-mono text-[length:var(--fs-micro)] text-[#5a6d87]">
               {t("me.wallet")}: {truncatedWallet}
             </span>
           ) : null}
-          {currentUser.location ? (
+          {currentUser.location && currentUser.location !== "TBD" ? (
             <span className="text-[#5a6d87]">{currentUser.location}</span>
           ) : null}
         </div>
 
         {currentUser.bio ? (
-          <p className="mt-2.5 text-[13px] leading-6 text-[#b8c6da]">{currentUser.bio}</p>
+          <p className="mt-2.5 text-[length:var(--fs-caption)] leading-6 text-[#b8c6da]">{currentUser.bio}</p>
         ) : null}
       </div>
     </div>
@@ -244,23 +244,23 @@ const AboutTab = ({ currentUser }: { currentUser: CurrentUserRecord }) => {
   return (
     <div className="space-y-4">
       <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)] px-4 py-4">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f8099]">Bio</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f8099]">{t("me.aboutBio")}</h3>
         <p className="mt-2 text-sm leading-7 text-[#b8c6da]">
           {currentUser.bio || t("me.bio.empty")}
         </p>
       </section>
 
       <section className="rounded-[16px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)] px-4 py-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#6f8099]">Details</h3>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#6f8099]">{t("me.aboutDetails")}</h3>
         <div className="space-y-2 text-sm">
           {truncatedWallet ? (
             <DetailRow label={t("me.wallet")} value={truncatedWallet} mono />
           ) : null}
-          {currentUser.location ? (
-            <DetailRow label="Location" value={currentUser.location} />
+          {currentUser.location && currentUser.location !== "TBD" ? (
+            <DetailRow label={t("me.location")} value={currentUser.location} />
           ) : null}
-          <DetailRow label="Handle" value={`@${currentUser.handle}`} />
-          <DetailRow label="Session" value={currentUser.sessionMode} />
+          <DetailRow label={t("me.handle")} value={`@${currentUser.handle.replace(/^@+/, "")}`} />
+          <DetailRow label={t("me.session")} value={currentUser.sessionMode} />
         </div>
       </section>
     </div>
@@ -276,7 +276,9 @@ const DetailRow = ({ label, mono, value }: { label: string; mono?: boolean; valu
 
 /* ──────────────────────────────  Shared components  ────────────────────────────── */
 
-const NoteCard = ({ note }: { note: UserNoteRecord }) => (
+const NoteCard = ({ note }: { note: UserNoteRecord }) => {
+  const { t } = useI18n();
+  return (
   <Link
     className="group block overflow-hidden rounded-[14px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(14,20,30,0.88)_0%,rgba(10,14,22,0.88)_100%)] transition hover:border-white/[0.1]"
     href={note.sourcePostId ? `/posts/${note.sourcePostId}` : "#"}
@@ -297,32 +299,39 @@ const NoteCard = ({ note }: { note: UserNoteRecord }) => (
       </div>
     ) : null}
     <div className="px-3 py-2.5">
-      <p className="line-clamp-2 text-[13px] font-medium leading-5 text-white">{note.title}</p>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#8ea0ba]">
+      <p className="line-clamp-2 text-[length:var(--fs-caption)] font-medium leading-5 text-white">{note.title}</p>
+      <div className="mt-1.5 flex items-center gap-1.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">
         <img alt={note.authorName} className="h-4 w-4 rounded-full object-cover" src={note.authorAvatarSrc} />
         <span className="truncate">{note.authorName}</span>
         <span className="text-[#3e4a5e]">·</span>
-        <span>{compactNumber(note.likes)} likes</span>
+        <span>{t("me.likesCount", { n: compactNumber(note.likes) })}</span>
       </div>
     </div>
   </Link>
-);
+  );
+};
 
-const MockPreviewBadge = () => (
-  <div className="flex items-center gap-2">
-    <span className="rounded border border-[#f3b33e]/20 bg-[#1a1408]/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#f3c66e]">
-      Mock Preview
-    </span>
-    <span className="text-[10px] text-[#6f8099]">Derived from feed posts — not from user action history</span>
-  </div>
-);
+const MockPreviewBadge = () => {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center gap-2">
+      <span className="tone-state-warning rounded border px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em]">
+        {t("me.mockPreview")}
+      </span>
+      <span className="text-[length:var(--fs-micro)] text-[#6f8099]">{t("me.mockPreviewDesc")}</span>
+    </div>
+  );
+};
 
-const EmptyState = ({ cta, href, title }: { cta: string; href: string; title: string }) => (
-  <div className="rounded-[20px] border border-white/[0.05] bg-white/[0.02] px-6 py-10 text-center">
-    <p className="text-sm font-medium text-white">{title}</p>
-    <p className="mx-auto mt-2 max-w-[360px] text-xs text-[#7e90aa]">{cta}</p>
-    <Link className="mt-4 inline-flex rounded-full bg-[#de402a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#ea523e]" href={href}>
-      Explore
-    </Link>
-  </div>
-);
+const EmptyState = ({ cta, href, title }: { cta: string; href: string; title: string }) => {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-[20px] border border-white/[0.05] bg-white/[0.02] px-6 py-10 text-center">
+      <p className="text-sm font-medium text-white">{title}</p>
+      <p className="mx-auto mt-2 max-w-[360px] text-xs text-[#7e90aa]">{cta}</p>
+      <Link className="mt-4 inline-flex rounded-full bg-[#de402a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#ea523e]" href={href}>
+        {t("me.exploreCta")}
+      </Link>
+    </div>
+  );
+};

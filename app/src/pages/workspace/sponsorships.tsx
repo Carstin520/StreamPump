@@ -1,28 +1,196 @@
 import Head from "next/head";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
 
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
-import { SponsorshipDesk } from "@/components/workspace/SponsorshipDesk";
+import { StagePill } from "@/components/shared/StagePill";
+import { OpportunityInbox } from "@/components/workspace/OpportunityInbox";
+import {
+  ConsoleAuthRequired,
+  ConsoleLoading,
+} from "@/components/workspace/OverviewConsole";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
-import { workspacePersonas } from "@/lib/mocks/workspace";
+import { CreatorSeasonState } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
+import {
+  WorkspaceOverviewResponse,
+  getWorkspaceOverview,
+} from "@/lib/api/workspace";
+import { getStoredAuthSession } from "@/lib/auth-session";
+import {
+  WorkspacePersona,
+  workspacePersonas,
+} from "@/lib/mocks/workspace";
+import { WORKSPACE_SPONSORSHIPS_PATH, buildLoginHref } from "@/lib/routes";
+import { clearAuthAndBuildLoginHref, isAuthError } from "@/lib/session-flow";
+import {
+  WORKSPACE_STAGE_ORDER,
+  buildPersonaFromWorkspace,
+  getErrorMessage,
+  isLocalPreviewToken,
+} from "@/lib/workspace-overview";
+
+type PreviewTone = "info" | "warn";
+
+type InboxState =
+  | { status: "loading" }
+  | { status: "unauthenticated"; loginHref: string }
+  | { status: "preview"; message: string; tone: PreviewTone; loginHref?: string }
+  | { status: "ready"; data: WorkspaceOverviewResponse };
+
+// Demo defaults to the buyout stage so the graduation-sponsorship explainer is visible.
+const SPONSORSHIPS_DEMO_STAGE: CreatorSeasonState = "S1_BUYOUT";
 
 export default function SponsorshipsPage() {
-  const persona = workspacePersonas.S2_ACTIVE;
+  const router = useRouter();
+  const { t } = useI18n();
+  const [state, setState] = useState<InboxState>({ status: "loading" });
+  const [demoStage, setDemoStage] = useState<CreatorSeasonState>(SPONSORSHIPS_DEMO_STAGE);
+  const isDemoMode = router.isReady && router.query.demo === "1";
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (isDemoMode) return;
+
+    let isMounted = true;
+    const session = getStoredAuthSession();
+
+    if (!session) {
+      setState({ status: "unauthenticated", loginHref: buildLoginHref({ nextPath: WORKSPACE_SPONSORSHIPS_PATH }) });
+      return;
+    }
+
+    getWorkspaceOverview(session.accessToken)
+      .then((data) => {
+        if (isMounted) setState({ status: "ready", data });
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        if (isLocalPreviewToken(session.accessToken)) {
+          setState({ status: "preview", tone: "info", message: t("ws.preview.offline") });
+          return;
+        }
+        if (isAuthError(error)) {
+          setState({
+            status: "preview",
+            tone: "warn",
+            message: t("ws.preview.expired"),
+            loginHref: clearAuthAndBuildLoginHref(WORKSPACE_SPONSORSHIPS_PATH),
+          });
+          return;
+        }
+        setState({
+          status: "preview",
+          tone: "info",
+          message: t("ws.preview.apiError", { error: getErrorMessage(error, t("ws.preview.apiUnavailable")) }),
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isDemoMode, router.isReady, t]);
+
+  const persona = useMemo<WorkspacePersona>(() => {
+    if (isDemoMode) return workspacePersonas[demoStage];
+    if (state.status === "ready") return buildPersonaFromWorkspace(state.data);
+    return workspacePersonas[SPONSORSHIPS_DEMO_STAGE];
+  }, [isDemoMode, demoStage, state]);
 
   return (
     <>
       <Head>
-        <title>StreamPump | Sponsorship Desk</title>
+        <title>{t("ws.opps.pageTitle")}</title>
       </Head>
       <WorkspaceShell stage={persona.stage} wallet={persona.wallet}>
-        <div className="space-y-5">
-          <ProductReadinessBanner
-            description="This sponsorship desk is assembled from local workspace mock campaigns. It is useful for reviewing the S2 operations model, but it is not a live proposal, funding, oracle, or settlement console yet."
-            status="MOCK_PREVIEW"
-            title="Sponsorship desk is a mock operator preview"
-          />
-          <SponsorshipDesk />
-        </div>
+        <ProductReadinessBanner
+          description={t("ws.opps.readinessDesc")}
+          status="SEEDED_DEMO"
+          title={t("ws.opps.readinessTitle")}
+        />
+
+        {isDemoMode ? <DemoStageSwitcher activeStage={demoStage} onChange={setDemoStage} /> : null}
+
+        {!isDemoMode && state.status === "loading" ? <ConsoleLoading /> : null}
+        {!isDemoMode && state.status === "unauthenticated" ? (
+          <ConsoleAuthRequired loginHref={state.loginHref} />
+        ) : null}
+        {!isDemoMode && state.status === "preview" ? (
+          <InboxPreviewNotice loginHref={state.loginHref} message={state.message} tone={state.tone} />
+        ) : null}
+
+        {(isDemoMode || state.status === "ready" || state.status === "preview") && (
+          <OpportunityInbox persona={persona} />
+        )}
       </WorkspaceShell>
     </>
   );
 }
+
+const DemoStageSwitcher = ({
+  activeStage,
+  onChange,
+}: {
+  activeStage: CreatorSeasonState;
+  onChange: (stage: CreatorSeasonState) => void;
+}) => {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
+      <span className="px-2 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
+        {t("ws.demoStage")}
+      </span>
+      {WORKSPACE_STAGE_ORDER.map((stage) => (
+        <button
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] transition ${
+            activeStage === stage ? "bg-white/[0.06] text-white" : "text-[#7e90aa] hover:bg-white/[0.04] hover:text-white"
+          }`}
+          key={stage}
+          onClick={() => onChange(stage)}
+          type="button"
+        >
+          <StagePill compact stage={stage} />
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const InboxPreviewNotice = ({
+  loginHref,
+  message,
+  tone,
+}: {
+  loginHref?: string;
+  message: string;
+  tone: PreviewTone;
+}) => {
+  const { t } = useI18n();
+  const toneClass =
+    tone === "warn" ? "border-[#de402a]/22 bg-[#1f120e]/70" : "border-[#67b8ff]/20 bg-[#0e1726]/70";
+  const accentClass = tone === "warn" ? "text-[#ff8a78]" : "text-[#8ad0ff]";
+  const dotClass = tone === "warn" ? "bg-[#de402a]" : "bg-[#67b8ff]";
+
+  return (
+    <section className={`rounded-xl border px-3 py-2 ${toneClass}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+          <p className={`text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
+            {tone === "warn" ? t("ws.preview.sessionTag") : t("ws.preview.previewTag")}
+          </p>
+          <p className="truncate text-[length:var(--fs-micro)] text-[#9aabc4]">{message}</p>
+        </div>
+        {loginHref ? (
+          <a
+            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
+            href={loginHref}
+          >
+            {t("ws.console.signInAgain")}
+          </a>
+        ) : null}
+      </div>
+    </section>
+  );
+};

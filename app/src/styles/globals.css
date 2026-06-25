@@ -2,24 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ============================================================================
+ * StreamPump Design Tokens — single source of truth (batch 1)
+ * ----------------------------------------------------------------------------
+ * This block is the canonical token layer. It is ADDITIVE and visually neutral:
+ * every pre-existing variable name is preserved with its original value, and
+ * new tokens encode values already present elsewhere in this file / the
+ * whitepaper so that later batches can reference them without drift.
+ *
+ * Migration plan:
+ *   batch 1 (this) — define tokens.
+ *   batch 2        — collapse the 8 glass containers into --elev-* elevation classes.
+ *   batch 3        — replace one-off type sizes with the --fs-* type scale.
+ *
+ * Rule: brand red is for primary action + brand accent ONLY. Use --state-* for
+ * status, --stage-* for S1/Buyout/S2. Do not reach for --primary as "danger".
+ * ============================================================================
+ */
 :root {
+  /* --- Base background ---------------------------------------------------- */
   --bg-start: #090d14;
   --bg-end: #0a1018;
+
+  /* --- Opaque surface ramp ----------------------------------------------- */
   --surface-1: #111827;
   --surface-2: #161f2c;
   --surface-3: #1a2231;
   --surface-4: rgba(255, 255, 255, 0.05);
+
+  /* --- Borders / hairlines ----------------------------------------------- */
   --border-subtle: rgba(255, 255, 255, 0.045);
   --border-soft: rgba(255, 255, 255, 0.09);
+
+  /* --- Text ramp (3 levels) ---------------------------------------------- */
   --text-main: #f5f7fb;
   --text-muted: #93a2bb;
-  --primary: #de402a;
-  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
-  --radius-card: 1.75rem;
+  --text-faint: #7486a1; /* tertiary — eyebrows, captions, meta */
+
+  /* --- Brand (red-orange) ------------------------------------------------- */
+  --brand: #de402a;
+  --brand-strong: #f05540; /* gradient top of primary button */
+  --brand-soft: rgba(222, 64, 42, 0.16);
+  --brand-line: rgba(222, 64, 42, 0.34);
+  --primary: var(--brand); /* legacy alias — keep existing references working */
+
+  /* --- Secondary accents -------------------------------------------------- */
+  --accent-blue: #4a6cd4;
+  --accent-teal: #3fb6a8;
+  --accent-green: #65ecaf;
+  --accent-sky: #67b8ff;
+  --accent-violet: #b890ff;
+
+  /* --- Semantic state colors (decoupled from brand red AND stage hues) ----- */
+  /* Kept distinct from --stage-* so state and lifecycle can be retuned
+     independently (success != stage-s2 teal, info != stage-s1 blue). */
+  --state-success: #2fbf71;
+  --state-success-soft: rgba(47, 191, 113, 0.14);
+  --state-warning: #e0a23a;
+  --state-warning-soft: rgba(224, 162, 58, 0.14);
+  --state-danger: #e5484d;
+  --state-danger-soft: rgba(229, 72, 77, 0.14);
+  --state-info: #5b9def;
+  --state-info-soft: rgba(91, 157, 239, 0.14);
+
+  /* --- Lifecycle stage colors (match the product's stage-pill hues) ------- */
+  --stage-s1: #67b8ff; /* S1 Discovery — sky blue */
+  --stage-s1-soft: rgba(103, 184, 255, 0.16);
+  --stage-buyout: #de402a; /* S1 Buyout — red-orange (brand-aligned by design) */
+  --stage-buyout-soft: rgba(222, 64, 42, 0.16);
+  --stage-s2: #65ecaf; /* S2 Sponsored — green */
+  --stage-s2-soft: rgba(101, 236, 175, 0.16);
+
+  /* --- Glass fills / lines (referenced by container classes) -------------- */
   --glass-line: rgba(255, 255, 255, 0.08);
   --glass-line-strong: rgba(255, 255, 255, 0.14);
   --glass-fill: rgba(255, 255, 255, 0.05);
   --glass-fill-strong: rgba(255, 255, 255, 0.09);
+
+  /* --- Radius scale ------------------------------------------------------- */
+  --radius-sm: 0.75rem;
+  --radius-md: 1.125rem;
+  --radius-lg: 1.75rem;
+  --radius-pill: 9999px;
+  --radius-card: var(--radius-lg); /* legacy alias */
+
+  /* --- Type scale (font-size) -------------------------------------------- */
+  /* Heading levels are fluid + capped via clamp(min, preferred, max) so they
+     scale with viewport and never overgrow on ultrawide. h1 ends match the
+     prior PageShell behavior (38px mobile -> 46px desktop). */
+  --fs-display: clamp(2.5rem, 1.8rem + 3.6vw, 3.5rem); /* 40 -> 56px */
+  --fs-h1: clamp(2.375rem, 1.6rem + 2.4vw, 2.875rem); /* 38 -> 46px */
+  --fs-h2: clamp(1.75rem, 1.4rem + 1.6vw, 2rem); /* 28 -> 32px */
+  --fs-h3: clamp(1.375rem, 1.2rem + 0.8vw, 1.5rem); /* 22 -> 24px */
+  --fs-title: 1.125rem; /* 18px */
+  --fs-body: 1rem; /* 16px */
+  --fs-sm: 0.875rem; /* 14px */
+  --fs-caption: 0.8125rem; /* 13px */
+  --fs-overline: 0.75rem; /* 12px — uppercase eyebrows */
+  --fs-micro: 0.6875rem; /* 11px — dense meta / pills (consolidates old 10/11px) */
+  --fs-nano: 0.625rem; /* 10px — smallest dense labels (consolidates old 8/9px) */
+
+  /* --- Letter-spacing ----------------------------------------------------- */
+  --tracking-display: -0.06em;
+  --tracking-tight: -0.04em;
+  --tracking-normal: 0;
+  --tracking-overline: 0.24em;
+
+  /* --- Motion ------------------------------------------------------------- */
+  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-reel: cubic-bezier(0.17, 0.84, 0.44, 1);
+  --dur-fast: 180ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+  --dur-page: 460ms;
+
+  /* --- Elevation system (consumed by glass classes in batch 2) ------------ */
+  /* Each level carries a full --elev-N-backdrop (blur + saturate) so batch 2
+     can reproduce the old glass treatments exactly; --elev-N-blur is the raw
+     radius for cases that don't need saturation. */
+  /* surface-0 · muted / page-inset (was .surface-muted) */
+  --elev-0-bg: rgba(255, 255, 255, 0.04);
+  --elev-0-border: rgba(255, 255, 255, 0.08);
+  --elev-0-blur: 16px;
+  --elev-0-backdrop: blur(16px);
+  --elev-0-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 18px 44px rgba(0, 0, 0, 0.12);
+  /* surface-1 · section / panel (was .liquid-panel) */
+  --elev-1-bg: linear-gradient(180deg, rgba(20, 28, 41, 0.84) 0%, rgba(11, 16, 25, 0.8) 100%);
+  --elev-1-border: rgba(255, 255, 255, 0.06);
+  --elev-1-blur: 22px;
+  --elev-1-backdrop: blur(22px) saturate(145%);
+  --elev-1-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 72px rgba(0, 0, 0, 0.26);
+  /* surface-2 · card (was .liquid-card) */
+  --elev-2-bg: linear-gradient(180deg, rgba(18, 25, 37, 0.76) 0%, rgba(11, 17, 27, 0.68) 100%);
+  --elev-2-border: rgba(255, 255, 255, 0.06);
+  --elev-2-blur: 18px;
+  --elev-2-backdrop: blur(18px) saturate(150%);
+  --elev-2-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 18px 46px rgba(0, 0, 0, 0.2);
+  /* surface-3 · overlay / shell / drawer (was .liquid-glass-shell) */
+  --elev-3-bg: linear-gradient(180deg, rgba(15, 21, 32, 0.9) 0%, rgba(10, 15, 23, 0.8) 100%);
+  --elev-3-border: rgba(255, 255, 255, 0.07);
+  --elev-3-blur: 30px;
+  --elev-3-backdrop: blur(30px) saturate(150%);
+  --elev-3-shadow: 0 34px 110px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+
+  /* --- Texture dials (batch §6.4 — single levers for glass feel) ---------- */
+  --sheen-top: rgba(255, 255, 255, 0.1); /* top inner highlight (was 0.14 on cards) */
+  --edge-light: rgba(255, 255, 255, 0.55); /* main edge reflection (was 0.82–0.9) */
+  --edge-soft: rgba(255, 255, 255, 0.34); /* secondary soft edge */
+  --edge-opacity: 0.55; /* reflection layer opacity (was 0.72) */
+  --glow-brand: rgba(222, 64, 42, 0.18); /* primary glow rest (was 0.28) */
+  --glow-brand-strong: rgba(222, 64, 42, 0.24); /* primary glow hover (was 0.34) */
+
+  /* --- Landing primitives (additive) ------------------------------------- */
+  --energy: var(--brand);
+  --energy-soft: var(--brand-soft);
+  --tier-starter: var(--stage-s1);
+  --tier-growth: #f0a070;
+  --tier-studio: var(--accent-violet);
+  --momentum-line: var(--accent-green);
 }
 
 html,
@@ -101,45 +242,212 @@ a {
     margin-bottom: 1rem;
   }
 
+  /*
+   * Typography scale (batch 3). Each .type-* class bundles size + line-height +
+   * tracking + a default weight. Defined in @layer components so utility classes
+   * (font-semibold, text-white, leading-*, tracking-*) still override per-use.
+   * Heading sizes are fluid/capped via the --fs-* clamp tokens.
+   */
+  .type-display {
+    font-size: var(--fs-display);
+    line-height: 1.04;
+    letter-spacing: var(--tracking-display);
+    font-weight: 700;
+  }
+
+  .type-h1 {
+    font-size: var(--fs-h1);
+    line-height: 1.06;
+    letter-spacing: var(--tracking-display);
+    font-weight: 600;
+  }
+
+  .type-h2 {
+    font-size: var(--fs-h2);
+    line-height: 1.14;
+    letter-spacing: var(--tracking-tight);
+    font-weight: 600;
+  }
+
+  .type-h3 {
+    font-size: var(--fs-h3);
+    line-height: 1.2;
+    letter-spacing: var(--tracking-tight);
+    font-weight: 600;
+  }
+
+  .type-title {
+    font-size: var(--fs-title);
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  .type-body {
+    font-size: var(--fs-body);
+    line-height: 1.6;
+  }
+
+  .type-sm {
+    font-size: var(--fs-sm);
+    line-height: 1.55;
+  }
+
+  .type-caption {
+    font-size: var(--fs-caption);
+    line-height: 1.5;
+  }
+
+  .type-overline {
+    font-size: var(--fs-overline);
+    line-height: 1.4;
+    letter-spacing: var(--tracking-overline);
+    text-transform: uppercase;
+  }
+
+  /*
+   * Status / stage tone classes (batch 5 — color decoupling). Each bundles
+   * border-color + background + text from a single hue token via color-mix, so
+   * status semantics never borrow brand red. Apply alongside a `border` width
+   * utility. Stage hues are intentionally separate from --state-* hues.
+   */
+  .tone-stage-s1,
+  .tone-stage-buyout,
+  .tone-stage-s2,
+  .tone-state-success,
+  .tone-state-info,
+  .tone-state-warning,
+  .tone-state-danger,
+  .tone-state-pending {
+    border-color: color-mix(in srgb, var(--tone) 32%, transparent);
+    background: color-mix(in srgb, var(--tone) 14%, #0b0f17);
+    color: color-mix(in srgb, var(--tone) 62%, #ffffff);
+  }
+
+  .tone-stage-s1 {
+    --tone: var(--stage-s1);
+  }
+
+  .tone-stage-buyout {
+    --tone: var(--stage-buyout);
+  }
+
+  .tone-stage-s2 {
+    --tone: var(--stage-s2);
+  }
+
+  .tone-state-success {
+    --tone: var(--state-success);
+  }
+
+  .tone-state-info {
+    --tone: var(--state-info);
+  }
+
+  .tone-state-warning {
+    --tone: var(--state-warning);
+  }
+
+  .tone-state-danger {
+    --tone: var(--state-danger);
+  }
+
+  .tone-state-pending {
+    --tone: var(--accent-violet);
+  }
+
+  .tone-state-neutral {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #cbd6e7;
+  }
+
+  /*
+   * Canonical elevation surfaces (batch 2). Pure token-driven — use these for
+   * new work. Legacy glass classes below now alias the same --elev-* tokens so
+   * output is pixel-identical during migration.
+   *   surface-0  muted / page-inset      (legacy: .surface-muted)
+   *   surface-1  section / panel         (legacy: .liquid-panel)
+   *   surface-2  card                    (legacy: .liquid-card)
+   *   surface-3  overlay / shell / drawer (legacy base of .liquid-glass-shell)
+   * Note: .glass-card is a deliberately separate bright-glass content card and
+   * is NOT part of this elevation ramp.
+   */
+  .surface-0 {
+    border-radius: var(--radius-card);
+    background: var(--elev-0-bg);
+    border: 1px solid var(--elev-0-border);
+    box-shadow: var(--elev-0-shadow);
+    backdrop-filter: var(--elev-0-backdrop);
+    -webkit-backdrop-filter: var(--elev-0-backdrop);
+  }
+
+  .surface-1 {
+    border-radius: var(--radius-card);
+    background: var(--elev-1-bg);
+    border: 1px solid var(--elev-1-border);
+    box-shadow: var(--elev-1-shadow);
+    backdrop-filter: var(--elev-1-backdrop);
+    -webkit-backdrop-filter: var(--elev-1-backdrop);
+    transition:
+      transform var(--dur-base) var(--ease-fluid),
+      border-color var(--dur-base) var(--ease-fluid),
+      box-shadow var(--dur-base) var(--ease-fluid);
+  }
+
+  .surface-2 {
+    border-radius: var(--radius-card);
+    background: var(--elev-2-bg);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+    backdrop-filter: var(--elev-2-backdrop);
+    -webkit-backdrop-filter: var(--elev-2-backdrop);
+  }
+
+  .surface-3 {
+    position: relative;
+    overflow: hidden;
+    border-radius: calc(var(--radius-card) + 0.25rem);
+    background: var(--elev-3-bg);
+    border: 1px solid var(--elev-3-border);
+    box-shadow: var(--elev-3-shadow);
+    backdrop-filter: var(--elev-3-backdrop);
+    -webkit-backdrop-filter: var(--elev-3-backdrop);
+  }
+
+  /* Legacy alias — equals surface-1 (--elev-1). */
   .liquid-panel {
     border-radius: var(--radius-card);
-    background: linear-gradient(180deg, rgba(20, 28, 41, 0.84) 0%, rgba(11, 16, 25, 0.8) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 26px 72px rgba(0, 0, 0, 0.26);
-    backdrop-filter: blur(22px) saturate(145%);
-    -webkit-backdrop-filter: blur(22px) saturate(145%);
+    background: var(--elev-1-bg);
+    border: 1px solid var(--elev-1-border);
+    box-shadow: var(--elev-1-shadow);
+    backdrop-filter: var(--elev-1-backdrop);
+    -webkit-backdrop-filter: var(--elev-1-backdrop);
     transition:
-      transform 220ms var(--ease-fluid),
-      border-color 220ms var(--ease-fluid),
-      box-shadow 220ms var(--ease-fluid);
+      transform var(--dur-base) var(--ease-fluid),
+      border-color var(--dur-base) var(--ease-fluid),
+      box-shadow var(--dur-base) var(--ease-fluid);
   }
 
+  /* Legacy alias — equals surface-2 (--elev-2). */
   .liquid-card {
     border-radius: var(--radius-card);
-    background: linear-gradient(180deg, rgba(18, 25, 37, 0.76) 0%, rgba(11, 17, 27, 0.68) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.02),
-      0 18px 46px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    background: var(--elev-2-bg);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+    backdrop-filter: var(--elev-2-backdrop);
+    -webkit-backdrop-filter: var(--elev-2-backdrop);
   }
 
+  /* Legacy alias — base equals surface-3 (--elev-3) + decorative highlights. */
   .liquid-glass-shell {
     position: relative;
     overflow: hidden;
     border-radius: calc(var(--radius-card) + 0.25rem);
-    background:
-      linear-gradient(180deg, rgba(15, 21, 32, 0.9) 0%, rgba(10, 15, 23, 0.8) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow:
-      0 34px 110px rgba(0, 0, 0, 0.34),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(30px) saturate(150%);
-    -webkit-backdrop-filter: blur(30px) saturate(150%);
+    background: var(--elev-3-bg);
+    border: 1px solid var(--elev-3-border);
+    box-shadow: var(--elev-3-shadow);
+    backdrop-filter: var(--elev-3-backdrop);
+    -webkit-backdrop-filter: var(--elev-3-backdrop);
   }
 
   .liquid-glass-shell::before {
@@ -159,10 +467,10 @@ a {
     pointer-events: none;
     border-radius: inherit;
     box-shadow:
-      inset -12px -8px 0 -13px rgba(255, 255, 255, 0.82),
-      inset 0 -8px 0 -7px rgba(255, 255, 255, 0.28);
-    opacity: 0.72;
-    filter: blur(0.6px) brightness(1.08);
+      inset -12px -8px 0 -13px var(--edge-light),
+      inset 0 -8px 0 -7px var(--edge-soft);
+    opacity: var(--edge-opacity);
+    filter: blur(0.6px) brightness(1.04);
   }
 
   .liquid-pill {
@@ -190,7 +498,7 @@ a {
     position: relative;
     overflow: hidden;
     border-radius: var(--radius-card);
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.03) 100%);
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow:
       0 14px 44px rgba(0, 0, 0, 0.28),
@@ -264,7 +572,7 @@ a {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0) 60%);
+    background: linear-gradient(155deg, var(--sheen-top) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0) 60%);
     z-index: 2;
     border-radius: inherit;
   }
@@ -276,16 +584,16 @@ a {
     background: rgba(255, 255, 255, 0.04);
     border-radius: inherit;
     box-shadow:
-      inset -10px -8px 0px -11px rgba(255, 255, 255, 0.9),
-      inset 0px -9px 0px -8px rgba(255, 255, 255, 0.7);
-    opacity: 0.72;
+      inset -10px -8px 0px -11px var(--edge-light),
+      inset 0px -9px 0px -8px var(--edge-soft);
+    opacity: var(--edge-opacity);
     z-index: 3;
     pointer-events: none;
-    filter: blur(0.5px) brightness(116%);
+    filter: blur(0.5px) brightness(106%);
   }
 
   .glass-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     border-color: rgba(255, 255, 255, 0.22);
     box-shadow:
       0 24px 64px rgba(0, 0, 0, 0.36),
@@ -303,17 +611,18 @@ a {
     -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
 
+  /* Legacy alias — unused in app (0 references); folded onto surface-3 tokens. */
   .liquid-glass-surface {
     border-radius: var(--radius-card);
-    background: linear-gradient(180deg, rgba(18, 24, 37, 0.9) 0%, rgba(11, 17, 27, 0.84) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    box-shadow:
-      0 24px 90px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    background: var(--elev-3-bg);
+    border: 1px solid var(--elev-3-border);
+    box-shadow: var(--elev-3-shadow);
+    backdrop-filter: var(--elev-3-backdrop);
+    -webkit-backdrop-filter: var(--elev-3-backdrop);
   }
 
+  /* Variant surface (1 usage) — kept literal to preserve exact look; candidate
+     to fold onto surface-3 in a later pass if a small visual delta is accepted. */
   .detail-card-surface {
     border-radius: var(--radius-card);
     background: linear-gradient(180deg, rgba(16, 22, 34, 0.82) 0%, rgba(9, 13, 20, 0.74) 100%);
@@ -353,7 +662,7 @@ a {
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: white;
     box-shadow:
-      0 18px 34px rgba(222, 64, 42, 0.28),
+      0 14px 30px var(--glow-brand),
       inset 0 1px 0 rgba(255, 255, 255, 0.16);
     transition:
       transform 180ms var(--ease-fluid),
@@ -365,7 +674,7 @@ a {
     transform: translateY(-1px);
     filter: brightness(1.04);
     box-shadow:
-      0 22px 40px rgba(222, 64, 42, 0.34),
+      0 18px 34px var(--glow-brand-strong),
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
 
@@ -410,8 +719,8 @@ a {
     inset: 0;
     pointer-events: none;
     border-radius: inherit;
-    box-shadow: inset -10px -7px 0 -11px rgba(255, 255, 255, 0.7);
-    opacity: 0.6;
+    box-shadow: inset -10px -7px 0 -11px var(--edge-light);
+    opacity: var(--edge-opacity);
   }
 
   .scroll-reveal-search-header {
@@ -433,6 +742,8 @@ a {
       border-color 180ms var(--ease-fluid);
   }
 
+  /* Variant surface (1 usage) — kept literal to preserve exact look; candidate
+     to fold onto surface-3 in a later pass if a small visual delta is accepted. */
   .app-shell-frame {
     position: relative;
     overflow: hidden;
@@ -499,15 +810,14 @@ a {
     animation: section-enter 420ms var(--ease-fluid);
   }
 
+  /* Legacy alias — equals surface-0 (--elev-0). */
   .surface-muted {
     border-radius: var(--radius-card);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.02),
-      0 18px 44px rgba(0, 0, 0, 0.12);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: var(--elev-0-bg);
+    border: 1px solid var(--elev-0-border);
+    box-shadow: var(--elev-0-shadow);
+    backdrop-filter: var(--elev-0-backdrop);
+    -webkit-backdrop-filter: var(--elev-0-backdrop);
   }
 
   .input-glass {
@@ -635,12 +945,12 @@ a {
 
   .backdrop-orb {
     filter: blur(120px);
-    opacity: 0.5;
+    opacity: 0.32;
     will-change: transform, opacity;
   }
 
   .backdrop-orb-1 {
-    background: radial-gradient(circle, rgba(64, 105, 180, 0.18) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(64, 105, 180, 0.12) 0%, transparent 70%);
     animation: orb-float-1 24s ease-in-out infinite;
   }
 
@@ -650,7 +960,7 @@ a {
   }
 
   .backdrop-orb-3 {
-    background: radial-gradient(circle, rgba(52, 78, 130, 0.14) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(52, 78, 130, 0.09) 0%, transparent 70%);
     animation: orb-float-3 32s ease-in-out infinite;
   }
 
@@ -660,7 +970,7 @@ a {
   }
 
   .backdrop-orb-5 {
-    background: radial-gradient(circle, rgba(74, 120, 200, 0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(74, 120, 200, 0.07) 0%, transparent 70%);
     animation: orb-float-5 26s ease-in-out infinite;
   }
 
@@ -671,9 +981,9 @@ a {
 
   .explore-mesh-bg {
     background:
-      radial-gradient(circle at 20% 50%, rgba(222, 64, 42, 0.08), transparent 40%),
-      radial-gradient(circle at 80% 30%, rgba(101, 236, 175, 0.06), transparent 35%),
-      radial-gradient(circle at 50% 80%, rgba(103, 184, 255, 0.05), transparent 30%);
+      radial-gradient(circle at 20% 50%, rgba(222, 64, 42, 0.055), transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(101, 236, 175, 0.04), transparent 35%),
+      radial-gradient(circle at 50% 80%, rgba(103, 184, 255, 0.035), transparent 30%);
     animation: mesh-shift 20s ease-in-out infinite;
   }
 }
@@ -863,9 +1173,9 @@ a {
 }
 
 @keyframes orb-float-1 {
-  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
-  33% { opacity: 0.62; transform: translate(30px, -20px) scale(1.06); }
-  66% { opacity: 0.44; transform: translate(-18px, 14px) scale(0.96); }
+  0%, 100% { opacity: 0.32; transform: translate(0, 0) scale(1); }
+  33% { opacity: 0.4; transform: translate(30px, -20px) scale(1.06); }
+  66% { opacity: 0.28; transform: translate(-18px, 14px) scale(0.96); }
 }
 
 @keyframes orb-float-2 {
@@ -875,8 +1185,8 @@ a {
 }
 
 @keyframes orb-float-3 {
-  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
-  50% { opacity: 0.6; transform: translate(20px, 22px) scale(1.05); }
+  0%, 100% { opacity: 0.32; transform: translate(0, 0) scale(1); }
+  50% { opacity: 0.38; transform: translate(20px, 22px) scale(1.05); }
 }
 
 @keyframes orb-float-4 {
@@ -886,9 +1196,9 @@ a {
 }
 
 @keyframes orb-float-5 {
-  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
-  45% { opacity: 0.56; transform: translate(22px, -18px) scale(1.04); }
-  80% { opacity: 0.43; transform: translate(-14px, 10px) scale(0.97); }
+  0%, 100% { opacity: 0.32; transform: translate(0, 0) scale(1); }
+  45% { opacity: 0.36; transform: translate(22px, -18px) scale(1.04); }
+  80% { opacity: 0.27; transform: translate(-14px, 10px) scale(0.97); }
 }
 
 @keyframes mesh-shift {
@@ -897,10 +1207,13 @@ a {
   66% { opacity: 0.95; transform: scale(0.98) rotate(-0.5deg); }
 }
 
-.feed-masonry-item {
-  content-visibility: auto;
-  contain-intrinsic-size: 360px;
-}
+/* NOTE: `content-visibility: auto; contain-intrinsic-size: 360px;` was removed.
+   Inside the CSS multi-column masonry it applied size/layout containment to the
+   cards, which broke column flow and let the first card's absolutely-positioned
+   image layer blow out and cover the whole viewport (sidebar/topbar hidden, all
+   hit-tests landing on the first PostCard <img>). The off-screen-render perf win
+   is not worth the layout breakage. The `.feed-masonry-item` class is still added
+   in PostCard markup but is now an intentional no-op (no containment). */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

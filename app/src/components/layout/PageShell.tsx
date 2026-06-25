@@ -18,6 +18,7 @@ type PageShellProps = {
   tabs?: RouteItem[];
   title?: string;
   topbarMode?: TopbarMode;
+  topbarLeading?: ReactNode;
 };
 
 export const PageShell = ({
@@ -31,13 +32,14 @@ export const PageShell = ({
   tabs,
   title,
   topbarMode = "sticky",
+  topbarLeading,
 }: PageShellProps) => {
   const router = useRouter();
   const { t } = useI18n();
   const showHeaderCard = Boolean(title || subtitle || action || tabs?.length);
 
   return (
-    <UserShell header={hideTopbar ? undefined : <UserTopbar hideSearch={hideSearch} mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
+    <UserShell header={hideTopbar ? undefined : <UserTopbar hideSearch={hideSearch} leading={topbarLeading} mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
       <div className="space-y-6 py-4">
         {showHeaderCard ? (
           <section className="liquid-glass-shell hero-glow section-enter relative p-6 md:p-8">
@@ -45,9 +47,9 @@ export const PageShell = ({
             {title || subtitle || action ? (
               <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
-                  <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">{eyebrow}</p>
+                  <p className="type-overline text-[color:var(--text-faint)]">{eyebrow}</p>
                   {title ? (
-                    <h1 className="mt-3 text-[38px] font-semibold tracking-[-0.06em] text-white md:text-[46px]">
+                    <h1 className="type-h1 mt-3 font-semibold text-white">
                       {title}
                     </h1>
                   ) : null}

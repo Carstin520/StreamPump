@@ -8,7 +8,7 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { useManagedWallet } from "@/hooks/useManagedWallet";
 import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
 import { buildClaimEndorsementTransaction, buildEndorseProposalTransaction } from "@/lib/api/proposal";
-import { executeManagedWalletAction, getS1Portfolio, S1PortfolioResponse } from "@/lib/api/s1";
+import { getS1Portfolio, runManagedWalletAction, S1PortfolioResponse } from "@/lib/api/s1";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
 import { formatUsdcAtomic } from "@/lib/formatting";
 import { getStoredAuthSession } from "@/lib/auth-session";
@@ -20,7 +20,6 @@ import { compactNumber, findCreator, formatUsd } from "@/lib/public-data";
 const creator = findCreator("neo-park");
 
 const SPONSOR_NAME = "Nova Screen";
-const CAMPAIGN_BRIEF = "Nova Screen's sponsored review video reaches 10,000 likes within the campaign window.";
 const TRACK1_BASE = 100_000;
 const TRACK2_BUDGET = 1_000_000;
 const TRACK3_BUDGET = 300_000;
@@ -31,7 +30,17 @@ const TRACK2_CURRENT = 0;
 const FAN_POOL_SHARE = TRACK2_BUDGET * 0.2;
 const FAN_BALANCE = 500_000;
 const STATUS = "FUNDED";
-const DEADLINE = "May 15, 2026";
+
+const localizeEnum = (
+  t: (key: string) => string,
+  prefix: string,
+  value: string | null | undefined,
+) => {
+  if (!value) return value ?? "";
+  const key = `${prefix}.${value}`;
+  const resolved = t(key);
+  return resolved === key ? value : resolved;
+};
 
 const ENDORSERS = [
   { name: "0xA7...91", amount: 50_000 },
@@ -60,7 +69,8 @@ type UserEndorsement = NonNullable<S1PortfolioResponse["s2Endorsements"]>[number
 
 export default function EndorsePage() {
   const router = useRouter();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "zh-CN";
   const [stakeAmount, setStakeAmount] = useState(10_000);
   const [endorsers, setEndorsers] = useState(ENDORSERS);
   const [demoSummary, setDemoSummary] = useState<string | null>(null);
@@ -157,7 +167,7 @@ export default function EndorsePage() {
   const track2Current = campaign
     ? parseAmount(campaign.budgetTracks.track2ActualValue, TRACK2_CURRENT)
     : TRACK2_CURRENT;
-  const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString() : DEADLINE;
+  const deadlineLabel = campaign ? new Date(campaign.deadlineAt).toLocaleDateString(dateLocale) : t("endorse.demoDeadline");
   const statusLabel = campaign?.status ?? STATUS;
   const track1Budget = campaign
     ? parseAmount(campaign.budgetTracks.track1BaseUsdc, TRACK1_BASE)
@@ -179,17 +189,18 @@ export default function EndorsePage() {
   const cancelVoidRefund = stakeAmount - cancelVoidLoss;
   const creatorName = campaign
     ? shortWallet(campaign.creatorWallet)
-    : locale === "en"
-      ? "Midnight Save"
-      : creator.name;
-  const campaignTitle = `${creatorName} × ${SPONSOR_NAME}`;
+    : creator.name;
+  // Data-truth fix: use real sponsor wallet on live campaigns; fall back to demo SPONSOR_NAME only when no live campaign
+  const campaignTitle = campaign
+    ? `${creatorName} × ${shortWallet(campaign.sponsorWallet)}`
+    : `${creatorName} × ${SPONSOR_NAME}`;
   const deadlineMs = campaign ? new Date(campaign.deadlineAt).getTime() : null;
   const isDeadlinePassed = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs <= Date.now();
   const liveEndorsementBlockedReason =
     campaign?.status && campaign.status !== "FUNDED"
-      ? `Campaign status is ${campaign.status}; endorse_proposal only accepts FUNDED campaigns.`
+      ? t("endorse.campaignStatus", { status: campaign.status })
       : isDeadlinePassed
-        ? "Campaign deadline has passed; endorse_proposal is closed."
+        ? t("endorse.deadlinePassed")
         : null;
   const isClaimableEndorsement = Boolean(
     userEndorsement &&
@@ -206,22 +217,25 @@ export default function EndorsePage() {
     : endorsers;
   const visibleTracks = [
     {
-      label: "Track 1 · Base",
+      label: `${t("campaign.track1Label")} · ${t("endorse.trackBase")}`,
       valueLabel: formatCampaignUsdValue(track1Budget),
       settled: campaign?.budgetTracks.track1Claimed ?? true,
       color: "#65ecaf",
+      gated: false,
     },
     {
-      label: `Track 2 · ${track2Metric}`,
+      label: `${t("campaign.track2Label")} · ${localizeEnum(t, "campaign.metricLabel", track2Metric)}`,
       valueLabel: formatCampaignUsdValue(track2Budget),
       settled: Boolean(campaign?.budgetTracks.track2SettledAt),
       color: "#67b8ff",
+      gated: false,
     },
     {
-      label: "Track 3 · CPS",
+      label: `${t("campaign.track3Label")} · CPS`,
       valueLabel: formatCampaignUsdValue(track3Budget),
       settled: Boolean(campaign?.budgetTracks.track3SettledAt),
       color: "#f3b33e",
+      gated: true,
     },
   ];
 
@@ -270,11 +284,11 @@ export default function EndorsePage() {
             const withoutYou = items.filter((item) => item.name !== "You");
             return [{ name: "You", amount: stakeAmount }, ...withoutYou];
           });
-          setDemoSummary(`Preview endorsed with ${compactNumber(stakeAmount)} SPUMP.`);
+          setDemoSummary(t("endorse.previewEndorsedSummary", { amount: compactNumber(stakeAmount) }));
         },
       });
     },
-    [demoFlow, stakeAmount],
+    [demoFlow, stakeAmount, t],
   );
 
   const handleBeginEndorse = useCallback(() => {
@@ -291,12 +305,12 @@ export default function EndorsePage() {
       if (managedWallet.isManagedWallet) {
         const session = getStoredAuthSession();
         if (!session?.accessToken) {
-          setDemoSummary("Sign in before sending an endorsement transaction.");
+          setDemoSummary(t("endorse.signInFirst"));
           return;
         }
         setManagedEndorseBusy(true);
         setManagedEndorseError(null);
-        void executeManagedWalletAction(session.accessToken, {
+        void runManagedWalletAction(session.accessToken, {
           action: "endorse-proposal",
           params: {
             proposalPda: campaign.proposalPda,
@@ -304,7 +318,7 @@ export default function EndorsePage() {
           },
         })
           .then(async (result) => {
-            setDemoSummary(`Managed endorse submitted: ${result.signature.slice(0, 8)}...`);
+            setDemoSummary(t("endorse.managedSubmitted", { sig: result.signature.slice(0, 8) }));
             const refreshed = await refreshCampaign();
             await refreshUserEndorsement(refreshed);
           })
@@ -321,7 +335,7 @@ export default function EndorsePage() {
         })
       ).then(async (result) => {
         if (result) {
-          setDemoSummary(`Endorse transaction submitted: ${result.signature.slice(0, 8)}...`);
+          setDemoSummary(t("endorse.txSubmittedSig", { sig: result.signature.slice(0, 8) }));
           const refreshed = await refreshCampaign();
           await refreshUserEndorsement(refreshed);
         }
@@ -340,6 +354,7 @@ export default function EndorsePage() {
     refreshUserEndorsement,
     router,
     stakeAmount,
+    t,
   ]);
 
   const handleClaimEndorsement = useCallback(() => {
@@ -351,28 +366,28 @@ export default function EndorsePage() {
       buildClaimEndorsementTransaction(token, campaign.proposalPda)
     ).then(async (result) => {
       if (result) {
-        setDemoSummary(`Claim transaction submitted: ${result.signature.slice(0, 8)}...`);
+        setDemoSummary(t("endorse.claimTxSubmitted", { sig: result.signature.slice(0, 8) }));
         const refreshed = await refreshCampaign();
         await refreshUserEndorsement(refreshed);
       }
     });
-  }, [campaign, claimFlow, refreshCampaign, refreshUserEndorsement, router, userEndorsement]);
+  }, [campaign, claimFlow, refreshCampaign, refreshUserEndorsement, router, t, userEndorsement]);
 
   return (
     <>
       <Head>
-        <title>{`StreamPump | Endorse ${creatorName}`}</title>
+        <title>{`StreamPump | ${t("endorse.pageTitle", { name: creatorName })}`}</title>
       </Head>
-      <PageShell eyebrow="S2 Endorsement Preview" title={`Endorse ${creatorName}`}>
+      <PageShell eyebrow={t("endorse.pageEyebrow")} title={t("endorse.pageTitle", { name: creatorName })}>
         <div className="space-y-5">
           <ProductReadinessBanner
             description={
               isLiveCampaign
-                ? "This page loads campaign projection data and builds wallet-signed endorse_proposal transactions. It still depends on seeded campaign state, SPUMP ATA readiness, and indexer confirmation for the projection update."
-                : "Stake amount, endorser list, and success state update locally because no live campaign projection was loaded for this route."
+                ? t("endorse.readinessBannerLiveDesc")
+                : t("endorse.readinessBannerPreviewDesc")
             }
             status={isLiveCampaign ? "SEEDED_DEMO" : "MOCK_PREVIEW"}
-            title={isLiveCampaign ? "S2 endorsement is API and wallet wired" : "S2 endorsement is a local interaction preview"}
+            title={isLiveCampaign ? t("endorse.readinessBannerLiveTitle") : t("endorse.readinessBannerPreviewTitle")}
           />
           <EndorsementPreviewNotice
             error={campaignError}
@@ -385,24 +400,29 @@ export default function EndorsePage() {
           <div className="space-y-5">
             {/* ── Campaign target ── */}
             <section className="liquid-card section-enter rounded-[28px] p-6">
-              <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">Campaign Target</p>
+              <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.24em] text-[#67b8ff]">{t("endorse.campaignTarget")}</p>
               <h2 className="mt-2 text-lg font-bold tracking-[-0.03em] text-white">{campaignTitle}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{CAMPAIGN_BRIEF}</p>
+              {/* Data-truth fix: only render the hardcoded brief in the non-live (demo) case */}
+              {!isLiveCampaign ? (
+                <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{t("endorse.demoBrief")}</p>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-[#9aabc4]">{t("endorse.liveBriefPlaceholder")}</p>
+              )}
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Metric</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {track2Metric}</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.metricLabel")}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white">{compactNumber(track2Target)} {localizeEnum(t, "campaign.metricLabel", track2Metric)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Cliff</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.cliffLabel")}</p>
                   <p className="mt-0.5 text-sm font-semibold text-white">{track2CliffFraction * 100}%</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Fan Pool</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.fanPoolLabel")}</p>
                   <p className="mt-0.5 text-sm font-semibold text-[#65ecaf]">{formatCampaignUsdValue(fanPoolShare)}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.04] px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-[0.14em] text-[#5a6d87]">Deadline</p>
+                  <p className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#5a6d87]">{t("endorse.deadlineLabel")}</p>
                   <p className="mt-0.5 text-sm font-semibold text-white">{deadlineLabel}</p>
                 </div>
               </div>
@@ -412,9 +432,9 @@ export default function EndorsePage() {
             <section className="liquid-card section-enter flex flex-col items-center gap-6 rounded-[28px] p-8">
               <div className="flex items-center gap-3 self-start">
                 <span className="liquid-pill rounded-full px-3 py-1 text-xs font-medium text-white">
-                  {statusLabel}
+                  {localizeEnum(t, "campaign.statusLabel", statusLabel)}
                 </span>
-                <span className="text-xs text-[#8ea0ba]">Deadline {deadlineLabel}</span>
+                <span className="text-xs text-[#8ea0ba]">{t("endorse.deadlineLabel")} {deadlineLabel}</span>
               </div>
 
               <div
@@ -481,24 +501,24 @@ export default function EndorsePage() {
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                     {formatCampaignUsdValue(successUsdc)}
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                    Est. USDC if success
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    {t("endorse.estUsdcSuccess")}
                   </p>
                 </div>
                 <div>
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-white">
                     {(fraction * 100).toFixed(1)}%
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                    Of balance
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    {t("endorse.ofBalance")}
                   </p>
                 </div>
                 <div>
                   <p className="text-[20px] font-semibold tracking-[-0.05em] text-[#de402a]">
                     {compactNumber(failLoss)}
                   </p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                    Fail slash
+                  <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                    {t("endorse.failSlash")}
                   </p>
                 </div>
               </div>
@@ -509,74 +529,74 @@ export default function EndorsePage() {
               {/* Success */}
               <section className="glass-card section-enter rounded-[28px] border border-[#65ecaf]/20 bg-[#65ecaf]/[0.04] p-6">
                 <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#65ecaf]">
-                  If Success
+                  {t("endorse.ifSuccess")}
                 </p>
                 <p className="mt-4 text-[32px] font-bold tracking-[-0.05em] text-[#65ecaf]">
                   100%
                 </p>
-                <p className="text-xs text-[#8ea0ba]">SPUMP returned</p>
+                <p className="text-xs text-[#8ea0ba]">{t("endorse.spumpReturned")}</p>
 
                 <div className="mt-5 space-y-3">
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(stakeAmount)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      SPUMP back
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                      {t("endorse.spumpBack")}
                     </p>
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                       +{formatCampaignUsdValue(successUsdc)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      Capped reward
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                      {t("endorse.cappedReward")}
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
-                  Track 2 metric ≥ {track2CliffFraction * 100}% cliff
+                <p className="mt-4 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
+                  {t("endorse.track2CliffNote", { pct: String(track2CliffFraction * 100) })}
                 </p>
               </section>
 
               {/* Fail */}
               <section className="glass-card section-enter rounded-[28px] border border-[#de402a]/20 bg-[#de402a]/[0.04] p-6">
                 <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#de402a]">
-                  If Fail
+                  {t("endorse.ifFail")}
                 </p>
                 <p className="mt-4 text-[32px] font-bold tracking-[-0.05em] text-[#de402a]">100%</p>
-                <p className="text-xs text-[#8ea0ba]">SPUMP returned</p>
+                <p className="text-xs text-[#8ea0ba]">{t("endorse.spumpReturned")}</p>
 
                 <div className="mt-5 space-y-3">
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(stakeAmount)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      SPUMP back
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                      {t("endorse.spumpBack")}
                     </p>
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#65ecaf]">
                       0
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      SPUMP slashed on fail
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                      {t("endorse.spumpSlashedOnFail")}
                     </p>
                   </div>
                   <div className="surface-muted rounded-2xl px-4 py-3">
                     <p className="text-[22px] font-semibold tracking-[-0.05em] text-[#8ea0ba]">
                       $0
                     </p>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">
-                      Capped reward
+                    <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">
+                      {t("endorse.cappedReward")}
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-[10px] leading-4 text-[#8ea0ba]">
-                  Track 2 metric &lt; {track2CliffFraction * 100}% cliff. Cancelled/voided campaigns still return only {compactNumber(cancelVoidRefund)} SPUMP and leave {compactNumber(cancelVoidLoss)} SPUMP unminted.
+                <p className="mt-4 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
+                  {t("endorse.failCliffNote", { pct: String(track2CliffFraction * 100), refund: compactNumber(cancelVoidRefund), loss: compactNumber(cancelVoidLoss) })}
                 </p>
               </section>
             </div>
@@ -584,17 +604,24 @@ export default function EndorsePage() {
             {/* ── Track progress rails ── */}
             <section className="liquid-card section-enter rounded-[28px] p-6">
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#8ea0ba]">
-                Track Settlement
+                {t("endorse.trackSettlement")}
               </p>
               <div className="mt-5 space-y-4">
-                {visibleTracks.map((t) => {
-                  const pct = t.settled ? 100 : (track2Current / Math.max(track2Target, 1)) * 100;
+                {visibleTracks.map((track) => {
+                  const pct = track.settled ? 100 : (track2Current / Math.max(track2Target, 1)) * 100;
                   return (
-                    <div key={t.label}>
+                    <div key={track.label}>
                       <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs text-[#8ea0ba]">{t.label}</span>
+                        <span className="flex items-center gap-1.5 text-xs text-[#8ea0ba]">
+                          {track.label}
+                          {track.gated && (
+                            <span className="rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-1.5 py-0.5 font-mono text-[length:var(--fs-micro)] font-semibold text-[#f3b33e]">
+                              {t("endorse.track3Gated")}
+                            </span>
+                          )}
+                        </span>
                         <span className="text-sm font-semibold tracking-[-0.05em] text-white">
-                          {t.valueLabel}
+                          {track.valueLabel}
                         </span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -602,12 +629,12 @@ export default function EndorsePage() {
                           className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${pct}%`,
-                            backgroundColor: t.color,
+                            backgroundColor: track.color,
                           }}
                         />
                       </div>
-                      <p className="mt-1 text-[10px] text-[#8ea0ba]">
-                        {t.settled ? "Settled" : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${track2Metric.toLowerCase()} · ${pct.toFixed(0)}%`}
+                      <p className="mt-1 text-[length:var(--fs-micro)] text-[#8ea0ba]">
+                        {track.settled ? t("endorse.settled") : `${compactNumber(track2Current)} / ${compactNumber(track2Target)} ${localizeEnum(t, "campaign.metricLabel", track2Metric)} · ${pct.toFixed(0)}%`}
                       </p>
                     </div>
                   );
@@ -635,15 +662,15 @@ export default function EndorsePage() {
                 <p className="truncate text-sm font-semibold text-white">{creatorName}</p>
                 <p className="truncate text-xs text-[#8ea0ba]">{creator.handle}</p>
               </div>
-              <span className="ml-auto shrink-0 rounded-full bg-[#65ecaf]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#65ecaf]">
-                S2 Active
+              <span className="ml-auto shrink-0 rounded-full bg-[#65ecaf]/10 px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-[#65ecaf]">
+                {t("endorse.s2Active")}
               </span>
             </section>
 
             {/* ── Endorser list ── */}
             <section className="liquid-card section-enter rounded-[28px] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#8ea0ba]">
-                Current Endorsers
+                {t("endorse.currentEndorsers")}
               </p>
               <div className="mt-4 space-y-3">
                 {visibleEndorsers.length > 0 ? visibleEndorsers.map((e) => (
@@ -651,19 +678,19 @@ export default function EndorsePage() {
                     key={e.name}
                     className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3"
                   >
-                    <span className="font-mono text-xs text-[#8ea0ba]">{e.name}</span>
+                    <span className="font-mono text-xs text-[#8ea0ba]">{e.name === "You" ? t("endorse.you") : e.name}</span>
                     <span className="text-sm font-semibold tracking-[-0.05em] text-white">
                       {compactNumber(e.amount)}
                     </span>
                   </div>
                 )) : (
                   <div className="rounded-2xl bg-white/[0.04] px-4 py-3 text-xs text-[#8ea0ba]">
-                    No indexed endorsement positions yet.
+                    {t("endorse.noEndorsers")}
                   </div>
                 )}
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-4">
-                <span className="text-xs text-[#8ea0ba]">Total endorsed</span>
+                <span className="text-xs text-[#8ea0ba]">{t("endorse.totalEndorsed")}</span>
                 <span className="text-sm font-semibold tracking-[-0.05em] text-white">
                   {compactNumber(totalEndorsed)}
                 </span>
@@ -673,14 +700,14 @@ export default function EndorsePage() {
             {/* ── Campaign summary ── */}
             <section className="liquid-card section-enter rounded-[28px] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#8ea0ba]">
-                Campaign
+                {t("endorse.campaignSection")}
               </p>
               <div className="mt-4 space-y-2.5">
                 {[
-                  ["Track 2 target", `${compactNumber(track2Target)} ${track2Metric.toLowerCase()}`],
-                  ["Cliff", `${track2CliffFraction * 100}%`],
-                  ["Fan pool (20%)", formatCampaignUsdValue(fanPoolShare)],
-                  ["Your balance", `${compactNumber(FAN_BALANCE)} SPUMP`],
+                  [t("endorse.track2Target"), `${compactNumber(track2Target)} ${localizeEnum(t, "campaign.metricLabel", track2Metric)}`],
+                  [t("endorse.cliff"), `${track2CliffFraction * 100}%`],
+                  [t("endorse.fanPool20"), formatCampaignUsdValue(fanPoolShare)],
+                  [t("endorse.yourBalance"), `${compactNumber(FAN_BALANCE)} SPUMP`],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-xs text-[#8ea0ba]">{label}</span>
@@ -709,29 +736,35 @@ export default function EndorsePage() {
             >
               {isLiveCampaign
                 ? managedEndorseBusy
-                  ? "Submitting managed endorsement..."
+                  ? t("endorse.submittingManaged")
                   : proposalFlow.state.status === "success"
-                  ? "Endorse transaction submitted"
+                  ? t("endorse.txSubmitted")
                   : proposalFlow.state.status === "building"
-                    ? "Building transaction..."
+                    ? t("endorse.buildingTx")
                     : proposalFlow.state.status === "waiting_signature"
-                      ? "Waiting for wallet..."
+                      ? t("endorse.waitingWallet")
                       : proposalFlow.state.status === "submitting"
-                        ? "Submitting..."
+                        ? t("endorse.submitting")
                         : liveEndorsementBlockedReason
-                          ? "Endorsement closed"
+                          ? t("endorse.endorsementClosed")
                         : managedWallet.isManagedWallet
-                          ? `Managed endorse ${compactNumber(stakeAmount)} SPUMP`
-                          : `Endorse ${compactNumber(stakeAmount)} SPUMP`
+                          ? t("endorse.managedEndorse", { amount: compactNumber(stakeAmount) })
+                          : t("endorse.endorseAmount", { amount: compactNumber(stakeAmount) })
                 : demoFlow.busy
-                  ? "Simulating..."
+                  ? t("endorse.simulating")
                   : demoFlow.state.status === "success"
-                    ? "Preview endorsed"
-                    : `Preview endorse ${compactNumber(stakeAmount)} SPUMP`}
+                    ? t("endorse.previewEndorsed")
+                    : t("endorse.previewEndorse", { amount: compactNumber(stakeAmount) })}
             </button>
+
+            {/* Capped-flat disclaimer */}
+            <p className="text-center text-[length:var(--fs-micro)] leading-5 text-[#5a6d87]">
+              {t("endorse.cappedFlatDisclaimer")}
+            </p>
+
             {isLiveCampaign ? (
               <section className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[#8ea0ba]">Wallet transaction</p>
+                <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#8ea0ba]">{t("endorse.walletTx")}</p>
                 <p className="mt-1 text-xs leading-5 text-[#a7b2c4]">
                   {liveEndorsementBlockedReason
                     ? liveEndorsementBlockedReason
@@ -742,46 +775,46 @@ export default function EndorsePage() {
                     : proposalFlow.state.signature
                       ? `Signature ${proposalFlow.state.signature}`
                       : managedWallet.isManagedWallet
-                        ? "The backend signs and relays endorse_proposal with the managed wallet; oracle pays the transaction fee."
-                        : "The backend builds endorse_proposal; your wallet signs and the backend relays the signed transaction."}
+                        ? t("endorse.managedRelayDesc")
+                        : t("endorse.walletRelayDesc")}
                 </p>
               </section>
             ) : (
               <DemoActionStatusCard
                 amountLabel={`${compactNumber(stakeAmount)} SPUMP`}
-                confirmLabel="Confirm Preview"
-                description="Confirm this mock SPUMP endorsement. No wallet signature, token burn, endorsement PDA, or backend write will occur; the endorser list updates locally."
+                confirmLabel={t("endorse.demoConfirmLabel")}
+                description={t("endorse.demoConfirmDesc")}
                 onCancel={demoFlow.reset}
                 onConfirm={handleConfirmEndorse}
                 onRetry={demoFlow.retry}
                 state={demoFlow.state}
-                successLabel="Preview endorsed"
-                title="Mock endorsement confirmation"
+                successLabel={t("endorse.demoSuccessLabel")}
+                title={t("endorse.demoTitle")}
               />
             )}
             {demoSummary ? (
-              <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[12px] font-medium text-[#8df0c4]">
+              <div className="rounded-[18px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 px-4 py-3 text-[length:var(--fs-overline)] font-medium text-[#8df0c4]">
                 {demoSummary}
               </div>
             ) : null}
             {isLiveCampaign && userEndorsement ? (
               <section className="liquid-card section-enter rounded-[28px] p-5">
                 <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#8ea0ba]">
-                  Your Endorsement
+                  {t("endorse.yourEndorsement")}
                 </p>
                 <div className="mt-4 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#8ea0ba]">Staked</span>
+                    <span className="text-xs text-[#8ea0ba]">{t("endorse.staked")}</span>
                     <span className="text-sm font-semibold text-white">{compactNumber(Number(userEndorsement.stakedSpumpAmount))} SPUMP</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#8ea0ba]">Capped reward estimate</span>
+                    <span className="text-xs text-[#8ea0ba]">{t("endorse.cappedRewardEst")}</span>
                     <span className="text-sm font-semibold text-[#65ecaf]">{formatUsdcAtomic(Number(userEndorsement.estimatedUsdcReward))}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#8ea0ba]">Status</span>
+                    <span className="text-xs text-[#8ea0ba]">{t("endorse.status")}</span>
                     <span className="text-sm font-semibold text-white">
-                      {userEndorsement.claimedStatus ? "Claimed" : userEndorsement.status ?? "Pending"}
+                      {userEndorsement.claimedStatus ? t("endorse.claimed") : (userEndorsement.status ? localizeEnum(t, "campaign.statusLabel", userEndorsement.status) : t("endorse.pending"))}
                     </span>
                   </div>
                 </div>
@@ -797,18 +830,18 @@ export default function EndorsePage() {
                     type="button"
                   >
                     {claimFlow.state.status === "building"
-                      ? "Building claim..."
+                      ? t("endorse.buildingClaim")
                       : claimFlow.state.status === "waiting_signature"
-                        ? "Waiting for wallet..."
+                        ? t("endorse.waitingWalletClaim")
                         : claimFlow.state.status === "submitting"
-                          ? "Submitting claim..."
-                          : "Claim endorsement reward"}
+                          ? t("endorse.submittingClaim")
+                          : t("endorse.claimReward")}
                   </button>
                 ) : (
                   <p className="mt-4 rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-[#8ea0ba]">
                     {userEndorsement.claimedStatus
-                      ? "Reward has already been claimed."
-                      : "Claim opens after Track 2 settlement or cancellation/void resolution."}
+                      ? t("endorse.rewardClaimed")
+                      : t("endorse.claimOpensAfter")}
                   </p>
                 )}
                 {claimFlow.state.status === "failed" ? (
@@ -832,28 +865,31 @@ const EndorsementPreviewNotice = ({
   error: string | null;
   isLiveCampaign: boolean;
   proposalId: string;
-}) => (
-  <section className="rounded-[20px] border border-[#f3b33e]/25 bg-[#1f1708]/60 px-4 py-3">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#f3c66e]">
-          {isLiveCampaign ? "Seeded chain/API path" : "Local simulator"}
-        </p>
-        <p className="mt-1 text-sm font-semibold text-white">
-          {isLiveCampaign ? "Campaign projection loaded" : "No campaign projection is loaded here"}
-        </p>
-        <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
-          {isLiveCampaign
-            ? "Endorsement now builds a real wallet-signed transaction and writes the endorsement projection after indexer sync. Keep this surfaced as SEEDED_DEMO until devnet SPUMP balances, ATAs, and seeded campaign state are verified."
-            : "The route keeps the proposal id for context, but this surface currently uses local fixture values only. Real promotion requires SPUMP burn, endorsement PDA creation, reward pool projection, and claim state from the backend/indexer."}
-          {error ? ` API fallback reason: ${error}` : ""}
-        </p>
+}) => {
+  const { t } = useI18n();
+  return (
+    <section className="rounded-[20px] border tone-state-warning px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.2em]">
+            {isLiveCampaign ? t("endorse.seededChainLabel") : t("endorse.localSimLabel")}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-white">
+            {isLiveCampaign ? t("endorse.projectionLoaded") : t("endorse.noProjection")}
+          </p>
+          <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
+            {isLiveCampaign
+              ? t("endorse.projectionLoadedDesc")
+              : t("endorse.noProjectionDesc")}
+            {error ? ` ${t("endorse.apiError", { error })}` : ""}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
+          {proposalId || "proposal pending"}
+        </span>
       </div>
-      <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[10px] font-semibold text-[#f8d48a]">
-        {proposalId || "proposal pending"}
-      </span>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 (EndorsePage as typeof EndorsePage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;
