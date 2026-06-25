@@ -18,6 +18,7 @@ type PageShellProps = {
   tabs?: RouteItem[];
   title?: string;
   topbarMode?: TopbarMode;
+  topbarLeading?: ReactNode;
 };
 
 export const PageShell = ({
@@ -31,13 +32,14 @@ export const PageShell = ({
   tabs,
   title,
   topbarMode = "sticky",
+  topbarLeading,
 }: PageShellProps) => {
   const router = useRouter();
   const { t } = useI18n();
   const showHeaderCard = Boolean(title || subtitle || action || tabs?.length);
 
   return (
-    <UserShell header={hideTopbar ? undefined : <UserTopbar hideSearch={hideSearch} mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
+    <UserShell header={hideTopbar ? undefined : <UserTopbar hideSearch={hideSearch} leading={topbarLeading} mode={topbarMode} searchPlaceholder={searchPlaceholder} />}>
       <div className="space-y-6 py-4">
         {showHeaderCard ? (
           <section className="liquid-glass-shell hero-glow section-enter relative p-6 md:p-8">

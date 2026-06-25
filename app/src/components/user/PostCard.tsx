@@ -4,6 +4,7 @@ import { primeHlsJs } from "@/components/shared/hlsPreload";
 import { ProgressiveImage } from "@/components/shared/ProgressiveImage";
 import { StagePill } from "@/components/shared/StagePill";
 import { PostRecord } from "@/lib/api/types";
+import { useI18n } from "@/lib/i18n";
 import { compactNumber } from "@/lib/public-data";
 
 const stageGlow: Record<PostRecord["stage"], string> = {
@@ -56,6 +57,9 @@ export const PostCard = ({
   onClick?: () => void;
   onPreview?: () => void;
 }) => {
+  const { t } = useI18n();
+  const imageCount = post.gallerySrcs?.length ?? 0;
+
   const handlePreview = () => {
     onPreview?.();
 
@@ -82,9 +86,26 @@ export const PostCard = ({
           <StagePill stage={post.stage} />
         </div>
 
-        {(post.type === "VIDEO" || post.hasMultipleImages) ? (
-          <div className="absolute right-3 top-3 z-[2] flex h-8 min-w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 px-2 text-[length:var(--fs-micro)] uppercase tracking-[0.16em] text-white backdrop-blur-md">
-            {post.type === "VIDEO" ? "▶" : "•••"}
+        {/* Top-right: video duration, or multi-image count (▤ N 图) */}
+        {post.type === "VIDEO" && post.durationLabel ? (
+          <div className="absolute right-3 top-3 z-[2] rounded-md bg-black/55 px-1.5 py-0.5 font-mono text-[length:var(--fs-nano)] text-white backdrop-blur-md">
+            {post.durationLabel}
+          </div>
+        ) : post.hasMultipleImages && imageCount > 1 ? (
+          <div className="absolute right-3 top-3 z-[2] flex items-center gap-1 rounded-md bg-black/55 px-2 py-0.5 text-[length:var(--fs-nano)] font-medium text-white backdrop-blur-md">
+            <span aria-hidden>▤</span>
+            <span>{t("feed.imageCount", { count: String(imageCount) })}</span>
+          </div>
+        ) : null}
+
+        {/* Centered circular play button for video */}
+        {post.type === "VIDEO" ? (
+          <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur-md">
+              <svg className="ml-0.5 h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </span>
           </div>
         ) : null}
 
@@ -97,7 +118,7 @@ export const PostCard = ({
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <span className="text-[length:var(--fs-caption)] text-[#8ea0ba]">
-                {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : "metrics pending"}
+                {post.likes > 0 ? `♡ ${compactNumber(post.likes)}` : t("feed.metricsPending")}
               </span>
               <EnergyTailChip stage={post.stage} />
             </div>

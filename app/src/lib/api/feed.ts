@@ -1,5 +1,5 @@
 import { CommentRecord, PostRecord } from "@/lib/api/types";
-import { findLocalCommentsByTitle } from "@/lib/mocks/discover";
+import { findLocalEngagementByTitle } from "@/lib/mocks/discover";
 import { apiClient } from "./client";
 
 type PublicFeedAssetRecord = {
@@ -164,9 +164,10 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   const creatorKey = slugify(creatorName);
   const avatarSeed = `${creatorKey}:${post.slug}`;
   const resolvedTitle = post.title?.trim() || post.slug;
-  // The public-feed projection does not carry comments yet; enrich with the
-  // seeded local comment thread when the (unique, stable) title matches.
-  const localComments = findLocalCommentsByTitle(resolvedTitle);
+  // The public-feed projection does not carry engagement yet; enrich with the
+  // seeded local data (comments + like/save counts) when the (unique, stable)
+  // title matches.
+  const localEngagement = findLocalEngagementByTitle(resolvedTitle);
 
   return {
     id: post.postId,
@@ -180,9 +181,9 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     body: post.body?.trim() || post.excerpt?.trim() || "",
     tags: post.tags,
     stage: stageFromMetadata(post.creatorStage),
-    likes: 0,
-    saves: 0,
-    commentsCount: localComments?.commentsCount ?? 0,
+    likes: localEngagement?.likes ?? 0,
+    saves: localEngagement?.saves ?? 0,
+    commentsCount: localEngagement?.commentsCount ?? 0,
     timeLabel: post.publishTimeLabel?.trim() || "Imported",
     location: post.location?.trim() || "Unknown",
     mediaHeightClass: inferMediaHeightClass(post),
@@ -191,7 +192,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     ...(videoSrc ? { videoSrc } : {}),
     ...(gallerySrcs.length > 0 ? { gallerySrcs } : {}),
     hasMultipleImages: gallerySrcs.length > 1,
-    comments: localComments?.comments ?? ([] as CommentRecord[]),
+    comments: localEngagement?.comments ?? ([] as CommentRecord[]),
   };
 };
 

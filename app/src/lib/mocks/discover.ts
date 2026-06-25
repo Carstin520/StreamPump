@@ -681,18 +681,32 @@ export const findPost = (postId: string) => postIndex.get(postId) ?? posts[0];
 const normalizePostTitleKey = (value: string) =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
 
-const localCommentsByTitle = new Map(
+type LocalEngagement = {
+  comments: CommentRecord[];
+  commentsCount: number;
+  likes: number;
+  saves: number;
+};
+
+const localEngagementByTitle = new Map<string, LocalEngagement>(
   posts.map((post) => [
     normalizePostTitleKey(post.title),
-    { comments: post.comments, commentsCount: post.commentsCount },
+    {
+      comments: post.comments,
+      commentsCount: post.commentsCount,
+      likes: post.likes,
+      saves: post.saves,
+    },
   ]),
 );
 
-export const findLocalCommentsByTitle = (
+// Engagement (comments + like/save counts) seeded per post, joined by title so
+// the backend public-feed projection (which omits these) can be enriched.
+export const findLocalEngagementByTitle = (
   title: string | null | undefined,
-): { comments: CommentRecord[]; commentsCount: number } | null => {
+): LocalEngagement | null => {
   if (!title) {
     return null;
   }
-  return localCommentsByTitle.get(normalizePostTitleKey(title)) ?? null;
+  return localEngagementByTitle.get(normalizePostTitleKey(title)) ?? null;
 };
