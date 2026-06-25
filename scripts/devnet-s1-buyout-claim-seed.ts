@@ -3,6 +3,7 @@ import path from "path";
 
 import * as anchor from "@coral-xyz/anchor";
 import { ed25519 } from "@noble/curves/ed25519";
+import bs58 from "bs58";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -41,6 +42,7 @@ type SeedFan = StoredKeypair & {
   s1PositionPda?: string;
   cohort?: "EARLY" | "REGULAR";
   claimed?: boolean;
+  secretSourceEnv?: string;
 };
 
 type SeedState = {
@@ -75,9 +77,15 @@ const OFFER_USDC_AMOUNT = 1_000_000_000n;
 const USER_ROLE_FAN = 1 << 0;
 const TEST_RAGE_QUIT_SECONDS = 2;
 const PRODUCTION_RAGE_QUIT_SECONDS = 48 * 3_600;
+const DEFAULT_S1_MIN_USER_XP = 10n;
+const DEFAULT_MAX_S1_DAILY_BUY_SPUMP = 15_000_000n;
+const DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD = 500n;
+const DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS = 2_000;
 const USER_REWARD_AMOUNT = 20_000_000n;
 const USER_XP_GAIN = 10n;
 const REPORT_DIGEST = Array.from({ length: 32 }, (_, index) => index + 1);
+const DEFAULT_DEMO_MANAGED_WALLET = "HTso2VWboA92KSKbHRXR5vvGjwGqcZtSD4rKSD4hAn7W";
+const MANAGED_DEMO_BACKER_INDEX = 1;
 
 const log = (message: string) => {
   console.log(`[devnet-s1] ${message}`);
@@ -158,6 +166,39 @@ const keypairJson = (keypair: Keypair): StoredKeypair => ({
 const keypairFromStored = (stored: StoredKeypair): Keypair =>
   Keypair.fromSecretKey(Uint8Array.from(stored.secretKey));
 
+const keypairFromSecretEnv = (envName: string): Keypair | null => {
+  const value = process.env[envName]?.trim();
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith("[")) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(value) as number[]));
+  }
+
+  return Keypair.fromSecretKey(bs58.decode(value));
+};
+
+const loadManagedDemoBacker = (): Keypair | null => {
+  const keypair =
+    keypairFromSecretEnv("DEMO_MANAGED_WALLET_SECRET_BASE58") ??
+    keypairFromSecretEnv("DEMO_MANAGED_WALLET_SECRET_KEY");
+  if (!keypair) {
+    return null;
+  }
+
+  const expectedWallet = new PublicKey(
+    process.env.DEMO_MANAGED_WALLET_ADDRESS?.trim() || DEFAULT_DEMO_MANAGED_WALLET
+  ).toBase58();
+  if (keypair.publicKey.toBase58() !== expectedWallet) {
+    throw new Error(
+      `managed demo backer secret resolves to ${keypair.publicKey.toBase58()}, expected ${expectedWallet}`
+    );
+  }
+
+  return keypair;
+};
+
 const readJson = <T>(filePath: string): T | null => {
   if (!existsSync(filePath)) {
     return null;
@@ -201,6 +242,50 @@ const loadOrCreateState = (rpcEndpoint: string, programId: string): SeedState =>
   const state = createState(rpcEndpoint, programId);
   writeState(state);
   return state;
+};
+
+const injectManagedDemoBacker = (state: SeedState, managedBacker: Keypair | null) => {
+  if (!managedBacker) {
+    return;
+  }
+
+  const existing = state.fans[MANAGED_DEMO_BACKER_INDEX];
+  if (
+    existing.s1PositionPda ||
+    existing.claimed ||
+    state.lastRun?.completedAt
+  ) {
+    if (existing.publicKey !== managedBacker.publicKey.toBase58()) {
+      throw new Error(
+        [
+          "Existing seed state already progressed with a different fan at the managed demo slot.",
+          "Set DEMO_S1_SEED_FORCE_NEW=true for a fresh state before injecting the managed wallet.",
+        ].join(" ")
+      );
+    }
+    return;
+  }
+
+  state.fans[MANAGED_DEMO_BACKER_INDEX] = {
+    ...existing,
+    publicKey: managedBacker.publicKey.toBase58(),
+    secretKey: [],
+    secretSourceEnv: "DEMO_MANAGED_WALLET_SECRET_BASE58",
+    cohort: "EARLY",
+    claimed: false,
+  };
+  writeState(state);
+};
+
+const seedFanKeypair = (fan: SeedFan, managedBacker: Keypair | null): Keypair => {
+  if (fan.secretSourceEnv) {
+    if (!managedBacker || managedBacker.publicKey.toBase58() !== fan.publicKey) {
+      throw new Error(`${fan.secretSourceEnv} must be set to the managed demo backer secret`);
+    }
+    return managedBacker;
+  }
+
+  return keypairFromStored(fan);
 };
 
 const parseKeypairSecret = (value: string, label: string): Keypair => {
@@ -407,10 +492,12 @@ const main = async () => {
       );
     })();
   const connection = new Connection(rpcEndpoint, "confirmed");
+  const managedBacker = loadManagedDemoBacker();
   const state = loadOrCreateState(rpcEndpoint, programId);
+  injectManagedDemoBacker(state, managedBacker);
   const creator = keypairFromStored(state.creator);
   const sponsor = keypairFromStored(state.sponsor);
-  const fans = state.fans.map(keypairFromStored);
+  const fans = state.fans.map((fan) => seedFanKeypair(fan, managedBacker));
 
   process.env.SOLANA_RPC_ENDPOINT = rpcEndpoint;
   process.env.STREAMPUMP_PROGRAM_ID = programId;
@@ -422,6 +509,9 @@ const main = async () => {
   log(`program=${programId}`);
   log(`creator=${creator.publicKey.toBase58()}`);
   log(`sponsor=${sponsor.publicKey.toBase58()}`);
+  if (managedBacker) {
+    log(`managed claimable backer=${managedBacker.publicKey.toBase58()} (fan ${MANAGED_DEMO_BACKER_INDEX})`);
+  }
 
   await ensureProgramDeployed(connection, new PublicKey(programId));
 
@@ -472,18 +562,40 @@ const main = async () => {
 
   const setS1RageQuitWindow = async (seconds: number) => {
     const current = await anchorService.fetchProtocolS1Config();
+    const s1MinUserXp =
+      current.s1MinUserXp < DEFAULT_S1_MIN_USER_XP ? DEFAULT_S1_MIN_USER_XP : current.s1MinUserXp;
+    const maxS1DailyBuySpump =
+      current.maxS1DailyBuySpump < DEFAULT_MAX_S1_DAILY_BUY_SPUMP
+        ? DEFAULT_MAX_S1_DAILY_BUY_SPUMP
+        : current.maxS1DailyBuySpump;
+    const s1EarlyCohortSupplyThreshold =
+      current.s1EarlyCohortSupplyThreshold < DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD
+        ? DEFAULT_S1_EARLY_COHORT_SUPPLY_THRESHOLD
+        : current.s1EarlyCohortSupplyThreshold;
+    const s1EarlyCohortBuyoutCapBps =
+      current.s1EarlyCohortBuyoutCapBps <= 0 ||
+      current.s1EarlyCohortBuyoutCapBps > DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS
+        ? DEFAULT_S1_EARLY_COHORT_BUYOUT_CAP_BPS
+        : current.s1EarlyCohortBuyoutCapBps;
     const signature = await program.methods
       .updateProtocolS1Emission({
         dailySpumpEmissionMultiplierBps: current.dailySpumpEmissionMultiplierBps,
         newUserEmissionBps: current.newUserEmissionBps,
         newUserEmissionWindowSeconds: new anchor.BN(current.newUserEmissionWindowSeconds),
-        s1MinUserXp: new anchor.BN(current.s1MinUserXp.toString()),
-        maxS1DailyBuySpump: new anchor.BN(current.maxS1DailyBuySpump.toString()),
-        s1EarlyCohortSupplyThreshold: new anchor.BN(
-          current.s1EarlyCohortSupplyThreshold.toString()
-        ),
-        s1EarlyCohortBuyoutCapBps: current.s1EarlyCohortBuyoutCapBps,
+        s1MinUserXp: new anchor.BN(s1MinUserXp.toString()),
+        maxS1DailyBuySpump: new anchor.BN(maxS1DailyBuySpump.toString()),
+        s1EarlyCohortSupplyThreshold: new anchor.BN(s1EarlyCohortSupplyThreshold.toString()),
+        s1EarlyCohortBuyoutCapBps,
         s1RageQuitWindowSeconds: new anchor.BN(seconds),
+        s1BuyoutCreatorShareBps: current.s1BuyoutCreatorShareBps,
+        s1BuyoutRewardModel: current.s1BuyoutRewardModel,
+        s1DiscoveryRewardCapUsdc: new anchor.BN(current.s1DiscoveryRewardCapUsdc.toString()),
+        s1StatusThankyouUsdc: new anchor.BN(current.s1StatusThankyouUsdc.toString()),
+        s1BuyoutResidualTo: current.s1BuyoutResidualTo,
+        s1DiscoveryMinHoldSeconds: new anchor.BN(current.s1DiscoveryMinHoldSeconds),
+        s1DiscoveryClaimWindowSeconds: new anchor.BN(current.s1DiscoveryClaimWindowSeconds),
+        track2RewardCapUsdc: new anchor.BN(current.track2RewardCapUsdc.toString()),
+        track2ResidualTo: current.track2ResidualTo,
       })
       .accounts({
         admin: admin.publicKey,
@@ -712,8 +824,13 @@ const main = async () => {
         protocolConfig: protocolConfigPda,
         creatorProfile,
         s1BuyoutState: buyoutState,
+        buyoutOffer,
+        offerUsdcVault,
+        creatorUsdcAta,
         creatorRevenueSpumpAta: creatorSpumpAta,
+        usdcMint,
         spumpMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
         spumpTokenProgram: TOKEN_2022_PROGRAM_ID,
       })
       .signers([fans[0]])

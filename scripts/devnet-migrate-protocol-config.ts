@@ -98,11 +98,43 @@ const loadOrCreateState = (
   return { state, oracle };
 };
 
+const idlPrimitiveSize = (type: unknown): number => {
+  if (typeof type !== "string") {
+    throw new Error(`Unsupported ProtocolConfig IDL field type: ${JSON.stringify(type)}`);
+  }
+
+  switch (type) {
+    case "pubkey":
+      return 32;
+    case "u8":
+      return 1;
+    case "u16":
+      return 2;
+    case "u64":
+    case "i64":
+      return 8;
+    default:
+      throw new Error(`Unsupported ProtocolConfig IDL primitive type: ${type}`);
+  }
+};
+
+const protocolConfigAccountLen = (idl: Idl): number => {
+  const typeDef = (idl.types ?? []).find((type) => type.name === "ProtocolConfig");
+  if (!typeDef || typeDef.type.kind !== "struct") {
+    throw new Error("ProtocolConfig type missing from IDL");
+  }
+
+  return (
+    8 +
+    typeDef.type.fields.reduce((total, field) => total + idlPrimitiveSize(field.type), 0)
+  );
+};
+
 const loadProgram = (
   connection: Connection,
   payer: Keypair,
   programId: string
-): { program: Program<Idl>; protocolConfig: PublicKey } => {
+): { program: Program<Idl>; protocolConfig: PublicKey; protocolConfigLen: number } => {
   const idl = JSON.parse(readFileSync(IDL_PATH, "utf8")) as Idl & { address?: string };
   idl.address = programId;
   const provider = new AnchorProvider(connection, new Wallet(payer), AnchorProvider.defaultOptions());
@@ -112,7 +144,7 @@ const loadProgram = (
     new PublicKey(programId)
   );
 
-  return { program, protocolConfig };
+  return { program, protocolConfig, protocolConfigLen: protocolConfigAccountLen(idl) };
 };
 
 const main = async () => {
@@ -133,7 +165,7 @@ const main = async () => {
   process.env.INDEXER_ENABLED = "false";
 
   const connection = new Connection(rpcEndpoint, "confirmed");
-  const { program, protocolConfig } = loadProgram(connection, admin, programId);
+  const { program, protocolConfig, protocolConfigLen } = loadProgram(connection, admin, programId);
 
   log(`program=${programId}`);
   log(`admin=${admin.publicKey.toBase58()}`);
@@ -151,7 +183,7 @@ const main = async () => {
   }
 
   let spumpMint: PublicKey;
-  if (before.data.length === 8 + 234) {
+  if (before.data.length === protocolConfigLen) {
     const current = await program.account.protocolConfig.fetch(protocolConfig);
     spumpMint = current.spumpMint as PublicKey;
     if (!(current.admin as PublicKey).equals(admin.publicKey)) {
@@ -164,8 +196,11 @@ const main = async () => {
     }
     log("protocol_config already migrated; no chain write needed");
   } else {
-    if (before.data.length !== 174) {
-      throw new Error(`Unexpected protocol_config length ${before.data.length}`);
+    const supportedLegacyLengths = new Set([174, 242, 244, 252, 289]);
+    if (!supportedLegacyLengths.has(before.data.length)) {
+      throw new Error(
+        `Unexpected protocol_config length ${before.data.length}; current IDL expects ${protocolConfigLen}`
+      );
     }
     spumpMint = new PublicKey(before.data.subarray(104, 136));
     const legacyAdmin = new PublicKey(before.data.subarray(8, 40));
