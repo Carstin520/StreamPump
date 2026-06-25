@@ -5,7 +5,27 @@ import {
   PortfolioHoldingRecord,
   PortfolioReentryRecord,
   PortfolioUpcomingClaimRecord,
+  ScoutScoreboardRecord,
 } from "@/lib/api/types";
+
+// 伯乐档案 scoreboard — MOCK_PREVIEW. Creator ids map to seeded discover.ts
+// creators so avatars/names/stages stay consistent; ranks/eligibility are
+// preview labels, never presented as on-chain reward truth.
+export const scoutScoreboard: ScoutScoreboardRecord = {
+  backingCount: 8,
+  graduatedHits: 3,
+  reputationFrom: "Observer",
+  reputationTo: "Scout",
+  claimableCount: 2,
+  claimWindowLabel: "18h",
+  rediscoverCreatorId: "corner-heartbeat",
+  rows: [
+    { creatorId: "luna-cai", backedAtLabel: "3mo", entryRank: 42, identity: "early", action: "claim" },
+    { creatorId: "mika-zhou", backedAtLabel: "6wk", entryRank: 210, identity: null, action: "add" },
+    { creatorId: "neo-park", backedAtLabel: "5mo", entryRank: 12, identity: "founding", action: "view" },
+    { creatorId: "night-arrival", backedAtLabel: "3mo", entryRank: 624, identity: null, action: "add" },
+  ],
+};
 
 export const portfolioHoldings: PortfolioHoldingRecord[] = [
   {

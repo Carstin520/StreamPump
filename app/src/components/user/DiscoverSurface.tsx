@@ -9,10 +9,10 @@ import { PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 
 import { PageShell } from "@/components/layout/PageShell";
+import { DiscoverBoard } from "./DiscoverBoard";
 import { PostCard } from "./PostCard";
 import { ShortImmersiveOverlay } from "./ShortImmersiveOverlay";
 import { ShortsShelf } from "./ShortsShelf";
-import { TrendingTabsView } from "./TrendingTabs";
 
 let postDetailExperiencePromise:
   | Promise<typeof import("@/components/post/PostDetailExperience").PostDetailExperience>
@@ -374,7 +374,7 @@ const TrendingView = ({
   initialPosts?: PostRecord[];
 }) => {
   const { t } = useI18n();
-  const { creators, error, loading, posts, postsByCreator } = usePublicFeedViewModel({
+  const { creators, error, loading, postsByCreator } = usePublicFeedViewModel({
     initialError,
     initialPosts,
   });
@@ -382,17 +382,6 @@ const TrendingView = ({
   return (
     <section className="mx-auto max-w-[1280px] space-y-5 py-4">
       <PublicFeedSourceNotice error={error} postCount={creators.length} surface="trending" />
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="type-h3 text-white">{t("feed.trendingCreators")}</h1>
-          <p className="mt-1 text-[length:var(--fs-caption)] text-[color:var(--text-faint)]">{t("feed.trendingDesc")}</p>
-        </div>
-        {creators.length > 0 ? (
-          <div className="tone-state-info rounded-full border px-3 py-1.5 text-[length:var(--fs-caption)] font-medium">
-            {creators.length} {creators.length === 1 ? "creator" : "creators"}
-          </div>
-        ) : null}
-      </div>
 
       {loading ? <div className="text-sm text-[#8ea0ba]">{t("feed.loadingCreators")}</div> : null}
       {!loading && error ? <div className="text-sm text-[#8ea0ba]">{error}</div> : null}
@@ -405,7 +394,7 @@ const TrendingView = ({
       ) : null}
 
       {!loading && !error && creators.length > 0 ? (
-        <TrendingTabsView creators={creators} posts={posts} postsByCreator={postsByCreator} />
+        <DiscoverBoard creators={creators} postsByCreator={postsByCreator} />
       ) : null}
     </section>
   );

@@ -12,6 +12,7 @@ import {
   usePreviewPortfolio,
   usePreviewWatchlist,
 } from "@/components/portfolio/PortfolioPreviewPanels";
+import { ScoutScoreboard } from "@/components/portfolio/ScoutScoreboard";
 import {
   DemoCreatorBanner,
   S1ErrorState,
@@ -1010,6 +1011,9 @@ function PortfolioPage() {
     <>
       <Head><title>{t("page.portfolio.title")}</title></Head>
       <PageShell>
+        <div className="mx-auto max-w-[1100px] space-y-3 py-4">
+          <ScoutScoreboard />
+        </div>
         <div className="mx-auto max-w-[1100px] space-y-3">
           {!loading ? <PortfolioSourceNotice mode={portfolioSourceMode} reason={fallbackReason} /> : null}
         </div>

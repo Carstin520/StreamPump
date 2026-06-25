@@ -386,3 +386,24 @@ export type UserNoteRecord = {
   authorAvatarSrc: string;
   mediaHeightClass: string;
 };
+
+// Scout track-record scoreboard (伯乐档案). Presentation-only (MOCK_PREVIEW):
+// reputation/ranks/eligibility here are seeded preview labels, not chain truth.
+export type ScoutBackingRowRecord = {
+  creatorId: string;
+  backedAtLabel: string;
+  entryRank: number;
+  identity: "early" | "founding" | null;
+  action: "claim" | "add" | "view";
+};
+
+export type ScoutScoreboardRecord = {
+  backingCount: number;
+  graduatedHits: number;
+  reputationFrom: string;
+  reputationTo: string;
+  claimableCount: number;
+  claimWindowLabel: string;
+  rediscoverCreatorId: string;
+  rows: ScoutBackingRowRecord[];
+};
