@@ -109,15 +109,15 @@ export const UserShell = ({
         <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-3">
           <Link className="hidden lg:block" href={REWARDS_PATH}>
             <div
-              className="flex items-center gap-2.5 rounded-[13px] border px-3 py-2.5 transition hover:opacity-90"
+              className="flex items-center gap-2.5 rounded-[13px] border px-3 py-2.5 transition hover:brightness-110"
               style={{
-                background: "color-mix(in srgb, var(--brand) 12%, transparent)",
-                borderColor: "color-mix(in srgb, var(--brand) 30%, transparent)",
+                background: "linear-gradient(135deg, rgba(240,121,95,0.22), rgba(222,64,42,0.12))",
+                borderColor: "rgba(240,140,95,0.45)",
               }}
             >
-              <span className="text-base" style={{ color: "var(--energy, #f0a070)" }}>⚡</span>
-              <span className="text-xs" style={{ color: "var(--energy-soft, #f5b8ab)" }}>{t("shell.spumpEnergy")}</span>
-              <span className="ml-auto font-mono text-base font-extrabold tabular-nums" style={{ color: "var(--energy-soft, #f5b8ab)" }}>
+              <span className="text-base" style={{ color: "#f9bf57" }}>⚡</span>
+              <span className="text-xs font-medium" style={{ color: "#f6cdb9" }}>{t("shell.spumpEnergy")}</span>
+              <span className="ml-auto font-mono text-base font-extrabold tabular-nums" style={{ color: "#ffe2cf" }}>
                 {SEEDED_SPUMP_ENERGY}
               </span>
             </div>

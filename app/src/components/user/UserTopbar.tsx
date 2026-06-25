@@ -2,7 +2,6 @@ import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
-import { currentUser } from "@/lib/public-data";
 
 export type TopbarMode = "sticky" | "scroll-reveal";
 
@@ -301,13 +300,6 @@ const TopbarInner = ({
           href="/workspace"
         >
           + {t("shell.workspaceCenter")}
-        </Link>
-        <Link
-          className="glass-button-ghost flex items-center gap-2 px-2.5 py-1.5 text-sm text-[#c4d0e3] transition duration-200 hover:text-white"
-          href="/me"
-        >
-          <img alt={currentUser.name} className="h-7 w-7 rounded-full object-cover" src={currentUser.avatarSrc} />
-          <span className="hidden max-w-[140px] truncate sm:inline">{currentUser.handle}</span>
         </Link>
       </div>
     </div>
