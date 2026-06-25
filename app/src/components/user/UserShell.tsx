@@ -3,11 +3,41 @@ import { useRouter } from "next/router";
 import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
-import { SwitchAccountIcon } from "@/components/shared/AppIcons";
 import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
 import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
-import { PROFILE_PATH, REWARDS_PATH, buildLoginHref, isRouteActive, primaryNavItems } from "@/lib/routes";
+import {
+  ACTIVITY_PATH,
+  EXPLORE_PATH,
+  PORTFOLIO_PATH,
+  PROFILE_PATH,
+  REWARDS_PATH,
+  TRENDING_PATH,
+  WORKSPACE_PATH,
+  isRouteActive,
+} from "@/lib/routes";
+
+// Seeded preview value — no real SPUMP balance is wired into the consumer shell.
+const SEEDED_SPUMP_ENERGY = 215;
+
+type ShellNavItem = {
+  href: string;
+  glyph: string;
+  labelKey: string;
+  subKey?: string;
+  badge?: string;
+  prefixes: string[];
+  separatorBefore?: boolean;
+};
+
+const NAV_ITEMS: ShellNavItem[] = [
+  { href: EXPLORE_PATH, glyph: "▦", labelKey: "nav.explore", subKey: "nav.exploreSub", prefixes: [EXPLORE_PATH, "/posts"] },
+  { href: ACTIVITY_PATH, glyph: "◉", labelKey: "nav.activity", badge: "3", prefixes: [ACTIVITY_PATH] },
+  { href: TRENDING_PATH, glyph: "✦", labelKey: "nav.trending", subKey: "nav.trendingSub", prefixes: [TRENDING_PATH] },
+  { href: PORTFOLIO_PATH, glyph: "◈", labelKey: "nav.portfolio", subKey: "nav.portfolioSub", prefixes: [PORTFOLIO_PATH] },
+  { href: REWARDS_PATH, glyph: "⚡", labelKey: "nav.rewards", subKey: "nav.rewardsSub", prefixes: [REWARDS_PATH] },
+  { href: WORKSPACE_PATH, glyph: "✎", labelKey: "nav.workspace", prefixes: [WORKSPACE_PATH], separatorBefore: true },
+];
 
 export const UserShell = ({
   children,
@@ -18,96 +48,99 @@ export const UserShell = ({
 }) => {
   const router = useRouter();
   const { t } = useI18n();
-  const switchAccountHref = buildLoginHref({
-    nextPath: router.asPath,
-    preview: "switch",
-  });
-  const profileActive = isRouteActive(router.asPath, {
-    href: PROFILE_PATH,
-    label: "Me",
-    labelKey: "nav.me",
-    prefixes: [PROFILE_PATH],
-  });
 
   return (
     <main className="relative min-h-[100dvh] bg-[#090d14] text-[#f5f7fb]">
       <AnimatedFeedBackdrop />
 
       <aside className="liquid-glass-shell fixed bottom-4 left-4 top-4 z-40 hidden w-16 lg:flex lg:w-[248px] lg:flex-col">
-        <div className="flex h-20 items-center justify-center border-b border-white/[0.06] lg:justify-start lg:px-6">
+        {/* Logo */}
+        <div className="flex h-20 items-center justify-center border-b border-white/[0.06] lg:justify-start lg:px-5">
           <Link
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#de402a] text-sm font-semibold text-white shadow-[0_14px_34px_rgba(222,64,42,0.34)]"
-            href="/explore"
+            className="flex h-9 w-9 items-center justify-center rounded-[11px] text-sm font-extrabold text-white shadow-[0_8px_22px_rgba(222,64,42,0.34)]"
+            href={EXPLORE_PATH}
+            style={{ background: "linear-gradient(150deg, #de402a, #f0795f)" }}
           >
-            SP
+            S
           </Link>
-          <span className="ml-3 hidden text-lg font-bold tracking-[-0.05em] text-white lg:block">
+          <span className="ml-3 hidden text-[17px] font-extrabold tracking-[-0.03em] text-white lg:block">
             StreamPump
           </span>
         </div>
 
-        <nav className="flex-1 space-y-2 px-2 py-6 lg:px-4">
-          {primaryNavItems.map((item) => (
-            <Link
-              className="glass-nav-link group flex h-12 items-center justify-center px-3 text-sm transition duration-200 lg:justify-start"
-              data-active={isRouteActive(router.asPath, item)}
-              href={item.href}
-              key={item.href}
-            >
-              <span className={`${isRouteActive(router.asPath, item) ? "text-white" : "text-[#8f9eb7]"} transition duration-200 group-hover:text-white`}>
-                {t(item.labelKey)}
-              </span>
-            </Link>
-          ))}
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4 lg:px-3">
+          {NAV_ITEMS.map((item) => {
+            const active = isRouteActive(router.asPath, { href: item.href, label: item.labelKey, labelKey: item.labelKey, prefixes: item.prefixes });
+            return (
+              <div key={item.href}>
+                {item.separatorBefore ? <div className="my-2.5 h-px bg-white/[0.06] lg:mx-1.5" /> : null}
+                <Link
+                  className={`group flex h-11 items-center gap-3 rounded-[13px] px-3 transition duration-200 ${
+                    active ? "bg-white/[0.09] text-white" : "text-[#93a2bb] hover:bg-white/[0.05] hover:text-white"
+                  }`}
+                  data-active={active}
+                  href={item.href}
+                >
+                  <span className={`w-5 shrink-0 text-center text-[15px] ${active ? "text-white" : "text-[#93a2bb] group-hover:text-white"}`}>
+                    {item.glyph}
+                  </span>
+                  <span className="hidden flex-1 items-baseline gap-2 lg:flex">
+                    <span className="text-sm font-semibold">{t(item.labelKey)}</span>
+                    {item.subKey ? (
+                      <span className="text-[length:var(--fs-nano)] font-medium text-[#7486a1]">{t(item.subKey)}</span>
+                    ) : null}
+                  </span>
+                  {item.badge ? (
+                    <span
+                      className="ml-auto hidden rounded-full px-1.5 text-[length:var(--fs-nano)] font-bold leading-[18px] lg:block"
+                      style={{ color: "#ff9d8c", background: "color-mix(in srgb, var(--brand) 16%, transparent)" }}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </Link>
+              </div>
+            );
+          })}
         </nav>
 
-        <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-4">
+        {/* Bottom: SPUMP energy + profile + small language switch */}
+        <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-3">
           <Link className="hidden lg:block" href={REWARDS_PATH}>
             <div
-              className="flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition hover:opacity-90"
+              className="flex items-center gap-2.5 rounded-[13px] border px-3 py-2.5 transition hover:opacity-90"
               style={{
                 background: "color-mix(in srgb, var(--brand) 12%, transparent)",
                 borderColor: "color-mix(in srgb, var(--brand) 30%, transparent)",
               }}
             >
               <span className="text-base" style={{ color: "var(--energy, #f0a070)" }}>⚡</span>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold" style={{ color: "var(--energy-soft, #f5b8ab)" }}>{t("shell.spumpEnergy")}</p>
-                <p className="truncate text-[length:var(--fs-nano)] text-[#9aabc4]">{t("shell.spumpClaim")}</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link href={PROFILE_PATH}>
-            <div
-              className={`surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 transition duration-200 lg:h-auto lg:justify-start lg:px-3 lg:py-3 ${
-                profileActive
-                  ? "border-white/[0.14] bg-white/[0.09] text-white"
-                  : "text-white/80 hover:bg-white/[0.07]"
-              }`}
-            >
-              <img
-                alt={currentUser.name}
-                className="h-8 w-8 rounded-full object-cover"
-                src={currentUser.avatarSrc}
-              />
-              <div className="ml-3 hidden min-w-0 lg:block">
-                <p className="truncate text-sm font-medium text-white">{currentUser.name}</p>
-                <p className="truncate text-xs text-[#8fa1bd]">{currentUser.handle}</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link href={switchAccountHref}>
-            <div className="surface-muted flex h-12 items-center justify-center rounded-2xl border px-1 text-white/80 transition duration-200 hover:bg-white/[0.07] lg:justify-start lg:px-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-[#9dadc6]">
-                <SwitchAccountIcon className="h-4 w-4" />
+              <span className="text-xs" style={{ color: "var(--energy-soft, #f5b8ab)" }}>{t("shell.spumpEnergy")}</span>
+              <span className="ml-auto font-mono text-base font-extrabold tabular-nums" style={{ color: "var(--energy-soft, #f5b8ab)" }}>
+                {SEEDED_SPUMP_ENERGY}
               </span>
-              <span className="ml-3 hidden text-sm font-medium text-white lg:block">{t("shell.switchAccount")}</span>
             </div>
           </Link>
 
-          <LanguageSwitch />
+          <div className="flex items-center gap-2">
+            <Link className="min-w-0 flex-1" href={PROFILE_PATH}>
+              <div className="flex items-center gap-2.5 rounded-[13px] px-2 py-1.5 transition hover:bg-white/[0.05]">
+                <img
+                  alt={currentUser.name}
+                  className="h-8 w-8 flex-none rounded-full object-cover"
+                  src={currentUser.avatarSrc}
+                />
+                <div className="hidden min-w-0 lg:block">
+                  <p className="truncate text-[13px] font-semibold text-white">{currentUser.handle}</p>
+                  <p className="truncate text-[length:var(--fs-nano)] text-[#7486a1]">{t("shell.scoutLevel")}</p>
+                </div>
+              </div>
+            </Link>
+            <div className="hidden lg:block">
+              <LanguageSwitch compact />
+            </div>
+          </div>
         </div>
       </aside>
 
