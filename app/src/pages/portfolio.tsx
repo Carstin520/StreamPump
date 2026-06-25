@@ -30,9 +30,9 @@ import {
   getS1MarketProfile,
   getS1Portfolio,
   S1_MOCK_ACCESS_TOKEN,
-  S1_MOCK_USER_WALLET,
   S1PortfolioResponse,
 } from "@/lib/api/s1";
+import { exchangeProviderSession } from "@/lib/api/auth";
 import { clearStoredAuthSession, getStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
 import { type Locale, useI18n } from "@/lib/i18n";
 import {
@@ -55,6 +55,15 @@ import {
 /* ------------------------------------------------------------------ */
 /*  Tabs                                                               */
 /* ------------------------------------------------------------------ */
+
+// Platform-managed ("custodial") wallet assigned to the devnet demo account.
+// Only the public key is exposed here; backend secret material stays in env/DB.
+const DEMO_MANAGED_WALLET =
+  process.env.NEXT_PUBLIC_DEMO_MANAGED_WALLET?.trim() ||
+  "HTso2VWboA92KSKbHRXR5vvGjwGqcZtSD4rKSD4hAn7W";
+const DEMO_MANAGED_PROVIDER_SUBJECT =
+  process.env.NEXT_PUBLIC_DEMO_MANAGED_PROVIDER_SUBJECT?.trim() ||
+  "managed-demo@streampump.local";
 
 type LiveTab = "Portfolio" | "Claim queue" | "S2 Endorsements" | "Preview Holdings" | "Watchlist" | "Rewards";
 const LIVE_TABS: LiveTab[] = ["Portfolio", "Claim queue", "S2 Endorsements", "Preview Holdings", "Watchlist", "Rewards"];
@@ -330,12 +339,16 @@ function ClaimButton({
 
   const execute = useCallback(async () => {
     setShowDrawer(true);
-    const submitted = await flow.execute(async (token) => {
-      const profile = await getS1MarketProfile(creatorWallet);
-      const sponsor = profile.buyout?.winningSponsorWallet;
-      if (!sponsor) throw new Error("Winning sponsor not available for this buyout.");
-      return buildS1ClaimUsdcTransaction(token, { creatorWallet, sponsorWallet: sponsor });
-    });
+    const profile = await getS1MarketProfile(creatorWallet);
+    const sponsor = profile.buyout?.winningSponsorWallet;
+    if (!sponsor) throw new Error("Winning sponsor not available for this buyout.");
+    const submitted = await flow.execute(
+      (token) => buildS1ClaimUsdcTransaction(token, { creatorWallet, sponsorWallet: sponsor }),
+      {
+        action: "claim-s1-buyout-usdc",
+        params: { creatorWallet, sponsorWallet: sponsor },
+      },
+    );
     if (submitted) await onRefresh();
   }, [flow, creatorWallet, onRefresh]);
 
@@ -800,10 +813,10 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#8ad0ff]">
-            Demo portfolio
+            Seeded portfolio
           </p>
           <p className="mt-1 text-[length:var(--fs-overline)] leading-5 text-[#8ea0ba]">
-            Load a local mock session to preview S1 positions and claim eligibility labels without a wallet.
+            Use the platform-managed devnet wallet to load real S1 portfolio projection without connecting an external wallet.
           </p>
         </div>
         <button
@@ -811,7 +824,7 @@ function PortfolioDemoLinks({ onLoadDemo }: { onLoadDemo: () => void }) {
           onClick={onLoadDemo}
           type="button"
         >
-          Load demo preview
+          Use platform wallet
         </button>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -871,7 +884,7 @@ function PortfolioSourceNotice({
     live: {
       label: "SEEDED_DEMO",
       title: "Backend portfolio projection",
-      body: "Positions come from the portfolio API. USDC claim actions build a devnet transaction through the backend, require the matching wallet signature, and depend on the S1 projection being synchronized.",
+      body: "Positions come from the portfolio API. USDC claim actions execute on devnet through either the connected wallet signature path or the platform-managed wallet path, then depend on S1 projection sync.",
       tone: "tone-state-info",
     },
     mock: {
@@ -915,6 +928,7 @@ function PortfolioPage() {
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [isMockPortfolioSession, setIsMockPortfolioSession] = useState(false);
+  const [isManagedPortfolioSession, setIsManagedPortfolioSession] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
   const previewPortfolio = usePreviewPortfolio();
@@ -922,7 +936,9 @@ function PortfolioPage() {
 
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const hasActiveWalletSession =
-    isMockPortfolioSession || Boolean(sessionWallet && connectedWallet && sessionWallet === connectedWallet);
+    isMockPortfolioSession ||
+    isManagedPortfolioSession ||
+    Boolean(sessionWallet && connectedWallet && sessionWallet === connectedWallet);
   const portfolioSourceMode = !hasActiveWalletSession
     ? "signed-out"
     : fallbackReason
@@ -937,6 +953,7 @@ function PortfolioPage() {
     clearStoredAuthSession();
     setSessionWallet(null);
     setIsMockPortfolioSession(false);
+    setIsManagedPortfolioSession(false);
     setPortfolio(null);
     setFallbackReason(null);
     setActiveTab("Portfolio");
@@ -946,6 +963,10 @@ function PortfolioPage() {
     const session = getStoredAuthSession();
     setSessionWallet(session?.wallet ?? null);
     setIsMockPortfolioSession(session?.accessToken === S1_MOCK_ACCESS_TOKEN);
+    setIsManagedPortfolioSession(
+      Boolean(session?.identity?.managedWalletAddress) &&
+      session?.wallet === session?.identity?.managedWalletAddress
+    );
     if (!session?.accessToken) {
       setPortfolio(null);
       return;
@@ -958,21 +979,30 @@ function PortfolioPage() {
     setPortfolio(await getS1Portfolio(session.accessToken));
   }, []);
 
-  const loadDemoPortfolio = useCallback(() => {
-    storeAuthSession({
-      wallet: S1_MOCK_USER_WALLET,
-      accessToken: S1_MOCK_ACCESS_TOKEN,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      tokenType: "Bearer",
-      identity: null,
-    });
+  const loadDemoPortfolio = useCallback(async () => {
+    // Platform-wallet session: the assigned managed wallet IS the session wallet,
+    // so useManagedWallet() reports a managed (custodial) session and can execute
+    // seeded devnet claims through /s1/managed/execute without a wallet adapter.
     setLoading(true);
-    refresh()
-      .catch((err) => {
-        setPortfolio(null);
-        setFallbackReason(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setLoading(false));
+    setFallbackReason(null);
+    try {
+      const session = await exchangeProviderSession({
+        provider: "EMAIL",
+        providerSubject: DEMO_MANAGED_PROVIDER_SUBJECT,
+        email: DEMO_MANAGED_PROVIDER_SUBJECT,
+        displayName: "Platform Wallet",
+      });
+      if (session.wallet !== DEMO_MANAGED_WALLET || session.identity?.managedWalletAddress !== DEMO_MANAGED_WALLET) {
+        throw new Error("Backend returned a different managed wallet for the seeded portfolio.");
+      }
+      storeAuthSession(session);
+      await refresh();
+    } catch (err) {
+      setPortfolio(null);
+      setFallbackReason(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, [refresh]);
 
   useEffect(() => {
@@ -981,10 +1011,10 @@ function PortfolioPage() {
       return;
     }
 
-    if (sawConnectedWalletRef.current && sessionWallet && !isMockPortfolioSession) {
+    if (sawConnectedWalletRef.current && sessionWallet && !isMockPortfolioSession && !isManagedPortfolioSession) {
       clearPortfolioSession();
     }
-  }, [clearPortfolioSession, connectedWallet, isMockPortfolioSession, sessionWallet]);
+  }, [clearPortfolioSession, connectedWallet, isManagedPortfolioSession, isMockPortfolioSession, sessionWallet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1043,6 +1073,22 @@ function PortfolioPage() {
                 {t("portfolio.connected")}: {shortenWallet(connectedWallet)}
               </p>
             ) : null}
+
+            {/* Platform-wallet path: browse without connecting; own wallet only at withdrawal. */}
+            <div className="mx-auto max-w-md rounded-[16px] border border-[#de402a]/25 bg-[#de402a]/[0.06] p-4 text-left">
+              <p className="text-[length:var(--fs-caption)] font-semibold text-white">{t("portfolio.platform.title")}</p>
+              <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#c8d2e3]">{t("portfolio.platform.body")}</p>
+              <button
+                className="mt-3 w-full rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2.5 text-[length:var(--fs-caption)] font-bold text-white transition hover:brightness-110"
+                onClick={loadDemoPortfolio}
+                type="button"
+              >
+                {t("portfolio.platform.cta")}
+              </button>
+              <p className="mt-2 text-[length:var(--fs-nano)] text-[#9aabc4]">{t("portfolio.platform.withdrawNote")}</p>
+            </div>
+            <p className="text-[length:var(--fs-micro)] text-[#5a6d87]">{t("portfolio.platform.orConnect")}</p>
+
             <div className="flex flex-wrap items-center justify-center gap-3">
               <WalletMultiButton className="!rounded-full !text-sm" />
               <Link
@@ -1071,6 +1117,11 @@ function PortfolioPage() {
           <FallbackPreview reason={fallbackReason} />
         ) : portfolio ? (
           <div className="mx-auto max-w-[1100px] space-y-4 py-4">
+            {isManagedPortfolioSession ? (
+              <div className="tone-state-info flex items-start gap-2 rounded-[12px] border px-3.5 py-2.5 text-[length:var(--fs-micro)] leading-5">
+                <span>{t("portfolio.platform.activeWithdrawNote")}</span>
+              </div>
+            ) : null}
             <DemoCreatorBanner
               buyoutHref={DEMO_S1_BUYOUT_PATH}
               creatorHref={DEMO_S1_CREATOR_PATH}
@@ -1082,7 +1133,7 @@ function PortfolioPage() {
               connectedWallet={connectedWallet}
               portfolio={portfolio}
               sessionWallet={sessionWallet}
-              sourceLabel={isMockPortfolioSession ? "Demo Portfolio" : "Backend Portfolio"}
+              sourceLabel={isManagedPortfolioSession ? "Platform Wallet Portfolio" : "Backend Portfolio"}
             />
 
             <MetricsStrip portfolio={portfolio} />

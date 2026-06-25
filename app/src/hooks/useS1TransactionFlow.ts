@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 import {
-  executeManagedWalletAction,
+  runManagedWalletAction,
   S1BuildTransactionResponse,
   S1ProjectionSyncResponse,
   S1SubmitTransactionResponse,
@@ -74,7 +74,13 @@ export const useS1TransactionFlow = () => {
 
         try {
           setState({ status: "building", signature: null, projectionSync: null, error: null });
-          const submitted = await executeManagedWalletAction(session.accessToken, managedAction);
+          const submitted = await runManagedWalletAction(session.accessToken, managedAction, {
+            onStatus: (jobStatus) => {
+              if (jobStatus === "running") {
+                setState({ status: "submitting", signature: null, projectionSync: null, error: null });
+              }
+            },
+          });
           setState({
             status: "syncing_projection",
             signature: submitted.signature,

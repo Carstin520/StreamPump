@@ -2,6 +2,7 @@ import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
+import { WORKSPACE_CONTENT_NEW_PATH } from "@/lib/routes";
 
 export type TopbarMode = "sticky" | "scroll-reveal";
 
@@ -297,9 +298,9 @@ const TopbarInner = ({
       <div className="ml-4 flex items-center gap-3">
         <Link
           className="glass-button-primary px-5 py-2.5 text-sm font-semibold"
-          href="/workspace"
+          href={WORKSPACE_CONTENT_NEW_PATH}
         >
-          + {t("shell.workspaceCenter")}
+          ↑ {t("shell.upload")}
         </Link>
       </div>
     </div>

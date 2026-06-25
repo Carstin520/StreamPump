@@ -15,6 +15,7 @@ export const WORKSPACE_EARNINGS_PATH = "/workspace/earnings";
 export const WORKSPACE_SETTINGS_PATH = "/workspace/settings";
 export const WORKSPACE_BUYOUT_PATH = "/workspace/buyout";
 export const ONBOARDING_PATH = "/onboarding";
+export const TRY_PATH = "/try";
 export const REWARDS_PATH = "/rewards";
 export const DEMO_PATH = "/demo";
 export const PITCH_PATH = "/pitch";
@@ -159,12 +160,12 @@ export type WorkspaceNavItem = RouteItem & {
 export const workspaceSidebarNav: WorkspaceNavItem[] = [
   { href: WORKSPACE_PATH, labelKey: "nav.overview", iconName: "overview", exact: true },
   { href: WORKSPACE_CONTENT_NEW_PATH, labelKey: "nav.create", iconName: "create", prefixes: ["/workspace/content"] },
-  { href: WORKSPACE_LIBRARY_PATH, labelKey: "nav.library", iconName: "library", disabled: true },
+  { href: WORKSPACE_LIBRARY_PATH, labelKey: "nav.library", iconName: "library", prefixes: [WORKSPACE_LIBRARY_PATH] },
   { href: WORKSPACE_SPONSORSHIPS_PATH, labelKey: "nav.sponsorships", iconName: "sponsor", prefixes: ["/workspace/sponsorships", "/workspace/intents"] },
   { href: WORKSPACE_SPONSOR_ONBOARDING_PATH, labelKey: "nav.sponsorKyb", iconName: "sponsor", prefixes: [WORKSPACE_SPONSOR_ONBOARDING_PATH] },
   { href: WORKSPACE_BUYOUT_PATH, labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
   { href: WORKSPACE_CAMPAIGNS_PATH, labelKey: "nav.campaign", iconName: "campaign", disabled: true },
-  { href: WORKSPACE_ANALYTICS_PATH, labelKey: "nav.analytics", iconName: "analytics", disabled: true },
-  { href: WORKSPACE_EARNINGS_PATH, labelKey: "nav.earnings", iconName: "earnings", disabled: true },
+  { href: WORKSPACE_ANALYTICS_PATH, labelKey: "nav.analytics", iconName: "analytics", prefixes: [WORKSPACE_ANALYTICS_PATH] },
+  { href: WORKSPACE_EARNINGS_PATH, labelKey: "nav.earnings", iconName: "earnings", prefixes: [WORKSPACE_EARNINGS_PATH] },
   { href: WORKSPACE_SETTINGS_PATH, labelKey: "nav.settings", iconName: "settings", disabled: true },
 ];

@@ -44,9 +44,6 @@ const FLOW_STEPS: { id: FlowStep; labelKey: string }[] = [
 
 const STEP_INDEX: Record<FlowStep, number> = { details: 0, media: 1, checks: 2, publish: 3, sponsorship: 4 };
 
-const CONTENT_CREATE_READINESS_DESCRIPTION =
-  "This route calls live content manifest APIs, R2 presign/upload, asset-complete, and finalize endpoints. It still depends on an authenticated session plus backend storage/R2/Mux configuration; interrupted uploads can leave a recoverable draft that must be resumed from the content detail page.";
-
 const TYPE_OPTIONS: { type: ContentType; labelKey: string; descKey: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { type: "IMAGE_CAROUSEL", labelKey: "workspace.imageCarousel", descKey: "workspace.imageCarouselDesc", icon: ImageIcon },
   { type: "SHORT_VIDEO", labelKey: "workspace.shortVideo", descKey: "workspace.shortVideoDesc", icon: VideoIcon },
@@ -266,9 +263,9 @@ export default function NewContentPage() {
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
           <ProductReadinessBanner
-            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            description={t("workspace.contentReadinessDesc")}
             status="SEEDED_DEMO"
-            title="Content creation is API/R2-wired with recovery gaps"
+            title={t("workspace.contentReadinessTitle")}
           />
           <div className="liquid-card card-radius flex items-center gap-3 px-6 py-8">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#de402a] border-t-transparent" />
@@ -285,9 +282,9 @@ export default function NewContentPage() {
         <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
         <WorkspaceShell>
           <ProductReadinessBanner
-            description={CONTENT_CREATE_READINESS_DESCRIPTION}
+            description={t("workspace.contentReadinessDesc")}
             status="SEEDED_DEMO"
-            title="Content creation is API/R2-wired with recovery gaps"
+            title={t("workspace.contentReadinessTitle")}
           />
           <div className="liquid-card card-radius px-6 py-8">
             <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.loginRequired")}</p>
@@ -350,9 +347,9 @@ export default function NewContentPage() {
       <Head><title>{t("page.workspace.newContentTitle")}</title></Head>
       <WorkspaceShell aside={previewPanel}>
         <ProductReadinessBanner
-          description={CONTENT_CREATE_READINESS_DESCRIPTION}
+          description={t("workspace.contentReadinessDesc")}
           status="SEEDED_DEMO"
-          title="Content creation is API/R2-wired with recovery gaps"
+          title={t("workspace.contentReadinessTitle")}
         />
 
         {/* Top bar with save status */}

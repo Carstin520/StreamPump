@@ -24,9 +24,12 @@ type AccountState =
 
 const shortenWallet = (wallet: string) => `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
 
+type Translate = (key: string, params?: Record<string, string>) => string;
+
 const buildSessionUser = (
   baseUser: CurrentUserRecord,
-  account: AccountMeRecord | null
+  account: AccountMeRecord | null,
+  t: Translate,
 ): CurrentUserRecord => {
   if (!account?.profile) {
     return baseUser;
@@ -34,18 +37,18 @@ const buildSessionUser = (
 
   const displayName = account.profile.displayName || account.identity?.displayName || baseUser.name;
   const handle = account.profile.handle ? `@${account.profile.handle}` : baseUser.handle;
-  const roleLabel = account.profile.role.toLowerCase();
+  const roleLabel = t(`me.role.${account.profile.role.toLowerCase()}`);
 
   return {
     ...baseUser,
     id: account.profile.handle ?? account.wallet,
     name: displayName,
     handle,
-    bio: `Session-backed ${roleLabel} profile. Portfolio, rewards, watchlist, and activity below still use preview records until their account-specific APIs are live.`,
+    bio: t("me.sessionBio", { role: roleLabel }),
     sessionMode:
       account.storageStatus === "LIVE"
-        ? "Email/wallet session + AccountProfile"
-        : "Session active · profile migration required",
+        ? t("me.sessionLive")
+        : t("me.sessionMigration"),
     primaryWallet: shortenWallet(account.wallet),
   };
 };
@@ -104,8 +107,8 @@ export default function MePage({
 
   const account = accountState.kind === "ready" ? accountState.account : null;
   const sessionBackedUser = useMemo(
-    () => buildSessionUser(currentUser, account),
-    [account, currentUser],
+    () => buildSessionUser(currentUser, account, t),
+    [account, currentUser, t],
   );
 
   return (
@@ -139,14 +142,15 @@ const MeReadinessNotice = ({
   accountState: AccountState;
   error: string | null;
 }) => {
+  const { t } = useI18n();
   const messages: string[] = [];
 
   if (accountState.kind === "error") {
-    messages.push(`Account API error: ${accountState.message}`);
+    messages.push(t("me.accountApiError", { message: accountState.message }));
   }
 
   if (error) {
-    messages.push(`Public feed unavailable: ${error}`);
+    messages.push(t("me.feedUnavailable", { error }));
   }
 
   if (messages.length === 0) {
@@ -155,7 +159,7 @@ const MeReadinessNotice = ({
 
   return (
     <section className="rounded-[14px] border tone-state-warning px-4 py-3">
-      <p className="text-sm font-semibold text-white">Profile data partially unavailable</p>
+      <p className="text-sm font-semibold text-white">{t("me.partialTitle")}</p>
       {messages.map((msg) => (
         <p className="mt-1 text-xs leading-5 text-[#9aabc4]" key={msg}>
           {msg}

@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
-import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
+import { SettingsMenu } from "@/components/shared/SettingsMenu";
 import { useI18n } from "@/lib/i18n";
 import { currentUser } from "@/lib/public-data";
 import {
@@ -138,21 +138,41 @@ export const UserShell = ({
               </div>
             </Link>
             <div className="hidden lg:block">
-              <LanguageSwitch compact />
+              <SettingsMenu openUp />
             </div>
           </div>
         </div>
       </aside>
 
       <div className="relative lg:ml-[280px]">
-        <div className="page-enter mx-auto max-w-[1480px] space-y-6 px-4 py-4 lg:px-6 lg:py-0">
+        <div className="page-enter mx-auto max-w-[1480px] space-y-6 px-4 pb-24 pt-4 lg:px-6 lg:py-0">
           <div className="flex justify-end lg:hidden">
-            <LanguageSwitch compact />
+            <SettingsMenu />
           </div>
           {header}
           {children}
         </div>
       </div>
+
+      {/* Mobile bottom tab bar — sidebar is hidden < lg, so this is the phone nav. */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-white/[0.08] bg-[#0b1018]/95 backdrop-blur-xl lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {NAV_ITEMS.filter((item) => item.href !== WORKSPACE_PATH).map((item) => {
+          const active = isRouteActive(router.asPath, { href: item.href, label: item.labelKey, labelKey: item.labelKey, prefixes: item.prefixes });
+          return (
+            <Link
+              className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition ${active ? "text-white" : "text-[#7e90aa]"}`}
+              href={item.href}
+              key={item.href}
+            >
+              <span className="text-[17px] leading-none">{item.glyph}</span>
+              <span className="max-w-[68px] truncate text-[10px] font-medium leading-tight">{t(item.labelKey)}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </main>
   );
 };

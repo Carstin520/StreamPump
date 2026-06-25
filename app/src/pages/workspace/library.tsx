@@ -1,16 +1,16 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
-import { StagePill } from "@/components/shared/StagePill";
 import {
   ConsoleAuthRequired,
   ConsoleLoading,
-  OverviewConsole,
+  RECENT_PRIORITY,
+  RecentContentRow,
 } from "@/components/workspace/OverviewConsole";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
-import { CreatorSeasonState } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 import {
   WorkspaceOverviewResponse,
@@ -21,11 +21,14 @@ import {
   WorkspacePersona,
   workspacePersonas,
 } from "@/lib/mocks/workspace";
-import { WORKSPACE_PATH, buildLoginHref } from "@/lib/routes";
+import {
+  WORKSPACE_CONTENT_NEW_PATH,
+  WORKSPACE_LIBRARY_PATH,
+  buildLoginHref,
+} from "@/lib/routes";
 import { clearAuthAndBuildLoginHref, isAuthError } from "@/lib/session-flow";
 import {
   WORKSPACE_DEMO_STAGE,
-  WORKSPACE_STAGE_ORDER,
   buildPersonaFromWorkspace,
   getErrorMessage,
   isLocalPreviewToken,
@@ -33,22 +36,16 @@ import {
 
 type PreviewTone = "info" | "warn";
 
-type WorkspaceState =
+type LibraryState =
   | { status: "loading" }
   | { status: "unauthenticated"; loginHref: string }
-  | {
-      status: "preview";
-      message: string;
-      tone: PreviewTone;
-      loginHref?: string;
-    }
+  | { status: "preview"; message: string; tone: PreviewTone; loginHref?: string }
   | { status: "ready"; data: WorkspaceOverviewResponse };
 
-export default function WorkspacePage() {
+export default function WorkspaceLibraryPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [state, setState] = useState<WorkspaceState>({ status: "loading" });
-  const [activeStage, setActiveStage] = useState<CreatorSeasonState>(WORKSPACE_DEMO_STAGE);
+  const [state, setState] = useState<LibraryState>({ status: "loading" });
   const isDemoMode = router.isReady && router.query.demo === "1";
 
   useEffect(() => {
@@ -59,7 +56,7 @@ export default function WorkspacePage() {
     const session = getStoredAuthSession();
 
     if (!session) {
-      setState({ status: "unauthenticated", loginHref: buildLoginHref({ nextPath: WORKSPACE_PATH }) });
+      setState({ status: "unauthenticated", loginHref: buildLoginHref({ nextPath: WORKSPACE_LIBRARY_PATH }) });
       return;
     }
 
@@ -70,11 +67,7 @@ export default function WorkspacePage() {
       .catch((error: unknown) => {
         if (!isMounted) return;
         if (isLocalPreviewToken(session.accessToken)) {
-          setState({
-            status: "preview",
-            tone: "info",
-            message: t("ws.preview.offline"),
-          });
+          setState({ status: "preview", tone: "info", message: t("ws.preview.offline") });
           return;
         }
         if (isAuthError(error)) {
@@ -82,7 +75,7 @@ export default function WorkspacePage() {
             status: "preview",
             tone: "warn",
             message: t("ws.preview.expired"),
-            loginHref: clearAuthAndBuildLoginHref(WORKSPACE_PATH),
+            loginHref: clearAuthAndBuildLoginHref(WORKSPACE_LIBRARY_PATH),
           });
           return;
         }
@@ -99,16 +92,15 @@ export default function WorkspacePage() {
   }, [isDemoMode, router.isReady, t]);
 
   const persona = useMemo<WorkspacePersona>(() => {
-    if (isDemoMode) return workspacePersonas[activeStage];
+    if (isDemoMode) return workspacePersonas[WORKSPACE_DEMO_STAGE];
     if (state.status === "ready") return buildPersonaFromWorkspace(state.data);
-    if (state.status === "preview") return workspacePersonas[WORKSPACE_DEMO_STAGE];
     return workspacePersonas[WORKSPACE_DEMO_STAGE];
-  }, [isDemoMode, activeStage, state]);
+  }, [isDemoMode, state]);
 
   return (
     <>
       <Head>
-        <title>{t("ws.pageTitle")}</title>
+        <title>{t("ws.library.pageTitle")}</title>
       </Head>
       <WorkspaceShell stage={persona.stage} wallet={persona.wallet}>
         <ProductReadinessBanner
@@ -117,29 +109,64 @@ export default function WorkspacePage() {
           title={t("ws.readinessTitle")}
         />
 
-        {isDemoMode ? <StageSwitcher activeStage={activeStage} onChange={setActiveStage} /> : null}
-
         {!isDemoMode && state.status === "loading" ? <ConsoleLoading /> : null}
         {!isDemoMode && state.status === "unauthenticated" ? (
           <ConsoleAuthRequired loginHref={state.loginHref} />
         ) : null}
         {!isDemoMode && state.status === "preview" ? (
-          <WorkspacePreviewNotice
-            loginHref={state.loginHref}
-            message={state.message}
-            tone={state.tone}
-          />
+          <LibraryPreviewNotice loginHref={state.loginHref} message={state.message} tone={state.tone} />
         ) : null}
 
         {(isDemoMode || state.status === "ready" || state.status === "preview") && (
-          <OverviewConsole persona={persona} />
+          <LibraryConsole persona={persona} />
         )}
       </WorkspaceShell>
     </>
   );
 }
 
-const WorkspacePreviewNotice = ({
+const LibraryConsole = ({ persona }: { persona: WorkspacePersona }) => {
+  const { t } = useI18n();
+  const items = [...persona.contentItems].sort(
+    (a, b) => RECENT_PRIORITY[a.status] - RECENT_PRIORITY[b.status],
+  );
+
+  return (
+    <div className="space-y-4 pb-4">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="flex items-baseline gap-2 text-2xl font-extrabold tracking-[-0.02em] text-white">
+          {t("ws.library.title")}
+          <span className="text-[length:var(--fs-caption)] font-semibold text-[#7486a1]">
+            {t("ws.library.count", { n: String(items.length) })}
+          </span>
+        </h1>
+        <Link
+          className="shrink-0 rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-2 text-[length:var(--fs-caption)] font-bold text-white shadow-[0_10px_24px_rgba(222,64,42,0.28)] transition hover:brightness-110"
+          href={WORKSPACE_CONTENT_NEW_PATH}
+        >
+          {t("ws.postContent")}
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-4 py-10 text-center text-[length:var(--fs-overline)] text-[#7e90aa]">
+          {t("ws.noContent")} ·{" "}
+          <Link className="text-[#cbd6e7] underline-offset-4 hover:underline" href={WORKSPACE_CONTENT_NEW_PATH}>
+            {t("ws.uploadFirst")}
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <RecentContentRow item={item} key={item.id} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LibraryPreviewNotice = ({
   loginHref,
   message,
   tone,
@@ -150,9 +177,7 @@ const WorkspacePreviewNotice = ({
 }) => {
   const { t } = useI18n();
   const toneClass =
-    tone === "warn"
-      ? "border-[#de402a]/22 bg-[#1f120e]/70"
-      : "border-[#67b8ff]/20 bg-[#0e1726]/70";
+    tone === "warn" ? "border-[#de402a]/22 bg-[#1f120e]/70" : "border-[#67b8ff]/20 bg-[#0e1726]/70";
   const accentClass = tone === "warn" ? "text-[#ff8a78]" : "text-[#8ad0ff]";
   const dotClass = tone === "warn" ? "bg-[#de402a]" : "bg-[#67b8ff]";
 
@@ -176,36 +201,5 @@ const WorkspacePreviewNotice = ({
         ) : null}
       </div>
     </section>
-  );
-};
-
-const StageSwitcher = ({
-  activeStage,
-  onChange,
-}: {
-  activeStage: CreatorSeasonState;
-  onChange: (stage: CreatorSeasonState) => void;
-}) => {
-  const { t } = useI18n();
-  return (
-  <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-    <span className="px-2 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#6f8099]">
-      {t("ws.demoStage")}
-    </span>
-    {WORKSPACE_STAGE_ORDER.map((stage) => (
-      <button
-        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[length:var(--fs-micro)] transition ${
-          activeStage === stage
-            ? "bg-white/[0.06] text-white"
-            : "text-[#7e90aa] hover:bg-white/[0.04] hover:text-white"
-        }`}
-        key={stage}
-        onClick={() => onChange(stage)}
-        type="button"
-      >
-        <StagePill compact stage={stage} />
-      </button>
-    ))}
-  </div>
   );
 };

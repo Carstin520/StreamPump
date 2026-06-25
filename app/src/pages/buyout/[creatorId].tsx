@@ -517,13 +517,13 @@ function RageQuitPanel({
             </div>
             <div className="rounded-[10px] border border-[#65ecaf]/15 bg-[#0e1f17]/40 px-3 py-2.5">
               <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.14em] text-[#8df0c4]">
-                留到毕业
+                {t("buyout.rageQuit.keepTitle")}
               </p>
               <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-white">
-                预计可领取 {formatUsdcAmount(estimatedClaimableUsdc ?? null)} USDC 发现奖励（封顶估算）
+                {t("buyout.rageQuit.keepReward", { usdc: formatUsdcAmount(estimatedClaimableUsdc ?? null) })}
               </p>
               <p className="mt-2 border-t border-white/[0.06] pt-2 text-[length:var(--fs-micro)] leading-4 text-[#8ea0ba]">
-                注意：发现奖励按合格人数与档位估算，并受单用户上限约束；S1 数量不会按比例放大 USDC 领取额。最终领取额以实际链上结算为准。
+                {t("buyout.rageQuit.keepNote")}
               </p>
             </div>
           </div>
@@ -801,7 +801,7 @@ function BuyoutReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
     <section className={`rounded-[14px] border px-4 py-3 ${config.tone}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">毕业赞助数据来源</p>
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] opacity-80">{t("buyout.dataSource")}</p>
           <p className="mt-1 text-sm font-semibold text-white">{t(config.titleKey)}</p>
           <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t(config.bodyKey)}</p>
         </div>
@@ -1012,7 +1012,7 @@ function BuyoutPage() {
 
   return (
     <>
-      <Head><title>{`StreamPump | ${title} 毕业赞助`}</title></Head>
+      <Head><title>{`StreamPump | ${title} ${t("buyout.graduationLabel")}`}</title></Head>
       <PageShell>
         <div className="mx-auto max-w-4xl space-y-4">
           <ProductReadinessBanner
@@ -1040,7 +1040,7 @@ function BuyoutPage() {
                 <span aria-hidden className="text-sm">‹</span>
               </Link>
               <div className="min-w-0 flex-1">
-                <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">S1 毕业赞助</p>
+                <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{t("buyout.s1GraduationLabel")}</p>
                 <h1 className="mt-0.5 truncate text-xl font-bold tracking-[-0.03em] text-white">{title}</h1>
                 <p className="mt-0.5 truncate text-xs text-[#8ea0ba]">
                   @{handle} · {shortenWallet(profile.creator.creatorWallet)}

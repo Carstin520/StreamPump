@@ -59,6 +59,11 @@ export const PostCard = ({
 }) => {
   const { t } = useI18n();
   const imageCount = post.gallerySrcs?.length ?? 0;
+  // Fallback box height parsed from the Tailwind height class (e.g. "h-[420px]").
+  // Applied as an inline style so the media box ALWAYS has a definite height and
+  // clips its image even if the global stylesheet (Tailwind) fails to load — this
+  // prevents the first card's image layer from blowing out and covering the viewport.
+  const mediaHeightPx = Number(post.mediaHeightClass.match(/(\d+)px/)?.[1]) || 360;
 
   const handlePreview = () => {
     onPreview?.();
@@ -70,7 +75,10 @@ export const PostCard = ({
 
   const inner = (
     <article className="glass-card relative overflow-hidden border-white/[0.06] bg-[#101621]">
-      <div className={`relative overflow-hidden ${post.mediaHeightClass} ${post.mediaStyle}`}>
+      <div
+        className={`relative overflow-hidden ${post.mediaHeightClass} ${post.mediaStyle}`}
+        style={{ position: "relative", overflow: "hidden", height: mediaHeightPx }}
+      >
         <ProgressiveImage
           alt={post.title}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
@@ -79,6 +87,7 @@ export const PostCard = ({
           priority={priority}
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
           src={post.coverSrc}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_40%,rgba(8,17,28,0.36)_64%,rgba(8,17,28,0.82)_100%)]" />
 

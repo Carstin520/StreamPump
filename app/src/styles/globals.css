@@ -1207,10 +1207,13 @@ a {
   66% { opacity: 0.95; transform: scale(0.98) rotate(-0.5deg); }
 }
 
-.feed-masonry-item {
-  content-visibility: auto;
-  contain-intrinsic-size: 360px;
-}
+/* NOTE: `content-visibility: auto; contain-intrinsic-size: 360px;` was removed.
+   Inside the CSS multi-column masonry it applied size/layout containment to the
+   cards, which broke column flow and let the first card's absolutely-positioned
+   image layer blow out and cover the whole viewport (sidebar/topbar hidden, all
+   hit-tests landing on the first PostCard <img>). The off-screen-render perf win
+   is not worth the layout breakage. The `.feed-masonry-item` class is still added
+   in PostCard markup but is now an intentional no-op (no containment). */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

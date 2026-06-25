@@ -18,6 +18,7 @@ import { DemoActionStatusCard } from "@/components/shared/DemoActionStatusCard";
 import { PriceHistoryChart } from "@/components/shared/PriceHistoryChart";
 import { StagePill } from "@/components/shared/StagePill";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
+import { useManagedWallet } from "@/hooks/useManagedWallet";
 import { useS1TransactionFlow } from "@/hooks/useS1TransactionFlow";
 import {
   buildS1BuyTransaction,
@@ -54,50 +55,6 @@ import {
   DEMO_S1_CREATOR_PATH,
   DEMO_S1_MARKET_PATH,
 } from "@/lib/routes";
-
-/* ------------------------------------------------------------------ */
-/*  Price card                                                         */
-/* ------------------------------------------------------------------ */
-
-function PriceCard({ profile }: { profile: S1MarketProfileResponse }) {
-  const { t } = useI18n();
-  const priceHistory = useMemo(
-    () =>
-      createMockPriceHistory({
-        basePrice: parseAtomicSpumpToNumber(profile.creator.currentPriceSpump),
-        key: profile.creator.creatorWallet,
-      }),
-    [profile.creator.creatorWallet, profile.creator.currentPriceSpump],
-  );
-
-  return (
-    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.2em] text-[#5a6d87]">{t("common.currentPrice")}</p>
-          <p className="mt-1.5 text-[32px] font-bold leading-none tracking-[-0.05em] text-white md:text-[40px]">
-            {formatSpump(profile.creator.currentPriceSpump)}
-          </p>
-          <p className="mt-2 text-xs text-[#8ea0ba]">
-            {t("market.nextTier")}: {formatSpump(profile.creator.nextPriceSpump)}
-          </p>
-        </div>
-        <StagePill stage={profile.creator.stage} />
-      </div>
-      <div className="-mx-2 mt-3">
-        <PriceHistoryChart
-          className="px-2"
-          currencyLabel="SPUMP"
-          defaultRange="1M"
-          height={260}
-          points={priceHistory}
-        />
-      </div>
-      {/* Chart note: current price is real on-chain; history curve is synthetic */}
-      <p className="mt-2 text-[length:var(--fs-micro)] text-[#5a6d87]">{t("market.priceChartNote")}</p>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Stats grid                                                         */
@@ -252,6 +209,8 @@ function TradePanel({
   const demoFlow = useDemoActionFlow();
   const flow = useS1TransactionFlow();
   const wallet = useWallet();
+  const managedWallet = useManagedWallet();
+  const isManaged = managedWallet.isManagedWallet;
 
   const pos = findPortfolioPosition(portfolio, creatorWallet);
   const maxSell = Math.max(0, Number(pos?.internalTokenBalance || 0));
@@ -261,7 +220,11 @@ function TradePanel({
   const isLocalDemoSession = sessionToken === S1_MOCK_ACCESS_TOKEN;
   const connectedWallet = wallet.publicKey?.toBase58() ?? null;
   const walletMismatch = sessionWallet && connectedWallet && sessionWallet !== connectedWallet;
-  const canTrade = Boolean(sessionToken && !isLocalDemoSession && wallet.connected && !walletMismatch);
+  // Platform-wallet (managed) sessions back ("应援" = buy) server-side via the job
+  // queue — no external wallet needed. Sell isn't wired for managed yet.
+  const canTrade = isManaged
+    ? Boolean(sessionToken && side === "buy")
+    : Boolean(sessionToken && !isLocalDemoSession && wallet.connected && !walletMismatch);
   const sellOverLimit = side === "sell" && hasPosition && amount > maxSell;
 
   const estimatedCost = useMemo(() => {
@@ -270,10 +233,14 @@ function TradePanel({
   }, [amount, profile.creator.currentPriceSpump]);
 
   const executeTrade = useCallback(async () => {
-    const submitted = await flow.execute((token) =>
-      side === "buy"
-        ? buildS1BuyTransaction(token, { creatorWallet, amount })
-        : buildS1SellTransaction(token, { creatorWallet, amount }),
+    const submitted = await flow.execute(
+      (token) =>
+        side === "buy"
+          ? buildS1BuyTransaction(token, { creatorWallet, amount })
+          : buildS1SellTransaction(token, { creatorWallet, amount }),
+      // Platform-wallet (managed) sessions execute server-side via the job queue.
+      // Backend supports buy_s1_token; sell stays connected-wallet only for now.
+      side === "buy" ? { action: "buy_s1_token", params: { creatorWallet, amount } } : undefined,
     );
     if (submitted) await onRefresh();
   }, [side, amount, creatorWallet, flow, onRefresh]);
@@ -292,9 +259,10 @@ function TradePanel({
   const demoBusy = demoFlow.state.status === "submitted";
 
   const ctaLabel = (): string => {
-    if (!wallet.connected) return t("market.connectWallet");
-    if (!sessionToken || isLocalDemoSession) return t("market.signInWithWallet");
-    if (walletMismatch) return t("market.walletMismatch");
+    if (!isManaged && !wallet.connected) return t("market.connectWallet");
+    if (!isManaged && (!sessionToken || isLocalDemoSession)) return t("market.signInWithWallet");
+    if (!isManaged && walletMismatch) return t("market.walletMismatch");
+    if (isManaged && side === "sell") return t("market.connectToSell");
     if (side === "sell" && !hasPosition) return t("market.noPositionToSell");
     if (sellOverLimit) return t("market.amountExceedsPosition");
     return side === "buy" ? t("market.buySide") : t("market.sellSide");
@@ -302,6 +270,12 @@ function TradePanel({
 
   return (
     <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(175deg,rgba(14,19,30,0.94)_0%,rgba(10,14,22,0.94)_100%)] p-4 md:p-5">
+      {/* Backing heading (display only) */}
+      <div className="mb-3">
+        <p className="text-base font-extrabold text-white">{t("market.backTitle")}</p>
+        <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">{t("market.backSubtitle")}</p>
+      </div>
+
       {/* Buy / Sell tabs */}
       <div className="flex gap-1 rounded-full border border-white/[0.06] bg-white/[0.02] p-0.5">
         {(["buy", "sell"] as const).map((s) => (
@@ -419,7 +393,7 @@ function TradePanel({
             title={side === "buy" ? t("market.previewBuyTitle") : t("market.previewSellTitle")}
           />
         </>
-      ) : !wallet.connected ? (
+      ) : !isManaged && !wallet.connected ? (
         <div className="mt-4 space-y-2">
           <WalletMultiButton className="!w-full !justify-center !rounded-full !text-sm" />
           <Link
@@ -429,7 +403,7 @@ function TradePanel({
             {t("market.signInToTrade")}
           </Link>
         </div>
-      ) : !sessionToken || isLocalDemoSession ? (
+      ) : !isManaged && (!sessionToken || isLocalDemoSession) ? (
         <Link
           className="mt-4 block w-full rounded-full bg-[linear-gradient(180deg,rgba(222,64,42,0.85)_0%,rgba(190,52,34,0.85)_100%)] py-3 text-center text-[length:var(--fs-caption)] font-bold tracking-wide text-white shadow-[0_8px_24px_rgba(222,64,42,0.2)] transition-all hover:brightness-110"
           href={`/login?next=/market/${creatorWallet}`}
@@ -473,40 +447,6 @@ function Row({ bold, label, value }: { bold?: boolean; label: string; value: str
     <div className="flex items-baseline justify-between gap-3">
       <span className={`text-[length:var(--fs-micro)] ${bold ? "font-semibold text-[#8ea0ba]" : "text-[#6f8099]"}`}>{label}</span>
       <span className={`text-[length:var(--fs-micro)] ${bold ? "font-bold text-white" : "font-medium text-white"}`}>{value}</span>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Header                                                             */
-/* ------------------------------------------------------------------ */
-
-function MarketHeader({
-  fallbackAvatar,
-  profile,
-  title,
-  handle,
-}: {
-  fallbackAvatar: string;
-  profile: S1MarketProfileResponse;
-  title: string;
-  handle: string;
-}) {
-  return (
-    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
-      <div className="flex items-center gap-3.5">
-        <Link className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-[#7e90aa] transition hover:bg-white/[0.08]" href="/trending">
-          <span aria-hidden className="text-sm">‹</span>
-        </Link>
-        <img alt="" className="h-10 w-10 rounded-full border border-white/[0.08] object-cover" src={fallbackAvatar} />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-bold tracking-[-0.03em] text-white">{title}</h1>
-          <p className="truncate text-xs text-[#8ea0ba]">
-            @{handle} · {shortenWallet(profile.creator.creatorWallet)}
-          </p>
-        </div>
-        <StagePill className="hidden sm:inline-flex" stage={profile.creator.stage} />
-      </div>
     </div>
   );
 }
@@ -577,6 +517,124 @@ function MarketReadinessNotice({ isDemoRoute }: { isDemoRoute: boolean }) {
         </span>
       </div>
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Backing-detail left column (presentation only — no signing chain)  */
+/* ------------------------------------------------------------------ */
+
+function CreatorDetailHeader({
+  fallbackCreator,
+  handle,
+  profile,
+  title,
+}: {
+  fallbackCreator: ReturnType<typeof resolveFallbackCreator>;
+  handle: string;
+  profile: S1MarketProfileResponse;
+  title: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
+      <div className="flex items-center gap-3.5">
+        <Link className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-[#7e90aa] transition hover:bg-white/[0.08]" href="/trending">
+          <span aria-hidden className="text-sm">‹</span>
+        </Link>
+        <img alt="" className="h-14 w-14 shrink-0 rounded-2xl border border-white/[0.1] object-cover" src={fallbackCreator.avatarSrc} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="truncate text-2xl font-extrabold tracking-[-0.02em] text-white">{title}</h1>
+            <StagePill stage={profile.creator.stage} />
+          </div>
+          <p className="mt-1 truncate text-[length:var(--fs-caption)] text-[#93a2bb]">
+            @{handle} · {fallbackCreator.niche} · {fallbackCreator.city}
+          </p>
+        </div>
+        <button className="shrink-0 rounded-full border border-white/[0.14] bg-white/[0.05] px-4 py-2 text-[length:var(--fs-caption)] font-semibold text-white transition hover:border-white/[0.24]" type="button">
+          + {t("market.follow")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MomentumPanel({ momentum, profile }: { momentum: number; profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
+  const priceHistory = useMemo(
+    () =>
+      createMockPriceHistory({
+        basePrice: parseAtomicSpumpToNumber(profile.creator.currentPriceSpump),
+        key: profile.creator.creatorWallet,
+      }),
+    [profile.creator.creatorWallet, profile.creator.currentPriceSpump],
+  );
+
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5 md:p-6">
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.momentumTitle")}</p>
+          <p className="mt-1 text-[36px] font-extrabold leading-none tracking-[-0.04em] text-white md:text-[40px]">{momentum || "—"}</p>
+        </div>
+        <span className="mb-1 rounded-full border border-[#2fbf71]/30 bg-[#2fbf71]/[0.1] px-2.5 py-1 text-[length:var(--fs-micro)] font-semibold text-[#2fbf71]">
+          {t("market.momentumSignal")}
+        </span>
+      </div>
+      <div className="-mx-2 mt-3">
+        <PriceHistoryChart className="px-2" currencyLabel="SPUMP" defaultRange="1M" height={220} points={priceHistory} />
+      </div>
+      <p className="mt-2 text-[length:var(--fs-micro)] leading-relaxed text-[#5a6d87]">{t("market.momentumNote")}</p>
+    </div>
+  );
+}
+
+function LifecyclePanel({ profile }: { profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
+  const grad = formatGraduationProgressPercent(profile.creator.graduationProgressBps);
+  const stage = profile.creator.stage;
+  const atBuyout = stage === "S1_BUYOUT" || stage === "S2_ACTIVE";
+  const atS2 = stage === "S2_ACTIVE";
+  const seg = (label: string, color: string, on: boolean) => (
+    <span className="whitespace-nowrap text-[length:var(--fs-micro)] font-bold" style={{ color: on ? color : "#5a6d87" }}>{label}</span>
+  );
+  const bar = (flex: number, pct: number, fill: string) => (
+    <div className="h-2 overflow-hidden rounded-full bg-white/[0.09]" style={{ flex }}>
+      <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: fill }} />
+    </div>
+  );
+
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5">
+      <p className="mb-3 text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.lifecycleTitle")}</p>
+      <div className="flex items-center gap-1.5">
+        {seg(t("market.lifecycleS1"), "#67b8ff", true)}
+        {bar(3, grad, "linear-gradient(90deg,#67b8ff,#de402a)")}
+        {seg(t("market.lifecycleBuyout"), "#de402a", atBuyout)}
+        {bar(1, atS2 ? 100 : 0, "linear-gradient(90deg,#de402a,#65ecaf)")}
+        {seg(t("market.lifecycleS2"), "#65ecaf", atS2)}
+      </div>
+      <p className="mt-3 text-[length:var(--fs-micro)] leading-relaxed text-[#5a6d87]">
+        {t("market.graduation")} {grad}% · {t("market.lifecycleNote")}
+      </p>
+    </div>
+  );
+}
+
+function ScoutsPanel({ profile }: { profile: S1MarketProfileResponse }) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] p-5">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[length:var(--fs-micro)] font-medium uppercase tracking-[0.18em] text-[#5a6d87]">{t("market.backersLabel")}</p>
+          <p className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">{compactNumber(profile.creator.holderCount)}</p>
+        </div>
+        <p className="text-[length:var(--fs-micro)] text-[#5a6d87]">{t("market.topScouts")}: —</p>
+      </div>
+      <p className="mt-2 text-[length:var(--fs-nano)] text-[#5a6d87]">{t("market.topScoutsPending")}</p>
+    </div>
   );
 }
 
@@ -746,17 +804,19 @@ function MarketPage() {
           />
           {isDemoRoute ? <DemoRouteRail /> : null}
 
-          <MarketHeader
-            fallbackAvatar={fallbackCreator.avatarSrc}
+          <CreatorDetailHeader
+            fallbackCreator={fallbackCreator}
             handle={handle}
             profile={profile}
             title={title}
           />
 
           <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-            {/* Left column */}
+            {/* Left column — backing detail (momentum / lifecycle / scouts) */}
             <div className="space-y-4">
-              <PriceCard profile={profile} />
+              <MomentumPanel momentum={fallbackCreator.momentumScore} profile={profile} />
+              <LifecyclePanel profile={profile} />
+              <ScoutsPanel profile={profile} />
               <StatsGrid profile={profile} />
               <BuyoutSummary
                 buyout={profile.buyout}

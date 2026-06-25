@@ -8,11 +8,37 @@ import { getAccountMe, updateAccountMe } from "@/lib/api/account";
 import { AccountMeRecord, AccountRole } from "@/lib/api/types";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import { useI18n } from "@/lib/i18n";
-import { buildLoginHref } from "@/lib/routes";
+import {
+  EXPLORE_PATH,
+  WORKSPACE_CONTENT_NEW_PATH,
+  WORKSPACE_SPONSOR_ONBOARDING_PATH,
+  buildLoginHref,
+} from "@/lib/routes";
 
 const TOTAL_SPUMP = 1_250_000;
 const XP_REWARD = 20;
-const STEPS = 4;
+const STEPS = 3;
+
+const roleDestination = (role: AccountRole) =>
+  role === "CREATOR"
+    ? WORKSPACE_CONTENT_NEW_PATH
+    : role === "SPONSOR"
+      ? WORKSPACE_SPONSOR_ONBOARDING_PATH
+      : EXPLORE_PATH;
+
+const roleCtaKey = (role: AccountRole) =>
+  role === "CREATOR"
+    ? "onboarding.ctaCreator"
+    : role === "SPONSOR"
+      ? "onboarding.ctaSponsor"
+      : "onboarding.startExploring";
+
+const roleNextKey = (role: AccountRole) =>
+  role === "CREATOR"
+    ? "onboarding.nextCreator"
+    : role === "SPONSOR"
+      ? "onboarding.nextSponsor"
+      : "onboarding.nextFan";
 
 type AccountLoadState =
   | { kind: "checking" }
@@ -259,7 +285,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   const xpCount = useCountUp(XP_REWARD, 800, currentStep === 2);
-  const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 3);
+  const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 2);
   const account = accountState.kind === "ready" ? accountState.account : null;
   const canWriteProfile = accountState.kind === "ready" && accountState.account.storageStatus === "LIVE";
 
@@ -543,7 +569,9 @@ export default function OnboardingPage() {
               )}
 
               {currentStep === 2 && (
-                <div className="liquid-glass-shell p-8 text-center">
+                <div className="liquid-glass-shell relative overflow-hidden p-8 text-center">
+                  <TokenRain active />
+
                   <CheckCircle animated />
                   <h1 className="type-h2 mt-4 font-semibold">
                     {t("onboarding.profileSaved")}
@@ -554,64 +582,43 @@ export default function OnboardingPage() {
                       : t("onboarding.profileSavedSubtitleDefault")}
                   </p>
 
+                  {/* Combined reward: XP + welcome SPUMP in one compact card */}
                   <div
-                    className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full border border-[#65ecaf]/20 bg-[#65ecaf]/[0.08] px-5 py-2.5"
+                    className="mx-auto mt-6 flex w-full max-w-[320px] items-center justify-between gap-3 rounded-2xl border border-[#65ecaf]/18 bg-[#65ecaf]/[0.06] px-5 py-3.5"
                     style={{ animation: "count-pop 500ms ease-out" }}
                   >
-                    <span className="text-[length:var(--fs-caption)] font-medium text-[#65ecaf]">{t("onboarding.previewXpLabel")}</span>
-                    <span className="text-xl font-bold tabular-nums text-[#65ecaf]">+{xpCount}</span>
+                    <div className="text-left">
+                      <p className="text-[length:var(--fs-micro)] font-medium text-[#65ecaf]">{t("onboarding.previewXpLabel")}</p>
+                      <p className="text-lg font-bold tabular-nums text-[#65ecaf]">+{xpCount}</p>
+                    </div>
+                    <div className="h-8 w-px bg-white/[0.1]" />
+                    <div className="text-right">
+                      <p className="text-[length:var(--fs-micro)] font-medium text-[#8ea0ba]">{t("onboarding.previewSpumpUnit")}</p>
+                      <p className="text-lg font-bold tabular-nums text-white">{spumpCount.toLocaleString()}</p>
+                    </div>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[#6f8099]">
                     {t("onboarding.previewXpNote")}
                   </p>
 
-                  <button
-                    className="glass-button-primary mt-8 w-full px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
-                    onClick={goNext}
-                    type="button"
-                  >
-                    {t("onboarding.previewReward")}
-                  </button>
-                </div>
-              )}
-
-              {currentStep === 3 && (
-                <div className="liquid-glass-shell relative overflow-hidden p-8 text-center">
-                  <TokenRain active />
-
-                  <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-[#de402a]/20 bg-[#de402a]/10">
-                    <svg className="h-10 w-10 text-[#de402a]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                      <path
-                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-
-                  <h1 className="type-h2 font-semibold">
-                    {t("onboarding.previewSpumpReady")}
-                  </h1>
-                  <p className="mt-2 text-[length:var(--fs-sm)] text-[#8ea0ba]">
-                    {t("onboarding.previewSpumpSubtitle")}
+                  {/* Role-based next step + primary exit */}
+                  <p className="mt-6 text-[length:var(--fs-caption)] text-[#9aabc4]">
+                    {t(roleNextKey(role))}
                   </p>
-
-                  <div
-                    className="mt-6"
-                    style={{ animation: "count-pop 600ms ease-out" }}
-                  >
-                    <div className="text-[48px] font-bold tabular-nums tracking-[-0.04em] text-white">
-                      {spumpCount.toLocaleString()}
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-[#8ea0ba]">{t("onboarding.previewSpumpUnit")}</div>
-                  </div>
-
                   <Link
-                    className="glass-button-primary mt-8 flex w-full items-center justify-center px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
-                    href="/explore"
+                    className="glass-button-primary mt-3 flex w-full items-center justify-center px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
+                    href={roleDestination(role)}
                   >
-                    {t("onboarding.startExploring")}
+                    {t(roleCtaKey(role))}
                   </Link>
+                  {role !== "FAN" ? (
+                    <Link
+                      className="mt-3 inline-block text-[length:var(--fs-micro)] text-[#8ea0ba] transition hover:text-white"
+                      href={EXPLORE_PATH}
+                    >
+                      {t("onboarding.startExploring")}
+                    </Link>
+                  ) : null}
                 </div>
               )}
             </div>

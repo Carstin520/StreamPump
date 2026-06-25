@@ -3,6 +3,7 @@ import Link from "next/link";
 import { StagePill } from "@/components/shared/StagePill";
 import { findCreator } from "@/lib/public-data";
 import { scoutScoreboard } from "@/lib/mocks/portfolio";
+import { creatorMarketSeed } from "@/lib/mocks/marketSeed";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
 import { useI18n } from "@/lib/i18n";
 import type { ScoutBackingRowRecord } from "@/lib/api/types";
@@ -120,7 +121,7 @@ export const ScoutScoreboard = () => {
                 <div className="text-[length:var(--fs-micro)] text-[#cbd6e7]">
                   {t("portfolio.scout.entryRank", { rank: String(row.entryRank) })} {identityBadge(row.identity, t)}
                 </div>
-                <div className="text-[length:var(--fs-caption)] font-bold text-white">{creator.momentumScore || "—"}</div>
+                <div className="text-[length:var(--fs-caption)] font-bold text-white">{creatorMarketSeed[row.creatorId]?.momentumScore ?? creator.momentumScore ?? "—"}</div>
                 <div><StagePill compact stage={creator.state} /></div>
                 <div className="flex justify-start sm:justify-end">
                   <span

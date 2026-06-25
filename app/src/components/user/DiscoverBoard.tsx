@@ -7,12 +7,19 @@ import { CreatorMarketRecord, PostRecord } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 import { compactNumber } from "@/lib/public-data";
 import { resolveCreatorWalletForRoute } from "@/lib/s1-market-view";
+import { CREATOR_CATEGORIES, CreatorCategory, creatorCampaignByName, resolveCreatorMarketSeed } from "@/lib/mocks/marketSeed";
 
 type DiscoverTab = "trending" | "new" | "graduating" | "s2";
 
 const GRADUATION_THRESHOLD = 80;
 const MOVERS_COUNT = 4;
-const ALL_NICHES = "__all__";
+const ALL_CATEGORIES = "__all__";
+
+// Join by id or stable display name (feed slugifies CJK names → id won't match).
+const creatorCategory = (creator: CreatorMarketRecord): CreatorCategory | null =>
+  resolveCreatorMarketSeed(creator.id, creator.name)?.category ?? null;
+const creatorDelta = (creator: CreatorMarketRecord): number =>
+  resolveCreatorMarketSeed(creator.id, creator.name)?.momentumDelta7d ?? 0;
 
 const DerivedBadge = ({ label }: { label: string }) => (
   <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#7486a1]">
@@ -43,6 +50,15 @@ const creatorHref = (creator: CreatorMarketRecord) => {
   const wallet = resolveCreatorWalletForRoute(creator.id);
   return wallet ? `/market/${wallet}` : `/creators/${creator.id}`;
 };
+// S2 creators with a seeded campaign route to the on-chain proof page; everyone
+// else routes to their market/creator page.
+const resolveCardHref = (creator: CreatorMarketRecord) => {
+  if (creator.state === "S2_ACTIVE") {
+    const campaignId = creatorCampaignByName[creator.name];
+    if (campaignId) return `/campaigns/${campaignId}`;
+  }
+  return creatorHref(creator);
+};
 const isBackable = (creator: CreatorMarketRecord) => resolveCreatorWalletForRoute(creator.id) !== null;
 
 export const DiscoverBoard = ({
@@ -53,7 +69,7 @@ export const DiscoverBoard = ({
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<DiscoverTab>("trending");
-  const [activeNiche, setActiveNiche] = useState<string>(ALL_NICHES);
+  const [activeCategory, setActiveCategory] = useState<CreatorCategory | typeof ALL_CATEGORIES>(ALL_CATEGORIES);
 
   const sorted = useMemo(
     () => [...creators].sort((a, b) => b.momentumScore - a.momentumScore),
@@ -71,16 +87,11 @@ export const DiscoverBoard = ({
 
   const movers = useMemo(() => sorted.slice(0, MOVERS_COUNT), [sorted]);
 
-  const niches = useMemo(() => {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const c of sorted) {
-      if (c.niche && !seen.has(c.niche)) {
-        seen.add(c.niche);
-        result.push(c.niche);
-      }
-    }
-    return result;
+  // Real category chips (fixed enum) — only categories actually present among
+  // the loaded creators are shown, in the canonical CREATOR_CATEGORIES order.
+  const categories = useMemo(() => {
+    const present = new Set(sorted.map((c) => creatorCategory(c)).filter(Boolean) as CreatorCategory[]);
+    return CREATOR_CATEGORIES.filter((cat) => present.has(cat));
   }, [sorted]);
 
   const tabFiltered = useMemo(() => {
@@ -97,8 +108,11 @@ export const DiscoverBoard = ({
   }, [sorted, activeTab]);
 
   const visible = useMemo(
-    () => (activeNiche === ALL_NICHES ? tabFiltered : tabFiltered.filter((c) => c.niche === activeNiche)),
-    [tabFiltered, activeNiche],
+    () =>
+      activeCategory === ALL_CATEGORIES
+        ? tabFiltered
+        : tabFiltered.filter((c) => creatorCategory(c) === activeCategory),
+    [tabFiltered, activeCategory],
   );
 
   const tabs: { id: DiscoverTab; label: string; sub?: string }[] = [
@@ -162,7 +176,7 @@ export const DiscoverBoard = ({
               {movers.map((mover) => (
                 <Link
                   className="flex items-center gap-2.5 py-2.5 transition hover:opacity-80"
-                  href={creatorHref(mover)}
+                  href={resolveCardHref(mover)}
                   key={mover.id}
                 >
                   <img alt={mover.name} className="h-7 w-7 shrink-0 rounded-lg object-cover" src={mover.avatarSrc} />
@@ -182,33 +196,33 @@ export const DiscoverBoard = ({
         ) : null}
       </div>
 
-      {/* Niche chips */}
-      {niches.length > 1 ? (
+      {/* Category chips (real categories, not hashtags) */}
+      {categories.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[length:var(--fs-nano)] text-[#5a6d87]">{t("discover.filterBy")}</span>
           <button
             className={`rounded-full border px-3.5 py-1 text-[length:var(--fs-micro)] font-medium transition ${
-              activeNiche === ALL_NICHES
+              activeCategory === ALL_CATEGORIES
                 ? "border-white/[0.25] bg-white/[0.12] text-white"
                 : "border-white/[0.08] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.14] hover:text-white"
             }`}
-            onClick={() => startTransition(() => setActiveNiche(ALL_NICHES))}
+            onClick={() => startTransition(() => setActiveCategory(ALL_CATEGORIES))}
             type="button"
           >
             {t("discover.allNiches")}
           </button>
-          {niches.map((niche) => (
+          {categories.map((cat) => (
             <button
               className={`rounded-full border px-3.5 py-1 text-[length:var(--fs-micro)] font-medium transition ${
-                activeNiche === niche
+                activeCategory === cat
                   ? "border-[color:color-mix(in_srgb,var(--brand)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--brand)_12%,transparent)] text-[color:var(--brand)]"
                   : "border-white/[0.08] bg-white/[0.02] text-[#8ea0ba] hover:border-white/[0.14] hover:text-white"
               }`}
-              key={niche}
-              onClick={() => startTransition(() => setActiveNiche(niche))}
+              key={cat}
+              onClick={() => startTransition(() => setActiveCategory(cat))}
               type="button"
             >
-              {niche}
+              {t(`discover.category.${cat}`)}
             </button>
           ))}
         </div>
@@ -240,7 +254,7 @@ const FeaturedCard = ({ creator }: { creator: CreatorMarketRecord }) => {
   const { t } = useI18n();
   const projection = hasMarketProjection(creator);
   const graduating = creator.state !== "S2_ACTIVE" && creator.graduationProgress > 0;
-  const href = creatorHref(creator);
+  const href = resolveCardHref(creator);
 
   return (
     <div className="relative flex-1 overflow-hidden rounded-[24px] border border-white/[0.14] bg-[linear-gradient(160deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.03)_100%)] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.3)]">
@@ -303,9 +317,10 @@ const CreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => {
   const { t } = useI18n();
   const projection = hasMarketProjection(creator);
   const points = momentumPoints(creator);
-  const href = creatorHref(creator);
+  const href = resolveCardHref(creator);
   const backable = isBackable(creator);
   const isS2 = creator.state === "S2_ACTIVE";
+  const delta = creatorDelta(creator);
 
   return (
     <Link
@@ -342,6 +357,11 @@ const CreatorCard = ({ creator }: { creator: CreatorMarketRecord }) => {
           </div>
           {isS2 ? (
             <span className="text-[length:var(--fs-micro)] font-bold text-[#7ce0b0]">{t("discover.sponsoring")}</span>
+          ) : delta > 0 ? (
+            <div className="text-right">
+              <p className="text-[length:var(--fs-nano)] text-[#7e90aa]">{t("discover.thisWeek")}</p>
+              <p className="text-[length:var(--fs-caption)] font-bold text-[#2fbf71]">↗ +{delta}</p>
+            </div>
           ) : (
             <DerivedBadge label={t("feed.trending.derived")} />
           )}

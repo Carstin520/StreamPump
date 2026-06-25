@@ -12,12 +12,12 @@ const SCOUT_TIER_LABEL = "Scout";
 const SCOUT_TIER_ZH = "星探";
 
 const MISSIONS = [
-  { name: "Complete Profile", emoji: "👤", spump: 20_000, xp: 20, done: true },
-  { name: "First S1 Buy", emoji: "💎", spump: 50_000, xp: 30, done: false },
-  { name: "Endorse a Proposal", emoji: "✅", spump: 30_000, xp: 25, done: false },
-  { name: "Share a Post", emoji: "📤", spump: 10_000, xp: 10, done: true },
-  { name: "Follow 5 Creators", emoji: "👥", spump: 15_000, xp: 15, done: false },
-  { name: "Daily Login Streak ×7", emoji: "🔥", spump: 100_000, xp: 50, done: false },
+  { key: "rewards.mission.profile", emoji: "👤", spump: 20_000, xp: 20, done: true },
+  { key: "rewards.mission.firstBuy", emoji: "💎", spump: 50_000, xp: 30, done: false },
+  { key: "rewards.mission.endorse", emoji: "✅", spump: 30_000, xp: 25, done: false },
+  { key: "rewards.mission.share", emoji: "📤", spump: 10_000, xp: 10, done: true },
+  { key: "rewards.mission.follow", emoji: "👥", spump: 15_000, xp: 15, done: false },
+  { key: "rewards.mission.streak7", emoji: "🔥", spump: 100_000, xp: 50, done: false },
 ] as const;
 
 const DAILY_AMOUNT = 1_250_000;
@@ -27,10 +27,10 @@ const CURRENT_LEVEL = 3;
 const STREAK = 3;
 const BOOST_DAYS_LEFT = 5;
 const REWARD_BOUNDARIES = [
-  { label: "Daily claim", value: "wallet or managed transaction" },
-  { label: "SPUMP balance", value: "on-chain mint path" },
-  { label: "Missions", value: "fixture progress" },
-  { label: "Production gate", value: "anti-abuse + live reward ledger" },
+  { labelKey: "rewards.boundary.dailyClaim", valueKey: "rewards.boundary.dailyClaimV" },
+  { labelKey: "rewards.boundary.spumpBalance", valueKey: "rewards.boundary.spumpBalanceV" },
+  { labelKey: "rewards.boundary.missions", valueKey: "rewards.boundary.missionsV" },
+  { labelKey: "rewards.boundary.productionGate", valueKey: "rewards.boundary.productionGateV" },
 ] as const;
 
 function fmt(n: number) {
@@ -51,8 +51,8 @@ export default function RewardsPage() {
     flow.state.status === "waiting_signature" ||
     flow.state.status === "submitting" ||
     flow.state.status === "syncing_projection";
-  const claimLabel = managedWallet.isManagedWallet ? "Claim" : "Claim with Wallet";
-  const claimedLabel = "Claimed";
+  const claimLabel = managedWallet.isManagedWallet ? t("rewards.claim") : t("rewards.claimWithWallet");
+  const claimedLabel = t("rewards.claimed");
 
   const handleDailyClaim = useCallback(async () => {
     const submitted = await flow.execute(
@@ -73,19 +73,18 @@ export default function RewardsPage() {
       <PageShell>
         <div className="mx-auto max-w-3xl space-y-5">
           <ProductReadinessBanner
-            description="Daily SPUMP claim now uses the live S1 transaction builder: managed wallets submit through backend signing, and external wallets sign through the wallet adapter. Mission cards and streak progress remain fixture preview data."
+            description={t("rewards.readinessDesc")}
             status="SEEDED_DEMO"
-            title="Daily reward claim is transaction-wired; missions remain preview"
+            title={t("rewards.readinessTitle")}
           />
 
           <section className="glass-card section-enter border-[color:color-mix(in_srgb,var(--state-warning)_22%,transparent)] px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[color:var(--state-warning)]">Mixed rewards ledger</p>
-                <p className="mt-1 text-sm font-semibold text-white">Daily claim is live-wired; mission progress is still preview.</p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.2em] text-[color:var(--state-warning)]">{t("rewards.mixedLedger")}</p>
+                <p className="mt-1 text-sm font-semibold text-white">{t("rewards.mixedLedgerTitle")}</p>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-[#95a6bf]">
-                  Use a signed-in managed wallet for one-click backend signing, or an external wallet for the normal wallet-sign flow.
-                  Mission rewards still need live claim records and abuse controls before they affect holdings.
+                  {t("rewards.mixedLedgerDesc")}
                 </p>
               </div>
               <span className="tone-state-warning w-fit rounded-full border px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
@@ -94,9 +93,9 @@ export default function RewardsPage() {
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {REWARD_BOUNDARIES.map((item) => (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2" key={item.label}>
-                  <p className="text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">{item.label}</p>
-                  <p className="mt-1 text-xs text-[#d7e3f4]">{item.value}</p>
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2" key={item.labelKey}>
+                  <p className="text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.18em] text-[#6f8099]">{t(item.labelKey)}</p>
+                  <p className="mt-1 text-xs text-[#d7e3f4]">{t(item.valueKey)}</p>
                 </div>
               ))}
             </div>
@@ -112,18 +111,18 @@ export default function RewardsPage() {
                   </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-white">Level {CURRENT_LEVEL}</p>
+                      <p className="text-xs font-semibold text-white">{t("rewards.levelN", { n: String(CURRENT_LEVEL) })}</p>
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#67b8ff]/20 bg-[#67b8ff]/8 px-2 py-0.5">
                         <span className="text-[length:var(--fs-nano)] font-medium text-[#8ec8ff]">{locale === "zh" ? SCOUT_TIER_ZH : SCOUT_TIER_LABEL}</span>
                         <span className="rounded border tone-state-warning px-1 py-px text-[7px] font-semibold uppercase tracking-[0.08em]">
-                          Mock
+                          {t("rewards.mockTag")}
                         </span>
                       </span>
                     </div>
                     <p className="text-[length:var(--fs-micro)] text-[#8ea0ba]">{fmt(totalXP)} / {fmt(LEVEL_XP)} XP</p>
                   </div>
                 </div>
-                <span className="text-[length:var(--fs-micro)] font-medium text-[#67b8ff]">Level {CURRENT_LEVEL + 1} →</span>
+                <span className="text-[length:var(--fs-micro)] font-medium text-[#67b8ff]">{t("rewards.nextLevel", { n: String(CURRENT_LEVEL + 1) })}</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
@@ -139,10 +138,10 @@ export default function RewardsPage() {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">⚡</span>
-                    <h3 className="text-xs font-bold tracking-[-0.02em] text-white">New User Boost</h3>
+                    <h3 className="text-xs font-bold tracking-[-0.02em] text-white">{t("rewards.boostTitle")}</h3>
                     <span className="rounded-full bg-[#f3b33e]/15 px-1.5 py-0.5 text-[length:var(--fs-nano)] font-bold text-[#f3b33e]">+25%</span>
                   </div>
-                  <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">{BOOST_DAYS_LEFT} days remaining</p>
+                  <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#8ea0ba]">{t("rewards.boostDaysLeft", { n: String(BOOST_DAYS_LEFT) })}</p>
                 </div>
               </div>
               <div className="relative mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
@@ -152,8 +151,8 @@ export default function RewardsPage() {
                 />
               </div>
               <div className="mt-1 flex justify-between text-[length:var(--fs-nano)] text-[#5a6b82]">
-                <span>Day 1</span>
-                <span>Day 7</span>
+                <span>{t("rewards.boostDay1")}</span>
+                <span>{t("rewards.boostDay7")}</span>
               </div>
             </section>
           </div>
@@ -171,7 +170,7 @@ export default function RewardsPage() {
                 <span className="absolute inset-0 -m-3 rounded-full bg-[#65ecaf]/8" />
               )}
               <button
-                aria-label="Claim daily SPUMP"
+                aria-label={t("rewards.claim")}
                 className={`relative z-10 flex h-32 w-32 flex-col items-center justify-center rounded-full border-2 transition-all duration-500 md:h-36 md:w-36 ${
                   claimed
                     ? "border-[#65ecaf]/40 bg-[#65ecaf]/10 shadow-[0_0_50px_rgba(101,236,175,0.18)]"
@@ -187,13 +186,13 @@ export default function RewardsPage() {
                     <span className="mt-0.5 text-sm font-bold tracking-[-0.03em] text-[#65ecaf]">{claimedLabel}</span>
                     <span className="text-xs font-medium text-[#65ecaf]/70">{fmt(DAILY_AMOUNT)}</span>
                     <span className="text-center text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#65ecaf]/50">
-                      {managedWallet.isManagedWallet ? "managed tx" : "wallet tx"}
+                      {managedWallet.isManagedWallet ? t("rewards.managedTx") : t("rewards.walletTx")}
                     </span>
                   </>
                 ) : busy ? (
                   <>
                     <span className="text-2xl">...</span>
-                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">Claiming</span>
+                    <span className="mt-1 text-xs font-bold tracking-[-0.02em] text-white">{t("rewards.claiming")}</span>
                     <span className="mt-0.5 text-lg font-bold tracking-[-0.04em] text-[#de402a]">{fmt(DAILY_AMOUNT)}</span>
                     <span className="text-[length:var(--fs-nano)] uppercase tracking-[0.14em] text-[#8ea0ba]">SPUMP</span>
                   </>
@@ -215,9 +214,9 @@ export default function RewardsPage() {
           {/* Row 3: Login Streak — below the claim button */}
           <section className="section-enter">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-white">Login Streak</h2>
+              <h2 className="text-xs font-semibold text-white">{t("rewards.loginStreak")}</h2>
               <span className="rounded-full bg-[#f3b33e]/15 px-2.5 py-0.5 text-[length:var(--fs-micro)] font-bold text-[#f3b33e]">
-                ×{STREAK} Multiplier
+                {t("rewards.streakMultiplier", { n: String(STREAK) })}
               </span>
             </div>
             <div className="mt-2 flex justify-center gap-2 overflow-x-auto scrollbar-none">
@@ -246,7 +245,7 @@ export default function RewardsPage() {
 
           {/* Row 4: Mission grid */}
           <section className="section-enter">
-            <h2 className="mb-3 text-sm font-bold tracking-[-0.04em] text-white">Engagement Missions</h2>
+            <h2 className="mb-3 text-sm font-bold tracking-[-0.04em] text-white">{t("rewards.missionsTitle")}</h2>
             <div className="grid gap-2.5 sm:grid-cols-2">
               {MISSIONS.map((m) => (
                 <div
@@ -255,7 +254,7 @@ export default function RewardsPage() {
                       ? "border-[#65ecaf]/20 shadow-[0_0_20px_rgba(101,236,175,0.06)]"
                       : ""
                   }`}
-                  key={m.name}
+                  key={m.key}
                 >
                   {m.done && (
                     <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-inset ring-[#65ecaf]/20" />
@@ -266,7 +265,7 @@ export default function RewardsPage() {
                         {m.emoji}
                       </span>
                       <div>
-                        <p className="text-xs font-semibold text-white">{m.name}</p>
+                        <p className="text-xs font-semibold text-white">{t(m.key)}</p>
                         <div className="mt-0.5 flex items-center gap-2">
                           <span className="text-[length:var(--fs-micro)] font-medium text-[#de402a]">{fmt(m.spump)} SPUMP</span>
                           <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">+{m.xp} XP</span>
@@ -275,11 +274,11 @@ export default function RewardsPage() {
                     </div>
                     {m.done ? (
                       <span className="rounded-full bg-[#65ecaf]/15 px-2 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#65ecaf]">
-                        Fixture
+                        {t("rewards.fixture")}
                       </span>
                     ) : (
                       <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[length:var(--fs-nano)] font-medium text-[#8ea0ba]">
-                        Preview
+                        {t("rewards.preview")}
                       </span>
                     )}
                   </div>

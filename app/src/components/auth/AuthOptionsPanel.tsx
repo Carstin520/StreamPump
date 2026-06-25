@@ -14,7 +14,6 @@ import {
 } from "@/components/shared/AppIcons";
 import {
   createWalletAuthChallenge,
-  exchangeProviderSession,
   requestEmailLoginCode,
   verifyEmailLoginCode,
   verifyWalletAuthChallenge,
@@ -193,22 +192,11 @@ export const AuthOptionsPanel = ({
       return;
     }
 
+    // Fully-local preview: build a mock identity session with no network call.
     setBusyKey(identity.providerSubject);
     setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
-
-    try {
-      const session = await exchangeProviderSession(identity);
-      beginWalletChoice(session, successLabel);
-    } catch (error) {
-      if (!previewSocialAuthEnabled) {
-        setLastAction(error instanceof Error ? error.message : t("auth.socialDisabled"));
-        return;
-      }
-      const session = createLocalProviderSession(identity);
-      beginWalletChoice(session, `${successLabel} 本地预览`);
-    } finally {
-      setBusyKey(null);
-    }
+    beginWalletChoice(createLocalProviderSession(identity), successLabel);
+    setBusyKey(null);
   };
 
   const completeWalletLogin = useCallback(async () => {
@@ -347,6 +335,15 @@ export const AuthOptionsPanel = ({
 
   const handleWalletLogin = async () => {
     if (!connected || !publicKey) {
+      if (previewSocialAuthEnabled) {
+        // Fully-local wallet preview — no browser wallet extension required.
+        const session = createLocalWalletSession(PREVIEW_MANAGED_WALLET);
+        storeAuthSession(session);
+        setLastAction(t("auth.walletConnectedLocal"));
+        void router.push(resolveLocalPreviewRedirectHref(nextHref));
+        return;
+      }
+
       setPendingWalletLogin(true);
       setVisible(true);
       setLastAction(t("auth.walletRequired"));
@@ -360,6 +357,14 @@ export const AuthOptionsPanel = ({
     const email = emailValue.trim();
     if (!email) {
       setLastAction(t("auth.emailRequired"));
+      return;
+    }
+
+    if (previewSocialAuthEnabled) {
+      // Local mock OTP — no email is actually sent; any code continues.
+      setEmailCode("000000");
+      setEmailCodeExpiresAt(createPreviewExpiresAt());
+      setLastAction(t("auth.codeSentMock"));
       return;
     }
 
@@ -383,6 +388,12 @@ export const AuthOptionsPanel = ({
     const code = emailCode.trim();
     if (!email || !code) {
       setLastAction(t("auth.emailAndCodeRequired"));
+      return;
+    }
+
+    if (previewSocialAuthEnabled) {
+      // Local mock verify — accept any code and build a local email identity session.
+      beginWalletChoice(createLocalProviderSession(resolveMethodIdentity("email")), "邮箱 OTP");
       return;
     }
 

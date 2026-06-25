@@ -8,7 +8,7 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { useManagedWallet } from "@/hooks/useManagedWallet";
 import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
 import { buildClaimEndorsementTransaction, buildEndorseProposalTransaction } from "@/lib/api/proposal";
-import { executeManagedWalletAction, getS1Portfolio, S1PortfolioResponse } from "@/lib/api/s1";
+import { getS1Portfolio, runManagedWalletAction, S1PortfolioResponse } from "@/lib/api/s1";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
 import { formatUsdcAtomic } from "@/lib/formatting";
 import { getStoredAuthSession } from "@/lib/auth-session";
@@ -310,7 +310,7 @@ export default function EndorsePage() {
         }
         setManagedEndorseBusy(true);
         setManagedEndorseError(null);
-        void executeManagedWalletAction(session.accessToken, {
+        void runManagedWalletAction(session.accessToken, {
           action: "endorse-proposal",
           params: {
             proposalPda: campaign.proposalPda,

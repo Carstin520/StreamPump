@@ -11,6 +11,8 @@ import {
   PostRecord,
   UserNoteRecord,
 } from "@/lib/api/types";
+import { resolveCreatorMarketSeed } from "@/lib/mocks/marketSeed";
+import { currentUser as mockUserIdentity } from "@/lib/mocks/profile";
 import { usePublicFeedPosts } from "./usePublicFeedPosts";
 
 const activityFeedTabs: ActivityFeedTabRecord[] = [
@@ -99,6 +101,11 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
   const teaser = fallbackTeaser(posts.length, derivedTags, state);
   const contentMomentumScore =
     Math.min(72, 24 + posts.length * 12 + derivedTags.length * 4);
+  // SEEDED_DEMO market projection join (by creator id or stable display name —
+  // the feed slugifies CJK names so id alone won't match). When a seed exists we
+  // surface seeded momentum/graduation/holders/price; otherwise we keep the
+  // honest content-only momentum and leave market fields at 0 (UI renders "—").
+  const seed = resolveCreatorMarketSeed(primaryPost.creatorId, primaryPost.creatorName);
 
   return {
     id: primaryPost.creatorId,
@@ -113,15 +120,17 @@ const createCreatorRecord = (posts: PostRecord[]): CreatorMarketRecord => {
     city,
     intro,
     level: stageLevelLabel(state),
-    momentumScore: contentMomentumScore,
-    tokenPrice: 0,
+    momentumScore: seed?.momentumScore ?? contentMomentumScore,
+    tokenPrice: seed?.tokenPriceSpump ?? 0,
     supply: 0,
-    graduationProgress: 0,
-    buyoutStatus: `${stageStatusLabel(state)} · market projection unavailable`,
+    graduationProgress: seed?.graduationProgress ?? 0,
+    holderCount: seed?.holderCount ?? 0,
+    buyoutStatus: seed
+      ? stageStatusLabel(state)
+      : `${stageStatusLabel(state)} · market projection unavailable`,
     state,
     teaser,
     tags: derivedTags,
-    holderCount: 0,
     topHolders: [],
     targetGraduationPrice: 0,
     potentialSponsors: buildPotentialSponsors(posts),
@@ -166,14 +175,14 @@ const createCurrentUserRecord = (posts: PostRecord[]): CurrentUserRecord => {
     id: "james-li",
     name: "Alex Chen",
     handle: "@alexchen",
-    location: posts[0]?.location ?? "Shanghai",
+    location: mockUserIdentity.location,
     bio: "Curating imported creator signals and checking how real content reads inside the product surface.",
     followingCount: 120 + posts.length * 8,
     followersCount: 2400 + posts.length * 120,
     totalLikesAndSavesCount,
     sessionMode: "Social login + embedded wallet ready",
     primaryWallet: "4NwF...q8Yz",
-    avatarSrc: posts[0]?.creatorAvatarSrc ?? "/mock/user-surface/posts/cat-portrait.svg",
+    avatarSrc: mockUserIdentity.avatarSrc,
     bannerSrc,
   };
 };

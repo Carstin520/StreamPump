@@ -227,6 +227,22 @@ export const extractPublicMediaOrigins = (posts: PostRecord[]): string[] => {
   return [...origins];
 };
 
+// Drop devnet/corridor/smoke TEST posts so the public feed only shows real
+// content: nameless "Imported Creator" stubs, corridor/devnet/smoke-tagged posts,
+// or raw-timestamp titles (e.g. "S2 full corridor 2026-05-18T15-42-14-571Z").
+const TEST_TAGS = new Set(["corridor", "devnet", "smoke", "test", "happy-path"]);
+
+const isLowQualityFeedPost = (post: PublicFeedPostApiRecord): boolean => {
+  const name = (post.creatorName ?? "").trim();
+  if (!name) return true;
+  const title = (post.title ?? "").toLowerCase();
+  const tags = (post.tags ?? []).map((tag) => tag.trim().toLowerCase());
+  if (tags.some((tag) => TEST_TAGS.has(tag))) return true;
+  if (/corridor|smoke[- ]?test|full[- ]?corridor|happy[- ]?path/.test(title)) return true;
+  if (/\d{4}-\d{2}-\d{2}t\d{2}[-:]\d{2}/.test(title)) return true;
+  return false;
+};
+
 export const listPublicFeedPosts = async (
   options?: {
     limit?: number;
@@ -240,7 +256,7 @@ export const listPublicFeedPosts = async (
     timeoutMs: options?.timeoutMs ?? PUBLIC_FEED_TIMEOUT_MS,
   });
 
-  return response.posts.map(mapFeedPostToPostRecord);
+  return response.posts.filter((post) => !isLowQualityFeedPost(post)).map(mapFeedPostToPostRecord);
 };
 
 export const getPublicFeedPostById = async (postId: string): Promise<PostRecord> => {
