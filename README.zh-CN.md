@@ -13,7 +13,7 @@
   <p align="center">
     <a href="README.md">🇬🇧 English README</a>
   </p>
-  <img src="docs/readme-assets/frontend-discover-wide-2026-05-08.png" alt="StreamPump 创作者发现界面" width="100%">
+  <img src="docs/readme-assets/ui-explore-feed-zh.png" alt="StreamPump 创作者发现界面" width="100%">
 </p>
 
 ---
@@ -101,13 +101,13 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 
 ## 📸 界面预览
 
-| 发现页 | 热门创作者 |
+| 热门创作者 | S1 创作者市场 |
 |---|---|
-| ![Explore](docs/readme-assets/frontend-explore-surface.png) | ![Trending](docs/readme-assets/frontend-trending-creators.png) |
+| ![Trending](docs/readme-assets/ui-trending-creators-zh.png) | ![S1 Market](docs/readme-assets/ui-s1-market-zh.png) |
 
-| 资产页 | 内容详情 |
+| 投资组合与领取 | 活动链上凭证 |
 |---|---|
-| ![Portfolio](docs/readme-assets/frontend-portfolio-surface.png) | ![Post](docs/readme-assets/frontend-post-detail-modal.png) |
+| ![Portfolio](docs/readme-assets/ui-portfolio-claim-zh.png) | ![Campaign](docs/readme-assets/ui-campaign-detail-zh.png) |
 
 ---
 
@@ -240,7 +240,7 @@ StreamPump 是一个认真推进的原型，并已有一条**经过端到端验�
 |---|---|
 | `programs/streampump-core` | Anchor 程序：协议状态、S1、S1 买断、S2 三轨结算、内容锚定 |
 | `programs/tests` | 10 个 Anchor TypeScript 测试套件（happy/unhappy、guard、buyout、S2 流程） |
-| `backend` | Express v1 API、Prisma（22 模型 / 19 迁移）、R2/Mux、认证、索引、调度器、投影 |
+| `backend` | Express v1 API、Prisma（23 模型 / 20 迁移）、R2/Mux、认证、索引、调度器、投影 |
 | `app` | Next.js 15 前端：发现、创作者、资产、workspace、campaign、认证等界面 |
 | `docs` | 协议设计、后端 API 合同、前端规范、部署说明、路线图 |
 | `scripts` | devnet seed、demo、smoke、部署和 git hook 脚本 |
