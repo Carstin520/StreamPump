@@ -13,7 +13,7 @@
   <p align="center">
     <a href="README.zh-CN.md">🇨🇳 中文版 README</a>
   </p>
-  <img src="docs/readme-assets/frontend-discover-wide-2026-05-08.png" alt="StreamPump creator discovery surface" width="100%">
+  <img src="docs/readme-assets/ui-explore-feed-en.png" alt="StreamPump creator discovery surface" width="100%">
 </p>
 
 ---
@@ -101,13 +101,13 @@ StreamPump is built on four convictions that avoid every one of these traps:
 
 ## 📸 Screenshots
 
-| Discover | Trending Creators |
+| Trending Creators | S1 Creator Market |
 |---|---|
-| ![Explore](docs/readme-assets/frontend-explore-surface.png) | ![Trending](docs/readme-assets/frontend-trending-creators.png) |
+| ![Trending](docs/readme-assets/ui-trending-creators-en.png) | ![S1 Market](docs/readme-assets/ui-s1-market-en.png) |
 
-| Portfolio | Post Detail |
+| Portfolio & Claim | Campaign Proof |
 |---|---|
-| ![Portfolio](docs/readme-assets/frontend-portfolio-surface.png) | ![Post](docs/readme-assets/frontend-post-detail-modal.png) |
+| ![Portfolio](docs/readme-assets/ui-portfolio-claim-en.png) | ![Campaign](docs/readme-assets/ui-campaign-detail-en.png) |
 
 ---
 
@@ -240,7 +240,7 @@ For the full picture see [docs/streamPump-long-term-roadmap.md](docs/streamPump-
 |---|---|
 | `programs/streampump-core` | Anchor program: protocol state, S1, S1 buyout, S2 three-track settlement, content anchoring |
 | `programs/tests` | 10 Anchor TypeScript suites (happy/unhappy paths, guards, buyout, S2 flows) |
-| `backend` | Express v1 API, Prisma (22 models / 19 migrations), R2/Mux, auth, indexer, schedulers, projections |
+| `backend` | Express v1 API, Prisma (23 models / 20 migrations), R2/Mux, auth, indexer, schedulers, projections |
 | `app` | Next.js 15 frontend: discovery, creator, portfolio, workspace, campaign, and auth surfaces |
 | `docs` | Protocol design, backend API contracts, frontend specs, deployment notes, roadmap |
 | `scripts` | Devnet seed, demo, smoke, deploy, and git-hook scripts |
