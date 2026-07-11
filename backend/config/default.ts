@@ -163,14 +163,21 @@ export const config = {
       endpoint: process.env.R2_ENDPOINT,
       accessKeyId: process.env.R2_ACCESS_KEY_ID,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-      publicBaseUrl: process.env.R2_PUBLIC_BASE_URL,
-      publicFeedUseSignedUrls: env.readBoolean(process.env.R2_PUBLIC_FEED_USE_SIGNED_URLS, false),
       maxAssetSizeBytes: env.readNumber(process.env.R2_MAX_ASSET_SIZE_BYTES, 100 * 1024 * 1024),
       monthlyUploadLimitBytes: env.readNumber(process.env.R2_MONTHLY_UPLOAD_LIMIT_BYTES, 0),
     },
+    delivery: {
+      region: env.readString(process.env.R2_REGION, "auto"),
+      bucket: env.readString(process.env.R2_DELIVERY_BUCKET, ""),
+      endpoint: process.env.R2_ENDPOINT,
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+      publicBaseUrl: process.env.R2_PUBLIC_BASE_URL,
+      publicFeedUseSignedUrls: env.readBoolean(process.env.R2_PUBLIC_FEED_USE_SIGNED_URLS, false),
+    },
     edge: {
       region: env.readString(process.env.R2_REGION, "auto"),
-      bucket: env.readString(process.env.R2_BUCKET, ""),
+      bucket: env.readString(process.env.R2_DELIVERY_BUCKET, ""),
       endpoint: process.env.R2_ENDPOINT,
       accessKeyId: process.env.R2_ACCESS_KEY_ID,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
@@ -249,6 +256,7 @@ export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): 
     [runtimeConfig.pilot.prototypeRoutesEnabled, "PROTOTYPE_ROUTES_ENABLED"],
     [runtimeConfig.s1.mockApiEnabled, "S1_MOCK_API_ENABLED"],
     [runtimeConfig.oracle.schedulerEnabled, "ORACLE_SCHEDULER_ENABLED"],
+    [runtimeConfig.oracle.runOnBoot, "ORACLE_RUN_ON_BOOT"],
     [runtimeConfig.oracle.track2AutoSettlementEnabled, "ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED"],
     [runtimeConfig.oracle.track3AutoSettlementEnabled, "ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED"],
   ];
@@ -258,8 +266,23 @@ export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): 
     .map(([, variableName]) => variableName);
 };
 
+export const isPilotRuntimeSafetyRequired = (
+  runtimeConfig: typeof config,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+  runtimeEnvironment: NodeJS.ProcessEnv = process.env
+): boolean => {
+  const explicitPilotRuntime =
+    runtimeEnvironment.PILOT_INVITE_ONLY !== undefined && runtimeConfig.pilot.inviteOnly;
+  const hostedRuntime =
+    runtimeEnvironment.RENDER === "true" ||
+    Boolean(runtimeEnvironment.K_SERVICE) ||
+    Boolean(runtimeEnvironment.RAILWAY_ENVIRONMENT);
+
+  return nodeEnv === "production" || explicitPilotRuntime || hostedRuntime;
+};
+
 const validateProductionConfig = (runtimeConfig: typeof config): void => {
-  if (process.env.NODE_ENV !== "production") {
+  if (!isPilotRuntimeSafetyRequired(runtimeConfig)) {
     return;
   }
 
@@ -274,6 +297,21 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   if (runtimeConfig.app.corsAllowedOrigins.length === 0) {
     failures.push("CORS_ALLOWED_ORIGINS must include at least one frontend origin");
+  }
+
+  try {
+    const apiBaseUrl = new URL(runtimeConfig.app.apiBaseUrl);
+    if (apiBaseUrl.protocol !== "https:" || apiBaseUrl.hostname === "localhost") {
+      failures.push("API_BASE_URL must be a public HTTPS URL for the Pilot runtime");
+    }
+  } catch (_error) {
+    failures.push("API_BASE_URL must be a valid public HTTPS URL for the Pilot runtime");
+  }
+
+  if (!runtimeConfig.auth.internalOperatorApiKey?.trim()) {
+    failures.push("INTERNAL_OPERATOR_API_KEY is required for controlled Pilot operations");
+  } else if (runtimeConfig.auth.internalOperatorApiKey.trim().length < 32) {
+    failures.push("INTERNAL_OPERATOR_API_KEY must be at least 32 characters");
   }
 
   if (runtimeConfig.pilot.emailAuthEnabled && runtimeConfig.email.deliveryMode === "console") {
@@ -329,6 +367,48 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     failures.push(
       "SOLANA_INDEXER_RPC_ENDPOINT must be separate from SOLANA_TX_RPC_ENDPOINT when INDEXER_ENABLED=true"
     );
+  }
+
+  if (!runtimeConfig.indexer.enabled) {
+    failures.push("INDEXER_ENABLED=true is required for Pilot chain projections");
+  }
+
+  const r2 = runtimeConfig.storage.origin;
+  const r2Delivery = runtimeConfig.storage.delivery;
+  if (
+    !r2.bucket.trim() ||
+    !r2Delivery.bucket.trim() ||
+    !r2.endpoint?.trim() ||
+    !r2.accessKeyId?.trim() ||
+    !r2.secretAccessKey?.trim() ||
+    !r2Delivery.publicBaseUrl?.trim()
+  ) {
+    failures.push(
+      "R2_BUCKET, R2_DELIVERY_BUCKET, R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_PUBLIC_BASE_URL are required"
+    );
+  }
+  if (r2.bucket.trim() && r2.bucket.trim() === r2Delivery.bucket.trim()) {
+    failures.push("R2_DELIVERY_BUCKET must differ from private R2_BUCKET");
+  }
+  if (r2Delivery.publicFeedUseSignedUrls) {
+    failures.push("R2_PUBLIC_FEED_USE_SIGNED_URLS=true is not allowed for the Pilot public feed");
+  }
+  if (!Number.isFinite(r2.maxAssetSizeBytes) || r2.maxAssetSizeBytes <= 0) {
+    failures.push("R2_MAX_ASSET_SIZE_BYTES must be greater than zero");
+  }
+  if (!Number.isFinite(r2.monthlyUploadLimitBytes) || r2.monthlyUploadLimitBytes <= 0) {
+    failures.push("R2_MONTHLY_UPLOAD_LIMIT_BYTES must enforce a positive Pilot upload budget");
+  }
+
+  if (
+    !process.env.MUX_TOKEN_ID?.trim() ||
+    !process.env.MUX_TOKEN_SECRET?.trim() ||
+    !process.env.MUX_WEBHOOK_SECRET?.trim()
+  ) {
+    failures.push("MUX_TOKEN_ID, MUX_TOKEN_SECRET, and MUX_WEBHOOK_SECRET are required");
+  }
+  if (!runtimeConfig.mux.reconciliation.enabled) {
+    failures.push("MUX_RECONCILIATION_ENABLED=true is required for Pilot media recovery");
   }
 
   const databaseUrl = process.env.DATABASE_URL ?? "";

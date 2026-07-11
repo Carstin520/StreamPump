@@ -9,6 +9,7 @@ import {
   config,
   getEnabledForbiddenPilotFeatures,
   isManagedWalletEncryptionKeyRequired,
+  isPilotRuntimeSafetyRequired,
   normalizePilotInviteWallets,
 } from "../config/default";
 import { assertManifestAssetMutationAllowed } from "../src/controllers/contentManifestController";
@@ -51,7 +52,9 @@ describe("Pilot safety gates", () => {
 
   const validProductionEnv = (wallet: string): Record<string, string> => ({
     NODE_ENV: "production",
+    API_BASE_URL: "https://api.example.com/api/v1",
     AUTH_SESSION_SECRET: "production-session-secret-for-tests",
+    INTERNAL_OPERATOR_API_KEY: "production-operator-key-for-tests-123456",
     CORS_ALLOWED_ORIGINS: "https://app.example.com",
     DATABASE_URL:
       "postgresql://ep-example-pooler.ap-southeast-1.aws.neon.tech/streampump?sslmode=require&connection_limit=5&pool_timeout=5",
@@ -61,6 +64,20 @@ describe("Pilot safety gates", () => {
     PILOT_EXPECTED_USDC_MINT: Keypair.generate().publicKey.toBase58(),
     SOLANA_IS_DEVNET: "true",
     SOLANA_TX_RPC_ENDPOINT: "https://dedicated-rpc.example.com",
+    SOLANA_INDEXER_RPC_ENDPOINT: "https://dedicated-indexer-rpc.example.com",
+    INDEXER_ENABLED: "true",
+    R2_BUCKET: "pilot-origin",
+    R2_DELIVERY_BUCKET: "pilot-delivery",
+    R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
+    R2_ACCESS_KEY_ID: "test-access-key",
+    R2_SECRET_ACCESS_KEY: "test-secret-key",
+    R2_PUBLIC_BASE_URL: "https://media.example.com",
+    R2_MONTHLY_UPLOAD_LIMIT_BYTES: "10737418240",
+    R2_PUBLIC_FEED_USE_SIGNED_URLS: "false",
+    MUX_TOKEN_ID: "test-mux-token",
+    MUX_TOKEN_SECRET: "test-mux-secret",
+    MUX_WEBHOOK_SECRET: "test-mux-webhook-secret",
+    MUX_RECONCILIATION_ENABLED: "true",
   });
 
   const captureError = async (operation: Promise<unknown>): Promise<Error> => {
@@ -107,23 +124,62 @@ describe("Pilot safety gates", () => {
       ephemeral: config.managedWallet.ephemeralSessionsEnabled,
       engagement: config.pilot.engagementRewardsEnabled,
       track2: config.oracle.track2AutoSettlementEnabled,
+      oracleRunOnBoot: config.oracle.runOnBoot,
     };
 
     try {
       config.managedWallet.ephemeralSessionsEnabled = true;
       config.pilot.engagementRewardsEnabled = true;
       config.oracle.track2AutoSettlementEnabled = true;
+      config.oracle.runOnBoot = true;
 
       expect(getEnabledForbiddenPilotFeatures(config)).to.include.members([
         "EPHEMERAL_SESSIONS_ENABLED",
         "ENGAGEMENT_REWARDS_ENABLED",
         "ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED",
+        "ORACLE_RUN_ON_BOOT",
       ]);
     } finally {
       config.managedWallet.ephemeralSessionsEnabled = original.ephemeral;
       config.pilot.engagementRewardsEnabled = original.engagement;
       config.oracle.track2AutoSettlementEnabled = original.track2;
+      config.oracle.runOnBoot = original.oracleRunOnBoot;
     }
+  });
+
+  it("fails closed when Pilot media, projection, or operator infrastructure is missing", () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    const missing = runConfigImport({
+      ...validProductionEnv(wallet),
+      INTERNAL_OPERATOR_API_KEY: "",
+      INDEXER_ENABLED: "false",
+      R2_BUCKET: "",
+      R2_DELIVERY_BUCKET: "",
+      MUX_TOKEN_ID: "",
+      MUX_RECONCILIATION_ENABLED: "false",
+    });
+
+    expect(missing.status).not.to.equal(0);
+    const output = `${missing.stderr}${missing.stdout}`;
+    expect(output).to.contain("INTERNAL_OPERATOR_API_KEY");
+    expect(output).to.contain("INDEXER_ENABLED=true");
+    expect(output).to.contain("R2_BUCKET");
+    expect(output).to.contain("R2_DELIVERY_BUCKET");
+    expect(output).to.contain("MUX_TOKEN_ID");
+    expect(output).to.contain("MUX_RECONCILIATION_ENABLED=true");
+  });
+
+  it("requires distinct private origin and public delivery buckets", () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    const result = runConfigImport({
+      ...validProductionEnv(wallet),
+      R2_BUCKET: "same-bucket",
+      R2_DELIVERY_BUCKET: "same-bucket",
+    });
+    expect(result.status).not.to.equal(0);
+    expect(`${result.stderr}${result.stdout}`).to.contain(
+      "R2_DELIVERY_BUCKET must differ from private R2_BUCKET"
+    );
   });
 
   it("normalizes invite wallets and collapses duplicate entries", () => {
@@ -256,6 +312,43 @@ describe("Pilot safety gates", () => {
       "development"
     );
     expect(dependencyCalls).to.equal(0);
+  });
+
+  it("enforces the same static and chain gates for hosted or explicit Pilot runtimes", async () => {
+    const runtimeConfig = pilotChainRuntimeConfig();
+    runtimeConfig.pilot.inviteOnly = true;
+    expect(
+      isPilotRuntimeSafetyRequired(runtimeConfig, undefined, { RENDER: "true" })
+    ).to.equal(true);
+    expect(
+      isPilotRuntimeSafetyRequired(runtimeConfig, "development", {
+        PILOT_INVITE_ONLY: "true",
+      })
+    ).to.equal(true);
+
+    let dependencyCalls = 0;
+    const dependencies: PilotChainSafetyDependencies = {
+      async getGenesisHash() {
+        dependencyCalls += 1;
+        return "not-devnet";
+      },
+      async getProgramAccountInfo() {
+        dependencyCalls += 1;
+        return { executable: true };
+      },
+      async fetchProtocolUsdcMint() {
+        dependencyCalls += 1;
+        return runtimeConfig.pilot.expectedUsdcMint;
+      },
+    };
+
+    const hostedError = await captureError(
+      assertProductionPilotChainSafety(runtimeConfig, dependencies, undefined, {
+        RENDER: "true",
+      })
+    );
+    expect(hostedError.message).to.match(/not Solana devnet/);
+    expect(dependencyCalls).to.be.greaterThan(0);
   });
 
   it("verifies every unique active RPC, the executable program, and protocol USDC mint", async () => {

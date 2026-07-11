@@ -10,7 +10,9 @@ import authRoutes from "./authRoutes";
 import campaignRoutes from "./campaignRoutes";
 import contentManifestRoutes from "./contentManifestRoutes";
 import internalMuxRoutes from "./internalMuxRoutes";
+import internalContentRoutes from "./internalContentRoutes";
 import internalSponsorRoutes from "./internalSponsorRoutes";
+import internalSettlementRoutes from "./internalSettlementRoutes";
 import marketRoutes from "./marketRoutes";
 import publicFeedRoutes from "./publicFeedRoutes";
 import proposalIntentRoutes from "./proposalIntentRoutes";
@@ -33,6 +35,8 @@ if (config.pilot.s1PublicApiEnabled) {
 }
 router.use("/workspace", workspaceRoutes);
 router.use("/internal/mux", internalMuxRoutes);
+router.use("/internal/content", internalContentRoutes);
 router.use("/internal/sponsors", internalSponsorRoutes);
+router.use("/internal/settlements", internalSettlementRoutes);
 
 export default router;

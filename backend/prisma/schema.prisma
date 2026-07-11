@@ -170,6 +170,23 @@ enum CampaignProofStatus {
   VOIDED
 }
 
+enum ApiIdempotencyStatus {
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+}
+
+enum SettlementTrack {
+  TRACK1
+}
+
+enum Track1SettlementOperationStatus {
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+}
+
 model Proposal {
   id                          String              @id @default(cuid())
   /// CN: 链上 Proposal PDA，数据库用它和链上账户强绑定。
@@ -246,11 +263,42 @@ model Proposal {
   createdAt                   DateTime            @default(now())
   updatedAt                   DateTime            @updatedAt
   track2Events                Track2Event[]
+  track1SettlementOperations  Track1SettlementOperation[]
 
   @@index([status, track1Claimed])
   @@index([status, deadlineAt, track2SettledAt])
   @@index([deadlineAt, track3DelayDays, track3SettledAt])
   @@index([manifestId])
+}
+
+model Track1SettlementOperation {
+  id                    String                          @id @default(cuid())
+  proposalId            String
+  proposal              Proposal                        @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  proposalPda           String
+  track                 SettlementTrack                 @default(TRACK1)
+  idempotencyKey        String
+  payloadHash           String
+  operatorIdentity      String
+  evidenceDigest        String
+  status                Track1SettlementOperationStatus @default(PENDING)
+  txSignature           String?
+  errorCode             String?
+  errorMessage          String?
+  attemptCount          Int                             @default(0)
+  leaseToken            String?
+  leaseExpiresAt        DateTime?
+  lastAttemptAt         DateTime?
+  submittedAt           DateTime?
+  confirmedAt           DateTime?
+  failedAt              DateTime?
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+
+  @@unique([proposalPda, track])
+  @@index([idempotencyKey])
+  @@index([status, updatedAt])
+  @@index([proposalId, createdAt])
 }
 
 model S2EndorsementPositionProjection {
@@ -336,6 +384,33 @@ model ContentManifest {
   @@index([isPublicFeedEligible, publishedAt, createdAt])
 }
 
+model ApiIdempotencyRecord {
+  id                 String               @id @default(cuid())
+  wallet             String
+  method             String
+  scope              String
+  keyHash            String
+  requestHash        String
+  status             ApiIdempotencyStatus @default(IN_PROGRESS)
+  leaseToken         String?
+  leaseExpiresAt     DateTime?
+  resourceType       String?
+  resourceId         String?
+  responseStatus     Int?
+  responseBody       Json?
+  responseSizeBytes  Int?
+  responseExpiresAt  DateTime?
+  lastErrorCode      String?
+  attemptCount       Int                  @default(1)
+  completedAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@unique([wallet, method, scope, keyHash])
+  @@index([status, leaseExpiresAt])
+  @@index([resourceType, resourceId])
+}
+
 model ContentAsset {
   id                   String                 @id @default(cuid())
   manifestId           String
@@ -383,6 +458,16 @@ model ContentAsset {
   /// EN: Source that most recently advanced the processing state.
   processingSource     AssetProcessingSource?
   processingError      String?
+  /// SHA-256 recomputed by the backend from the stored object after upload completion.
+  verifiedSha256Hex    String?
+  /// Byte count observed while the backend streamed the stored object for verification.
+  verifiedSizeBytes    BigInt?
+  /// Object ETag observed during backend storage verification.
+  objectEtag           String?
+  /// Time when object size, MIME type, and SHA-256 were last verified by the backend.
+  storageVerifiedAt    DateTime?
+  /// Last fail-closed storage verification error, cleared only by a successful verification.
+  storageVerificationError String?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
@@ -405,7 +490,11 @@ model ContentPublication {
   externalUrlDigestHex String
   verificationStatus   PublicationVerificationStatus @default(PENDING)
   verificationSource   String?
+  verificationReviewer String?
+  verificationNote     String?
+  verificationEvidenceDigestHex String?
   verifiedAt           DateTime?
+  rejectedAt           DateTime?
   createdAt            DateTime                      @default(now())
   updatedAt            DateTime                      @updatedAt
 

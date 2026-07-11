@@ -7,10 +7,12 @@ import {
   AssetProcessingStatus,
   AssetProcessingSource,
   AssetUploadStatus,
+  ContentAsset,
   ContentManifestStatus,
   PublicationVerificationStatus,
   Prisma,
 } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 import {
   HttpError,
@@ -54,6 +56,23 @@ import {
 import { backfillDisplayVariantFromStorage } from "../services/imageVariants";
 import { issueCreatorAuthSignature as issueCreatorAuthSignatureService } from "../services/creatorAuth";
 import { syncManifestPublicationEligibility } from "../services/contentPublicationEligibility";
+import {
+  assertPromotedObjectMatches,
+  buildVerifiedStorageKey,
+  isAssetStorageVerified,
+  StorageObjectVerificationError,
+  shouldCompleteMultipartUpload,
+  verifiedAssetMatchesUploadDeclaration,
+  verifyStoredContentAsset,
+} from "../services/contentStorageVerification";
+import {
+  assertCreatorPublicationVerificationAllowed,
+  normalizePublicationTarget,
+} from "../services/contentPublicationReview";
+import {
+  bindApiIdempotencyResource,
+  getRecoveredIdempotencyResourceId,
+} from "../services/apiIdempotency";
 
 interface PresignAssetPlan {
   assetType: AssetType;
@@ -62,6 +81,15 @@ interface PresignAssetPlan {
   mimeType: string;
   fileSizeBytes: bigint;
 }
+
+export const assertUniqueAssetOrderIndexes = (
+  plans: Array<{ orderIndex: number }>
+): void => {
+  const indexes = new Set(plans.map((plan) => plan.orderIndex));
+  if (indexes.size !== plans.length) {
+    throw new HttpError(400, "INVALID_INPUT", "asset orderIndex values must be unique");
+  }
+};
 
 export const assertManifestAssetMutationAllowed = (status: ContentManifestStatus): void => {
   if (
@@ -76,7 +104,7 @@ export const assertManifestAssetMutationAllowed = (status: ContentManifestStatus
   }
 };
 
-const assertManifestFinalized = (manifest: {
+export const assertManifestFinalized = (manifest: {
   status: ContentManifestStatus;
   manifestHashHex: string | null;
   internalCanonicalUrl: string | null;
@@ -129,6 +157,17 @@ const currentUtcMonthStart = (): Date => {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 };
 
+export const R2_UPLOAD_BUDGET_ADVISORY_LOCK = "streampump:r2-monthly-upload-budget:v1";
+
+export const acquirePresignLocks = async (params: {
+  budgetEnabled: boolean;
+  lockBudget: () => Promise<unknown>;
+  lockManifest: () => Promise<unknown>;
+}): Promise<void> => {
+  if (params.budgetEnabled) await params.lockBudget();
+  await params.lockManifest();
+};
+
 const parsePresignAssetPlan = (rawAsset: unknown): PresignAssetPlan => {
   const payload =
     rawAsset && typeof rawAsset === "object" ? (rawAsset as Record<string, unknown>) : null;
@@ -143,6 +182,10 @@ const parsePresignAssetPlan = (rawAsset: unknown): PresignAssetPlan => {
   const mimeType = parseNonEmptyString(payload.mimeType, "mimeType").toLowerCase();
   const fileSizeBytes = parseNonNegativeBigInt(payload.fileSizeBytes, "fileSizeBytes");
   const maxAssetSizeBytes = readMaxAssetSizeBytes();
+
+  if (fileSizeBytes <= 0n) {
+    throw new HttpError(400, "INVALID_INPUT", "fileSizeBytes must be greater than 0");
+  }
 
   if (maxAssetSizeBytes > 0n && fileSizeBytes > maxAssetSizeBytes) {
     throw new HttpError(
@@ -164,40 +207,16 @@ const parsePresignAssetPlan = (rawAsset: unknown): PresignAssetPlan => {
   };
 };
 
-const assertR2MonthlyUploadBudget = async (
-  manifestId: string,
-  requestedBytes: bigint
-): Promise<void> => {
-  const monthlyUploadLimitBytes = readMonthlyUploadLimitBytes();
-
-  if (monthlyUploadLimitBytes <= 0n) {
-    return;
-  }
-
-  const aggregate = await prisma.contentAsset.aggregate({
-    _sum: {
-      fileSizeBytes: true,
-    },
-    where: {
-      createdAt: {
-        gte: currentUtcMonthStart(),
-      },
-      manifestId: {
-        not: manifestId,
-      },
-      uploadStatus: {
-        in: [AssetUploadStatus.PENDING, AssetUploadStatus.UPLOADED],
-      },
-    },
-  });
-  const usedBytes = aggregate._sum.fileSizeBytes ?? 0n;
-  const projectedBytes = usedBytes + requestedBytes;
-
-  if (projectedBytes > monthlyUploadLimitBytes) {
+export const assertR2MonthlyUploadBudget = (params: {
+  totalBytes: bigint;
+  limitBytes: bigint;
+}): void => {
+  if (params.limitBytes <= 0n) return;
+  if (params.totalBytes > params.limitBytes) {
     throw new HttpError(
       429,
       "R2_MONTHLY_UPLOAD_LIMIT_EXCEEDED",
-      `R2 monthly upload budget exceeded: projected ${projectedBytes.toString()} bytes, limit ${monthlyUploadLimitBytes.toString()} bytes`
+      `R2 monthly upload budget exceeded: current ${params.totalBytes.toString()} bytes, limit ${params.limitBytes.toString()} bytes`
     );
   }
 };
@@ -242,22 +261,40 @@ export const createContentManifest = withController("CREATE_CONTENT_MANIFEST_FAI
 
   try {
     const creatorWallet = requireSessionWallet(req);
+    const recoveredManifestId = getRecoveredIdempotencyResourceId(
+      req,
+      "CONTENT_MANIFEST"
+    );
+    if (recoveredManifestId) {
+      const recovered = await prisma.contentManifest.findFirst({
+        where: { id: recoveredManifestId, creatorWallet },
+      });
+      if (!recovered) {
+        throw new HttpError(409, "IDEMPOTENCY_RESOURCE_MISSING", "idempotent manifest is missing");
+      }
+      ok(res, serializeManifest(recovered), 201);
+      return;
+    }
     const contentType = normalizeContentType(req.body.contentType);
     const title = parseOptionalString(req.body.title);
     const captionText = parseOptionalString(req.body.captionText);
     const tags = parseStringArray(req.body.tags, "tags");
     const metadataJson = parseOptionalJsonObject(req.body.metadata);
 
-    const manifest = await prisma.contentManifest.create({
-      data: {
-        creatorWallet,
-        contentType,
-        status: ContentManifestStatus.DRAFT,
-        title,
-        captionText,
-        tagsJson: tags,
-        metadataJson,
-      },
+    const manifest = await prisma.$transaction(async (tx) => {
+      const created = await tx.contentManifest.create({
+        data: {
+          creatorWallet,
+          contentType,
+          status: ContentManifestStatus.DRAFT,
+          title,
+          captionText,
+          tagsJson: tags,
+          metadataJson,
+        },
+      });
+      await bindApiIdempotencyResource(tx, req, "CONTENT_MANIFEST", created.id);
+      return created;
     });
 
     ok(res, serializeManifest(manifest), 201);
@@ -278,7 +315,6 @@ export const presignManifestAssets = withController(
     const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const manifest = await requireOwnedManifest(manifestId, creatorWallet);
-    assertManifestAssetMutationAllowed(manifest.status);
     const inputs = Array.isArray(req.body.assets) ? req.body.assets : null;
 
     if (!inputs || inputs.length === 0) {
@@ -288,42 +324,104 @@ export const presignManifestAssets = withController(
     const assetPlans: PresignAssetPlan[] = inputs.map((input: unknown) =>
       parsePresignAssetPlan(input)
     );
-    const requestedBytes = assetPlans.reduce(
-      (totalBytes: bigint, assetPlan: PresignAssetPlan) => totalBytes + assetPlan.fileSizeBytes,
-      0n
-    );
-    await assertR2MonthlyUploadBudget(manifest.id, requestedBytes);
+    assertUniqueAssetOrderIndexes(assetPlans);
+    const monthlyUploadLimitBytes = readMonthlyUploadLimitBytes();
 
-    const assets = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(
-        Prisma.sql`SELECT "id" FROM "ContentManifest" WHERE "id" = ${manifest.id} FOR UPDATE`
-      );
+    const presignResult = await prisma.$transaction(async (tx) => {
+      // Global advisory lock serializes budget accounting across manifests and is
+      // always acquired before the manifest row lock to prevent lock-order inversions.
+      await acquirePresignLocks({
+        budgetEnabled: monthlyUploadLimitBytes > 0n,
+        lockBudget: () => tx.$queryRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${R2_UPLOAD_BUDGET_ADVISORY_LOCK}))`
+        ),
+        lockManifest: () => tx.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "ContentManifest" WHERE "id" = ${manifest.id} FOR UPDATE`
+        ),
+      });
       const lockedManifest = await tx.contentManifest.findFirst({
         where: { id: manifest.id, creatorWallet },
       });
       if (!lockedManifest) {
         throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
       }
-      assertManifestAssetMutationAllowed(lockedManifest.status);
-
-      const records = [];
+      for (const assetPlan of assetPlans) {
+        const existing = await tx.contentAsset.findUnique({
+          where: {
+            manifestId_orderIndex: {
+              manifestId: lockedManifest.id,
+              orderIndex: assetPlan.orderIndex,
+            },
+          },
+        });
+        if (existing?.uploadStatus !== AssetUploadStatus.FAILED) continue;
+        try {
+          await r2Service.deleteOriginObject(existing.storageKey);
+        } catch (_error) {
+          const cleanupError = "failed to remove previous private staging object";
+          await tx.contentAsset.update({
+            where: { id: existing.id },
+            data: { storageVerificationError: cleanupError },
+          });
+          return { assets: [], cleanupError };
+        }
+      }
+      const records: Array<{ asset: ContentAsset; alreadyUploaded: boolean }> = [];
       for (const assetPlan of assetPlans) {
         const { assetType, orderIndex, sha256HexDigest, mimeType, fileSizeBytes } = assetPlan;
+        const existing = await tx.contentAsset.findUnique({
+          where: {
+            manifestId_orderIndex: {
+              manifestId: lockedManifest.id,
+              orderIndex,
+            },
+          },
+        });
+        if (existing?.uploadStatus === AssetUploadStatus.UPLOADED) {
+          if (!isAssetStorageVerified(existing)) {
+            throw new HttpError(
+              409,
+              "ASSET_STORAGE_REVERIFICATION_REQUIRED",
+              `asset ${existing.id} is uploaded but must be storage-reverified before presign can change it`
+            );
+          }
+          if (
+            !verifiedAssetMatchesUploadDeclaration({
+              asset: existing,
+              declaration: assetPlan,
+            })
+          ) {
+            throw new HttpError(
+              409,
+              "VERIFIED_ASSET_DECLARATION_CONFLICT",
+              `asset order ${orderIndex} is already verified with different metadata`
+            );
+          }
+          records.push({ asset: existing, alreadyUploaded: true });
+          continue;
+        }
+        assertManifestAssetMutationAllowed(lockedManifest.status);
+        if (
+          existing &&
+          existing.uploadStatus !== AssetUploadStatus.PENDING &&
+          existing.uploadStatus !== AssetUploadStatus.FAILED
+        ) {
+          throw new HttpError(
+            409,
+            "ASSET_NOT_RESIGNABLE",
+            `asset ${existing.id} cannot receive a new upload plan in its current state`
+          );
+        }
         const extension = extensionForMimeType(mimeType);
         const storageKey = `content/${lockedManifest.id}/v/${lockedManifest.version}/${orderIndex}-${sha256HexDigest.slice(
           0,
           12
-        )}.${extension}`;
+        )}-${randomUUID()}.${extension}`;
 
-        records.push(
-          await tx.contentAsset.upsert({
-            where: {
-              manifestId_orderIndex: {
-                manifestId: lockedManifest.id,
-                orderIndex,
-              },
-            },
-            update: {
+        const asset = existing
+          ? await tx.contentAsset.update({
+              where: { id: existing.id },
+              data: {
               assetType,
               sha256Hex: sha256HexDigest,
               mimeType,
@@ -341,8 +439,15 @@ export const presignManifestAssets = withController(
               muxReadyAt: null,
               muxReconcileAttempts: 0,
               processingError: null,
-            },
-            create: {
+              verifiedSha256Hex: null,
+              verifiedSizeBytes: null,
+              objectEtag: null,
+              storageVerifiedAt: null,
+              storageVerificationError: null,
+              },
+            })
+          : await tx.contentAsset.create({
+              data: {
               manifestId: lockedManifest.id,
               assetType,
               orderIndex,
@@ -354,20 +459,50 @@ export const presignManifestAssets = withController(
               uploadStatus: AssetUploadStatus.PENDING,
               processingStatus: AssetProcessingStatus.NONE,
               muxReconcileAttempts: 0,
-            },
-          })
-        );
+              },
+            });
+        records.push({ asset, alreadyUploaded: false });
       }
 
-      await tx.contentManifest.update({
-        where: { id: lockedManifest.id },
-        data: { status: ContentManifestStatus.UPLOADING },
-      });
-      return records;
+      if (monthlyUploadLimitBytes > 0n) {
+        const aggregate = await tx.contentAsset.aggregate({
+          _sum: { fileSizeBytes: true },
+          where: {
+            createdAt: { gte: currentUtcMonthStart() },
+            uploadStatus: {
+              in: [AssetUploadStatus.PENDING, AssetUploadStatus.UPLOADED],
+            },
+          },
+        });
+        assertR2MonthlyUploadBudget({
+          totalBytes: aggregate._sum.fileSizeBytes ?? 0n,
+          limitBytes: monthlyUploadLimitBytes,
+        });
+      }
+
+      if (records.some((record) => !record.alreadyUploaded)) {
+        await tx.contentManifest.update({
+          where: { id: lockedManifest.id },
+          data: { status: ContentManifestStatus.UPLOADING },
+        });
+      }
+      return { assets: records, cleanupError: null };
     });
 
+    if (presignResult.cleanupError) {
+      throw new HttpError(503, "STAGING_CLEANUP_FAILED", presignResult.cleanupError);
+    }
+    const assets = presignResult.assets;
+
     const uploads = [];
-    for (const asset of assets) {
+    const completedAssets = assets
+      .filter((record) => record.alreadyUploaded)
+      .map((record) => serializeAsset(record.asset));
+    for (const record of assets) {
+      if (record.alreadyUploaded) {
+        continue;
+      }
+      const asset = record.asset;
       const assetType = asset.assetType;
       const orderIndex = asset.orderIndex;
       const mimeType = asset.mimeType;
@@ -410,6 +545,7 @@ export const presignManifestAssets = withController(
     ok(res, {
       manifestId: manifest.id,
       uploads,
+      completedAssets,
     });
   }
 );
@@ -440,7 +576,10 @@ export const completeManifestAssetUpload = withController(
       throw new HttpError(404, "ASSET_NOT_FOUND", "content asset not found");
     }
 
-    if (asset.uploadStatus === AssetUploadStatus.UPLOADED) {
+    if (
+      asset.uploadStatus === AssetUploadStatus.UPLOADED &&
+      isAssetStorageVerified(asset)
+    ) {
       ok(res, {
         manifestId,
         asset: serializeAsset(asset),
@@ -448,9 +587,16 @@ export const completeManifestAssetUpload = withController(
       return;
     }
 
-    assertManifestAssetMutationAllowed(asset.manifest.status);
+    const storageReverificationOnly =
+      asset.uploadStatus === AssetUploadStatus.UPLOADED && !isAssetStorageVerified(asset);
+    if (!storageReverificationOnly) {
+      assertManifestAssetMutationAllowed(asset.manifest.status);
+    }
 
-    if (isVideoMimeType(asset.mimeType)) {
+    if (shouldCompleteMultipartUpload({
+      isVideo: isVideoMimeType(asset.mimeType),
+      uploadStatus: asset.uploadStatus,
+    })) {
       const multipartUploadId = parseNonEmptyString(
         req.body?.multipartUploadId,
         "multipartUploadId"
@@ -460,15 +606,74 @@ export const completeManifestAssetUpload = withController(
       await r2Service.completeMultipartUpload(asset.storageKey, multipartUploadId, parts);
     }
 
+    let storageVerification;
+    let verifiedStorageKey: string;
+    let verifiedObjectEtag: string | null;
+    try {
+      storageVerification = await verifyStoredContentAsset({
+        storageKey: asset.storageKey,
+        expectedSha256Hex: asset.sha256Hex,
+        expectedSizeBytes: asset.fileSizeBytes,
+        expectedMimeType: asset.mimeType,
+      });
+      verifiedStorageKey = buildVerifiedStorageKey(
+        asset.storageKey,
+        storageVerification.sha256Hex
+      );
+      const promoted = await r2Service.promoteVerifiedObject(
+        asset.storageKey,
+        verifiedStorageKey,
+        storageVerification.etag
+      );
+      assertPromotedObjectMatches(promoted, storageVerification);
+      verifiedObjectEtag = promoted.etag;
+    } catch (error) {
+      const inspectionError =
+        error instanceof StorageObjectVerificationError
+          ? error.message
+          : "stored object inspection failed";
+      let verificationError = inspectionError;
+      try {
+        await r2Service.deleteOriginObject(asset.storageKey);
+      } catch (_cleanupError) {
+        verificationError = `${inspectionError}; failed to remove private staging object`;
+      }
+      await prisma.contentAsset.update({
+        where: { id: asset.id },
+        data: {
+          uploadStatus: AssetUploadStatus.FAILED,
+          processingStatus: AssetProcessingStatus.ERRORED,
+          processingSource: AssetProcessingSource.CLIENT_COMPLETE,
+          processingError: verificationError,
+          verifiedSha256Hex: null,
+          verifiedSizeBytes: null,
+          objectEtag: null,
+          storageVerifiedAt: null,
+          storageVerificationError: verificationError,
+        },
+      });
+      throw new HttpError(
+        409,
+        "STORAGE_OBJECT_VERIFICATION_FAILED",
+        "uploaded object could not be verified"
+      );
+    }
+
     let updated = await prisma.contentAsset.update({
       where: { id: asset.id },
       data: {
         uploadStatus: AssetUploadStatus.UPLOADED,
-        cdnUrl: r2Service.buildCanonicalUrl(asset.storageKey),
+        storageKey: verifiedStorageKey,
+        cdnUrl: r2Service.buildCanonicalUrl(verifiedStorageKey),
+        verifiedSha256Hex: storageVerification.sha256Hex,
+        verifiedSizeBytes: storageVerification.sizeBytes,
+        objectEtag: verifiedObjectEtag,
+        storageVerifiedAt: new Date(),
+        storageVerificationError: null,
       },
     });
 
-    if (isVideoMimeType(asset.mimeType)) {
+    if (isVideoMimeType(asset.mimeType) && !storageReverificationOnly) {
       updated = await prisma.contentAsset.update({
         where: { id: asset.id },
         data: {
@@ -484,8 +689,10 @@ export const completeManifestAssetUpload = withController(
           processingError: null,
         },
       });
+    } else if (isVideoMimeType(asset.mimeType)) {
+      await syncManifestPublicationEligibility(manifestId);
     } else {
-      await backfillDisplayVariantFromStorage(asset.storageKey).catch(() => null);
+      await backfillDisplayVariantFromStorage(verifiedStorageKey).catch(() => null);
       updated = await prisma.contentAsset.update({
         where: { id: asset.id },
         data: {
@@ -533,6 +740,14 @@ export const finalizeContentManifest = withController("FINALIZE_MANIFEST_FAILED"
       manifest.status === ContentManifestStatus.ANCHORED ||
       manifest.status === ContentManifestStatus.PUBLISHED
     ) {
+      const unverifiedAsset = manifest.assets.find((asset) => !isAssetStorageVerified(asset));
+      if (unverifiedAsset) {
+        throw new HttpError(
+          409,
+          "ASSET_STORAGE_UNVERIFIED",
+          `asset ${unverifiedAsset.id} must pass backend storage verification before finalize`
+        );
+      }
       if (
         !manifest.manifestHashHex ||
         !manifest.internalCanonicalUrl ||
@@ -582,6 +797,15 @@ export const finalizeContentManifest = withController("FINALIZE_MANIFEST_FAILED"
       );
     }
 
+    const unverified = manifest.assets.find((asset) => !isAssetStorageVerified(asset));
+    if (unverified) {
+      throw new HttpError(
+        409,
+        "ASSET_STORAGE_UNVERIFIED",
+        `asset ${unverified.id} must pass backend storage verification before finalize`
+      );
+    }
+
     const finalized = computeManifestFinalizeState({ manifest, assets: manifest.assets });
     const updated = await tx.contentManifest.update({
       where: { id: manifest.id },
@@ -614,6 +838,34 @@ export const createContentPublication = withController(
     ensureIdempotencyKey(req);
 
     const creatorWallet = requireSessionWallet(req);
+    const recoveredPublicationId = getRecoveredIdempotencyResourceId(
+      req,
+      "CONTENT_PUBLICATION"
+    );
+    if (recoveredPublicationId) {
+      const recovered = await prisma.contentPublication.findFirst({
+        where: {
+          id: recoveredPublicationId,
+          manifest: { creatorWallet },
+        },
+      });
+      if (!recovered) {
+        throw new HttpError(409, "IDEMPOTENCY_RESOURCE_MISSING", "idempotent publication is missing");
+      }
+      ok(
+        res,
+        {
+          publicationId: recovered.id,
+          manifestId: recovered.manifestId,
+          platform: recovered.platform,
+          externalUrl: recovered.externalUrl,
+          verificationStatus: recovered.verificationStatus,
+          createdAt: recovered.createdAt.toISOString(),
+        },
+        201
+      );
+      return;
+    }
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
     const manifest = await prisma.contentManifest.findFirst({
       where: {
@@ -630,19 +882,27 @@ export const createContentPublication = withController(
     }
     assertManifestFinalized(manifest);
 
-    const platform = parseNonEmptyString(req.body.platform, "platform").toUpperCase();
-    const externalUrl = parseNonEmptyString(req.body.externalUrl, "externalUrl");
+    const target = normalizePublicationTarget({
+      platform: parseNonEmptyString(req.body.platform, "platform"),
+      externalUrl: parseNonEmptyString(req.body.externalUrl, "externalUrl"),
+      internalCanonicalUrl: manifest.internalCanonicalUrl as string,
+      allowInsecureInternalUrl: process.env.NODE_ENV !== "production",
+    });
     const externalPostId = parseOptionalString(req.body.externalPostId);
 
-    const publication = await prisma.contentPublication.create({
-      data: {
-        manifestId,
-        platform,
-        externalUrl,
-        externalUrlDigestHex: keccakHex(externalUrl),
-        externalPostIdHash: externalPostId ? sha256Hex(externalPostId) : null,
-        verificationStatus: PublicationVerificationStatus.PENDING,
-      },
+    const publication = await prisma.$transaction(async (tx) => {
+      const created = await tx.contentPublication.create({
+        data: {
+          manifestId,
+          platform: target.platform,
+          externalUrl: target.externalUrl,
+          externalUrlDigestHex: keccakHex(target.externalUrl),
+          externalPostIdHash: externalPostId ? sha256Hex(externalPostId) : null,
+          verificationStatus: PublicationVerificationStatus.PENDING,
+        },
+      });
+      await bindApiIdempotencyResource(tx, req, "CONTENT_PUBLICATION", created.id);
+      return created;
     });
 
     ok(
@@ -664,6 +924,7 @@ export const verifyContentPublication = withController(
   "VERIFY_PUBLICATION_FAILED",
   async (req, res) => {
     const creatorWallet = requireSessionWallet(req);
+    assertCreatorPublicationVerificationAllowed(config.pilot.inviteOnly);
     const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
     const publication = await prisma.contentPublication.findUnique({
       where: { id: publicationId },

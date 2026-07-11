@@ -1,6 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
-import { type config } from "../../config/default";
+import { isPilotRuntimeSafetyRequired, type config } from "../../config/default";
 import { getAnchorService } from "./AnchorService";
 
 export const SOLANA_DEVNET_GENESIS_HASH =
@@ -72,9 +72,10 @@ const preflightError = (reason: string): Error =>
 export const assertProductionPilotChainSafety = async (
   runtimeConfig: RuntimeConfig,
   dependencies: PilotChainSafetyDependencies = defaultPilotChainSafetyDependencies,
-  nodeEnv: string | undefined = process.env.NODE_ENV
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+  runtimeEnvironment: NodeJS.ProcessEnv = process.env
 ): Promise<void> => {
-  if (nodeEnv !== "production") {
+  if (!isPilotRuntimeSafetyRequired(runtimeConfig, nodeEnv, runtimeEnvironment)) {
     return;
   }
 

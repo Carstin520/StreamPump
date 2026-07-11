@@ -9,6 +9,12 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "./prisma";
+import { config } from "../../config/default";
+
+export const trustedPublicationVerificationWhere = (inviteOnly: boolean) => ({
+  verificationStatus: PublicationVerificationStatus.VERIFIED,
+  ...(inviteOnly ? { verificationSource: "OPERATOR_APPROVED" } : {}),
+});
 
 export const isAssetPublicDeliveryReady = (asset: {
   assetType: AssetType;
@@ -80,7 +86,7 @@ export const syncManifestPublicationEligibility = async (
       assets: true,
       publications: {
         where: {
-          verificationStatus: PublicationVerificationStatus.VERIFIED,
+          ...trustedPublicationVerificationWhere(config.pilot.inviteOnly),
         },
         orderBy: [
           {
