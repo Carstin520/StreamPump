@@ -42,27 +42,15 @@ const SPONSOR_TYPES: Array<{ value: SponsorType; label: string; body: string }> 
   { value: "INDIVIDUAL", label: "个人商家", body: "小型商家或个人经营主体" },
 ];
 
-function SponsorOfferLockNotice() {
-  const [remainingMs, setRemainingMs] = useState<number | null>(null);
-
-  useEffect(() => {
-    const deadline = Date.now() + 24 * 3_600_000;
-    const update = () => setRemainingMs(Math.max(0, deadline - Date.now()));
-    update();
-    const id = window.setInterval(update, 60_000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const hours = remainingMs === null ? "--" : String(Math.floor(remainingMs / 3_600_000));
-  const minutes =
-    remainingMs === null ? "--" : String(Math.floor((remainingMs % 3_600_000) / 60_000));
-
+function SponsorReviewNotice() {
   return (
     <div className="rounded-[14px] border tone-state-warning px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.18em]">
-        S1 Buyout 报价锁定
+        KYB 审核状态
       </p>
-      <p className="mt-1 text-sm text-[#f5d391]">锁定期剩余 {hours} 小时 {minutes} 分钟</p>
+      <p className="mt-1 text-sm text-[#f5d391]">
+        提交后状态为 PENDING_REVIEW，由 operator 人工审核。此处不承诺任何 S1 Buyout 报价、锁定期或托管账户。
+      </p>
     </div>
   );
 }
@@ -206,7 +194,7 @@ export default function SponsorOnboardingPage() {
             <section className="rounded-[18px] border border-white/[0.08] bg-[#111827]/90 p-6">
               <h1 className="text-2xl font-semibold text-white">Sponsor 企业认证</h1>
               <p className="mt-3 text-sm leading-6 text-[#9fb0ca]">
-                提交企业认证前需要先完成 StreamPump 登录，并选择托管账户或绑定官方管理钱包。
+                提交企业认证前需要先完成 StreamPump 登录，并连接一个外部 allowlisted 的 Solana 钱包（Phantom / Solflare）。Pilot 不提供托管账户。
               </p>
               <Link className="mt-5 inline-flex rounded-full bg-[#de402a] px-5 py-2.5 text-sm font-semibold text-white" href={loginHref}>
                 登录后继续
@@ -225,7 +213,7 @@ export default function SponsorOnboardingPage() {
               </div>
 
               <div className="mt-4">
-                <SponsorOfferLockNotice />
+                <SponsorReviewNotice />
               </div>
 
               <div className="mt-5 grid gap-5 lg:grid-cols-[220px_1fr]">
@@ -297,10 +285,10 @@ export default function SponsorOnboardingPage() {
                   {step === 2 ? (
                     <div className="space-y-4">
                       <div className="rounded-[14px] border border-white/[0.08] bg-white/[0.03] p-4">
-                        <p className="text-sm font-semibold text-white">官方管理钱包</p>
+                        <p className="text-sm font-semibold text-white">外部 allowlisted 钱包</p>
                         <p className="mt-2 break-all text-sm text-[#9fb0ca]">{session.wallet}</p>
                         <p className="mt-3 text-xs leading-5 text-[#7f90ab]">
-                          若需要使用 Gnosis Safe 或其他多签钱包，请先在登录页选择“连接自己的 Solana 钱包”，再返回本页提交。
+                          该地址即为提交 KYB 时绑定的外部 Solana 钱包。approval 后由 operator 加入 allowlist，才能创建生产 S2 Proposal。Pilot 不提供托管账户或代管私钥。
                         </p>
                       </div>
                       <TextField label="授权委托书 storageKey（非法人经办时填写）" value={form.powerOfAttorneyKey} onChange={(value) => updateField("powerOfAttorneyKey", value)} />

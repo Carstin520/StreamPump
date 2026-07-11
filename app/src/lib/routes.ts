@@ -155,17 +155,20 @@ export type WorkspaceNavItem = RouteItem & {
   disabled?: boolean;
 };
 
-// Labels are i18n-driven (labelKey). `disabled` items are upcoming surfaces;
-// the shell groups them under a muted "soon" section instead of inline.
+// Labels are i18n-driven (labelKey). Primary nav is narrowed to the Pilot
+// corridor: overview, content creation, the dual-sign sponsorship desk, and
+// sponsor KYB. Non-Pilot surfaces (library, S1 buyout, analytics, earnings,
+// campaigns, settings) are `disabled` and grouped under a muted "soon" section
+// so they read as not-in-Pilot rather than live product entries.
 export const workspaceSidebarNav: WorkspaceNavItem[] = [
   { href: WORKSPACE_PATH, labelKey: "nav.overview", iconName: "overview", exact: true },
   { href: WORKSPACE_CONTENT_NEW_PATH, labelKey: "nav.create", iconName: "create", prefixes: ["/workspace/content"] },
-  { href: WORKSPACE_LIBRARY_PATH, labelKey: "nav.library", iconName: "library", prefixes: [WORKSPACE_LIBRARY_PATH] },
   { href: WORKSPACE_SPONSORSHIPS_PATH, labelKey: "nav.sponsorships", iconName: "sponsor", prefixes: ["/workspace/sponsorships", "/workspace/intents"] },
   { href: WORKSPACE_SPONSOR_ONBOARDING_PATH, labelKey: "nav.sponsorKyb", iconName: "sponsor", prefixes: [WORKSPACE_SPONSOR_ONBOARDING_PATH] },
-  { href: WORKSPACE_BUYOUT_PATH, labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"] },
+  { href: WORKSPACE_LIBRARY_PATH, labelKey: "nav.library", iconName: "library", prefixes: [WORKSPACE_LIBRARY_PATH], disabled: true },
+  { href: WORKSPACE_BUYOUT_PATH, labelKey: "nav.buyout", iconName: "campaign", prefixes: ["/workspace/buyout"], disabled: true },
   { href: WORKSPACE_CAMPAIGNS_PATH, labelKey: "nav.campaign", iconName: "campaign", disabled: true },
-  { href: WORKSPACE_ANALYTICS_PATH, labelKey: "nav.analytics", iconName: "analytics", prefixes: [WORKSPACE_ANALYTICS_PATH] },
-  { href: WORKSPACE_EARNINGS_PATH, labelKey: "nav.earnings", iconName: "earnings", prefixes: [WORKSPACE_EARNINGS_PATH] },
+  { href: WORKSPACE_ANALYTICS_PATH, labelKey: "nav.analytics", iconName: "analytics", prefixes: [WORKSPACE_ANALYTICS_PATH], disabled: true },
+  { href: WORKSPACE_EARNINGS_PATH, labelKey: "nav.earnings", iconName: "earnings", prefixes: [WORKSPACE_EARNINGS_PATH], disabled: true },
   { href: WORKSPACE_SETTINGS_PATH, labelKey: "nav.settings", iconName: "settings", disabled: true },
 ];

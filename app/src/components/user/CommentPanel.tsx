@@ -130,7 +130,10 @@ export const CommentPanel = ({
                 </Link>
                 <StagePill compact stage={post.stage} />
               </div>
-              <p className="text-xs text-[#8799b3]">{post.creatorHandle}</p>
+              <p className="text-xs text-[#8799b3]">
+                {post.creatorHandle}
+                <span className="ml-1.5 text-[#5a6d87]">· {t("feed.identityPlaceholder")}</span>
+              </p>
             </div>
           </div>
           <button

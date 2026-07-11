@@ -687,7 +687,10 @@ const CreatorBackingPanel = ({ post }: { post: PostRecord }) => {
               <p className="truncate text-sm font-semibold text-white">{post.creatorName}</p>
               <StagePill compact stage={post.stage} />
             </div>
-            <p className="truncate text-xs text-[#8799b3]">{post.creatorHandle}</p>
+            <p className="truncate text-xs text-[#8799b3]">
+              {post.creatorHandle}
+              <span className="ml-1.5 text-[#5a6d87]">· {t("feed.identityPlaceholder")}</span>
+            </p>
           </div>
         </Link>
         <button

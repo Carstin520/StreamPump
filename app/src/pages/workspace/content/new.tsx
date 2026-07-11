@@ -192,11 +192,23 @@ export default function NewContentPage() {
             fileSizeBytes: String(file.size),
           }))
         );
+        // Match each presigned upload back to its selected file by orderIndex,
+        // never by array position — the backend may reorder or omit
+        // already-completed assets from `uploads`.
+        const fileByOrderIndex = new Map<number, File>();
+        assetInputs.forEach((input, index) => fileByOrderIndex.set(input.orderIndex, selectedFiles[index]));
+
         const presigned = await presignManifestAssets(token, manifest.manifestId, assetInputs);
 
-        for (const [index, upload] of presigned.uploads.entries()) {
-          const file = selectedFiles[index];
-          setMessage(t("workspace.uploadProgress", { name: file.name, current: index + 1, total: selectedFiles.length }));
+        const totalToUpload = presigned.uploads.length;
+        let uploadedSoFar = 0;
+        for (const upload of presigned.uploads) {
+          const file = fileByOrderIndex.get(upload.orderIndex);
+          if (!file) {
+            throw new Error(`No selected file for upload orderIndex ${upload.orderIndex}`);
+          }
+          uploadedSoFar += 1;
+          setMessage(t("workspace.uploadProgress", { name: file.name, current: uploadedSoFar, total: totalToUpload }));
 
           if (upload.uploadStrategy === "MULTIPART") {
             const completedParts = [];

@@ -42,6 +42,10 @@ type PageState =
       kind: "ready";
       data: ProposalDetailResponse;
       proofStatus?: PublicCampaignProofResponse["proofStatus"];
+      // Full campaign-proof payload, present only on the live-campaign-proof
+      // source. Carries the honest per-stage tx signatures and integrity flags
+      // that the flattened ProposalDetailResponse cannot represent.
+      campaignProof?: PublicCampaignProofResponse;
       source: "live-campaign-proof" | "live-api" | "demo-fallback";
     };
 
@@ -135,6 +139,7 @@ export default function CampaignDetailPage() {
             kind: "ready",
             data,
             proofStatus: campaignProof.proofStatus,
+            campaignProof,
             source: "live-campaign-proof",
           });
         }
@@ -211,6 +216,7 @@ export default function CampaignDetailPage() {
                 : `/campaigns/${state.data.proposal.proposalPda || state.data.proposal.id}/endorse`
             }
             heading={campaignHeading}
+            campaignProof={state.campaignProof}
             isCampaignProof={isCampaignProof}
             isDemoProposal={isDemoProposal}
             proofStatus={state.proofStatus}
@@ -295,12 +301,32 @@ const ProofRow = ({ label, value, href }: { label: string; value: string; href?:
   </div>
 );
 
+const IntegrityRow = ({
+  label,
+  pass,
+  passLabel,
+  failLabel,
+}: {
+  label: string;
+  pass: boolean;
+  passLabel: string;
+  failLabel: string;
+}) => (
+  <div className="flex items-center justify-between gap-3 rounded-[10px] border border-white/[0.05] bg-black/20 px-3 py-2.5">
+    <span className="text-[length:var(--fs-micro)] text-[#93a2bb]">{label}</span>
+    <span className={`shrink-0 text-[length:var(--fs-micro)] font-semibold ${pass ? "text-[#7ce0b0]" : "text-[#f5b8ab]"}`}>
+      {pass ? `✓ ${passLabel}` : `— ${failLabel}`}
+    </span>
+  </div>
+);
+
 const CampaignProofView = ({
   proposal,
   viewerRole,
   isDemoProposal,
   isCampaignProof,
   proofStatus,
+  campaignProof,
   heading,
   sponsorName,
   avatarSrc,
@@ -312,6 +338,7 @@ const CampaignProofView = ({
   isDemoProposal: boolean;
   isCampaignProof: boolean;
   proofStatus?: PublicCampaignProofResponse["proofStatus"];
+  campaignProof?: PublicCampaignProofResponse;
   heading: string;
   sponsorName: string;
   avatarSrc?: string;
@@ -333,10 +360,20 @@ const CampaignProofView = ({
       ? Math.min(100, Math.round((metricActual / metricTarget) * 100))
       : null;
 
+  // Honest per-stage evidence. Only the live campaign-proof source carries these
+  // dedicated signatures + integrity flags; the live-api / demo sources leave
+  // them undefined so the UI renders them unavailable rather than inventing data.
+  const proof = campaignProof?.proof;
+  const integrity = campaignProof?.integrity;
+  const fundingTx = proof?.fundingTxSignature ?? p.onChainTxSignature ?? null;
+  const contentAnchorTx = proof?.contentAnchorTx ?? null;
+  const settlementTx = proof?.latestSettlementTxSignature ?? null;
+
   // Track 1 "settled" derives from the mapped on-chain claim marker (track1Claimed),
   // not the coarse proposal.status. A proposal can be RESOLVED_SUCCESS overall while
-  // the Track 1 base payout has not yet been claimed on-chain.
-  const track1Settled = Boolean(p.track1Claimed);
+  // the Track 1 base payout has not yet been claimed on-chain. When the backend
+  // ships an integrity checklist, its confirmed flag is the stricter truth.
+  const track1Settled = integrity ? integrity.track1SettlementConfirmed : Boolean(p.track1Claimed);
   const track2Settled = Boolean(p.track2SettledAt);
   // Sum of the three Track budgets. This is the committed/funded budget, NOT a
   // live on-chain vault balance. The distinct on-chain account (proposal PDA) is
@@ -345,7 +382,11 @@ const CampaignProofView = ({
     toBigSafe(p.track1BaseUsdc) + toBigSafe(p.track2UsdcDeposited) + toBigSafe(p.track3UsdcDeposited)
   ).toString();
 
-  const anchored = Boolean(p.contentAnchorPda);
+  const anchored = Boolean(p.contentAnchorPda || contentAnchorTx);
+  // Only claim "on-chain verifiable" when at least one real on-chain artifact
+  // (proposal PDA, content anchor PDA/tx, or funding tx) exists. Otherwise the
+  // campaign is still off-chain/pending and must not assert chain verifiability.
+  const hasOnChainProof = Boolean(p.proposalPda || p.contentAnchorPda || contentAnchorTx || fundingTx);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
@@ -400,9 +441,15 @@ const CampaignProofView = ({
               <span className="h-3.5 w-3.5 rounded bg-[linear-gradient(135deg,#4a6cd4,#67b8ff)]" />
               {sponsorName}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#3fb6a8]/36 bg-[#3fb6a8]/[0.14] px-3 py-1 text-[length:var(--fs-micro)] text-[#7fe3d3]">
-              {t("campaign.onChainVerifiable")}
-            </span>
+            {hasOnChainProof ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#3fb6a8]/36 bg-[#3fb6a8]/[0.14] px-3 py-1 text-[length:var(--fs-micro)] text-[#7fe3d3]">
+                {t("campaign.onChainVerifiable")}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[length:var(--fs-micro)] text-[#93a2bb]">
+                {t("campaign.onChainPending")}
+              </span>
+            )}
           </div>
 
           {/* content manifest card */}
@@ -514,9 +561,19 @@ const CampaignProofView = ({
               value={p.contentAnchorPda ? shortenWallet(p.contentAnchorPda) : t("campaign.pendingPrivate")}
             />
             <ProofRow
-              href={p.onChainTxSignature ? explorerUrl("tx", p.onChainTxSignature) : undefined}
+              href={contentAnchorTx ? explorerUrl("tx", contentAnchorTx) : undefined}
+              label={t("campaign.proofContentAnchorTx")}
+              value={contentAnchorTx ? shortenWallet(contentAnchorTx) : t("campaign.evidenceUnavailable")}
+            />
+            <ProofRow
+              href={fundingTx ? explorerUrl("tx", fundingTx) : undefined}
               label={t("campaign.proofFundingTx")}
-              value={p.onChainTxSignature ? shortenWallet(p.onChainTxSignature) : t("campaign.pendingPrivate")}
+              value={fundingTx ? shortenWallet(fundingTx) : t("campaign.evidenceUnavailable")}
+            />
+            <ProofRow
+              href={settlementTx ? explorerUrl("tx", settlementTx) : undefined}
+              label={t("campaign.proofSettlementTx")}
+              value={settlementTx ? shortenWallet(settlementTx) : t("campaign.evidenceUnavailable")}
             />
             <ProofRow label={t("campaign.proofVault")} value={formatUsdcAtomic(committedBudgetAtomic)} />
           </div>
@@ -527,6 +584,35 @@ const CampaignProofView = ({
             {t("campaign.deadline")} {formatIsoLabel(p.deadlineAt, dateLocale)}
           </p>
         </Panel>
+
+        {/* integrity checklist — only rendered when the backend ships verified flags */}
+        {integrity ? (
+          <Panel className="space-y-3">
+            <div>
+              <p className="text-[length:var(--fs-caption)] font-semibold text-[#93a2bb]">{t("campaign.integrityTitle")}</p>
+              <p className="mt-0.5 text-[length:var(--fs-micro)] text-[#7e90aa]">{t("campaign.integritySubtitle")}</p>
+            </div>
+            <div className="space-y-2">
+              {([
+                ["campaign.integrityManifestFinalized", integrity.manifestFinalized],
+                ["campaign.integrityAssetsReady", integrity.assetsReady],
+                ["campaign.integrityOperatorApproved", integrity.operatorApprovedPublication],
+                ["campaign.integrityContentHashMatch", integrity.contentHashMatchesManifest],
+                ["campaign.integrityAnchorMatch", integrity.contentAnchorMatchesManifest],
+                ["campaign.integrityTrack1Only", integrity.track1OnlyBudget],
+                ["campaign.integrityTrack1Settled", integrity.track1SettlementConfirmed],
+              ] as const).map(([key, pass]) => (
+                <IntegrityRow
+                  failLabel={t("campaign.integrityFail")}
+                  key={key}
+                  label={t(key)}
+                  pass={pass}
+                  passLabel={t("campaign.integrityPass")}
+                />
+              ))}
+            </div>
+          </Panel>
+        ) : null}
       </div>
 
       {/* right column */}

@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
@@ -15,8 +15,6 @@ import {
   buildLoginHref,
 } from "@/lib/routes";
 
-const TOTAL_SPUMP = 1_250_000;
-const XP_REWARD = 20;
 const STEPS = 3;
 
 const roleDestination = (role: AccountRole) =>
@@ -46,13 +44,9 @@ type AccountLoadState =
   | { kind: "ready"; token: string; account: AccountMeRecord }
   | { kind: "error"; message: string };
 
+// Pilot corridor onboards Creators and Sponsors only. Fans can browse via
+// /explore without an onboarding role gate.
 const ROLE_KEYS: Array<{ role: AccountRole; labelKey: string; descKey: string; badge: string }> = [
-  {
-    role: "FAN",
-    labelKey: "onboarding.roleFan",
-    descKey: "onboarding.roleFanDesc",
-    badge: "S1",
-  },
   {
     role: "CREATOR",
     labelKey: "onboarding.roleCreator",
@@ -71,35 +65,6 @@ const defaultHandle = (account: AccountMeRecord | null) =>
   account?.profile?.handle ??
   account?.identity?.email?.split("@")[0]?.replace(/[^a-z0-9_.-]/gi, "-").toLowerCase() ??
   "";
-
-function useCountUp(target: number, duration: number, active: boolean) {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!active) {
-      setValue(0);
-      return;
-    }
-
-    const start = performance.now();
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(target * eased));
-      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    };
-  }, [target, duration, active]);
-
-  return value;
-}
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -186,26 +151,6 @@ function CheckCircle({ animated }: { animated: boolean }) {
   );
 }
 
-function TokenRain({ active }: { active: boolean }) {
-  if (!active) return null;
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {Array.from({ length: 12 }, (_, i) => (
-        <div
-          key={i}
-          className="absolute h-1.5 w-1.5 rounded-full bg-[#de402a]"
-          style={{
-            left: `${8 + (i * 7.5) % 84}%`,
-            top: "-4px",
-            opacity: 0.6 + Math.random() * 0.4,
-            animation: `token-fall ${1200 + i * 150}ms ${i * 100}ms ease-in forwards`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 const OnboardingReadinessNotice = ({
   accountState,
 }: {
@@ -276,7 +221,7 @@ function DiscoveryOrientationBlock() {
 export default function OnboardingPage() {
   const { t } = useI18n();
   const [currentStep, setCurrentStep] = useState(0);
-  const [role, setRole] = useState<AccountRole>("FAN");
+  const [role, setRole] = useState<AccountRole>("CREATOR");
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [stepKey, setStepKey] = useState(0);
@@ -284,8 +229,6 @@ export default function OnboardingPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const xpCount = useCountUp(XP_REWARD, 800, currentStep === 2);
-  const spumpCount = useCountUp(TOTAL_SPUMP, 1600, currentStep === 2);
   const account = accountState.kind === "ready" ? accountState.account : null;
   const canWriteProfile = accountState.kind === "ready" && accountState.account.storageStatus === "LIVE";
 
@@ -307,7 +250,7 @@ export default function OnboardingPage() {
       .then((record) => {
         if (cancelled) return;
         setAccountState({ kind: "ready", token: session.accessToken, account: record });
-        setRole(record.profile?.role ?? "FAN");
+        setRole(record.profile?.role === "SPONSOR" ? "SPONSOR" : "CREATOR");
         setDisplayName(record.profile?.displayName ?? record.identity?.displayName ?? record.identity?.email?.split("@")[0] ?? "");
         setHandle(defaultHandle(record));
       })
@@ -570,8 +513,6 @@ export default function OnboardingPage() {
 
               {currentStep === 2 && (
                 <div className="liquid-glass-shell relative overflow-hidden p-8 text-center">
-                  <TokenRain active />
-
                   <CheckCircle animated />
                   <h1 className="type-h2 mt-4 font-semibold">
                     {t("onboarding.profileSaved")}
@@ -582,23 +523,10 @@ export default function OnboardingPage() {
                       : t("onboarding.profileSavedSubtitleDefault")}
                   </p>
 
-                  {/* Combined reward: XP + welcome SPUMP in one compact card */}
-                  <div
-                    className="mx-auto mt-6 flex w-full max-w-[320px] items-center justify-between gap-3 rounded-2xl border border-[#65ecaf]/18 bg-[#65ecaf]/[0.06] px-5 py-3.5"
-                    style={{ animation: "count-pop 500ms ease-out" }}
-                  >
-                    <div className="text-left">
-                      <p className="text-[length:var(--fs-micro)] font-medium text-[#65ecaf]">{t("onboarding.previewXpLabel")}</p>
-                      <p className="text-lg font-bold tabular-nums text-[#65ecaf]">+{xpCount}</p>
-                    </div>
-                    <div className="h-8 w-px bg-white/[0.1]" />
-                    <div className="text-right">
-                      <p className="text-[length:var(--fs-micro)] font-medium text-[#8ea0ba]">{t("onboarding.previewSpumpUnit")}</p>
-                      <p className="text-lg font-bold tabular-nums text-white">{spumpCount.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-[#6f8099]">
-                    {t("onboarding.previewXpNote")}
+                  {/* No reward is issued at onboarding. SPUMP mint, XP, and the
+                      reward ledger are not part of the Pilot corridor. */}
+                  <p className="mx-auto mt-6 w-full max-w-[360px] rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-3.5 text-xs leading-5 text-[#9aabc4]">
+                    {t("onboarding.noRewardNote")}
                   </p>
 
                   {/* Role-based next step + primary exit */}

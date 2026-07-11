@@ -20,6 +20,9 @@ type Track1Evidence = {
   budgetUsd: number;
   status: TrackStatus;
   creatorWallet: string;
+  // Optional dedicated settlement tx signature. Rendered as a verifiable link
+  // when present, and as an unavailable dash otherwise — never fabricated.
+  settlementTxSignature: string | null;
 };
 
 type SettlementData = {
@@ -45,6 +48,7 @@ const MOCK: SettlementData = {
     budgetUsd: 100_000,
     status: "SETTLED",
     creatorWallet: "5Yk3...R8wF",
+    settlementTxSignature: null,
   },
   track2Budget: 1_000_000,
   track3Budget: 300_000,
@@ -68,8 +72,14 @@ const mapCampaignProofToSettlement = (proof: PublicCampaignProofResponse): Settl
   status: proof.status,
   track1: {
     budgetUsd: usdcAtomicToUsdNumber(proof.budgetTracks.track1BaseUsdc),
-    status: deriveTrackStatus(proof.budgetTracks.track1Claimed, proof.proofStatus),
+    // Prefer the backend integrity confirmation when present — a claim marker
+    // alone is not "settled" once the server ships a verified checklist.
+    status: deriveTrackStatus(
+      proof.integrity ? proof.integrity.track1SettlementConfirmed : proof.budgetTracks.track1Claimed,
+      proof.proofStatus,
+    ),
     creatorWallet: `${proof.creatorWallet.slice(0, 4)}...${proof.creatorWallet.slice(-4)}`,
+    settlementTxSignature: proof.proof.latestSettlementTxSignature ?? null,
   },
   track2Budget: usdcAtomicToUsdNumber(proof.budgetTracks.track2UsdcDeposited),
   track3Budget: usdcAtomicToUsdNumber(proof.budgetTracks.track3UsdcDeposited),
@@ -102,11 +112,28 @@ const trackStatusColor = (status: TrackStatus) =>
 /*  Cards                                                              */
 /* ------------------------------------------------------------------ */
 
-function EvidenceRow({ label, value, color }: { color?: string; label: string; value: string }) {
+const explorerTxUrl = (signature: string) =>
+  `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+
+const shortenSignature = (signature: string) =>
+  signature.length > 12 ? `${signature.slice(0, 6)}...${signature.slice(-6)}` : signature;
+
+function EvidenceRow({ label, value, color, href }: { color?: string; href?: string; label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between border-b border-white/5 py-2.5 last:border-0">
       <span className="text-xs text-[#8ea0ba]">{label}</span>
-      <span className="text-sm font-medium" style={{ color: color ?? "white" }}>{value}</span>
+      {href ? (
+        <a
+          className="font-mono text-sm font-medium text-[#9fd0ff] transition hover:text-white"
+          href={href}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {value} ↗
+        </a>
+      ) : (
+        <span className="text-sm font-medium" style={{ color: color ?? "white" }}>{value}</span>
+      )}
     </div>
   );
 }
@@ -139,6 +166,11 @@ function Track1EvidenceCard({ track1 }: { track1: Track1Evidence }) {
         color={trackStatusColor(track1.status)}
         label={t("settlement.claimMarker")}
         value={trackStatusLabel(t, track1.status)}
+      />
+      <EvidenceRow
+        href={track1.settlementTxSignature ? explorerTxUrl(track1.settlementTxSignature) : undefined}
+        label={t("settlement.settlementTx")}
+        value={track1.settlementTxSignature ? shortenSignature(track1.settlementTxSignature) : t("settlement.evidenceUnavailable")}
       />
       <p className="mt-3 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{t("settlement.track1Note")}</p>
     </div>
@@ -221,7 +253,12 @@ export default function SettlementPage() {
   const [loadError, setLoadError] = useState<boolean>(false);
   const creator = useMemo(() => findCreator("neo-park"), []);
   const creatorName = locale === "en" ? "Midnight Save" : creator.name;
-  const subtitle = t("settlement.subtitle", { name: creatorName, handle: creator.handle });
+  // In live mode the creator identity is the on-chain wallet, not the seeded
+  // neo-park demo persona. Only the labeled legacy MOCK fixture keeps that name.
+  const subtitle =
+    source === "live" && data
+      ? t("settlement.subtitleLive", { wallet: data.track1.creatorWallet })
+      : t("settlement.subtitle", { name: creatorName, handle: creator.handle });
   const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
 
   useEffect(() => {

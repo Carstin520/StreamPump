@@ -26,7 +26,6 @@ import {
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
-  verifyContentPublication,
 } from "@/lib/api/workspace";
 import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
@@ -50,8 +49,22 @@ type UploadStage = "selected" | "hashing" | "presigning" | "uploading" | "comple
 type UploadQueueItem = { file: File; key: string; message: string; stage: UploadStage };
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
+// Pilot scope: ordinary proposal intents submit Track 1 base pay only. Track 2
+// performance budgets and Track 3 CPS are not part of the invite-only devnet/
+// test-USDC corridor and are always submitted as zero terms.
+const TRACK2_PILOT_CLOSED_METRIC = "VIEWS" as const;
+const TRACK2_PILOT_CLOSED_TARGET = "0";
+const TRACK2_PILOT_CLOSED_BPS = 0;
+const TRACK2_PILOT_CLOSED_USDC = "0";
 const TRACK3_OPERATOR_GATED_USDC = "0";
 const TRACK3_OPERATOR_GATED_DELAY_DAYS = 0;
+
+// Publication platforms. STREAMPUMP is the internal canonical destination: it
+// publishes against the manifest's own `internalCanonicalUrl` and then waits for
+// operator verification. External platforms are limited to the exact set the
+// backend supports and require the creator to paste an HTTPS link.
+const INTERNAL_PLATFORM = "STREAMPUMP";
+const EXTERNAL_PLATFORMS = ["X", "INSTAGRAM", "TIKTOK", "YOUTUBE", "XIAOHONGSHU"] as const;
 
 const CONTENT_DETAIL_READINESS_DESCRIPTION =
   "This page reads live content manifests and can resume asset upload, finalize content, record publication URLs, and create proposal intents. It still depends on authenticated session state, R2/Mux/backend configuration, and seeded S2 creator readiness; failed asset cleanup and webhook reconciliation are not fully productized.";
@@ -107,6 +120,17 @@ const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
   if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
   if (isRenderableUrl(a.originUrl)) return a.originUrl;
   return null;
+};
+
+// Public-feed / proposal-intent eligibility. Trusts the backend flag when set,
+// otherwise falls back to the same evidence the backend gates on: every asset
+// delivery-ready (backend storage verification + Mux ready) and at least one
+// operator-verified publication.
+const isManifestPublicFeedEligible = (d: ContentManifestDetailResponse) => {
+  if (typeof d.isPublicFeedEligible === "boolean") return d.isPublicFeedEligible;
+  const assetsReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
+  const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
+  return assetsReady && hasVerifiedPublication;
 };
 
 const sha256Hex = async (file: File) => {
@@ -185,20 +209,15 @@ export default function ManifestDetailPage() {
   const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
-  const [verifyingPublicationId, setVerifyingPublicationId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
-  const [publicationPlatform, setPublicationPlatform] = useState("XIAOHONGSHU");
+  const [publicationPlatform, setPublicationPlatform] = useState(INTERNAL_PLATFORM);
   const [publicationUrl, setPublicationUrl] = useState("");
   const [publicationPostId, setPublicationPostId] = useState("");
   const [sponsorWallet, setSponsorWallet] = useState("");
   const [deadlineInput, setDeadlineInput] = useState(defaultDeadlineInput);
   const [track1BaseUsdc, setTrack1BaseUsdc] = useState("500");
-  const [track2MetricType, setTrack2MetricType] = useState<"VIEWS" | "CLICKS" | "SAVES">("VIEWS");
-  const [track2TargetValue, setTrack2TargetValue] = useState("10000");
-  const [track2MinAchievementBps, setTrack2MinAchievementBps] = useState("7000");
-  const [track2BudgetUsdc, setTrack2BudgetUsdc] = useState("1000");
   const [activeSection, setActiveSection] = useState<"assets" | "publish" | "sponsor">("assets");
 
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
@@ -250,14 +269,27 @@ export default function ManifestDetailPage() {
     setBusyAction("upload");
     try {
       const existingCount = state.kind === "ready" ? state.data.assets.length : 0;
+      // Match each presigned upload back to its selected file by orderIndex,
+      // never by array position — the backend may omit already-completed assets
+      // from `uploads` (surfaced via `completedAssets`).
+      const fileByOrderIndex = new Map<number, File>();
       const inputs = await Promise.all(selectedFiles.map(async (f, i) => {
         updateUploadItem(`${f.name}-${f.size}-${f.lastModified}`, { message: "计算哈希中", stage: "hashing" });
-        return { assetType: resolveAssetType(f), orderIndex: existingCount + i, sha256Hex: await sha256Hex(f), mimeType: f.type.toLowerCase(), fileSizeBytes: String(f.size) };
+        const orderIndex = existingCount + i;
+        fileByOrderIndex.set(orderIndex, f);
+        return { assetType: resolveAssetType(f), orderIndex, sha256Hex: await sha256Hex(f), mimeType: f.type.toLowerCase(), fileSizeBytes: String(f.size) };
       }));
       setUploadQueue((items) => items.map((i) => ({ ...i, message: "请求上传签名", stage: "presigning" })));
       const response = await presignManifestAssets(token, manifestId, inputs);
-      for (const [idx, upload] of response.uploads.entries()) {
-        const f = selectedFiles[idx];
+      // Assets the backend already verified are skipped from `uploads`; show them
+      // as completed in the queue without re-uploading.
+      for (const completed of response.completedAssets ?? []) {
+        const f = fileByOrderIndex.get(completed.orderIndex);
+        if (f) updateUploadItem(`${f.name}-${f.size}-${f.lastModified}`, { message: "已上传", stage: "uploaded" });
+      }
+      for (const upload of response.uploads) {
+        const f = fileByOrderIndex.get(upload.orderIndex);
+        if (!f) throw new Error(`上传缺少对应文件 (orderIndex ${upload.orderIndex})`);
         const key = `${f.name}-${f.size}-${f.lastModified}`;
         updateUploadItem(key, { message: `上传中 (${upload.uploadStrategy})`, stage: "uploading" });
         if (upload.uploadStrategy === "MULTIPART") {
@@ -303,34 +335,35 @@ export default function ManifestDetailPage() {
 
   const handleCreatePublication = async () => {
     const token = getAccessToken();
-    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
+    const manifest = state.kind === "ready" ? state.data : null;
     if (!token) { handleAuthFailure(); return; }
-    const url = publicationUrl.trim();
-    if (!url) { setActionMessage("请输入发布链接"); return; }
-    try { new URL(url); } catch { setActionMessage("无效的链接格式"); return; }
+    if (!manifest) { setActionMessage(t("content.finalizeFirst")); return; }
+    const manifestId = manifest.manifestId;
+    const isInternal = publicationPlatform === INTERNAL_PLATFORM;
+    // STREAMPUMP publishes against the manifest's own canonical URL — the creator
+    // never types it. External platforms require a creator-supplied HTTPS link.
+    let url: string;
+    let externalPostId: string | null;
+    if (isInternal) {
+      const internalUrl = manifest.internalCanonicalUrl?.trim();
+      if (!internalUrl) { setActionMessage(t("content.internalUrlPending")); return; }
+      url = internalUrl;
+      externalPostId = null;
+    } else {
+      url = publicationUrl.trim();
+      if (!url) { setActionMessage(t("content.externalLinkRequired")); return; }
+      if (!url.toLowerCase().startsWith("https://")) { setActionMessage(t("content.externalHttpsRequired")); return; }
+      try { new URL(url); } catch { setActionMessage(t("content.invalidLink")); return; }
+      externalPostId = publicationPostId.trim() || null;
+    }
     setBusyAction("publication");
     try {
-      await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId: publicationPostId.trim() || null });
+      await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId });
       await refreshManifest(token, manifestId);
-      setPublicationUrl(""); setPublicationPostId("");
-      setActionMessage("发布记录已创建，等待验证和媒体交付就绪后进入 public feed");
+      if (!isInternal) { setPublicationUrl(""); setPublicationPostId(""); }
+      setActionMessage(t("content.publicationRecorded"));
     } catch (error) { handleApiError(error, "发布失败"); }
     finally { setBusyAction(null); }
-  };
-
-  const handleVerifyPublication = async (publicationId: string) => {
-    const token = getAccessToken();
-    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
-    if (!token) { handleAuthFailure(); return; }
-    if (!manifestId) return;
-    setVerifyingPublicationId(publicationId);
-    try {
-      await verifyContentPublication(token, publicationId);
-      const next = await refreshManifest(token, manifestId);
-      const eligible = next.isPublicFeedEligible ? "，已进入 public feed eligibility" : "，等待媒体交付就绪后进入 public feed";
-      setActionMessage(`发布验证已完成${eligible}`);
-    } catch (error) { handleApiError(error, "验证发布失败"); }
-    finally { setVerifyingPublicationId(null); }
   };
 
   const handleCreateProposalIntent = async () => {
@@ -338,9 +371,22 @@ export default function ManifestDetailPage() {
     const manifest = state.kind === "ready" ? state.data : null;
     if (!token) { handleAuthFailure(); return; }
     if (!manifest || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(manifest.status)) { setActionMessage("请先完善内容"); return; }
+    // A proposal intent can only open once the content is public-feed eligible:
+    // backend storage verification + Mux ready + operator-approved publication.
+    if (!isManifestPublicFeedEligible(manifest)) { setActionMessage(t("content.intentBlockedEligibility")); return; }
     if (!sponsorWallet.trim()) { setActionMessage("请输入赞助商钱包"); return; }
     const dMs = new Date(deadlineInput).getTime();
     if (!Number.isFinite(dMs) || dMs <= Date.now()) { setActionMessage("截止日期须在未来"); return; }
+    let track1BaseUsdcAtomic: string;
+    try {
+      track1BaseUsdcAtomic = toUsdcAtomicString(track1BaseUsdc);
+    } catch {
+      setActionMessage("USDC 格式无效");
+      return;
+    }
+    // Track 1 base pay must be a strictly positive amount — a zero-budget intent
+    // is never a valid Pilot corridor proposal.
+    if (BigInt(track1BaseUsdcAtomic) <= 0n) { setActionMessage(t("content.track1Positive")); return; }
     setBusyAction("intent");
     try {
       const creatorMarket = await getCreatorMarketProfile(manifest.creatorWallet);
@@ -351,10 +397,12 @@ export default function ManifestDetailPage() {
 
       const intent = await createProposalIntent(token, {
         manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
-        deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),
-        track2MetricType, track2TargetValue: track2TargetValue.trim(), track2MinAchievementBps: Number(track2MinAchievementBps),
-        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc),
-        track3UsdcDeposited: toUsdcAtomicString(TRACK3_OPERATOR_GATED_USDC),
+        deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: track1BaseUsdcAtomic,
+        // Track 2/3 are closed in the Pilot corridor: submit zero terms only.
+        track2MetricType: TRACK2_PILOT_CLOSED_METRIC, track2TargetValue: TRACK2_PILOT_CLOSED_TARGET,
+        track2MinAchievementBps: TRACK2_PILOT_CLOSED_BPS,
+        track2UsdcDeposited: TRACK2_PILOT_CLOSED_USDC,
+        track3UsdcDeposited: TRACK3_OPERATOR_GATED_USDC,
         track3DelayDays: TRACK3_OPERATOR_GATED_DELAY_DAYS,
       });
       setActionMessage("合作意向已创建");
@@ -403,12 +451,15 @@ export default function ManifestDetailPage() {
   const assetsWaiting = d.assets.filter(isAssetWaiting);
   const assetsDeliveryReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
   const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
-  const isPublicFeedEligible = Boolean(d.isPublicFeedEligible) || (assetsDeliveryReady && hasVerifiedPublication);
+  const isPublicFeedEligible = isManifestPublicFeedEligible(d);
   const publicFeedBlockedReason = !hasVerifiedPublication
     ? "Awaiting verified publication"
     : !assetsDeliveryReady
       ? "Assets still processing"
       : "Backend eligibility flag pending";
+  const isInternalPublication = publicationPlatform === INTERNAL_PLATFORM;
+  const canSubmitProposalIntent =
+    ["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && isPublicFeedEligible;
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -465,14 +516,9 @@ export default function ManifestDetailPage() {
               </div>
               <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#5a6b82]">{pub.externalUrl}</p>
               {pub.verificationStatus === "PENDING" ? (
-                <button
-                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[length:var(--fs-micro)] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
-                  disabled={busyAction !== null || verifyingPublicationId !== null}
-                  onClick={() => void handleVerifyPublication(pub.publicationId)}
-                  type="button"
-                >
-                  {verifyingPublicationId === pub.publicationId ? "Verifying..." : "Verify Publication"}
-                </button>
+                <p className="mt-2 rounded-lg border border-[#f3b33e]/20 bg-[#2a1f0b]/40 px-2.5 py-1.5 text-[length:var(--fs-micro)] leading-5 text-[#f3c66e]">
+                  {t("content.publicationPendingOperator")}
+                </p>
               ) : null}
             </div>
           ))}
@@ -622,20 +668,47 @@ export default function ManifestDetailPage() {
             <div className="space-y-3">
               <label className="block space-y-1.5">
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishPlatform")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPlatform(e.target.value.toUpperCase())} value={publicationPlatform} />
+                <select
+                  className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                  onChange={(e) => setPublicationPlatform(e.target.value)}
+                  value={publicationPlatform}
+                >
+                  <option value={INTERNAL_PLATFORM}>{t("content.platformStreampump")}</option>
+                  {EXTERNAL_PLATFORMS.map((platform) => (
+                    <option key={platform} value={platform}>{platform}</option>
+                  ))}
+                </select>
               </label>
-              <label className="block space-y-1.5">
-                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
-              </label>
+              {isInternalPublication ? (
+                <>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.internalCanonicalUrl")}</span>
+                    <input
+                      className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-[#8ea0ba] outline-none"
+                      readOnly
+                      value={d.internalCanonicalUrl ?? t("content.internalUrlNotReady")}
+                    />
+                  </label>
+                  <p className="rounded-xl border border-[#67b8ff]/20 bg-[#0d1b2a]/50 px-3 py-2 text-[length:var(--fs-micro)] leading-5 text-[#a8c6e6]">
+                    {t("content.internalPublishHint")}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
+                    <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" inputMode="url" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
+                    <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
+                  </label>
+                </>
+              )}
             </div>
             <button
               className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || (isInternalPublication && !d.internalCanonicalUrl)}
               onClick={() => void handleCreatePublication()}
               type="button"
             >
@@ -654,6 +727,17 @@ export default function ManifestDetailPage() {
                 {t("workspace.sponsorshipAfterDraft")}
               </div>
             )}
+            {["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && !isPublicFeedEligible && (
+              <div className="rounded-2xl border tone-state-warning px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">{t("content.intentEligibilityTitle")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.intentEligibilityBody")}</p>
+                <ul className="mt-2 space-y-1 text-[length:var(--fs-micro)] text-[#9aabc4]">
+                  <li>· {t("content.intentReqStorage")}</li>
+                  <li>· {t("content.intentReqMux")}</li>
+                  <li>· {t("content.intentReqOperator")}</li>
+                </ul>
+              </div>
+            )}
             <div className="space-y-3">
               <label className="block space-y-1.5">
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorWallet")}</span>
@@ -663,38 +747,18 @@ export default function ManifestDetailPage() {
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
-                </label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
-                  <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
-                    <option value="VIEWS">{t("workspace.views")}</option><option value="CLICKS">{t("workspace.clicks")}</option><option value="SAVES">{t("workspace.saves")}</option>
-                  </select>
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
-                </label>
-              </div>
+              <label className="block space-y-1.5">
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
+              </label>
               <div className="rounded-2xl border tone-state-warning px-4 py-3">
-                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">Track 3 CPS operator-gated</p>
-                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
-                  Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
-                </p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">{t("content.track23ClosedTitle")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.track23ClosedBody")}</p>
               </div>
             </div>
             <button
               className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
-              disabled={busyAction !== null || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status)}
+              disabled={busyAction !== null || !canSubmitProposalIntent}
               onClick={() => void handleCreateProposalIntent()}
               type="button"
             >

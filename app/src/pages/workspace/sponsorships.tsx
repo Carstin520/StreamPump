@@ -8,6 +8,7 @@ import { StagePill } from "@/components/shared/StagePill";
 import { OpportunityInbox } from "@/components/workspace/OpportunityInbox";
 import {
   ConsoleAuthRequired,
+  ConsoleError,
   ConsoleLoading,
 } from "@/components/workspace/OverviewConsole";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -92,10 +93,12 @@ export default function SponsorshipsPage() {
     };
   }, [isDemoMode, router.isReady, t]);
 
-  const persona = useMemo<WorkspacePersona>(() => {
+  // Mock persona is ONLY produced in explicit ?demo=1 mode (fail-closed). Failed
+  // or absent live sessions never fall back to the mock inbox.
+  const persona = useMemo<WorkspacePersona | null>(() => {
     if (isDemoMode) return workspacePersonas[demoStage];
     if (state.status === "ready") return buildPersonaFromWorkspace(state.data);
-    return workspacePersonas[SPONSORSHIPS_DEMO_STAGE];
+    return null;
   }, [isDemoMode, demoStage, state]);
 
   return (
@@ -103,11 +106,11 @@ export default function SponsorshipsPage() {
       <Head>
         <title>{t("ws.opps.pageTitle")}</title>
       </Head>
-      <WorkspaceShell stage={persona.stage} wallet={persona.wallet}>
+      <WorkspaceShell stage={persona?.stage ?? SPONSORSHIPS_DEMO_STAGE} wallet={persona?.wallet}>
         <ProductReadinessBanner
-          description={t("ws.opps.readinessDesc")}
-          status="SEEDED_DEMO"
-          title={t("ws.opps.readinessTitle")}
+          description={isDemoMode ? t("ws.opps.readinessDescDemo") : t("ws.opps.readinessDesc")}
+          status={isDemoMode ? "MOCK_PREVIEW" : "SEEDED_DEMO"}
+          title={isDemoMode ? t("ws.opps.readinessTitleDemo") : t("ws.opps.readinessTitle")}
         />
 
         {isDemoMode ? <DemoStageSwitcher activeStage={demoStage} onChange={setDemoStage} /> : null}
@@ -117,12 +120,10 @@ export default function SponsorshipsPage() {
           <ConsoleAuthRequired loginHref={state.loginHref} />
         ) : null}
         {!isDemoMode && state.status === "preview" ? (
-          <InboxPreviewNotice loginHref={state.loginHref} message={state.message} tone={state.tone} />
+          <ConsoleError loginHref={state.loginHref} message={state.message} />
         ) : null}
 
-        {(isDemoMode || state.status === "ready" || state.status === "preview") && (
-          <OpportunityInbox persona={persona} />
-        )}
+        {persona ? <OpportunityInbox persona={persona} /> : null}
       </WorkspaceShell>
     </>
   );
@@ -154,43 +155,5 @@ const DemoStageSwitcher = ({
         </button>
       ))}
     </div>
-  );
-};
-
-const InboxPreviewNotice = ({
-  loginHref,
-  message,
-  tone,
-}: {
-  loginHref?: string;
-  message: string;
-  tone: PreviewTone;
-}) => {
-  const { t } = useI18n();
-  const toneClass =
-    tone === "warn" ? "border-[#de402a]/22 bg-[#1f120e]/70" : "border-[#67b8ff]/20 bg-[#0e1726]/70";
-  const accentClass = tone === "warn" ? "text-[#ff8a78]" : "text-[#8ad0ff]";
-  const dotClass = tone === "warn" ? "bg-[#de402a]" : "bg-[#67b8ff]";
-
-  return (
-    <section className={`rounded-xl border px-3 py-2 ${toneClass}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-          <p className={`text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
-            {tone === "warn" ? t("ws.preview.sessionTag") : t("ws.preview.previewTag")}
-          </p>
-          <p className="truncate text-[length:var(--fs-micro)] text-[#9aabc4]">{message}</p>
-        </div>
-        {loginHref ? (
-          <a
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
-            href={loginHref}
-          >
-            {t("ws.console.signInAgain")}
-          </a>
-        ) : null}
-      </div>
-    </section>
   );
 };
