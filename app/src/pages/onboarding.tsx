@@ -181,26 +181,26 @@ const OnboardingReadinessNotice = ({
         </p>
       </div>
       <span className="w-fit shrink-0 rounded-full border border-current/25 bg-black/10 px-2.5 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
-        {signedIn && storageStatus === "LIVE" ? "SEEDED_DEMO" : signedIn ? "BACKEND_READY_UI_GAP" : "MOCK_PREVIEW"}
+        {"BACKEND_READY_UI_GAP"}
       </span>
     </div>
   </section>
   );
 };
 
-/** Presentational orientation block: "这不是投资，是发现" + 3 concept rows */
-function DiscoveryOrientationBlock() {
+/** Presentational orientation block: invite-only Pilot corridor + 3 concept rows */
+function PilotOrientationBlock() {
   const { t } = useI18n();
   const concepts = [
-    { emoji: "⚡", label: t("onboarding.earnLabel"), desc: t("onboarding.earnDesc") },
-    { emoji: "🎯", label: t("onboarding.backLabel"), desc: t("onboarding.backDesc") },
-    { emoji: "🏅", label: t("onboarding.graduateLabel"), desc: t("onboarding.graduateDesc") },
+    { emoji: "🔗", label: t("onboarding.walletLabel"), desc: t("onboarding.walletDesc") },
+    { emoji: "🎬", label: t("onboarding.corridorLabel"), desc: t("onboarding.corridorDesc") },
+    { emoji: "🔍", label: t("onboarding.proofLabel"), desc: t("onboarding.proofDesc") },
   ] as const;
 
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 text-left">
       <p className="text-[length:var(--fs-caption)] font-semibold leading-snug" style={{ color: "var(--brand)" }}>
-        {t("onboarding.notInvestment")}
+        {t("onboarding.pilotScope")}
       </p>
       <ul className="mt-3 space-y-2.5">
         {concepts.map(({ emoji, label, desc }) => (
@@ -380,9 +380,9 @@ export default function OnboardingPage() {
                     {t("onboarding.welcomeSubtitle")}
                   </p>
 
-                  {/* Discovery orientation block */}
+                  {/* Pilot corridor orientation block */}
                   <div className="mt-5 text-left">
-                    <DiscoveryOrientationBlock />
+                    <PilotOrientationBlock />
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-left text-xs text-[#9aabc4]">

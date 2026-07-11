@@ -127,12 +127,13 @@ export const isRouteActive = (currentHref: string, item: RouteItem) => {
 
 // Labels are i18n-driven (labelKey). Demo is an internal/presentation surface
 // and is intentionally NOT in the consumer primary nav (still at /demo).
+// P2 Pilot primary consumer nav. Portfolio and Rewards are S1/SPUMP-era
+// surfaces that are out of the Pilot corridor — their routes still exist for
+// legacy/demo access but must not appear as normal Pilot navigation.
 export const primaryNavItems: RouteItem[] = [
   { href: EXPLORE_PATH, labelKey: "nav.explore", prefixes: [EXPLORE_PATH, "/posts"] },
   { href: ACTIVITY_PATH, labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
   { href: TRENDING_PATH, labelKey: "nav.trending", prefixes: [TRENDING_PATH] },
-  { href: PORTFOLIO_PATH, labelKey: "nav.portfolio", prefixes: [PORTFOLIO_PATH] },
-  { href: REWARDS_PATH, labelKey: "nav.rewards", prefixes: [REWARDS_PATH] },
   { href: WORKSPACE_PATH, labelKey: "nav.workspace", prefixes: [WORKSPACE_PATH] },
 ];
 

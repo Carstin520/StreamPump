@@ -9,9 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   ACTIVITY_PATH,
   EXPLORE_PATH,
-  PORTFOLIO_PATH,
   PROFILE_PATH,
-  REWARDS_PATH,
   TRENDING_PATH,
   WORKSPACE_PATH,
   buildLoginHref,
@@ -27,12 +25,12 @@ type ShellNavItem = {
   separatorBefore?: boolean;
 };
 
+// P2 Pilot consumer nav. Portfolio and Rewards (S1/SPUMP-era surfaces) are out
+// of the Pilot corridor and intentionally excluded from primary navigation.
 const NAV_ITEMS: ShellNavItem[] = [
   { href: EXPLORE_PATH, glyph: "▦", labelKey: "nav.explore", subKey: "nav.exploreSub", prefixes: [EXPLORE_PATH, "/posts"] },
   { href: ACTIVITY_PATH, glyph: "◉", labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
   { href: TRENDING_PATH, glyph: "✦", labelKey: "nav.trending", subKey: "nav.trendingSub", prefixes: [TRENDING_PATH] },
-  { href: PORTFOLIO_PATH, glyph: "◈", labelKey: "nav.portfolio", subKey: "nav.portfolioSub", prefixes: [PORTFOLIO_PATH] },
-  { href: REWARDS_PATH, glyph: "⚡", labelKey: "nav.rewards", subKey: "nav.rewardsSub", prefixes: [REWARDS_PATH] },
   { href: WORKSPACE_PATH, glyph: "✎", labelKey: "nav.workspace", prefixes: [WORKSPACE_PATH], separatorBefore: true },
 ];
 
@@ -115,25 +113,10 @@ export const UserShell = ({
           })}
         </nav>
 
-        {/* Bottom: rewards entry + real/anonymous identity + language switch.
-            No fabricated balance or fixture user is rendered here. */}
+        {/* Bottom: real/anonymous identity + language switch. The SPUMP energy
+            card is an S1-era surface outside the Pilot corridor and is not
+            rendered here. No fabricated balance or fixture user is shown. */}
         <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-3">
-          <Link className="hidden lg:block" href={REWARDS_PATH}>
-            <div
-              className="flex items-center gap-2.5 rounded-[13px] border px-3 py-2.5 transition hover:brightness-110"
-              style={{
-                background: "linear-gradient(135deg, rgba(240,121,95,0.22), rgba(222,64,42,0.12))",
-                borderColor: "rgba(240,140,95,0.45)",
-              }}
-            >
-              <span className="text-base" style={{ color: "#f9bf57" }}>⚡</span>
-              <span className="text-xs font-medium" style={{ color: "#f6cdb9" }}>{t("shell.spumpEnergy")}</span>
-              <span className="ml-auto text-base font-bold" style={{ color: "#ffe2cf" }} aria-hidden>
-                ›
-              </span>
-            </div>
-          </Link>
-
           <div className="flex items-center gap-2">
             {profile ? (
               <Link className="min-w-0 flex-1" href={profileHref}>
