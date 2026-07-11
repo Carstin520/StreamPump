@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/**
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+            backend/package-lock.json
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix app
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix backend
+
+      - name: Frontend lint
+        run: npm run lint --prefix app
+
+      - name: Frontend build
+        run: npm run build --prefix app
+
+      - name: Backend build
+        run: npm run build --prefix backend
+
+      - name: Backend tests
+        run: npm run test:backend
+        env:
+          STREAMPUMP_IDL_PATH: backend/tests/fixtures/streampump_core.test.idl.json
+
+      - name: Rust check
+        run: cargo check

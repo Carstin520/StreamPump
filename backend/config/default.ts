@@ -2,10 +2,46 @@
  * CN: Backend 运行时配置入口，集中读取环境变量并提供默认值。
  * EN: Runtime backend configuration entry that reads environment variables and applies defaults.
  */
+import { PublicKey } from "@solana/web3.js";
+
 import { env } from "./env";
 import "./loadEnv";
 
 const DEFAULT_AUTH_SESSION_SECRET = "dev-only-session-secret-change-me";
+
+export const normalizePilotInviteWallets = (rawWallets: string[]): string[] => {
+  const normalized = new Set<string>();
+
+  for (const rawWallet of rawWallets) {
+    const wallet = rawWallet.trim();
+    if (!wallet) {
+      continue;
+    }
+
+    try {
+      normalized.add(new PublicKey(wallet).toBase58());
+    } catch (_error) {
+      throw new Error(
+        "Invalid configuration: PILOT_INVITE_WALLETS contains an invalid Solana wallet address"
+      );
+    }
+  }
+
+  return [...normalized].sort();
+};
+
+const normalizeOptionalPublicKey = (rawValue: string | undefined, variableName: string): string => {
+  const value = rawValue?.trim() ?? "";
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new PublicKey(value).toBase58();
+  } catch (_error) {
+    throw new Error(`Invalid configuration: ${variableName} must be a valid Solana address`);
+  }
+};
 
 export const config = {
   app: {
@@ -27,7 +63,7 @@ export const config = {
     internalOperatorApiKey: process.env.INTERNAL_OPERATOR_API_KEY,
     creatorAuthAllowPreviewTwitter: env.readBoolean(
       process.env.CREATOR_AUTH_ALLOW_PREVIEW_TWITTER,
-      process.env.NODE_ENV !== "production"
+      false
     ),
   },
   managedWallet: {
@@ -92,10 +128,7 @@ export const config = {
     consumerKey: env.readString(process.env.INDEXER_CONSUMER_KEY, "streampump_core_logs"),
   },
   s1: {
-    mockApiEnabled: env.readBoolean(
-      process.env.S1_MOCK_API_ENABLED,
-      process.env.NODE_ENV !== "production"
-    ),
+    mockApiEnabled: env.readBoolean(process.env.S1_MOCK_API_ENABLED, false),
   },
   oracle: {
     schedulerEnabled: env.readBoolean(process.env.ORACLE_SCHEDULER_ENABLED, false),
@@ -164,7 +197,22 @@ export const config = {
     ),
     prototypeRoutesEnabled: env.readBoolean(
       process.env.PROTOTYPE_ROUTES_ENABLED,
-      process.env.NODE_ENV !== "production"
+      false
+    ),
+    inviteOnly: env.readBoolean(
+      process.env.PILOT_INVITE_ONLY,
+      process.env.NODE_ENV === "production"
+    ),
+    inviteWallets: normalizePilotInviteWallets(
+      env.readCsv(process.env.PILOT_INVITE_WALLETS)
+    ),
+    expectedUsdcMint: normalizeOptionalPublicKey(
+      process.env.PILOT_EXPECTED_USDC_MINT,
+      "PILOT_EXPECTED_USDC_MINT"
+    ),
+    chainPreflightTimeoutMs: env.readNumber(
+      process.env.PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS,
+      10_000
     ),
   },
   chainlink: {
@@ -175,6 +223,12 @@ export const config = {
     gatewayUrl: process.env.CHAINLINK_GATEWAY_URL,
   },
 };
+
+export const isManagedWalletEncryptionKeyRequired = (runtimeConfig: typeof config): boolean =>
+  runtimeConfig.auth.allowPreviewProviderExchange ||
+  runtimeConfig.managedWallet.ephemeralSessionsEnabled ||
+  runtimeConfig.managedWallet.publicExecutionEnabled ||
+  runtimeConfig.pilot.emailAuthEnabled;
 
 export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): string[] => {
   const forbiddenPilotFeatures: Array<[boolean, string]> = [
@@ -214,6 +268,8 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   if (runtimeConfig.auth.sessionSecret === DEFAULT_AUTH_SESSION_SECRET) {
     failures.push("AUTH_SESSION_SECRET must be set to a non-default value");
+  } else if (runtimeConfig.auth.sessionSecret.length < 32) {
+    failures.push("AUTH_SESSION_SECRET must be at least 32 characters");
   }
 
   if (runtimeConfig.app.corsAllowedOrigins.length === 0) {
@@ -228,15 +284,41 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     failures.push(`${variableName}=true is not allowed in the invite-only Pilot`);
   }
 
-  if (!/^[0-9a-fA-F]{64}$/.test(runtimeConfig.managedWallet.encryptionKey)) {
+  if (
+    isManagedWalletEncryptionKeyRequired(runtimeConfig) &&
+    !/^[0-9a-fA-F]{64}$/.test(runtimeConfig.managedWallet.encryptionKey)
+  ) {
     failures.push(
       "MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars; generate with `openssl rand -hex 32` and store it in Render Environment or a secret manager"
     );
   }
 
+  if (!runtimeConfig.pilot.inviteOnly) {
+    failures.push("PILOT_INVITE_ONLY=false is not allowed in production");
+  }
+
+  if (runtimeConfig.pilot.inviteWallets.length === 0) {
+    failures.push("PILOT_INVITE_WALLETS must include at least one wallet in production");
+  }
+
+  if (!runtimeConfig.pilot.expectedUsdcMint) {
+    failures.push("PILOT_EXPECTED_USDC_MINT must be set in production");
+  }
+
+  if (
+    !Number.isFinite(runtimeConfig.pilot.chainPreflightTimeoutMs) ||
+    runtimeConfig.pilot.chainPreflightTimeoutMs <= 0
+  ) {
+    failures.push("PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS must be greater than zero");
+  }
+
+  if (!runtimeConfig.solana.isDevnet) {
+    failures.push("SOLANA_IS_DEVNET=true is required for the devnet/test-USDC Pilot");
+  }
+
   if (runtimeConfig.solana.txRpcEndpoint.includes("api.devnet.solana.com")) {
     failures.push(
-      "SOLANA_TX_RPC_ENDPOINT must use a dedicated devnet RPC for demo-day managed transactions"
+      "SOLANA_TX_RPC_ENDPOINT must use a dedicated devnet RPC for Pilot transactions"
     );
   }
 

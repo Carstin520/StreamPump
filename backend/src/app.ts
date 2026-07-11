@@ -60,27 +60,38 @@ const createJsonMiddleware = (): RequestHandler => {
   };
 };
 
+export const buildHealthPayload = () => {
+  const invitePolicyConfigured =
+    config.pilot.inviteOnly && config.pilot.inviteWallets.length > 0;
+
+  return {
+    ok: true,
+    mode: invitePolicyConfigured
+      ? "INVITE_ONLY_PILOT"
+      : config.pilot.inviteOnly
+        ? "INVITE_POLICY_MISCONFIGURED"
+        : "OPEN_DEVELOPMENT",
+    automatedSettlement: config.oracle.schedulerEnabled,
+    accessPolicy: {
+      configured: invitePolicyConfigured,
+      type: config.pilot.inviteOnly ? "invite_only" : "open",
+    },
+  };
+};
+
 export const createApp = (): Application => {
   const app = express();
+
+  // Render terminates public HTTP at one reverse-proxy hop. Trust exactly that
+  // hop so Express derives req.ip from the right-most untrusted address; rate
+  // limiting code must never parse X-Forwarded-For on its own.
+  app.set("trust proxy", 1);
 
   app.use(createCorsMiddleware());
   app.use(createJsonMiddleware());
 
   app.get("/health", (_req, res) => {
-    res.json({
-      ok: true,
-      mode: process.env.NODE_ENV === "production" ? "INVITE_ONLY_PILOT" : "DEVELOPMENT",
-      automatedSettlement: config.oracle.schedulerEnabled,
-      publicFeatures: {
-        s1: config.pilot.s1PublicApiEnabled,
-        track2: config.pilot.track2Enabled,
-        track3: config.pilot.track3Enabled,
-        engagementRewards: config.pilot.engagementRewardsEnabled,
-        managedWalletExecution: config.managedWallet.publicExecutionEnabled,
-        ephemeralSessions: config.managedWallet.ephemeralSessionsEnabled,
-        emailAuth: config.pilot.emailAuthEnabled,
-      },
-    });
+    res.json(buildHealthPayload());
   });
 
   app.use("/api", routes);
