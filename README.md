@@ -97,6 +97,8 @@ StreamPump is built on four convictions that avoid every one of these traps:
 | 🛡️ **Anti-Speculation Guardrails** | Non-transferable token, daily buy caps, dynamic exit tax, delayed ratings, endorsement caps |
 | 🎞️ **Real Media Pipeline** | Cloudflare R2 storage + Mux video processing + publication verification before public feed |
 
+> **Boundary — these are protocol/code capabilities, not current Pilot availability.** The invite-only Pilot candidate is devnet/test-USDC only and is **not deployed, not live, no real funds**. The only lane open to Pilot users is external-wallet auth → media → feed → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 → campaign proof. S1 discovery/buyout, the fan endorsement pool, Track 2/3 settlement, and managed/email-social wallets exist in code but are **closed for all Pilot users** (see [Current Status](#-current-status)).
+
 ---
 
 ## 📸 Screenshots
@@ -208,23 +210,37 @@ Every core mechanism depends on a specific Solana capability — this is not a m
 
 ## 📍 Current Status
 
-StreamPump is a serious prototype with a **verified end-to-end production corridor** (authenticated creator → media upload → public feed → proposal → dual-signature launch → on-chain campaign proof). Several surfaces remain controlled-demo or operator-gated, and readiness labels are kept honest.
+StreamPump is currently a **code-verified invite-only Pilot candidate — not a deployed production system and not live.** All chain activity targets **Solana devnet with a test-USDC mint; no real funds are ever involved.** The end-to-end corridor (external-wallet creator → media upload → public feed → proposal → dual-signature launch → backend relay → manual Track 1 → on-chain campaign proof) is code-verified on devnet, not deployed. Readiness labels are kept honest.
+
+### Invite-Only Pilot (P1) — candidate, not a live launch
+
+Access is gated by an **external real-wallet allowlist**. The auth challenge is identical in shape for every valid wallet, and the invite check runs **only after a valid signature** — the allowlist cannot be probed in advance.
+
+**Open in the Pilot corridor:** external wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay of the fully signed transaction; manual Track 1 fixed-base settlement; campaign proof as projection/on-chain evidence (PDA, tx signature, manifest hash, content anchor).
+
+**Closed for all Pilot users:** email/social/provider managed-wallet auth and public managed execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic settlement schedulers; prototype/legacy routes.
+
+**Not claimed** (do not represent these as done): server-side SHA256 verification of uploaded bytes; independent third-party publication verification; program-side allowlist enforcement; security audit; production deployment; real funds.
+
+**Production-listen gate (fail-closed).** In production the backend refuses to start unless every active RPC reports the full Solana devnet genesis hash, the configured program account exists and is `executable`, and on-chain `ProtocolConfig.usdcMint` exactly equals `PILOT_EXPECTED_USDC_MINT`. Governing env: `PILOT_INVITE_ONLY`, `PILOT_INVITE_WALLETS`, `PILOT_EXPECTED_USDC_MINT`, `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`.
+
+**Verification.** P0 safety fixes (`5a7f355..6ee771e`) passed a Fable 5 review; human gate **H0 approved**. P1 backend hardening (`b393bac`) passed Node 22 backend build + 107 tests, frontend lint/build, `cargo check`, and an HTTP contract smoke. **P1 Fable review is pending; human gate H1 is closed / not opened until Fable returns PASS.**
+
+**Remaining blockers before a real Pilot launch:** a real dedicated devnet RPC; a decided Pilot test-USDC mint; a complete production IDL artifact/package; a real deployment chain preflight; a deployed-corridor smoke; and external security audit + legal review.
 
 | Area | Readiness | What's real now |
 |---|---|---|
-| **Production corridor** | ✅ Verified E2E | Auth → R2/Mux media → feed → proposal intent → dual sign → Solana → campaign proof |
-| **S1 market buy/sell** | `SEEDED_DEMO` | Live buy/sell against seeded devnet state with wallet session |
-| **S1 portfolio / claim** | `SEEDED_DEMO` | Claim USDC from a graduated buyout position |
-| **S1 buyout lifecycle** | `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED` | Full chain + builder support; workspace UI still preview |
-| **S2 proposal launch** | `SEEDED_DEMO` | Full corridor verified |
-| **S2 endorsement** | `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` | On-chain burn + backend build/submit for seeded proposals |
-| **Settlement Track 1/2** | `OPERATOR_REQUIRED` | Operable against controlled data |
-| **Settlement Track 3 (CPS)** | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` | Gated — requires a real merchant/reconciliation provider |
-| **Managed wallet signing** | In progress | Backend custodial signing path implemented; production needs KMS + program deploy |
-| **Rewards** | `MOCK_PREVIEW` | Managed daily-claim path wired; missions still preview |
+| **Pilot corridor (invite-only)** | Code-verified on devnet · not deployed | External-wallet auth → R2/Mux media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof |
+| **S1 market / portfolio / buyout** | Closed for Pilot (`SEEDED_DEMO` in code) | Buy/sell/claim/buyout code exists against seeded devnet state but is disabled for Pilot users |
+| **S2 proposal launch** | Code-verified on devnet | Dual-sign launch corridor verified; the only money-flow open in the Pilot |
+| **S2 endorsement** | Closed for Pilot (`BACKEND_READY_UI_GAP` in code) | On-chain burn + backend builders exist for seeded proposals but are disabled for Pilot users |
+| **Settlement Track 1 (manual)** | `OPERATOR_REQUIRED` | Pilot allows the manual fixed-base payout only; no automatic settlement |
+| **Settlement Track 2/3 (CPS)** | Closed for Pilot | Track 2 endorsement + Track 3 CPS disabled for Pilot users; Track 3 still needs a real merchant/reconciliation provider |
+| **Managed wallet / email-social auth** | Closed for Pilot | Disabled for all Pilot users; external real wallets only |
+| **Rewards** | Closed for Pilot | Daily/engagement/fan rewards disabled for Pilot users |
 | **Operator tooling** | `OPERATOR_REQUIRED` | Internal routes exist; no dashboards yet |
 
-> ⚠️ The Anchor program is **not audited**. Do not deploy with real funds. The new chain guards and reward behavior require program deployment before they are live on-chain.
+> ⚠️ The Anchor program is **not audited** and **not deployed for production**. This build is an invite-only Pilot candidate on devnet/test-USDC only — **not live and no real funds**. The new chain guards and reward behavior require program deployment before they are live on-chain.
 
 ### Compliance & token posture (design in progress)
 
@@ -320,7 +336,9 @@ cargo check            # lighter type check
 
 ## 🎬 Demo Path
 
-The live demo is intentionally scoped to two controlled flows:
+> These are **legacy controlled demos** — seeded/operator walkthroughs kept for reference on devnet/test-USDC. They are a superset of the invite-only Pilot corridor and are not, by themselves, current Pilot availability, deployed, or live.
+
+The legacy controlled demo is intentionally scoped to two controlled flows:
 
 ```text
 S1 controlled demo
@@ -393,15 +411,21 @@ Details in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render
 
 ## 🗺 Roadmap
 
-Near-term priorities:
+Present P1 priorities (invite-only Pilot candidate — devnet/test-USDC, not deployed, not live):
 
-- Harden the verified production corridor (auth → media → feed → proposal → campaign proof).
-- Finish production auth identity verification and managed-wallet hardening (KMS/Vault, SOL budget, recovery).
-- Productize the S1 buyout formation UI after the controlled S1 demo path stabilizes.
-- Complete S2 endorsement claim UX and the fan reward ledger.
-- Add operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
-- Build the loyalty/Fan Badge layer and `SPUMP` sinks (cheer, boost, tier claims) — see [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
-- Run a broader security review before any real-money deployment.
+- **P1 gate sequence (exact order):** (1) finalize the fixed P1 commit/range, (2) run integrated verification on that fixed range, (3) obtain a Fable 5 **PASS** on it, then (4) **stop at human gate H1 for human review/approval**. The agent does not open, close, or approve H1 — it halts at that point and hands off to a human.
+- Stand up a real dedicated devnet RPC, decide the Pilot test-USDC mint, and ship a complete production IDL artifact/package.
+- Run a real deployment chain preflight and a deployed-corridor smoke.
+- Complete external security audit + legal review before any real-money or public launch.
+
+Post-Pilot backlog (closed for all Pilot users — each needs a later H gate plus its own audit/legal/provider prerequisites):
+
+- Production auth identity verification and managed/email-social wallet hardening (KMS/Vault, SOL budget, recovery).
+- S1 self-serve market and buyout formation UI after the closed S1 lane is audited.
+- S2 Track 2 endorsement claim UX and the fan reward ledger.
+- Track 3 CPS / automatic settlement once a real merchant/reconciliation provider exists.
+- Operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
+- The loyalty/Fan Badge layer and `SPUMP` sinks (cheer, boost, tier claims) — see [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
 
 ---
 

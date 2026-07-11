@@ -10,7 +10,17 @@ This runbook keeps the hackathon demo focused on two controlled web3 paths:
 6. Sponsor signs once and submits.
 7. Campaign detail and settlement pages show Solana proof: proposal PDA, transaction signature, manifest hash, content anchor, and track state.
 
-S1 buyout formation is still prepared by seed/operator scripts. The productized live S1 demo path starts from a seeded creator market and graduated/claimable buyout state.
+S1 buyout formation is still prepared by seed/operator scripts. This legacy controlled seeded S1 demo path starts from a seeded creator market and graduated/claimable buyout state; it is not part of the Pilot corridor described below.
+
+## Pilot Boundary (read first)
+
+This build is a **code-verified invite-only Pilot candidate — not deployed production and not live**. Everything below runs on **Solana devnet with a test-USDC mint; no real funds are involved**. The demo paths in this runbook are operator/seed-prepared and are a superset of what the Pilot exposes to invited users.
+
+The only corridor open to Pilot users is: **external-wallet auth → content create/upload (R2/Mux) → public feed/post projection → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 fixed-base settlement → campaign proof**. Access is gated by an external real-wallet allowlist; the auth challenge is identical for every valid wallet and the invite check runs only after a valid signature, so the allowlist cannot be probed in advance.
+
+Closed for all Pilot users (seed/operator-only in this runbook, never a Pilot user path): email/social/provider managed wallet and public managed execution, S1 market/buyout/portfolio claim, Track 2 endorsement and fan rewards, Track 3 CPS, daily/engagement rewards, automatic settlement schedulers, and prototype/legacy routes.
+
+Do not claim: server-side SHA256 verification of uploaded bytes, independent third-party publication verification, program-side allowlist enforcement, security audit, production deployment, or real funds.
 
 ## Environment
 
@@ -208,7 +218,10 @@ npm run dev --prefix app
 See [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) for the frozen post-hackathon readiness matrix.
 See [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) for the long-term product target and gap-closing roadmap.
 
+- This is a Pilot candidate on devnet/test-USDC only; do not present any path as deployed production, live, or handling real funds.
+- The only Pilot-user corridor is external-wallet auth → media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof. S1, Track 2 endorsement, Track 3 CPS, managed/email-social auth, rewards, and prototype routes are closed to Pilot users.
 - Do not claim S1 buyout formation is productized in this build; offers, acceptance, and graduation are seeded/operator-driven.
 - Do not enable Track3 automatic settlement. Track3 CPS still needs a real merchant/reconciliation source.
 - Do not present S2 endorsement or third-party Track3 reconciliation as live integrations.
 - Keep oracle scheduler off for the public demo unless manually testing Track1/Track2 with known seeded data.
+- The seeded devnet smoke below settles Track 2/3 with mocked values for operator verification only; those settlements are not part of the Pilot-user corridor.

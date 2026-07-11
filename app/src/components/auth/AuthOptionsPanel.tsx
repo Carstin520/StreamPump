@@ -251,7 +251,10 @@ export const AuthOptionsPanel = ({
       }
 
       if (!demoAuthEnabled) {
-        setLastAction(error instanceof Error ? error.message : "Wallet session creation failed.");
+        // Pilot: invite/allowlist status is only known after signature verification.
+        // On failure, show only the generic notice — never surface the underlying
+        // error detail, which can leak internal URLs / backend error strings.
+        setLastAction(t("auth.pilotWalletFailed"));
         return;
       }
 
@@ -524,6 +527,12 @@ export const AuthOptionsPanel = ({
               <h2 className="type-h1 font-semibold text-white">{t("auth.welcomeBack")}</h2>
               <p className="mt-3 text-sm text-[#93a3bb]">{t(demoAuthEnabled ? "auth.signInOrCreate" : "auth.signInOrCreatePilot")}</p>
             </div>
+
+            {!demoAuthEnabled ? (
+              <p className="card-radius border border-[#8f5824]/40 bg-[#2e1e17]/70 px-4 py-3 text-xs leading-6 text-[#ffd0a6]">
+                {t("auth.pilotWalletNote")}
+              </p>
+            ) : null}
 
             {demoAuthEnabled ? (
             <>

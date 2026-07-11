@@ -16,88 +16,43 @@ import { findCreator, formatUsd } from "@/lib/public-data";
 
 type TrackStatus = "PENDING" | "SETTLED" | "VOIDED";
 
-type Track1 = {
-  label: string;
+type Track1Evidence = {
   budgetUsd: number;
   status: TrackStatus;
   creatorWallet: string;
 };
 
-type Track2 = {
-  label: string;
-  budgetUsd: number;
-  target: number;
-  actual: number;
-  cliffPct: number;
-  fanPoolPct: number;
-  status: TrackStatus;
-  creatorPayoutUsd: number;
-  fanPoolUsd: number;
-  sponsorRefundUsd: number;
-};
-
-type Track3 = {
-  label: string;
-  budgetUsd: number;
-  approvedCpsUsd: number;
-  status: TrackStatus;
-  creatorPayoutUsd: number;
-  sponsorRefundUsd: number;
-  delayed: boolean;
-};
-
 type SettlementData = {
   proposalId: string;
   status: string;
-  track1: Track1;
-  track2: Track2;
-  track3: Track3;
+  track1: Track1Evidence;
+  // Track 2/3 are not part of the current Pilot. We keep the committed budget only
+  // so the closed rows can show what was funded — never a simulated payout split.
+  track2Budget: number;
+  track3Budget: number;
 };
 
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
 /* ------------------------------------------------------------------ */
-/*  Mock data                                                          */
+/*  Seeded legacy-demo fixture (Track 1 evidence only)                 */
 /* ------------------------------------------------------------------ */
 
 const MOCK: SettlementData = {
   proposalId: "prop-neo-park-2026q2",
   status: "RESOLVED_SUCCESS",
   track1: {
-    label: "Fixed Base",
     budgetUsd: 100_000,
     status: "SETTLED",
     creatorWallet: "5Yk3...R8wF",
   },
-  track2: {
-    label: "Performance",
-    budgetUsd: 1_000_000,
-    target: 1000,
-    actual: 800,
-    cliffPct: 50,
-    fanPoolPct: 20,
-    status: "SETTLED",
-    creatorPayoutUsd: 640_000,
-    fanPoolUsd: 160_000,
-    sponsorRefundUsd: 200_000,
-  },
-  track3: {
-    label: "CPS Commission",
-    budgetUsd: 300_000,
-    approvedCpsUsd: 250_000,
-    status: "SETTLED",
-    creatorPayoutUsd: 250_000,
-    sponsorRefundUsd: 50_000,
-    delayed: false,
-  },
+  track2Budget: 1_000_000,
+  track3Budget: 300_000,
 };
 
 const usdcAtomicToUsdNumber = (value: string | number | bigint | null | undefined) => {
   const label = formatUsdcAtomic(value);
   const parsed = Number(label.replace(/[$,]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const parseMetricValue = (value: string | null | undefined) => {
-  const parsed = Number(value ?? "0");
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
@@ -108,50 +63,17 @@ const deriveTrackStatus = (settled: boolean, proofStatus: PublicCampaignProofRes
   return settled ? "SETTLED" : "PENDING";
 };
 
-const mapCampaignProofToSettlement = (proof: PublicCampaignProofResponse): SettlementData => {
-  const track2Budget = usdcAtomicToUsdNumber(proof.budgetTracks.track2UsdcDeposited);
-  const track2FanPool = usdcAtomicToUsdNumber(proof.budgetTracks.track2InitialFanPool) || track2Budget * 0.2;
-  const track2Target = parseMetricValue(proof.budgetTracks.track2TargetValue);
-  const track2Actual = parseMetricValue(proof.budgetTracks.track2ActualValue);
-  const achievement = track2Target > 0 ? Math.min(track2Actual / track2Target, 1) : 0;
-  const aboveCliff = achievement >= proof.budgetTracks.track2MinAchievementBps / 10_000;
-  const track2CreatorPayout = aboveCliff ? Math.max(track2Budget - track2FanPool, 0) * achievement : 0;
-  const track2SponsorRefund = Math.max(track2Budget - track2CreatorPayout - (aboveCliff ? track2FanPool : 0), 0);
-  const track3Budget = usdcAtomicToUsdNumber(proof.budgetTracks.track3UsdcDeposited);
-  const track3Payout = usdcAtomicToUsdNumber(proof.budgetTracks.track3CpsPayout);
-
-  return {
-    proposalId: proof.proposalId,
-    status: proof.status,
-    track1: {
-      label: "Fixed Base",
-      budgetUsd: usdcAtomicToUsdNumber(proof.budgetTracks.track1BaseUsdc),
-      status: deriveTrackStatus(proof.budgetTracks.track1Claimed, proof.proofStatus),
-      creatorWallet: `${proof.creatorWallet.slice(0, 4)}...${proof.creatorWallet.slice(-4)}`,
-    },
-    track2: {
-      label: proof.budgetTracks.track2MetricType || "Performance",
-      budgetUsd: track2Budget,
-      target: track2Target,
-      actual: track2Actual,
-      cliffPct: proof.budgetTracks.track2MinAchievementBps / 100,
-      fanPoolPct: track2Budget > 0 ? Math.round((track2FanPool / track2Budget) * 100) : 0,
-      status: deriveTrackStatus(Boolean(proof.budgetTracks.track2SettledAt), proof.proofStatus),
-      creatorPayoutUsd: track2CreatorPayout,
-      fanPoolUsd: aboveCliff ? track2FanPool : 0,
-      sponsorRefundUsd: track2SponsorRefund,
-    },
-    track3: {
-      label: "CPS Commission",
-      budgetUsd: track3Budget,
-      approvedCpsUsd: track3Payout,
-      status: deriveTrackStatus(Boolean(proof.budgetTracks.track3SettledAt), proof.proofStatus),
-      creatorPayoutUsd: track3Payout,
-      sponsorRefundUsd: Math.max(track3Budget - track3Payout, 0),
-      delayed: !proof.budgetTracks.track3SettledAt && proof.budgetTracks.track3DelayDays > 0,
-    },
-  };
-};
+const mapCampaignProofToSettlement = (proof: PublicCampaignProofResponse): SettlementData => ({
+  proposalId: proof.proposalId,
+  status: proof.status,
+  track1: {
+    budgetUsd: usdcAtomicToUsdNumber(proof.budgetTracks.track1BaseUsdc),
+    status: deriveTrackStatus(proof.budgetTracks.track1Claimed, proof.proofStatus),
+    creatorWallet: `${proof.creatorWallet.slice(0, 4)}...${proof.creatorWallet.slice(-4)}`,
+  },
+  track2Budget: usdcAtomicToUsdNumber(proof.budgetTracks.track2UsdcDeposited),
+  track3Budget: usdcAtomicToUsdNumber(proof.budgetTracks.track3UsdcDeposited),
+});
 
 /* ------------------------------------------------------------------ */
 /*  Colour helpers                                                     */
@@ -160,325 +82,27 @@ const mapCampaignProofToSettlement = (proof: PublicCampaignProofResponse): Settl
 const C = {
   accent: "#de402a",
   success: "#65ecaf",
-  warning: "#f3b33e",
   info: "#67b8ff",
   dim: "#1e2536",
   dimBorder: "#2a3348",
   text2: "#8ea0ba",
-  bg: "#090d14",
-  card: "#121826",
-  creator: "#67b8ff",
-  fan: "#f3b33e",
-  sponsor: "#8ea0ba",
-  refund: "#de402a",
 } as const;
 
-/* ------------------------------------------------------------------ */
-/*  Radial gauge (Track 2)                                             */
-/* ------------------------------------------------------------------ */
+const trackStatusLabel = (t: Translate, status: TrackStatus) =>
+  status === "SETTLED"
+    ? t("settlement.status.settled")
+    : status === "VOIDED"
+      ? t("settlement.status.voided")
+      : t("settlement.status.pending");
 
-function AchievementGauge({ target, actual, cliffPct }: { actual: number; cliffPct: number; target: number }) {
-  const pct = target > 0 ? Math.min(actual / target, 1) : 0;
-  const aboveCliff = pct >= cliffPct / 100;
-
-  const r = 82;
-  const cx = 100;
-  const cy = 100;
-  const circumference = 2 * Math.PI * r;
-
-  const startAngle = -90;
-  const fillAngle = pct * 360;
-  const cliffAngle = (cliffPct / 100) * 360;
-
-  const polarToCart = (angleDeg: number, radius: number) => ({
-    x: cx + radius * Math.cos(((angleDeg + startAngle) * Math.PI) / 180),
-    y: cy + radius * Math.sin(((angleDeg + startAngle) * Math.PI) / 180),
-  });
-
-  const cliffOuter = polarToCart(cliffAngle, r + 10);
-  const cliffInner = polarToCart(cliffAngle, r - 10);
-
-  return (
-    <div className="flex flex-col items-center">
-      <svg className="drop-shadow-[0_0_24px_rgba(101,236,175,0.15)]" height="200" viewBox="0 0 200 200" width="200">
-        <circle
-          cx={cx}
-          cy={cy}
-          fill="none"
-          r={r}
-          stroke={C.dim}
-          strokeWidth="14"
-        />
-
-        <circle
-          cx={cx}
-          cy={cy}
-          fill="none"
-          r={r}
-          stroke={aboveCliff ? C.success : C.accent}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - pct)}
-          strokeLinecap="round"
-          strokeWidth="14"
-          style={{ transition: "stroke-dashoffset 1.2s ease-out", transform: "rotate(-90deg)", transformOrigin: "center" }}
-        />
-
-        <line
-          stroke={C.warning}
-          strokeDasharray="4 3"
-          strokeWidth="2"
-          x1={cliffInner.x}
-          x2={cliffOuter.x}
-          y1={cliffInner.y}
-          y2={cliffOuter.y}
-        />
-        <text
-          dominantBaseline="central"
-          fill={C.warning}
-          fontSize="9"
-          textAnchor="middle"
-          x={polarToCart(cliffAngle, r + 20).x}
-          y={polarToCart(cliffAngle, r + 20).y}
-        >
-          cliff
-        </text>
-
-        <text dominantBaseline="central" fill="white" fontSize="22" fontWeight="600" textAnchor="middle" x={cx} y={cy - 8}>
-          {actual.toLocaleString()} / {target.toLocaleString()}
-        </text>
-        <text dominantBaseline="central" fill={aboveCliff ? C.success : C.accent} fontSize="16" fontWeight="700" textAnchor="middle" x={cx} y={cy + 18}>
-          {Math.round(pct * 100)}%
-        </text>
-      </svg>
-
-      <p className="mt-2 text-xs text-[#8ea0ba]">
-        {aboveCliff ? "Above cliff — creator qualifies" : "Below cliff — no payout"}
-      </p>
-    </div>
-  );
-}
+const trackStatusColor = (status: TrackStatus) =>
+  status === "SETTLED" ? C.success : status === "VOIDED" ? C.accent : C.text2;
 
 /* ------------------------------------------------------------------ */
-/*  Rail pipeline                                                      */
+/*  Cards                                                              */
 /* ------------------------------------------------------------------ */
 
-function RailPipeline({ data }: { data: SettlementData }) {
-  const total = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
-  const tracks = [
-    { key: "T1", ...data.track1, budget: data.track1.budgetUsd, color: C.info },
-    { key: "T2", ...data.track2, budget: data.track2.budgetUsd, color: C.success },
-    { key: "T3", ...data.track3, budget: data.track3.budgetUsd, color: C.warning },
-  ];
-
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setAnimate(true), 200);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <div className="w-full">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Simulated settlement pipeline</p>
-        <p className="text-xs text-[#8ea0ba]">Total {formatUsd(total)}</p>
-      </div>
-
-      <div className="flex h-14 w-full gap-1 overflow-hidden rounded-full">
-        {tracks.map((t, i) => {
-          const widthPct = (t.budget / total) * 100;
-          const settled = t.status === "SETTLED";
-          const voided = t.status === "VOIDED";
-
-          return (
-            <div
-              className="relative flex items-center justify-center overflow-hidden transition-all duration-1000 ease-out"
-              key={t.key}
-              style={{
-                width: animate ? `${widthPct}%` : "0%",
-                transitionDelay: `${i * 200}ms`,
-                background: settled
-                  ? `linear-gradient(135deg, ${t.color}22, ${t.color}44)`
-                  : voided
-                    ? `linear-gradient(135deg, ${C.accent}22, ${C.accent}44)`
-                    : C.dim,
-                borderLeft: i > 0 ? `1px solid ${C.dimBorder}` : undefined,
-              }}
-            >
-              {settled && (
-                <div
-                  className="absolute inset-0 opacity-30"
-                  style={{
-                    background: `radial-gradient(ellipse at center, ${t.color}55, transparent 70%)`,
-                  }}
-                />
-              )}
-
-              <div className="relative z-10 text-center">
-                <p className="text-[length:var(--fs-micro)] font-semibold text-white">{t.key}</p>
-                <p className="text-[length:var(--fs-micro)]" style={{ color: settled ? t.color : C.text2 }}>
-                  {formatUsd(t.budget)}
-                </p>
-              </div>
-
-              {settled && (
-                <div
-                  className="absolute bottom-1 right-2 h-1.5 w-1.5 rounded-full"
-                  style={{ background: t.color, boxShadow: `0 0 6px ${t.color}` }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex gap-4">
-        {tracks.map((t) => (
-          <div className="flex items-center gap-1.5" key={t.key}>
-            <div
-              className="h-2 w-2 rounded-full"
-              style={{ background: t.status === "SETTLED" ? t.color : C.dimBorder }}
-            />
-            <span className="text-[length:var(--fs-micro)] text-[#8ea0ba]">
-              {t.key} {t.label} — {t.status === "SETTLED" ? "Settled" : t.status === "VOIDED" ? "Voided" : "Pending"}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Money-flow stacked bars                                            */
-/* ------------------------------------------------------------------ */
-
-type FlowSegment = { label: string; amount: number; color: string };
-
-function MoneyFlow({ data }: { data: SettlementData }) {
-  const flows: { label: string; total: number; segments: FlowSegment[] }[] = [
-    {
-      label: "Track 1 — Fixed",
-      total: data.track1.budgetUsd,
-      segments: [{ label: "Creator", amount: data.track1.budgetUsd, color: C.creator }],
-    },
-    {
-      label: "Track 2 — Performance",
-      total: data.track2.budgetUsd,
-      segments: [
-        { label: "Creator", amount: data.track2.creatorPayoutUsd, color: C.creator },
-        { label: "Fan pool", amount: data.track2.fanPoolUsd, color: C.fan },
-        { label: "Sponsor refund", amount: data.track2.sponsorRefundUsd, color: C.sponsor },
-      ],
-    },
-    {
-      label: "Track 3 — CPS",
-      total: data.track3.budgetUsd,
-      segments: [
-        { label: "Creator", amount: data.track3.creatorPayoutUsd, color: C.creator },
-        { label: "Sponsor refund", amount: data.track3.sponsorRefundUsd, color: C.sponsor },
-      ],
-    },
-  ];
-
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setAnimate(true), 600);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <div className="space-y-5">
-      <p className="text-xs uppercase tracking-[0.24em] text-[#7486a1]">Money flow preview - USDC distribution</p>
-
-      {flows.map((flow) => (
-        <div key={flow.label}>
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <p className="text-sm font-medium text-white">{flow.label}</p>
-            <p className="text-xs text-[#8ea0ba]">{formatUsd(flow.total)}</p>
-          </div>
-
-          <div className="flex h-8 w-full overflow-hidden rounded-full" style={{ background: C.dim }}>
-            {flow.segments.map((seg, i) => {
-              const pct = (seg.amount / flow.total) * 100;
-              return (
-                <div
-                  className="relative flex items-center justify-center overflow-hidden transition-all duration-1000 ease-out"
-                  key={seg.label}
-                  style={{
-                    width: animate ? `${pct}%` : "0%",
-                    transitionDelay: `${i * 150}ms`,
-                    background: `${seg.color}33`,
-                    borderRight: i < flow.segments.length - 1 ? `1px solid ${C.card}` : undefined,
-                  }}
-                >
-                  {pct > 12 && (
-                    <span className="relative z-10 truncate px-2 text-[length:var(--fs-micro)] font-medium" style={{ color: seg.color }}>
-                      {seg.label} {formatUsd(seg.amount)}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-1 flex flex-wrap gap-3">
-            {flow.segments.map((seg) => (
-              <span className="flex items-center gap-1 text-[length:var(--fs-micro)] text-[#8ea0ba]" key={seg.label}>
-                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: seg.color }} />
-                {seg.label}: {formatUsd(seg.amount)}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <div className="flex flex-wrap gap-4 pt-2">
-        {[
-          { label: "Creator", color: C.creator },
-          { label: "Fan pool", color: C.fan },
-          { label: "Sponsor refund", color: C.sponsor },
-        ].map((leg) => (
-          <span className="flex items-center gap-1.5 text-xs text-[#8ea0ba]" key={leg.label}>
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: leg.color }} />
-            {leg.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Track detail cards                                                 */
-/* ------------------------------------------------------------------ */
-
-function TrackCard({ children, color, status, title }: { children: React.ReactNode; color: string; status: TrackStatus; title: string }) {
-  return (
-    <div
-      className="glass-card relative overflow-hidden rounded-[28px] p-6 transition-shadow duration-500"
-      style={{
-        boxShadow: status === "SETTLED" ? `0 0 40px ${color}12` : undefined,
-        borderTop: `2px solid ${status === "SETTLED" ? color : C.dimBorder}`,
-      }}
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">{title}</h3>
-        <span
-          className="rounded-full px-3 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em]"
-          style={{
-            background: status === "SETTLED" ? `${color}22` : status === "VOIDED" ? `${C.accent}22` : `${C.dim}`,
-            color: status === "SETTLED" ? color : status === "VOIDED" ? C.accent : C.text2,
-          }}
-        >
-          {status}
-        </span>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function DetailRow({ label, value, color }: { color?: string; label: string; value: string }) {
+function EvidenceRow({ label, value, color }: { color?: string; label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between border-b border-white/5 py-2.5 last:border-0">
       <span className="text-xs text-[#8ea0ba]">{label}</span>
@@ -487,54 +111,89 @@ function DetailRow({ label, value, color }: { color?: string; label: string; val
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Void overlay                                                       */
-/* ------------------------------------------------------------------ */
-
-function VoidOverlay({ total }: { total: number }) {
+function Track1EvidenceCard({ track1 }: { track1: Track1Evidence }) {
+  const { t } = useI18n();
+  const isSettled = track1.status === "SETTLED";
   return (
-    <div className="section-enter absolute inset-0 z-30 flex flex-col items-center justify-center rounded-[28px] bg-[#090d14]/85 backdrop-blur-sm">
-      <div className="rounded-full bg-[#de402a]/15 px-6 py-2">
-        <span className="text-lg font-bold tracking-[-0.03em] text-[#de402a]">VOIDED</span>
+    <div
+      className="glass-card relative overflow-hidden rounded-[28px] p-6"
+      style={{ borderTop: `2px solid ${isSettled ? C.info : C.dimBorder}` }}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">{t("settlement.track1Title")}</h3>
+        <span
+          className="rounded-full px-3 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em]"
+          style={{
+            background: isSettled ? `${C.info}22` : track1.status === "VOIDED" ? `${C.accent}22` : C.dim,
+            color: trackStatusColor(track1.status),
+          }}
+        >
+          {track1.status}
+        </span>
       </div>
-      <p className="mt-3 text-sm text-[#8ea0ba]">Emergency void — full refund to sponsor</p>
-      <p className="mt-1 text-2xl font-semibold text-white">{formatUsd(total)}</p>
-      <div className="mt-4 flex items-center gap-2">
-        <div className="h-2 w-2 animate-pulse rounded-full bg-[#de402a]" />
-        <span className="text-xs text-[#de402a]">All tracks returned to vault</span>
-      </div>
+      <EvidenceRow color={C.info} label={t("settlement.committedBase")} value={formatUsd(track1.budgetUsd)} />
+      {/* "Paid to" only once the Track 1 base is settled on-chain; otherwise the
+          wallet is just the intended recipient, not a confirmed payout. */}
+      <EvidenceRow label={isSettled ? t("settlement.paidTo") : t("settlement.recipient")} value={track1.creatorWallet} />
+      <EvidenceRow
+        color={trackStatusColor(track1.status)}
+        label={t("settlement.claimMarker")}
+        value={trackStatusLabel(t, track1.status)}
+      />
+      <p className="mt-3 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{t("settlement.track1Note")}</p>
     </div>
   );
 }
 
-function SettlementPreviewNotice({
-  error,
+function ClosedTrackCard({ budgetUsd, sub, title }: { budgetUsd: number; sub: string; title: string }) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="glass-card relative overflow-hidden rounded-[28px] p-6 opacity-70"
+      style={{ borderTop: `2px solid ${C.dimBorder}` }}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">{title}</h3>
+        <span
+          className="rounded-full px-3 py-1 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.12em]"
+          style={{ background: C.dim, color: C.text2 }}
+        >
+          {t("settlement.closedInPilot")}
+        </span>
+      </div>
+      <EvidenceRow label={t("settlement.committedBudget")} value={budgetUsd > 0 ? formatUsd(budgetUsd) : "—"} />
+      <p className="mt-3 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{sub}</p>
+    </div>
+  );
+}
+
+function SettlementSourceNotice({
+  hasError,
   isLive,
   proposalId,
 }: {
-  error: string | null;
+  hasError: boolean;
   isLive: boolean;
   proposalId: string;
 }) {
+  const { t } = useI18n();
   return (
     <section className="rounded-[20px] border tone-state-warning px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.2em]">
-            {isLive ? "Campaign proof projection" : "Operator preview"}
+            {isLive ? t("settlement.sourceLabelLive") : t("settlement.sourceLabel")}
           </p>
           <p className="mt-1 text-sm font-semibold text-white">
-            {isLive ? "Live settlement fields loaded from campaign proof" : "No live settlement projection is loaded here"}
+            {isLive ? t("settlement.sourceHeadingLive") : t("settlement.sourceHeading")}
           </p>
           <p className="mt-2 text-xs leading-5 text-[#a7b2c4]">
-            {isLive
-              ? "Track budgets and settlement markers come from the public campaign proof API. Track 3 remains gated by real merchant reconciliation before production promotion."
-              : "The route keeps the proposal id for context, but every track value on this page comes from a local mock. Production promotion needs proposal settlement read models, oracle permission checks, idempotent operator triggers, evidence digests, and Track 3 merchant reconciliation."}
-            {error ? ` API fallback reason: ${error}` : ""}
+            {isLive ? t("settlement.sourceBodyLive") : t("settlement.sourceBody")}
+            {hasError ? t("settlement.apiReason") : ""}
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-3 py-1 font-mono text-[length:var(--fs-micro)] font-semibold">
-          {proposalId || "proposal pending"}
+          {proposalId || t("settlement.proposalPending")}
         </span>
       </div>
     </section>
@@ -547,18 +206,22 @@ function SettlementPreviewNotice({
 
 export default function SettlementPage() {
   const router = useRouter();
-  const { locale } = useI18n();
-  // P0 truth gate: the local MOCK settlement is a demo-only fixture. Off the
-  // public demo flag, this page never seeds MOCK — it loads live campaign-proof
-  // fields or shows an honest unavailable state.
+  const { locale, t } = useI18n();
+  // Pilot scope: settlement is read-only Track 1 evidence. The local MOCK is a
+  // seeded legacy-demo Track 1 fixture only. Off the public demo flag, this page
+  // never seeds MOCK — it loads live campaign-proof fields or an honest unavailable
+  // state. Track 2/3 tri-track simulation has been removed entirely.
   const demoAllowed = publicDemoEnabled();
   const [data, setData] = useState<SettlementData | null>(demoAllowed ? MOCK : null);
   const [source, setSource] = useState<"live" | "mock" | "loading" | "unavailable">(
     demoAllowed ? "mock" : "loading",
   );
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Never store raw backend/API error text in rendered state — only a boolean so
+  // the UI can show a localized generic "campaign proof unavailable" reason.
+  const [loadError, setLoadError] = useState<boolean>(false);
   const creator = useMemo(() => findCreator("neo-park"), []);
   const creatorName = locale === "en" ? "Midnight Save" : creator.name;
+  const subtitle = t("settlement.subtitle", { name: creatorName, handle: creator.handle });
   const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
 
   useEffect(() => {
@@ -567,7 +230,19 @@ export default function SettlementPage() {
     }
 
     let cancelled = false;
-    setLoadError(null);
+    setLoadError(false);
+    // Fail closed on every new proposal request so financial values from a
+    // previously loaded proposal can never render under a new URL while this
+    // fetch is pending. Non-demo shows an honest loading state with no data.
+    // Demo clears any previous live proposal data and falls back to the
+    // labeled legacy MOCK fixture only — never the prior proposal's live data.
+    if (demoAllowed) {
+      setData(MOCK);
+      setSource("mock");
+    } else {
+      setData(null);
+      setSource("loading");
+    }
     getPublicCampaignProof(routeProposalId)
       .then((proof) => {
         if (!cancelled) {
@@ -575,9 +250,9 @@ export default function SettlementPage() {
           setSource("live");
         }
       })
-      .catch((error) => {
+      .catch(() => {
         if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
+          setLoadError(true);
           if (demoAllowed) {
             setData(MOCK);
             setSource("mock");
@@ -597,23 +272,18 @@ export default function SettlementPage() {
     return (
       <>
         <Head>
-          <title>StreamPump | Settlement Preview</title>
+          <title>{`StreamPump | ${t("settlement.headTitle")}`}</title>
         </Head>
-        <PageShell
-          eyebrow="S2 Settlement Preview"
-          subtitle={`Tri-track settlement view for ${creatorName} (${creator.handle}). This page reads live campaign-proof fields; it does not trigger oracle workers.`}
-          title="Settlement Dashboard Preview"
-        >
+        <PageShell eyebrow={t("settlement.eyebrow")} subtitle={subtitle} title={t("settlement.pageTitle")}>
           <div className="space-y-6">
-            <SettlementPreviewNotice error={loadError} isLive={false} proposalId={routeProposalId} />
+            <SettlementSourceNotice hasError={loadError} isLive={false} proposalId={routeProposalId} />
             <section className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] px-5 py-10 text-center">
               <p className="text-sm font-semibold text-white">
-                {source === "unavailable" ? "No live settlement projection" : "Loading settlement projection…"}
+                {source === "unavailable" ? t("settlement.noProjectionTitle") : t("settlement.loadingTitle")}
               </p>
               <p className="mx-auto mt-2 max-w-[460px] text-xs leading-6 text-[#8ea0ba]">
-                This page does not render a local settlement fixture in production. Track budgets and
-                settlement markers load from the public campaign proof API for this proposal.
-                {loadError ? ` API reason: ${loadError}` : ""}
+                {t("settlement.noProjectionBody")}
+                {loadError ? t("settlement.apiReason") : ""}
               </p>
             </section>
           </div>
@@ -622,39 +292,29 @@ export default function SettlementPage() {
     );
   }
 
-  const isVoided = data.status === "VOIDED";
-  const totalBudget = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
-  const totalCreatorPayout = data.track1.budgetUsd + data.track2.creatorPayoutUsd + data.track3.creatorPayoutUsd;
+  const statusColor = data.status === "VOIDED" ? C.accent : C.success;
 
   return (
     <>
       <Head>
-        <title>StreamPump | Settlement Preview</title>
+        <title>{`StreamPump | ${t("settlement.headTitle")}`}</title>
       </Head>
 
-      <PageShell
-        eyebrow="S2 Settlement Preview"
-        subtitle={`Local tri-track settlement model for ${creatorName} (${creator.handle}). This page does not trigger oracle workers or read live settlement projections.`}
-        title="Settlement Dashboard Preview"
-      >
+      <PageShell eyebrow={t("settlement.eyebrow")} subtitle={subtitle} title={t("settlement.pageTitle")}>
         <div className="relative space-y-6">
           <ProductReadinessBanner
-            description={
-              source === "live"
-                ? "This dashboard maps public campaign proof fields into the tri-track settlement view. Track 1/2 seeded settlement markers are readable here; Track 3 CPS remains operator-gated until merchant reconciliation is integrated."
-                : "This dashboard is using local settlement fallback data because no campaign proof projection loaded for this route."
-            }
+            description={source === "live" ? t("settlement.bannerDescLive") : t("settlement.bannerDescMock")}
             status={source === "live" ? "SEEDED_DEMO" : "MOCK_PREVIEW"}
-            title={source === "live" ? "Settlement dashboard is campaign-proof wired" : "Settlement dashboard is using mock fallback"}
+            title={source === "live" ? t("settlement.bannerTitleLive") : t("settlement.bannerTitleMock")}
           />
-          <SettlementPreviewNotice error={loadError} isLive={source === "live"} proposalId={routeProposalId} />
+          <SettlementSourceNotice hasError={loadError} isLive={source === "live"} proposalId={routeProposalId} />
 
           {/* ---- Top stats ---- */}
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: "Total budget", value: formatUsd(totalBudget), color: "white" },
-              { label: "Creator payout", value: formatUsd(totalCreatorPayout), color: C.success },
-              { label: "Status", value: data.status.replace(/_/g, " "), color: data.status === "VOIDED" ? C.accent : C.success },
+              { label: t("settlement.statTrack1Base"), value: formatUsd(data.track1.budgetUsd), color: C.info },
+              { label: t("settlement.statTrack1Status"), value: trackStatusLabel(t, data.track1.status), color: trackStatusColor(data.track1.status) },
+              { label: t("settlement.statProposalStatus"), value: data.status.replace(/_/g, " "), color: statusColor },
             ].map((s) => (
               <div className="surface-muted flex flex-col items-center rounded-[28px] p-5 text-center" key={s.label}>
                 <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.24em] text-[#7486a1]">{s.label}</p>
@@ -663,56 +323,12 @@ export default function SettlementPage() {
             ))}
           </div>
 
-          {/* ---- Rail pipeline ---- */}
-          <section className="liquid-card rounded-[28px] p-6">
-            <RailPipeline data={data} />
-          </section>
-
-          {/* ---- Money flow ---- */}
-          <section className="liquid-card rounded-[28px] p-6">
-            <MoneyFlow data={data} />
-          </section>
-
-          {/* ---- Track 2 gauge + Track cards ---- */}
-          <div className="grid gap-5 lg:grid-cols-[auto_1fr]">
-            <section className="liquid-card flex flex-col items-center justify-center rounded-[28px] p-6">
-              <p className="mb-4 text-xs uppercase tracking-[0.24em] text-[#7486a1]">Track 2 achievement</p>
-              <AchievementGauge actual={data.track2.actual} cliffPct={data.track2.cliffPct} target={data.track2.target} />
-            </section>
-
-            <div className="grid gap-5 md:grid-cols-3">
-              {/* Track 1 */}
-              <TrackCard color={C.info} status={data.track1.status} title="Track 1">
-                <DetailRow label="Type" value="Fixed base pay" />
-                <DetailRow label="Amount" value={formatUsd(data.track1.budgetUsd)} color={C.info} />
-                <DetailRow label="Paid to" value={data.track1.creatorWallet} />
-                <DetailRow label="Status" value={data.track1.status === "SETTLED" ? "Paid" : "Pending"} color={data.track1.status === "SETTLED" ? C.success : C.text2} />
-              </TrackCard>
-
-              {/* Track 2 */}
-              <TrackCard color={C.success} status={data.track2.status} title="Track 2">
-                <DetailRow label="Budget" value={formatUsd(data.track2.budgetUsd)} />
-                <DetailRow label="Target" value={data.track2.target.toLocaleString() + " views"} />
-                <DetailRow label="Actual" value={data.track2.actual.toLocaleString() + " views"} />
-                <DetailRow label="Achievement" value={Math.round((data.track2.actual / data.track2.target) * 100) + "%"} color={C.success} />
-                <DetailRow label="Creator share" value={formatUsd(data.track2.creatorPayoutUsd)} color={C.creator} />
-                <DetailRow label="Fan pool" value={formatUsd(data.track2.fanPoolUsd)} color={C.fan} />
-                <DetailRow label="Sponsor refund" value={formatUsd(data.track2.sponsorRefundUsd)} color={C.sponsor} />
-              </TrackCard>
-
-              {/* Track 3 */}
-              <TrackCard color={C.warning} status={data.track3.status} title="Track 3">
-                <DetailRow label="Budget" value={formatUsd(data.track3.budgetUsd)} />
-                <DetailRow label="Approved CPS" value={formatUsd(data.track3.approvedCpsUsd)} />
-                <DetailRow label="Creator payout" value={formatUsd(data.track3.creatorPayoutUsd)} color={C.creator} />
-                <DetailRow label="Sponsor refund" value={formatUsd(data.track3.sponsorRefundUsd)} color={C.sponsor} />
-                <DetailRow label="Delay" value={data.track3.delayed ? "Delayed" : "On time"} color={data.track3.delayed ? C.warning : C.success} />
-              </TrackCard>
-            </div>
+          {/* ---- Track 1 evidence + closed Track 2/3 ---- */}
+          <div className="grid gap-5 md:grid-cols-3">
+            <Track1EvidenceCard track1={data.track1} />
+            <ClosedTrackCard budgetUsd={data.track2Budget} sub={t("settlement.track2Sub")} title={t("settlement.track2Title")} />
+            <ClosedTrackCard budgetUsd={data.track3Budget} sub={t("settlement.track3Sub")} title={t("settlement.track3Title")} />
           </div>
-
-          {/* ---- Void overlay ---- */}
-          {isVoided && <VoidOverlay total={totalBudget} />}
         </div>
       </PageShell>
     </>

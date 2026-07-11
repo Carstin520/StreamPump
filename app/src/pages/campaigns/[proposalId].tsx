@@ -37,7 +37,7 @@ const localizeEnum = (
 
 type PageState =
   | { kind: "loading" }
-  | { kind: "error"; message: string }
+  | { kind: "unavailable" }
   | {
       kind: "ready";
       data: ProposalDetailResponse;
@@ -106,7 +106,10 @@ export default function CampaignDetailPage() {
       if (!router.isReady) {
         return;
       }
-      setState({ kind: "error", message: "proposalId is required" });
+      // No raw validation string is surfaced to the viewer: a missing/invalid
+      // route id resolves to the same generic, localized unavailable state as a
+      // failed backend load.
+      setState({ kind: "unavailable" });
       return;
     }
 
@@ -135,7 +138,7 @@ export default function CampaignDetailPage() {
             source: "live-campaign-proof",
           });
         }
-      } catch (campaignError) {
+      } catch {
         try {
           const data = await loadWithPublicFallback({
             loadPublic: () => getProposalById(proposalId),
@@ -145,15 +148,12 @@ export default function CampaignDetailPage() {
           if (!cancelled) {
             setState({ kind: "ready", data, source: "live-api" });
           }
-        } catch (proposalError) {
-          const message =
-            proposalError instanceof Error
-              ? proposalError.message
-              : campaignError instanceof Error
-                ? campaignError.message
-                : "Failed to load proposal.";
+        } catch {
+          // Never surface a raw API/backend error (e.g. "Failed to fetch") to
+          // the viewer. Both the campaign-proof and proposal reads have failed;
+          // collapse to a single generic, localized unavailable state.
           if (!cancelled) {
-            setState({ kind: "error", message });
+            setState({ kind: "unavailable" });
           }
         }
       }
@@ -201,7 +201,7 @@ export default function CampaignDetailPage() {
         />
 
         {state.kind === "loading" ? <AsyncStateCard body={t("campaign.loadingBody")} title={t("campaign.loading")} /> : null}
-        {state.kind === "error" ? <AsyncStateCard body={state.message} title={t("campaign.requestFailed")} /> : null}
+        {state.kind === "unavailable" ? <AsyncStateCard body={t("campaign.unavailableBody")} title={t("campaign.unavailableTitle")} /> : null}
         {state.kind === "ready" ? (
           <CampaignProofView
             avatarSrc={demoCreator?.avatarSrc}
@@ -321,6 +321,10 @@ const CampaignProofView = ({
   const { locale, t } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "zh-CN";
   const p = proposal;
+  // Pilot scope: outside the seeded legacy demo, campaign detail is read-only
+  // projection / chain evidence. Track 2/3 and fan endorsement are not part of
+  // the current Pilot, so they render closed rather than as live actions.
+  const pilotClosed = !isDemoProposal;
 
   const metricActual = p.track2ActualValue != null ? Number(p.track2ActualValue) : NaN;
   const metricTarget = p.track2TargetValue != null ? Number(p.track2TargetValue) : NaN;
@@ -329,7 +333,10 @@ const CampaignProofView = ({
       ? Math.min(100, Math.round((metricActual / metricTarget) * 100))
       : null;
 
-  const track1Settled = p.status === "RESOLVED_SUCCESS";
+  // Track 1 "settled" derives from the mapped on-chain claim marker (track1Claimed),
+  // not the coarse proposal.status. A proposal can be RESOLVED_SUCCESS overall while
+  // the Track 1 base payout has not yet been claimed on-chain.
+  const track1Settled = Boolean(p.track1Claimed);
   const track2Settled = Boolean(p.track2SettledAt);
   // Sum of the three Track budgets. This is the committed/funded budget, NOT a
   // live on-chain vault balance. The distinct on-chain account (proposal PDA) is
@@ -360,7 +367,7 @@ const CampaignProofView = ({
           </div>
         </div>
 
-        {/* LIVE CAMPAIGN panel */}
+        {/* Campaign projection / on-chain evidence panel */}
         <Panel className="space-y-3" style={{ background: "linear-gradient(160deg,rgba(101,236,175,0.08),rgba(255,255,255,0.03))", borderColor: "rgba(101,236,175,0.22)" }}>
           <div className="flex items-center gap-2.5">
             {isDemoProposal ? (
@@ -372,8 +379,8 @@ const CampaignProofView = ({
               </>
             ) : (
               <>
-                <span className="h-[7px] w-[7px] rounded-full bg-[#65ecaf] shadow-[0_0_10px_#65ecaf]" />
-                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#7ce0b0]">
+                <span className="h-[7px] w-[7px] rounded-full bg-[#67b8ff] shadow-[0_0_10px_#67b8ff]" />
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#a8d8ff]">
                   {t("campaign.liveCampaignTag")}
                 </span>
               </>
@@ -456,9 +463,16 @@ const CampaignProofView = ({
             <TrackRow
               accent="#f0795f"
               amount={formatUsdcAtomic(p.track2UsdcDeposited)}
+              dim={pilotClosed}
               label={t("campaign.track2Label")}
-              statusColor={track2Settled ? "#7ce0b0" : "#f5b8ab"}
-              statusText={track2Settled ? t("campaign.statusSettled") : t("campaign.statusInProgress")}
+              statusColor={pilotClosed ? "#7486a1" : track2Settled ? "#7ce0b0" : "#f5b8ab"}
+              statusText={
+                pilotClosed
+                  ? t("campaign.pilotClosedStatus")
+                  : track2Settled
+                    ? t("campaign.statusSettled")
+                    : t("campaign.statusInProgress")
+              }
               sub={t("campaign.track2Sub")}
             />
             <TrackRow
@@ -467,7 +481,7 @@ const CampaignProofView = ({
               dim
               label={t("campaign.track3Label")}
               statusColor="#7486a1"
-              statusText={t("campaign.statusGated")}
+              statusText={pilotClosed ? t("campaign.pilotClosedStatus") : t("campaign.statusGated")}
               sub={t("campaign.track3Sub")}
             />
           </div>
@@ -518,14 +532,29 @@ const CampaignProofView = ({
       {/* right column */}
       <div className="space-y-3 xl:sticky xl:top-20 xl:self-start">
         <Panel className="space-y-3">
-          <p className="text-base font-extrabold text-white">{t("campaign.endorseTitle")}</p>
-          <p className="text-[length:var(--fs-micro)] leading-relaxed text-[#93a2bb]">{t("campaign.endorseDesc")}</p>
-          <Link
-            className="block rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-3 text-center text-[length:var(--fs-caption)] font-bold text-white shadow-[0_14px_28px_rgba(222,64,42,0.25)] transition hover:brightness-[1.05]"
-            href={endorseHref}
-          >
-            {t("campaign.endorseCta")}
-          </Link>
+          {pilotClosed ? (
+            <>
+              <p className="text-base font-extrabold text-white">{t("campaign.endorseClosedTitle")}</p>
+              <p className="text-[length:var(--fs-micro)] leading-relaxed text-[#93a2bb]">{t("campaign.endorseClosedDesc")}</p>
+              <span
+                aria-disabled="true"
+                className="block cursor-not-allowed rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-[length:var(--fs-caption)] font-bold text-white/40"
+              >
+                {t("campaign.endorseCta")}
+              </span>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-extrabold text-white">{t("campaign.endorseTitle")}</p>
+              <p className="text-[length:var(--fs-micro)] leading-relaxed text-[#93a2bb]">{t("campaign.endorseDesc")}</p>
+              <Link
+                className="block rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] px-4 py-3 text-center text-[length:var(--fs-caption)] font-bold text-white shadow-[0_14px_28px_rgba(222,64,42,0.25)] transition hover:brightness-[1.05]"
+                href={endorseHref}
+              >
+                {t("campaign.endorseCta")}
+              </Link>
+            </>
+          )}
           <Link
             className="block rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-center text-[length:var(--fs-micro)] font-semibold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
             href={settlementHref}

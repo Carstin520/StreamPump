@@ -97,6 +97,8 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 | 🛡️ **反投机护栏** | 非转让 token、每日买入上限、动态退出税、延迟评级、背书上限 |
 | 🎞️ **真实媒体管线** | Cloudflare R2 存储 + Mux 视频处理 + 进入公开 feed 前的发布验证 |
 
+> **边界——以上是协议/代码能力，不代表当前 Pilot 的可用性。** 邀请制 Pilot 候选版本仅运行在 devnet/test-USDC 上，**未部署、未上线、无真实资金**。对 Pilot 用户唯一开放的通道是：外部钱包认证 → 媒体 → feed → proposal intent → 创作者 + 赞助方双签 → 后端 relay → 手动 Track 1 → 活动凭证。S1 发现/买断、粉丝背书池、Track 2/3 结算、以及 email/social 托管钱包在代码中存在，但**对所有 Pilot 用户关闭**（见[当前状态](#-当前状态)）。
+
 ---
 
 ## 📸 界面预览
@@ -208,23 +210,37 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 是一个认真推进的原型，并已有一条**经过端到端验证的生产走廊**（已认证创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 链上活动凭证）。部分界面仍处于受控 demo 或运营驱动阶段，readiness 标签保持如实。
+StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** 所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
+
+### 邀请制 Pilot（P1）——候选版本，非线上发布
+
+访问由**外部真实钱包白名单**门控。auth challenge 对每一个有效钱包**形态完全相同**，邀请校验**只在有效签名之后**执行——白名单无法被提前探测。
+
+**Pilot 走廊内开放：** 外部钱包认证；经 R2/Mux 完成的内容创建与上传；公开 feed 与帖子详情投影；proposal intent 创建；创作者 + 赞助方双签；后端 relay 完整签名交易；手动 Track 1 固定底价结算；作为投影/链上证据的活动凭证（PDA、tx 签名、manifest hash、内容锚点）。
+
+**对所有 Pilot 用户关闭：** email/social/provider 托管钱包认证与公开托管执行；S1 市场/买断/portfolio 领取；Track 2 背书与粉丝奖励；Track 3 CPS；每日与互动奖励；自动结算调度器；prototype/legacy 路由。
+
+**不得声称**（不要表述为已完成）：服务端对上传字节做 SHA256 校验；第三方 publication 独立验证；program 侧白名单强制；安全审计；生产部署；真实资金。
+
+**生产监听门（fail-closed）。** 生产环境下，除非每个 active RPC 都返回完整的 Solana devnet genesis hash、所配置的 program 账户存在且 `executable`、且链上 `ProtocolConfig.usdcMint` 与 `PILOT_EXPECTED_USDC_MINT` 完全一致，后端才会启动。相关 env：`PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS`、`PILOT_EXPECTED_USDC_MINT`、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。
+
+**验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Node 22 后端构建 + 107 项测试、前端 lint/build、`cargo check` 与一次 HTTP 合同 smoke。**P1 Fable 审查待进行；在 Fable 返回 PASS 之前，人工门 H1 保持关闭 / 未开启。**
+
+**真实 Pilot 上线前的剩余 blocker：** 一个真实专用 devnet RPC；确定 Pilot test-USDC mint；完整的生产 IDL 制品/包；一次真实部署链上 preflight；一次已部署走廊 smoke；以及外部安全审计 + 法律审查。
 
 | 区域 | Readiness | 当前真实能力 |
 |---|---|---|
-| **生产走廊** | ✅ 端到端验证 | 认证 → R2/Mux 媒体 → feed → proposal intent → 双签 → Solana → 活动凭证 |
-| **S1 市场买卖** | `SEEDED_DEMO` | 钱包会话下针对种子 devnet 状态进行实时买卖 |
-| **S1 资产 / 领取** | `SEEDED_DEMO` | 从已毕业的买断头寸领取 USDC |
-| **S1 买断生命周期** | `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED` | 链上 + builder 完整；workspace UI 仍为预览 |
-| **S2 proposal 发起** | `SEEDED_DEMO` | 完整走廊已验证 |
-| **S2 背书** | `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` | 种子 proposal 的链上 burn + 后端 build/submit |
-| **结算 Track 1/2** | `OPERATOR_REQUIRED` | 可针对受控数据运行 |
-| **结算 Track 3（CPS）** | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` | 受控——需要真实商户/对账提供方 |
-| **托管钱包签名** | 进行中 | 后端托管签名路径已实现；生产需 KMS + 程序部署 |
-| **奖励** | `MOCK_PREVIEW` | 托管每日领取路径已接线；任务仍为预览 |
+| **Pilot 走廊（邀请制）** | 已在 devnet 代码验证 · 未部署 | 外部钱包认证 → R2/Mux 媒体 → feed → proposal intent → 双签 → 后端 relay → 手动 Track 1 → 活动凭证 |
+| **S1 市场 / portfolio / 买断** | Pilot 关闭（代码为 `SEEDED_DEMO`） | 买卖/领取/买断代码针对种子 devnet 状态存在，但对 Pilot 用户禁用 |
+| **S2 proposal 发起** | 已在 devnet 代码验证 | 双签发起走廊已验证；是 Pilot 中唯一开放的资金流 |
+| **S2 背书** | Pilot 关闭（代码为 `BACKEND_READY_UI_GAP`） | 种子 proposal 的链上 burn + 后端 builder 存在，但对 Pilot 用户禁用 |
+| **结算 Track 1（手动）** | `OPERATOR_REQUIRED` | Pilot 仅允许手动固定底价支付；无自动结算 |
+| **结算 Track 2/3（CPS）** | Pilot 关闭 | Track 2 背书 + Track 3 CPS 对 Pilot 用户禁用；Track 3 仍需真实商户/对账提供方 |
+| **托管钱包 / email-social 认证** | Pilot 关闭 | 对所有 Pilot 用户禁用；仅限外部真实钱包 |
+| **奖励** | Pilot 关闭 | 每日/互动/粉丝奖励对 Pilot 用户禁用 |
 | **运营工具** | `OPERATOR_REQUIRED` | 内部路由已具备；尚无后台面板 |
 
-> ⚠️ Anchor 程序**未经审计**，请勿用于真实资金。新的链上护栏和奖励逻辑需要先部署程序才能在链上生效。
+> ⚠️ Anchor 程序**未经审计**、**未部署生产**。此版本是 devnet/test-USDC 上的邀请制 Pilot 候选——**未上线、无真实资金**。新的链上护栏和奖励逻辑需要先部署程序才能在链上生效。
 
 ### 合规与代币定性（设计推进中）
 
@@ -320,7 +336,9 @@ cargo check            # 更轻量的类型检查
 
 ## 🎬 Demo 路径
 
-线上 demo 刻意收敛为两条受控流程：
+> 以下是**历史受控演示**——运行在 devnet/test-USDC 上、供参考的种子/运营演练。它是邀请制 Pilot 走廊的超集，其本身不代表当前 Pilot 可用性，也不代表已部署或已上线。
+
+历史受控演示刻意收敛为两条受控流程：
 
 ```text
 S1 受控 demo
@@ -393,15 +411,21 @@ cd backend && npm run prisma:migrate:deploy
 
 ## 🗺 路线图
 
-近期优先级：
+当前 P1 优先级（邀请制 Pilot 候选——devnet/test-USDC，未部署、未上线）：
 
-- 持续硬化已验证的生产走廊（认证 → 媒体 → feed → proposal → 活动凭证）。
-- 完成生产级身份验证和托管钱包硬化（KMS/Vault、SOL 预算、恢复/导出）。
-- 在受控 S1 demo 路径稳定后，产品化 S1 买断形成 UI。
-- 完成 S2 背书领取体验和粉丝奖励账本。
+- **P1 门控顺序（精确顺序）：** (1) 确定固定的 P1 commit/范围，(2) 在该固定范围上运行集成验证，(3) 取得 Fable 5 对其的 **PASS**，然后 (4) **在人工门 H1 停下，交由人工审查/批准**。agent 不开启、不关闭、也不批准 H1——它就此停下并移交人工。
+- 搭建真实专用 devnet RPC、确定 Pilot test-USDC mint，并交付完整的生产 IDL 制品/包。
+- 执行一次真实部署链上 preflight 与一次已部署走廊 smoke。
+- 在任何真实资金或公开上线前完成外部安全审计 + 法律审查。
+
+Post-Pilot backlog（对所有 Pilot 用户关闭——每项都需要后续 H 门以及各自的审计/法律/供应方前置条件）：
+
+- 生产级身份验证和 email/social 托管钱包硬化（KMS/Vault、SOL 预算、恢复/导出）。
+- 在关闭的 S1 通道通过审计后，产品化 S1 自助市场与买断形成 UI。
+- 完成 S2 Track 2 背书领取体验和粉丝奖励账本。
+- 在存在真实商户/对账提供方后开放 Track 3 CPS / 自动结算。
 - 为 oracle、风控审核、对账和结算监控添加运营后台。
 - 构建忠诚度/粉丝牌层与 `SPUMP` 消耗汇（打赏、助推、等级领取）——见 [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md)。
-- 在任何真实资金部署前进行更全面的安全审查。
 
 ---
 
