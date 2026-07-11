@@ -172,4 +172,8 @@ pub enum StreamPumpError {
     LegacyS1BuyoutStateAlreadyMigrated,
     #[msg("Invalid legacy S1 buyout state account")]
     InvalidLegacyS1BuyoutState,
+    #[msg("Invalid settlement track configuration")]
+    InvalidTrackConfiguration,
+    #[msg("Settlement track is disabled for this proposal")]
+    ProposalTrackDisabled,
 }

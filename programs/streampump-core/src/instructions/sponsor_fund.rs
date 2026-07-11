@@ -87,6 +87,18 @@ pub(crate) fn handler(ctx: Context<SponsorFund>, args: SponsorFundArgs) -> Resul
     let proposal = &mut ctx.accounts.proposal;
     let now = Clock::get()?.unix_timestamp;
     require!(now < proposal.deadline, StreamPumpError::ProposalExpired);
+    let track2_disabled = proposal.track2_target_value == 0
+        && proposal.track2_min_achievement_bps == 0
+        && proposal.max_endorsement_spump == 0;
+    let track2_enabled = proposal.track2_target_value > 0;
+    require!(
+        (track2_disabled && args.track2_amount == 0) || (track2_enabled && args.track2_amount > 0),
+        StreamPumpError::InvalidTrackConfiguration
+    );
+    require!(
+        (proposal.track3_delay_days == 0 && args.track3_amount == 0) || args.track3_amount > 0,
+        StreamPumpError::InvalidTrackConfiguration
+    );
     require!(
         args.track1_amount == proposal.track1_base_usdc,
         StreamPumpError::InvalidAmount

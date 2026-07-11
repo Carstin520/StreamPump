@@ -33,6 +33,7 @@ describe("streampump-core S2 unhappy paths", function () {
     track1BaseUsdc?: number | bigint;
     track2TargetValue?: number | bigint;
     track2MinAchievementBps?: number;
+    maxEndorsementSpump?: number | bigint;
     track3DelayDays?: number;
     contentHash?: number[] | null;
   }) => {
@@ -58,6 +59,7 @@ describe("streampump-core S2 unhappy paths", function () {
         track3DelayDays: params.track3DelayDays ?? 0,
         deadline,
         nonce: ctx.bn(0),
+        maxEndorsementSpump: ctx.bn(params.maxEndorsementSpump ?? 0),
       })
       .accounts({
         creator: creator.publicKey,
@@ -155,7 +157,7 @@ describe("streampump-core S2 unhappy paths", function () {
         createProposal({
           track2TargetValue: 0,
         }).then(() => "ok"),
-      "InvalidAmount"
+      "InvalidTrackConfiguration"
     );
 
     await ctx.expectAnchorError(

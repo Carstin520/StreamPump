@@ -127,7 +127,18 @@ pub struct CreateProposal<'info> {
 /// EN: Initializes a proposal in `Open` status with zeroed tri-track settlement state.
 /// ZH: 将提案初始化为 `Open` 状态，并将三轨结算状态归零。
 pub(crate) fn handler(ctx: Context<CreateProposal>, args: CreateProposalArgs) -> Result<()> {
-    require!(args.track2_target_value > 0, StreamPumpError::InvalidAmount);
+    // A completely zeroed Track 2 configuration is the native Track1-only sentinel.
+    // A zero target with non-zero auxiliary terms is ambiguous and rejected. An
+    // enabled Track 2 keeps the existing semantics: min bps may be zero and a zero
+    // per-proposal cap falls back to the protocol hard ceiling.
+    let track2_disabled = args.track2_target_value == 0
+        && args.track2_min_achievement_bps == 0
+        && args.max_endorsement_spump == 0;
+    let track2_enabled = args.track2_target_value > 0;
+    require!(
+        track2_disabled || track2_enabled,
+        StreamPumpError::InvalidTrackConfiguration
+    );
     require!(
         args.track2_min_achievement_bps <= 10_000,
         StreamPumpError::InvalidAmount

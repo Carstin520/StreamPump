@@ -100,6 +100,10 @@ pub(crate) fn handler(ctx: Context<EndorseProposal>, args: EndorseProposalArgs) 
             proposal.status == ProposalStatus::Funded,
             StreamPumpError::ProposalNotFunded
         );
+        require!(
+            proposal.track2_target_value > 0 && proposal.track2_usdc_deposited > 0,
+            StreamPumpError::ProposalTrackDisabled
+        );
         require!(now < proposal.deadline, StreamPumpError::ProposalExpired);
     }
 

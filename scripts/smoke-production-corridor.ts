@@ -11,6 +11,7 @@ import "../backend/config/loadEnv";
 import { createHash, randomUUID } from "crypto";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
+import type { Keypair } from "@solana/web3.js";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -85,8 +86,24 @@ type AssetRecord = {
 
 type ManifestDetailResponse = ContentManifestResponse & {
   manifestHashHex: string | null;
+  internalCanonicalUrl: string | null;
   currentAnchorPda: string | null;
   assets: AssetRecord[];
+};
+
+type ContentPublicationResponse = {
+  publicationId: string;
+  manifestId: string;
+  platform: string;
+  externalUrl: string;
+  verificationStatus: string;
+};
+
+type PublicationReviewResponse = {
+  publicationId: string;
+  verificationStatus: string;
+  publicFeedEligible: boolean;
+  assetsReady: boolean;
 };
 
 type PublicFeedResponse = {
@@ -187,8 +204,6 @@ const apiBaseUrl = normalizeBaseUrl(
     "http://localhost:4000/api/v1"
 );
 
-const defaultVideoPath = path.resolve(process.cwd(), "test_files/test_mux.mp4");
-const mediaPath = process.env.STREAM_PUMP_SMOKE_MEDIA_PATH?.trim() || defaultVideoPath;
 const waitForMuxReadySeconds = Number(process.env.STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS ?? 0);
 const proposalDeadlineSeconds = Number(
   process.env.STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_SECONDS ?? 6 * 24 * 60 * 60
@@ -203,6 +218,11 @@ const addStep = (step: string) => {
   completedSteps.push(step);
 };
 
+let activeStage = "environment validation";
+const beginStage = (stage: string) => {
+  activeStage = stage;
+};
+
 const addBlocker = (code: string, message: string, details?: JsonValue) => {
   blockers.push({ code, message, ...(details === undefined ? {} : { details }) });
 };
@@ -210,7 +230,18 @@ const addBlocker = (code: string, message: string, details?: JsonValue) => {
 const printSummary = (ok: boolean) => {
   const summary: SmokeSummary = {
     ok,
-    apiBaseUrl,
+    apiBaseUrl: (() => {
+      try {
+        const safeUrl = new URL(apiBaseUrl);
+        safeUrl.username = "";
+        safeUrl.password = "";
+        safeUrl.search = "";
+        safeUrl.hash = "";
+        return safeUrl.toString().replace(/\/$/, "");
+      } catch {
+        return "configured-api-base";
+      }
+    })(),
     completedSteps,
     blockers,
     artifacts,
@@ -293,7 +324,7 @@ const uploadToPresignedUrl = async (
     headers: {
       "Content-Type": mimeType,
     },
-    body,
+    body: body as unknown as BodyInit,
   });
 
   if (!response.ok) {
@@ -326,38 +357,42 @@ const mimeTypeForPath = (filePath: string): string => {
   }
 };
 
-const getMediaBuffer = (): { body: Buffer; mimeType: string; source: string; isVideo: boolean } => {
-  if (existsSync(mediaPath)) {
-    const mimeType = mimeTypeForPath(mediaPath);
-    return {
-      body: readFileSync(mediaPath),
-      mimeType,
-      source: mediaPath,
-      isVideo: mimeType.startsWith("video/"),
-    };
+const getMediaBuffer = (
+  mediaPath: string
+): { body: Buffer; mimeType: string; source: string; isVideo: boolean } => {
+  if (!existsSync(mediaPath)) {
+    throw new ExpectedBlocker(
+      "STREAM_PUMP_SMOKE_MEDIA_NOT_FOUND",
+      "STREAM_PUMP_SMOKE_MEDIA_PATH must point to an existing real media file."
+    );
   }
 
-  const png = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
-    "base64"
-  );
-
+  const mimeType = mimeTypeForPath(mediaPath);
   return {
-    body: png,
-    mimeType: "image/png",
-    source: "embedded-1x1-png",
-    isVideo: false,
+    body: readFileSync(mediaPath),
+    mimeType,
+    source: path.resolve(mediaPath),
+    isVideo: mimeType.startsWith("video/"),
   };
 };
 
 const sha256Hex = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
 
-type RuntimeKeypair = {
-  publicKey: {
-    toBase58: () => string;
-  };
-  secretKey: Uint8Array;
+const stableJson = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
 };
+
+type RuntimeKeypair = Keypair;
 
 const loadSolanaWeb3 = async () => import("@solana/web3.js");
 
@@ -440,12 +475,16 @@ const completeUpload = async (
 const pollMuxReadiness = async (
   creatorToken: string,
   manifestId: string,
-  assetId: string
+  assetId: string,
+  operatorKey: string
 ): Promise<AssetRecord | null> => {
   const deadline = Date.now() + Math.max(0, waitForMuxReadySeconds) * 1000;
 
   while (Date.now() <= deadline) {
-    await request(`/internal/mux/assets/${assetId}/reconcile`, { method: "POST" }).catch(() => null);
+    await request(`/internal/mux/assets/${assetId}/reconcile`, {
+      method: "POST",
+      headers: { "x-internal-operator-key": operatorKey },
+    }).catch(() => null);
     const detail = await request<ManifestDetailResponse>(`/content/manifests/${manifestId}`, {
       token: creatorToken,
     });
@@ -474,9 +513,13 @@ const proposalDeadlineUnix = (): string => {
 };
 
 const run = async () => {
+  beginStage("environment validation");
   const creatorToken = requireEnv("STREAM_PUMP_SMOKE_CREATOR_TOKEN");
-  const sponsorWallet = process.env.STREAM_PUMP_SMOKE_SPONSOR_WALLET?.trim() ?? "";
+  const sponsorWallet = requireEnv("STREAM_PUMP_SMOKE_SPONSOR_WALLET");
+  const operatorKey = requireEnv("STREAM_PUMP_SMOKE_OPERATOR_KEY");
+  const mediaPath = requireEnv("STREAM_PUMP_SMOKE_MEDIA_PATH");
 
+  beginStage("creator account verification");
   const account = await request<AccountMeResponse>("/account/me", { token: creatorToken });
   artifacts.creatorWallet = account.wallet;
   artifacts.accountStorageStatus = account.storageStatus;
@@ -516,11 +559,13 @@ const run = async () => {
     addStep("creator profile persisted");
   }
 
-  const media = getMediaBuffer();
+  beginStage("real media loading");
+  const media = getMediaBuffer(mediaPath);
   artifacts.mediaSource = media.source;
   artifacts.mediaMimeType = media.mimeType;
   artifacts.mediaBytes = media.body.length;
 
+  beginStage("content manifest creation");
   const manifest = await request<ContentManifestResponse>("/content/manifests", {
     method: "POST",
     token: creatorToken,
@@ -542,6 +587,7 @@ const run = async () => {
   });
   artifacts.manifestId = manifest.manifestId;
 
+  beginStage("media upload and storage verification");
   const presign = await request<PresignResponse>(
     `/content/manifests/${manifest.manifestId}/assets/presign`,
     {
@@ -572,13 +618,21 @@ const run = async () => {
   addStep("R2 upload completed through backend presign");
 
   if (media.isVideo) {
-    await request("/internal/mux/reconcile/run-once", { method: "POST" }).catch((error) => {
+    await request("/internal/mux/reconcile/run-once", {
+      method: "POST",
+      headers: { "x-internal-operator-key": operatorKey },
+    }).catch(() => {
       addBlocker(
         "MUX_RECONCILIATION_TRIGGER_FAILED",
-        error instanceof Error ? error.message : "failed to trigger Mux reconciliation"
+        "Mux reconciliation could not be triggered during the media readiness stage."
       );
     });
-    const muxAsset = await pollMuxReadiness(creatorToken, manifest.manifestId, upload.assetId);
+    const muxAsset = await pollMuxReadiness(
+      creatorToken,
+      manifest.manifestId,
+      upload.assetId,
+      operatorKey
+    );
     artifacts.muxAsset = (muxAsset ?? null) as JsonValue;
     if (muxAsset?.processingStatus === "READY" && muxAsset.muxPlaybackId) {
       addStep("Mux playback ready");
@@ -591,6 +645,7 @@ const run = async () => {
     }
   }
 
+  beginStage("content manifest finalization");
   const finalized = await request<ManifestDetailResponse>(
     `/content/manifests/${manifest.manifestId}/finalize`,
     {
@@ -604,7 +659,19 @@ const run = async () => {
   artifacts.manifestHashHex = finalized.manifestHashHex;
   addStep("content manifest finalized");
 
-  await request("/content/publications", {
+  beginStage("publication creation and operator approval");
+  const explicitPublicationUrl = process.env.STREAM_PUMP_SMOKE_PUBLICATION_URL?.trim();
+  const publicationPlatform = explicitPublicationUrl
+    ? requireEnv("STREAM_PUMP_SMOKE_PUBLICATION_PLATFORM")
+    : "STREAMPUMP";
+  const publicationUrl = explicitPublicationUrl ?? finalized.internalCanonicalUrl;
+  if (!publicationUrl) {
+    throw new ExpectedBlocker(
+      "FINALIZED_CANONICAL_URL_MISSING",
+      "The finalized manifest did not expose an internal canonical URL."
+    );
+  }
+  const publication = await request<ContentPublicationResponse>("/content/publications", {
     method: "POST",
     token: creatorToken,
     headers: {
@@ -612,15 +679,52 @@ const run = async () => {
     },
     body: {
       manifestId: manifest.manifestId,
-      platform: "STREAMPUMP",
-      externalUrl:
-        process.env.STREAM_PUMP_SMOKE_PUBLICATION_URL?.trim() ||
-        `https://streampump.local/smoke/${manifest.manifestId}`,
+      platform: publicationPlatform,
+      externalUrl: publicationUrl,
       externalPostId: `smoke-${manifest.manifestId}`,
     },
   });
   addStep("content publication recorded");
 
+  const evidenceDigestHex = sha256Hex(
+    Buffer.from(
+      stableJson({
+        manifestHashHex: finalized.manifestHashHex,
+        manifestId: manifest.manifestId,
+        mediaSha256Hex: sha256Hex(media.body),
+        platform: publication.platform,
+        publicationUrl: publication.externalUrl,
+      }),
+      "utf8"
+    )
+  );
+  const reviewed = await request<PublicationReviewResponse>(
+    `/internal/content/publications/${publication.publicationId}/review`,
+    {
+      method: "POST",
+      headers: { "x-internal-operator-key": operatorKey },
+      body: {
+        decision: "APPROVE",
+        note: "Production corridor smoke evidence verified by operator.",
+        evidenceDigestHex,
+      },
+    }
+  );
+  if (
+    reviewed.verificationStatus !== "VERIFIED" ||
+    !reviewed.assetsReady ||
+    !reviewed.publicFeedEligible
+  ) {
+    throw new ExpectedBlocker(
+      "PUBLICATION_APPROVAL_INCOMPLETE",
+      "Operator review completed without making the publication eligible for the public feed."
+    );
+  }
+  artifacts.publicationId = publication.publicationId;
+  artifacts.publicationEvidenceDigestHex = evidenceDigestHex;
+  addStep("operator approved publication evidence");
+
+  beginStage("public feed and post verification");
   const feed = await request<PublicFeedResponse>("/feed/posts?limit=24");
   const feedPost = feed.posts.find((post) => post.manifestId === manifest.manifestId);
   if (!feedPost) {
@@ -636,13 +740,7 @@ const run = async () => {
   artifacts.postId = detail.post.postId;
   addStep("post detail projection loads from backend");
 
-  if (!sponsorWallet) {
-    throw new ExpectedBlocker(
-      "STREAM_PUMP_SMOKE_SPONSOR_WALLET_REQUIRED",
-      "Set STREAM_PUMP_SMOKE_SPONSOR_WALLET to create a proposal intent from this content."
-    );
-  }
-
+  beginStage("Track1-only proposal intent creation");
   let intent: IntentResponse;
   try {
     intent = await request<IntentResponse>("/proposal-intents", {
@@ -658,11 +756,12 @@ const run = async () => {
         deadlineUnix: proposalDeadlineUnix(),
         track1BaseUsdc: usdc(25),
         track2MetricType: "VIEWS",
-        track2TargetValue: "10000",
-        track2MinAchievementBps: 5000,
-        track2UsdcDeposited: usdc(150),
-        track3UsdcDeposited: usdc(75),
-        track3DelayDays: 14,
+        track2TargetValue: "0",
+        track2MinAchievementBps: 0,
+        track2UsdcDeposited: "0",
+        maxEndorsementSpump: "0",
+        track3UsdcDeposited: "0",
+        track3DelayDays: 0,
       },
     });
   } catch (error) {
@@ -678,6 +777,7 @@ const run = async () => {
   artifacts.intentId = intent.intentId;
   addStep("proposal intent created from published content");
 
+  beginStage("proposal intent lock and bundle build");
   const locked = await request<IntentResponse>(`/proposal-intents/${intent.intentId}/lock`, {
     method: "POST",
     token: creatorToken,
@@ -707,6 +807,7 @@ const run = async () => {
   artifacts.plannedContentAnchorPda = build.plannedContentAnchorPda;
   addStep("proposal launch bundle built");
 
+  beginStage("proposal transaction signing");
   const creatorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON");
   const sponsorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON");
   const sponsorToken = process.env.STREAM_PUMP_SMOKE_SPONSOR_TOKEN?.trim();
@@ -755,6 +856,7 @@ const run = async () => {
     creatorSigned.bundle.partiallySignedTxBase64 ?? partiallySignedTxBase64,
     sponsorKeypair
   );
+  beginStage("proposal transaction submission");
   const submitted = await request<SubmitBundleResponse>(
     `/proposal-intents/${intent.intentId}/submit`,
     {
@@ -790,6 +892,7 @@ const run = async () => {
     );
   }
 
+  beginStage("campaign proof verification");
   const proposal = await request<ProposalResponse>(`/proposals/${proposalId}`, {
     token: sponsorToken,
   });
@@ -814,16 +917,16 @@ run()
     }
 
     if (error instanceof ApiError) {
-      addBlocker("API_ERROR", error.message, {
+      addBlocker("API_STAGE_FAILED", `API request failed during ${activeStage}.`, {
+        stage: activeStage,
         status: error.status,
         code: error.code,
-        details: error.details ?? null,
       });
       printSummary(false);
       process.exit(1);
     }
 
-    addBlocker("UNEXPECTED_ERROR", error instanceof Error ? error.message : String(error));
+    addBlocker("STAGE_FAILED", `Smoke failed during ${activeStage}.`, { stage: activeStage });
     printSummary(false);
     process.exit(1);
   });

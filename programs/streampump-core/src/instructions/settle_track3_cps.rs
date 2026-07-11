@@ -98,6 +98,10 @@ pub(crate) fn handler(ctx: Context<SettleTrack3Cps>, args: SettleTrack3CpsArgs) 
     let proposal = &mut ctx.accounts.proposal;
 
     require!(
+        proposal.track3_usdc_deposited > 0,
+        StreamPumpError::ProposalTrackDisabled
+    );
+    require!(
         proposal.track3_settled_at == 0,
         StreamPumpError::ProposalAlreadySettled
     );

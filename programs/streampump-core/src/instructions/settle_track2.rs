@@ -100,16 +100,16 @@ pub(crate) fn handler(ctx: Context<SettleTrack2>, args: SettleTrack2Args) -> Res
     let proposal = &mut ctx.accounts.proposal;
 
     require!(
+        proposal.track2_target_value > 0 && proposal.track2_usdc_deposited > 0,
+        StreamPumpError::ProposalTrackDisabled
+    );
+    require!(
         now >= proposal.deadline,
         StreamPumpError::ProposalNotExpired
     );
     require!(
         proposal.track2_settled_at == 0,
         StreamPumpError::ProposalAlreadySettled
-    );
-    require!(
-        proposal.track2_target_value > 0,
-        StreamPumpError::InvalidAmount
     );
     require!(
         ctx.accounts.protocol_config.track2_reward_cap_usdc > 0,

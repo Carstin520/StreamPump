@@ -47,6 +47,9 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate --prefix backend
 
+      - name: Verify production Anchor IDL
+        run: npm run verify:production-idl
+
       - name: Frontend lint
         run: npm run lint --prefix app
 
