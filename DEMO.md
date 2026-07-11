@@ -14,13 +14,17 @@ S1 buyout formation is still prepared by seed/operator scripts. This legacy cont
 
 ## Pilot Boundary (read first)
 
-This build is a **code-verified invite-only Pilot candidate — not deployed production and not live**. Everything below runs on **Solana devnet with a test-USDC mint; no real funds are involved**. The demo paths in this runbook are operator/seed-prepared and are a superset of what the Pilot exposes to invited users.
+This build is a **code-verified invite-only Pilot candidate — not deployed production and not live**. Everything below runs on **Solana devnet with a test-USDC mint; no real funds are involved**. H0 and H1 human gates are approved; the P2 corridor-truth work (`d78815b..2e5130c`) is a **local review candidate** awaiting an independent Fable 5 review and human gate H2 (neither has passed). The demo paths in this runbook are operator/seed-prepared and are a superset of what the Pilot exposes to invited users.
 
 The only corridor open to Pilot users is: **external-wallet auth → content create/upload (R2/Mux) → public feed/post projection → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 fixed-base settlement → campaign proof**. Access is gated by an external real-wallet allowlist; the auth challenge is identical for every valid wallet and the invite check runs only after a valid signature, so the allowlist cannot be probed in advance.
 
-Closed for all Pilot users (seed/operator-only in this runbook, never a Pilot user path): email/social/provider managed wallet and public managed execution, S1 market/buyout/portfolio claim, Track 2 endorsement and fan rewards, Track 3 CPS, daily/engagement rewards, automatic settlement schedulers, and prototype/legacy routes.
+Closed for all Pilot users (seed/operator-only in this runbook, never a Pilot user path): email/social/provider managed wallet and public managed execution, S1 market/buyout/portfolio claim, Track 2 endorsement and fan rewards, Track 3 CPS, daily/engagement rewards, automatic oracle settlement schedulers, and prototype/legacy routes.
 
-Do not claim: server-side SHA256 verification of uploaded bytes, independent third-party publication verification, program-side allowlist enforcement, security audit, production deployment, or real funds.
+P2 corridor-truth (real in this build): content uploads land in a **private R2 origin bucket** and are only promoted to a **distinct public delivery bucket** (`R2_DELIVERY_BUCKET`, required to differ from `R2_BUCKET`) after the backend records **server-observed bytes/MIME/size/SHA-256**, enforces a **serialized monthly quota**, reconciles Mux, and an **operator approves** feed eligibility — a **creator cannot self-verify** their own content. Content and proposal-intent mutations use **durable, DB-backed idempotency keys**. A proposal launches only from a **feed-eligible immutable manifest** with a **positive Track 1**, **creator + sponsor signatures**, and a **confirmed chain-state match**; **Track 2/3 must be zero and are rejected if partially configured**. Manual Track 1 settlement is **evidence-bound, idempotent, lease-fenced, signature-verified**, and the proof **separates anchor/funding/settlement signatures** (historical unprovable anchor-tx signatures were cleared by migration).
+
+**Real production-corridor and Track 1 smoke were NOT executed** in this pass — live Pilot credentials and a live proposal were unavailable. The smoke scripts (`smoke:production-corridor`, `smoke-pilot-track1`) fail closed with explicit blockers; do not call the corridor live or production-ready.
+
+Do not claim: independent third-party publication verification, program-side allowlist enforcement, security audit, production deployment, or real funds.
 
 ## Environment
 
@@ -73,6 +77,18 @@ ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED=false
 ```
 
 Only set `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=true` and `NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH=true` for local screen recordings where the preview social identities are explicitly part of the script.
+
+P2 adds required content/operator config. Set a **distinct** delivery bucket and an operator key (server-only; never in the frontend), and point the backend at the packaged production IDL:
+
+```bash
+R2_BUCKET=streampump-origin      # private origin (presigned staging + KYB docs)
+R2_DELIVERY_BUCKET=streampump-delivery   # public delivery — MUST differ from R2_BUCKET
+R2_PUBLIC_BASE_URL=...           # bind only to the delivery bucket
+INTERNAL_OPERATOR_API_KEY=...    # >=32 chars; operator publication review + manual Track 1 only
+STREAMPUMP_IDL_PATH=./idl/streampump_core.json   # packaged production IDL under backend root
+INDEXER_ENABLED=true             # P2 .env.example default is now true
+MUX_RECONCILIATION_ENABLED=true  # P2 .env.example default is now true; keep false only for offline recordings
+```
 
 ## Required Checks
 

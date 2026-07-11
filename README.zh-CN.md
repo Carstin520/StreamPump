@@ -210,7 +210,7 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** 所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
+StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** H0 与 H1 人工门已批准；P2 走廊真实性工作（`d78815b..2e5130c`）是一个**本地审查候选**，尚待 Fable 5 审查与人工门 H2。所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
 
 ### 邀请制 Pilot（P1）——候选版本，非线上发布
 
@@ -218,15 +218,25 @@ StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——
 
 **Pilot 走廊内开放：** 外部钱包认证；经 R2/Mux 完成的内容创建与上传；公开 feed 与帖子详情投影；proposal intent 创建；创作者 + 赞助方双签；后端 relay 完整签名交易；手动 Track 1 固定底价结算；作为投影/链上证据的活动凭证（PDA、tx 签名、manifest hash、内容锚点）。
 
-**对所有 Pilot 用户关闭：** email/social/provider 托管钱包认证与公开托管执行；S1 市场/买断/portfolio 领取；Track 2 背书与粉丝奖励；Track 3 CPS；每日与互动奖励；自动结算调度器；prototype/legacy 路由。
+**对所有 Pilot 用户关闭：** email/social/provider 托管钱包认证与公开托管执行；S1 市场/买断/portfolio 领取；Track 2 背书与粉丝奖励；Track 3 CPS；每日与互动奖励；自动 oracle 结算调度器；prototype/legacy 路由。
 
-**不得声称**（不要表述为已完成）：服务端对上传字节做 SHA256 校验；第三方 publication 独立验证；program 侧白名单强制；安全审计；生产部署；真实资金。
+**内容真实性（P2）。** 上传先落到**私有 R2 源桶**，仅用于 presigned 暂存与 KYB 文档；一个**独立的公共交付桶**（`R2_DELIVERY_BUCKET`，必须与 `R2_BUCKET` 不同）只保存已验证/受信任的素材。后端记录每个素材的**服务端观测字节、MIME、大小与 SHA-256**，执行**串行化的月度上传配额**，运行 **Mux 对账**，随后将已验证素材提升至交付桶并清理源副本。**创作者无法自我验证**内容——进入 feed 前**必须经过 operator 审批**。
 
-**生产监听门（fail-closed）。** 生产环境下，除非每个 active RPC 都返回完整的 Solana devnet genesis hash、所配置的 program 账户存在且 `executable`、且链上 `ProtocolConfig.usdcMint` 与 `PILOT_EXPECTED_USDC_MINT` 完全一致，后端才会启动。相关 env：`PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS`、`PILOT_EXPECTED_USDC_MINT`、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。
+**API 幂等（P2）。** 内容与 proposal-intent 变更受**持久化、数据库支撑的幂等键**保护，重试的变更会回放已存结果，而非重复产生链上或 DB 副作用。
 
-**验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Node 22 后端构建 + 107 项测试、前端 lint/build、`cargo check` 与一次 HTTP 合同 smoke。**P1 Fable 审查待进行；在 Fable 返回 PASS 之前，人工门 H1 保持关闭 / 未开启。**
+**Proposal 真实性（P2）。** proposal 只能从**具备 feed 资格的不可变 manifest**、**正的 Track 1 预算**、以及**创作者与赞助方双签**发起，后端确认**链上状态与已存条款一致**。**Track 2 与 Track 3 必须为零**；部分配置了 Track 2/3 的 proposal 会被**拒绝**。
 
-**真实 Pilot 上线前的剩余 blocker：** 一个真实专用 devnet RPC；确定 Pilot test-USDC mint；完整的生产 IDL 制品/包；一次真实部署链上 preflight；一次已部署走廊 smoke；以及外部安全审计 + 法律审查。
+**Track 1 结算真实性（P2）。** 手动 Track 1 operator 结算是**证据绑定、幂等、租约围栏（lease-fenced）且签名校验**的；活动凭证**区分 anchor、funding 与 settlement 签名**。历史上无法证明的 anchor-tx 签名已由 **migration 清除**，而非当作凭证展示。
+
+**不得声称**（不要表述为已完成）：第三方 publication 独立验证；program 侧白名单强制；安全审计；生产部署；真实资金。
+
+**生产监听门（fail-closed）。** 生产环境下，除非每个 active RPC 都返回完整的 Solana devnet genesis hash、所配置的 program 账户存在且 `executable`、且链上 `ProtocolConfig.usdcMint` 与 `PILOT_EXPECTED_USDC_MINT` 完全一致，后端才会启动。相关 env：`PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS`、`PILOT_EXPECTED_USDC_MINT`、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。P2 新增运行时/配置：`R2_DELIVERY_BUCKET`（必须与 `R2_BUCKET` 不同）、内部 operator 密钥 `INTERNAL_OPERATOR_API_KEY`、`INDEXER_ENABLED`/`MUX_RECONCILIATION_ENABLED` 门控，以及打包在 backend 根目录下的**生产 IDL**（`STREAMPUMP_IDL_PATH=./idl/streampump_core.json`）。
+
+**验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Fable 5 审查；人工门 **H1 已批准**。**P2（`d78815b..2e5130c`）现在是本地审查候选——已实现并在本地验证，但尚未部署、尚未对真实资金上线。** 本地已验证：Prisma generate + validate；后端构建；**150 项后端测试**；生产 IDL 校验器（**35 instructions / 13 accounts / 66 types**）；Anchor 构建；**12 项关键本地链上测试**；app lint + build；以及 `git diff --check`。**真实生产走廊与 Track 1 smoke 未执行**，因为缺少可用的 Pilot 凭证与线上 proposal——smoke 脚本 fail-closed 并给出明确 blocker，因此走廊**尚未**被称为线上或生产就绪。
+
+**下一道门：** 固定的 P2 范围 → 一次独立的 **Fable 5** 审查 → 关闭任何 blocker/major 问题并重跑 → 然后**人工门 H2**。Fable 审查与 H2 **尚未**通过。
+
+**真实 Pilot 上线前的剩余 blocker：** 一个真实专用 devnet RPC；确定 Pilot test-USDC mint；一次真实部署链上 preflight；一次带真实凭证的已部署走廊 + Track 1 smoke；以及外部安全审计 + 法律审查。
 
 | 区域 | Readiness | 当前真实能力 |
 |---|---|---|
@@ -411,11 +421,11 @@ cd backend && npm run prisma:migrate:deploy
 
 ## 🗺 路线图
 
-当前 P1 优先级（邀请制 Pilot 候选——devnet/test-USDC，未部署、未上线）：
+当前 P2 优先级（邀请制 Pilot 候选——devnet/test-USDC，未部署、未上线）。H0 与 H1 已批准；P2 现在是本地审查候选：
 
-- **P1 门控顺序（精确顺序）：** (1) 确定固定的 P1 commit/范围，(2) 在该固定范围上运行集成验证，(3) 取得 Fable 5 对其的 **PASS**，然后 (4) **在人工门 H1 停下，交由人工审查/批准**。agent 不开启、不关闭、也不批准 H1——它就此停下并移交人工。
-- 搭建真实专用 devnet RPC、确定 Pilot test-USDC mint，并交付完整的生产 IDL 制品/包。
-- 执行一次真实部署链上 preflight 与一次已部署走廊 smoke。
+- **P2 门控顺序（精确顺序）：** (1) 固定 P2 commit 范围 `d78815b..2e5130c`，(2) 对其取得一次独立的 **Fable 5** 审查，(3) 关闭任何 blocker/major 问题并重跑，然后 (4) **在人工门 H2 停下，交由人工审查/批准**。agent 不开启、不关闭、也不批准 H2——它就此停下并移交人工。Fable 与 H2 尚未通过。
+- 搭建真实专用 devnet RPC、确定 Pilot test-USDC mint（生产 IDL 制品已打包在 backend 根目录下）。
+- 执行一次真实部署链上 preflight 与一次带真实 Pilot 凭证的已部署走廊 + Track 1 smoke。
 - 在任何真实资金或公开上线前完成外部安全审计 + 法律审查。
 
 Post-Pilot backlog（对所有 Pilot 用户关闭——每项都需要后续 H 门以及各自的审计/法律/供应方前置条件）：

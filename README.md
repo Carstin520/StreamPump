@@ -210,7 +210,7 @@ Every core mechanism depends on a specific Solana capability — this is not a m
 
 ## 📍 Current Status
 
-StreamPump is currently a **code-verified invite-only Pilot candidate — not a deployed production system and not live.** All chain activity targets **Solana devnet with a test-USDC mint; no real funds are ever involved.** The end-to-end corridor (external-wallet creator → media upload → public feed → proposal → dual-signature launch → backend relay → manual Track 1 → on-chain campaign proof) is code-verified on devnet, not deployed. Readiness labels are kept honest.
+StreamPump is currently a **code-verified invite-only Pilot candidate — not a deployed production system and not live.** H0 and H1 human gates are approved; the P2 corridor-truth work (`d78815b..2e5130c`) is a **local review candidate** awaiting Fable 5 review and human gate H2. All chain activity targets **Solana devnet with a test-USDC mint; no real funds are ever involved.** The end-to-end corridor (external-wallet creator → media upload → public feed → proposal → dual-signature launch → backend relay → manual Track 1 → on-chain campaign proof) is code-verified on devnet, not deployed. Readiness labels are kept honest.
 
 ### Invite-Only Pilot (P1) — candidate, not a live launch
 
@@ -218,15 +218,25 @@ Access is gated by an **external real-wallet allowlist**. The auth challenge is 
 
 **Open in the Pilot corridor:** external wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay of the fully signed transaction; manual Track 1 fixed-base settlement; campaign proof as projection/on-chain evidence (PDA, tx signature, manifest hash, content anchor).
 
-**Closed for all Pilot users:** email/social/provider managed-wallet auth and public managed execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic settlement schedulers; prototype/legacy routes.
+**Closed for all Pilot users:** email/social/provider managed-wallet auth and public managed execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic oracle settlement schedulers; prototype/legacy routes.
 
-**Not claimed** (do not represent these as done): server-side SHA256 verification of uploaded bytes; independent third-party publication verification; program-side allowlist enforcement; security audit; production deployment; real funds.
+**Content truth (P2).** Uploads land in a **private R2 origin bucket** used only for presigned staging and KYB docs; a **distinct public delivery bucket** (`R2_DELIVERY_BUCKET`, required to differ from `R2_BUCKET`) holds only verified/trusted media. The backend records **server-observed bytes, MIME, size, and SHA-256** for each asset, enforces a **serialized monthly upload quota**, runs **Mux reconciliation**, then promotes verified assets to delivery and cleans up the origin copy. A **creator cannot self-verify** their own content — **operator approval is required** before feed eligibility.
 
-**Production-listen gate (fail-closed).** In production the backend refuses to start unless every active RPC reports the full Solana devnet genesis hash, the configured program account exists and is `executable`, and on-chain `ProtocolConfig.usdcMint` exactly equals `PILOT_EXPECTED_USDC_MINT`. Governing env: `PILOT_INVITE_ONLY`, `PILOT_INVITE_WALLETS`, `PILOT_EXPECTED_USDC_MINT`, `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`.
+**API idempotency (P2).** Content and proposal-intent mutations are guarded by **durable, database-backed idempotency keys**, so retried mutations replay the stored result instead of duplicating on-chain or DB effects.
 
-**Verification.** P0 safety fixes (`5a7f355..6ee771e`) passed a Fable 5 review; human gate **H0 approved**. P1 backend hardening (`b393bac`) passed Node 22 backend build + 107 tests, frontend lint/build, `cargo check`, and an HTTP contract smoke. **P1 Fable review is pending; human gate H1 is closed / not opened until Fable returns PASS.**
+**Proposal truth (P2).** A proposal can only launch from a **feed-eligible, immutable manifest** with a **positive Track 1 budget** and **both creator and sponsor signatures**, and the backend confirms the **on-chain state matches** the stored terms. **Track 2 and Track 3 must be zero**; a proposal with a partially configured Track 2/3 is **rejected**.
 
-**Remaining blockers before a real Pilot launch:** a real dedicated devnet RPC; a decided Pilot test-USDC mint; a complete production IDL artifact/package; a real deployment chain preflight; a deployed-corridor smoke; and external security audit + legal review.
+**Track 1 settlement truth (P2).** Manual Track 1 operator settlement is **evidence-bound, idempotent, lease-fenced, and signature-verified**; the campaign proof **separates anchor, funding, and settlement signatures**. Historical, unprovable anchor-tx signatures were **cleared by migration** rather than presented as proof.
+
+**Not claimed** (do not represent these as done): independent third-party publication verification; program-side allowlist enforcement; security audit; production deployment; real funds.
+
+**Production-listen gate (fail-closed).** In production the backend refuses to start unless every active RPC reports the full Solana devnet genesis hash, the configured program account exists and is `executable`, and on-chain `ProtocolConfig.usdcMint` exactly equals `PILOT_EXPECTED_USDC_MINT`. Governing env: `PILOT_INVITE_ONLY`, `PILOT_INVITE_WALLETS`, `PILOT_EXPECTED_USDC_MINT`, `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`. New P2 runtime/config: `R2_DELIVERY_BUCKET` (must differ from `R2_BUCKET`), an internal `INTERNAL_OPERATOR_API_KEY` operator key, `INDEXER_ENABLED`/`MUX_RECONCILIATION_ENABLED` gates, and a **packaged production IDL** shipped under the backend root (`STREAMPUMP_IDL_PATH=./idl/streampump_core.json`).
+
+**Verification.** P0 safety fixes (`5a7f355..6ee771e`) passed a Fable 5 review; human gate **H0 approved**. P1 backend hardening (`b393bac`) passed Fable 5 review; human gate **H1 approved**. **P2 (`d78815b..2e5130c`) is now a local review candidate — implemented and verified locally, but not deployed and not live for real funds.** Verified locally: Prisma generate + validate; backend build; **150 backend tests**; the production-IDL verifier (**35 instructions / 13 accounts / 66 types**); Anchor build; **12 key local chain tests**; app lint + build; and `git diff --check`. **Real production-corridor and Track 1 smoke were NOT executed** because live Pilot credentials and a live proposal were unavailable — the smoke scripts fail closed with explicit blockers, so the corridor is **not** yet called live or production-ready.
+
+**Next gate:** the fixed P2 range → an independent **Fable 5** review → close any blocker/major finding and rerun → then **human gate H2**. Fable review and H2 have **not** passed yet.
+
+**Remaining blockers before a real Pilot launch:** a real dedicated devnet RPC; a decided Pilot test-USDC mint; a real deployment chain preflight; a deployed-corridor + Track 1 smoke with live credentials; and external security audit + legal review.
 
 | Area | Readiness | What's real now |
 |---|---|---|
@@ -411,11 +421,11 @@ Details in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render
 
 ## 🗺 Roadmap
 
-Present P1 priorities (invite-only Pilot candidate — devnet/test-USDC, not deployed, not live):
+Present P2 priorities (invite-only Pilot candidate — devnet/test-USDC, not deployed, not live). H0 and H1 are approved; P2 is now a local review candidate:
 
-- **P1 gate sequence (exact order):** (1) finalize the fixed P1 commit/range, (2) run integrated verification on that fixed range, (3) obtain a Fable 5 **PASS** on it, then (4) **stop at human gate H1 for human review/approval**. The agent does not open, close, or approve H1 — it halts at that point and hands off to a human.
-- Stand up a real dedicated devnet RPC, decide the Pilot test-USDC mint, and ship a complete production IDL artifact/package.
-- Run a real deployment chain preflight and a deployed-corridor smoke.
+- **P2 gate sequence (exact order):** (1) hold the fixed P2 commit range `d78815b..2e5130c`, (2) obtain an independent **Fable 5** review on it, (3) close any blocker/major finding and rerun, then (4) **stop at human gate H2 for review/approval**. The agent does not open, close, or approve H2 — it halts and hands off to a human. Fable and H2 have not passed yet.
+- Stand up a real dedicated devnet RPC and decide the Pilot test-USDC mint (the production IDL artifact is now packaged under the backend root).
+- Run a real deployment chain preflight and a deployed-corridor + Track 1 smoke with live Pilot credentials.
 - Complete external security audit + legal review before any real-money or public launch.
 
 Post-Pilot backlog (closed for all Pilot users — each needs a later H gate plus its own audit/legal/provider prerequisites):
