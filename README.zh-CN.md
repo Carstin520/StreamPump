@@ -210,7 +210,7 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** H0 与 H1 人工门已批准；P2 走廊真实性工作（`d78815b..5ad0065`）是一个**本地审查候选**，尚待 Fable 5 审查与人工门 H2。所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
+StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** H0 与 H1 人工门已批准；P2 走廊真实性工作（`d78815b..e0b6028`）已通过一次独立的 **Fable 5** 审查（**PASS，2026-07-12，无 blocker/major 问题**），现尚待人工门 H2。所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
 
 ### 邀请制 Pilot（P1）——候选版本，非线上发布
 
@@ -232,9 +232,9 @@ StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——
 
 **生产监听门（fail-closed）。** 生产环境下，除非每个 active RPC 都返回完整的 Solana devnet genesis hash、所配置的 program 账户存在且 `executable`、且链上 `ProtocolConfig.usdcMint` 与 `PILOT_EXPECTED_USDC_MINT` 完全一致，后端才会启动。相关 env：`PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS`、`PILOT_EXPECTED_USDC_MINT`、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。P2 新增运行时/配置：`R2_DELIVERY_BUCKET`（必须与 `R2_BUCKET` 不同）、内部 operator 密钥 `INTERNAL_OPERATOR_API_KEY`、`INDEXER_ENABLED`/`MUX_RECONCILIATION_ENABLED` 门控，以及打包在 backend 根目录下的**生产 IDL**（`STREAMPUMP_IDL_PATH=./idl/streampump_core.json`）。
 
-**验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Fable 5 审查；人工门 **H1 已批准**。**P2（`d78815b..5ad0065`）现在是本地审查候选——已实现并在本地验证，但尚未部署、尚未对真实资金上线。** 本地已验证：Prisma generate + validate；后端构建；**150 项后端测试**；生产 IDL 校验器（**35 instructions / 13 accounts / 66 types**）；Anchor 构建；**12 项关键本地链上测试**；app lint + build；以及 `git diff --check`。最终 Opus UI 真实性修复（`5ad0065`）修正 onboarding 的外部钱包/Track 1 文案，不带 preview/seeded 徽标，并将 portfolio/rewards 从正常 Pilot 导航中移除（legacy 路由仍保留标签、仅可直链访问）。已在 in-app Browser 中于 `/onboarding` 与 `/campaigns/not-a-pda` 桌面端与 390px 移动端浏览器验证：控制台干净、无框架 overlay 或横向溢出、外部钱包登录导航可用，且活动错误 fail-closed、无本地回退。**真实生产走廊与 Track 1 smoke 未执行**，因为缺少可用的 Pilot 凭证与线上 proposal——smoke 脚本 fail-closed 并给出明确 blocker，因此走廊**尚未**被称为线上或生产就绪。
+**验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Fable 5 审查；人工门 **H1 已批准**。**P2（`d78815b..e0b6028`）已通过一次独立的 Fable 5 审查（PASS，2026-07-12，无 blocker/major 问题），现尚待人工门 H2——已实现并在本地验证，但尚未部署、尚未对真实资金上线；未进行任何部署、迁移应用、真实凭证 smoke 或 readiness 提升。** 本地已验证：Prisma generate + validate；后端构建；**150 项后端测试**；生产 IDL 校验器（**35 instructions / 13 accounts / 66 types**）；Anchor 构建；**12 项关键本地链上测试**；app lint + build；以及 `git diff --check`。最终 Opus UI 真实性修复（`5ad0065`）修正 onboarding 的外部钱包/Track 1 文案，不带 preview/seeded 徽标，并将 portfolio/rewards 从正常 Pilot 导航中移除（legacy 路由仍保留标签、仅可直链访问）。已在 in-app Browser 中于 `/onboarding` 与 `/campaigns/not-a-pda` 桌面端与 390px 移动端浏览器验证：控制台干净、无框架 overlay 或横向溢出、外部钱包登录导航可用，且活动错误 fail-closed、无本地回退。**真实生产走廊与 Track 1 smoke 未执行**，因为缺少可用的 Pilot 凭证与线上 proposal——smoke 脚本 fail-closed 并给出明确 blocker，因此走廊**尚未**被称为线上或生产就绪。此次 Fable 5 审查记录了两条非门控观察：(1) 在 Render/Cloud Run/Railway 已识别标记之外的托管平台，仍依赖 `NODE_ENV=production` 或显式 `PILOT_INVITE_ONLY` 才能进入生产门控路径；(2) 月度上传配额归属以 asset `createdAt` 为键，因此跨月重新 presign 的归属为近似值。
 
-**下一道门：** 固定的 P2 范围 → 一次独立的 **Fable 5** 审查 → 关闭任何 blocker/major 问题并重跑 → 然后**人工门 H2**。Fable 审查与 H2 **尚未**通过。
+**下一道门：** 固定的 P2 范围（`d78815b..e0b6028`）已通过独立的 **Fable 5** 审查（PASS，2026-07-12，无 blocker/major 问题）；剩下的仅是**人工门 H2**，其**仍待处理 / 尚未批准**。剩余的外部上线 blocker 依旧存在：真实的专用 devnet RPC、已确定的 Pilot test-USDC mint、真实的部署链上 preflight、使用真实凭证的已部署走廊 + Track 1 smoke，以及外部安全审计与法律审查。
 
 **真实 Pilot 上线前的剩余 blocker：** 一个真实专用 devnet RPC；确定 Pilot test-USDC mint；一次真实部署链上 preflight；一次带真实凭证的已部署走廊 + Track 1 smoke；以及外部安全审计 + 法律审查。
 
@@ -423,7 +423,7 @@ cd backend && npm run prisma:migrate:deploy
 
 当前 P2 优先级（邀请制 Pilot 候选——devnet/test-USDC，未部署、未上线）。H0 与 H1 已批准；P2 现在是本地审查候选：
 
-- **P2 门控顺序（精确顺序）：** (1) 固定 P2 commit 范围 `d78815b..5ad0065`，(2) 对其取得一次独立的 **Fable 5** 审查，(3) 关闭任何 blocker/major 问题并重跑，然后 (4) **在人工门 H2 停下，交由人工审查/批准**。agent 不开启、不关闭、也不批准 H2——它就此停下并移交人工。Fable 与 H2 尚未通过。
+- **P2 门控顺序（精确顺序）：** (1) 固定 P2 commit 范围 `d78815b..e0b6028`，(2) 对其取得一次独立的 **Fable 5** 审查——**已完成：2026-07-12 PASS，无 blocker/major 问题**，(3) 关闭任何 blocker/major 问题并重跑——未提出任何问题，因此无需重跑，然后 (4) **在人工门 H2 停下，交由人工审查/批准**。agent 不开启、不关闭、也不批准 H2——它就此停下并移交人工。**H2 仍待处理 / 尚未批准。**
 - 搭建真实专用 devnet RPC、确定 Pilot test-USDC mint（生产 IDL 制品已打包在 backend 根目录下）。
 - 执行一次真实部署链上 preflight 与一次带真实 Pilot 凭证的已部署走廊 + Track 1 smoke。
 - 在任何真实资金或公开上线前完成外部安全审计 + 法律审查。
