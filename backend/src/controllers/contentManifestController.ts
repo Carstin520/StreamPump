@@ -79,6 +79,8 @@ export const assertManifestAssetMutationAllowed = (status: ContentManifestStatus
 const assertManifestFinalized = (manifest: {
   status: ContentManifestStatus;
   manifestHashHex: string | null;
+  internalCanonicalUrl: string | null;
+  internalUrlDigestHex: string | null;
 }): void => {
   const finalizedStatuses: ContentManifestStatus[] = [
     ContentManifestStatus.READY,
@@ -86,7 +88,12 @@ const assertManifestFinalized = (manifest: {
     ContentManifestStatus.ANCHORED,
     ContentManifestStatus.PUBLISHED,
   ];
-  if (!manifest.manifestHashHex || !finalizedStatuses.includes(manifest.status)) {
+  if (
+    !manifest.manifestHashHex ||
+    !manifest.internalCanonicalUrl ||
+    !manifest.internalUrlDigestHex ||
+    !finalizedStatuses.includes(manifest.status)
+  ) {
     throw new HttpError(
       409,
       "MANIFEST_NOT_FINALIZED",

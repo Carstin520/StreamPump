@@ -90,7 +90,11 @@ export const syncManifestPublicationEligibility = async (
     ? (verifiedPublication.verifiedAt ?? verifiedPublication.updatedAt)
     : null;
   const manifestIsFinalized =
-    Boolean(manifest.manifestHashHex) &&
+    Boolean(
+      manifest.manifestHashHex &&
+        manifest.internalCanonicalUrl &&
+        manifest.internalUrlDigestHex
+    ) &&
     manifest.status !== ContentManifestStatus.DRAFT &&
     manifest.status !== ContentManifestStatus.UPLOADING &&
     manifest.status !== ContentManifestStatus.ARCHIVED;
