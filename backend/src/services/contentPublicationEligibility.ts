@@ -3,6 +3,8 @@ import {
   AssetType,
   AssetUploadStatus,
   ContentManifestStatus,
+  Prisma,
+  ProposalStatus,
   PublicationVerificationStatus,
 } from "@prisma/client";
 
@@ -41,6 +43,26 @@ export const manifestStatusAfterEligibilitySync = (params: {
   }
 
   return params.currentStatus;
+};
+
+export const proposalPublicationEligibilityWhere = (
+  manifestId: string,
+  publicFeedEligible: boolean
+): Prisma.ProposalWhereInput => {
+  if (publicFeedEligible) {
+    return {
+      manifestId,
+      contentPublishedVerifiedAt: null,
+    };
+  }
+
+  return {
+    manifestId,
+    status: {
+      in: [ProposalStatus.OPEN, ProposalStatus.FUNDED],
+    },
+    track1Claimed: false,
+  };
 };
 
 export const syncManifestPublicationEligibility = async (
@@ -119,10 +141,7 @@ export const syncManifestPublicationEligibility = async (
     });
 
     await tx.proposal.updateMany({
-      where: {
-        manifestId: manifest.id,
-        ...(publicFeedEligible ? { contentPublishedVerifiedAt: null } : {}),
-      },
+      where: proposalPublicationEligibilityWhere(manifest.id, publicFeedEligible),
       data: {
         contentPublishedVerifiedAt: publicFeedEligible ? contentPublishedVerifiedAt : null,
       },

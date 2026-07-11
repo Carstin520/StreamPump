@@ -1,11 +1,15 @@
 import { expect } from "chai";
-import { ContentManifestStatus } from "@prisma/client";
+import { ContentManifestStatus, ProposalStatus } from "@prisma/client";
 
 import { config, getEnabledForbiddenPilotFeatures } from "../config/default";
 import { assertManifestAssetMutationAllowed } from "../src/controllers/contentManifestController";
 import { HttpError } from "../src/controllers/http";
-import { assertPilotTrackBudgetsAllowed } from "../src/controllers/proposalIntentController";
+import {
+  assertPilotTrackBudgetsAllowed,
+  assertStoredIntentPilotTracksAllowed,
+} from "../src/controllers/proposalIntentController";
 import { manifestStatusAfterEligibilitySync } from "../src/services/contentPublicationEligibility";
+import { proposalPublicationEligibilityWhere } from "../src/services/contentPublicationEligibility";
 
 describe("Pilot safety gates", () => {
   it("reports every production-forbidden Pilot feature that is enabled", () => {
@@ -87,5 +91,31 @@ describe("Pilot safety gates", () => {
     expect(() =>
       assertPilotTrackBudgetsAllowed({ ...closedTracks, track3DelayDays: 1 })
     ).to.throw(HttpError).with.property("code", "TRACK3_CLOSED_FOR_PILOT");
+
+    expect(() =>
+      assertStoredIntentPilotTracksAllowed({
+        track2TargetValue: 0n,
+        track2MinAchievementBps: 0,
+        track2UsdcDeposited: 1n,
+        maxEndorsementSpump: 0n,
+        track3UsdcDeposited: 0n,
+        track3DelayDays: 0,
+      })
+    ).to.throw(HttpError).with.property("code", "TRACK2_CLOSED_FOR_PILOT");
+  });
+
+  it("preserves publication verification on settled or resolved proposal history", () => {
+    expect(proposalPublicationEligibilityWhere("manifest-1", false)).to.deep.equal({
+      manifestId: "manifest-1",
+      status: {
+        in: [ProposalStatus.OPEN, ProposalStatus.FUNDED],
+      },
+      track1Claimed: false,
+    });
+
+    expect(proposalPublicationEligibilityWhere("manifest-1", true)).to.deep.equal({
+      manifestId: "manifest-1",
+      contentPublishedVerifiedAt: null,
+    });
   });
 });

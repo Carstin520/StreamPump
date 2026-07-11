@@ -141,6 +141,23 @@ export const assertPilotTrackBudgetsAllowed = (params: {
   }
 };
 
+type StoredPilotTrackTerms = {
+  track2TargetValue: bigint;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: bigint;
+  maxEndorsementSpump: bigint;
+  track3UsdcDeposited: bigint;
+  track3DelayDays: number;
+};
+
+export const assertStoredIntentPilotTracksAllowed = (intent: StoredPilotTrackTerms): void => {
+  assertPilotTrackBudgetsAllowed({
+    track2Enabled: config.pilot.track2Enabled,
+    track3Enabled: config.pilot.track3Enabled,
+    ...intent,
+  });
+};
+
 export const createProposalIntent = withController(
   "CREATE_PROPOSAL_INTENT_FAILED",
   async (req, res) => {
@@ -288,6 +305,7 @@ export const lockProposalIntent = withController("LOCK_PROPOSAL_INTENT_FAILED", 
   }
 
   assertProposalIntentParticipant(requesterWallet, intent);
+  assertStoredIntentPilotTracksAllowed(intent);
 
   if (intent.status !== ProposalIntentStatus.DRAFT) {
     throw new HttpError(409, "INTENT_ALREADY_LOCKED", "proposal intent is already locked");
@@ -360,6 +378,7 @@ export const buildProposalLaunchBundle = withController(
     }
 
     assertProposalIntentParticipant(requesterWallet, intent);
+    assertStoredIntentPilotTracksAllowed(intent);
 
     if (intent.txBundles[0] && !forceRebuild && isBundleReusable(intent.txBundles[0])) {
       ok(res, {
@@ -476,6 +495,7 @@ export const creatorPartialSignBundle = withController(
     if (requesterWallet !== intent.creatorWallet) {
       throw new HttpError(403, "FORBIDDEN", "only the creator can submit the partial signature");
     }
+    assertStoredIntentPilotTracksAllowed(intent);
 
     const bundle = await prisma.txBundle.findFirst({
       where: {
@@ -566,6 +586,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
   if (requesterWallet !== intent.sponsorWallet) {
     throw new HttpError(403, "FORBIDDEN", "only the sponsor can submit the final signature");
   }
+  assertStoredIntentPilotTracksAllowed(intent);
 
   const bundle = await prisma.txBundle.findFirst({
     where: {
