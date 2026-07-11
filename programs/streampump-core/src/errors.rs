@@ -166,6 +166,8 @@ pub enum StreamPumpError {
     LegacyCreatorProfileAlreadyMigrated,
     #[msg("Invalid legacy creator profile account")]
     InvalidLegacyCreatorProfile,
+    #[msg("Legacy creator profile with active S1 supply requires a holder-counter backfill")]
+    LegacyCreatorProfileRequiresHolderBackfill,
     #[msg("Legacy S1 buyout state has already been migrated")]
     LegacyS1BuyoutStateAlreadyMigrated,
     #[msg("Invalid legacy S1 buyout state account")]

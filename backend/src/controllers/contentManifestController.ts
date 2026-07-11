@@ -63,6 +63,38 @@ interface PresignAssetPlan {
   fileSizeBytes: bigint;
 }
 
+export const assertManifestAssetMutationAllowed = (status: ContentManifestStatus): void => {
+  if (
+    status !== ContentManifestStatus.DRAFT &&
+    status !== ContentManifestStatus.UPLOADING
+  ) {
+    throw new HttpError(
+      409,
+      "MANIFEST_IMMUTABLE",
+      `manifest assets cannot change after status ${status}`
+    );
+  }
+};
+
+const assertManifestFinalized = (manifest: {
+  status: ContentManifestStatus;
+  manifestHashHex: string | null;
+}): void => {
+  const finalizedStatuses: ContentManifestStatus[] = [
+    ContentManifestStatus.READY,
+    ContentManifestStatus.LOCKED,
+    ContentManifestStatus.ANCHORED,
+    ContentManifestStatus.PUBLISHED,
+  ];
+  if (!manifest.manifestHashHex || !finalizedStatuses.includes(manifest.status)) {
+    throw new HttpError(
+      409,
+      "MANIFEST_NOT_FINALIZED",
+      "manifest must be finalized before publication"
+    );
+  }
+};
+
 export const issueCreatorAuthSignature = withController(
   "ISSUE_CREATOR_AUTH_SIGNATURE_FAILED",
   async (req, res) => {
@@ -239,6 +271,7 @@ export const presignManifestAssets = withController(
     const creatorWallet = requireSessionWallet(req);
     const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
     const manifest = await requireOwnedManifest(manifestId, creatorWallet);
+    assertManifestAssetMutationAllowed(manifest.status);
     const inputs = Array.isArray(req.body.assets) ? req.body.assets : null;
 
     if (!inputs || inputs.length === 0) {
@@ -254,56 +287,85 @@ export const presignManifestAssets = withController(
     );
     await assertR2MonthlyUploadBudget(manifest.id, requestedBytes);
 
-    const uploads = [];
-
-    for (const assetPlan of assetPlans) {
-      const { assetType, orderIndex, sha256HexDigest, mimeType, fileSizeBytes } = assetPlan;
-      const extension = extensionForMimeType(mimeType);
-      const storageKey = `content/${manifest.id}/v/${manifest.version}/${orderIndex}-${sha256HexDigest.slice(
-        0,
-        12
-      )}.${extension}`;
-
-      const asset = await prisma.contentAsset.upsert({
-        where: {
-          manifestId_orderIndex: {
-            manifestId: manifest.id,
-            orderIndex,
-          },
-        },
-        update: {
-          assetType,
-          sha256Hex: sha256HexDigest,
-          mimeType,
-          fileSizeBytes,
-          storageKey,
-          cdnUrl: null,
-          uploadStatus: AssetUploadStatus.PENDING,
-          processingStatus: AssetProcessingStatus.NONE,
-          processingSource: null,
-          muxAssetId: null,
-          muxPlaybackId: null,
-          muxLastKnownStatus: null,
-          muxWebhookReceivedAt: null,
-          muxLastCheckedAt: null,
-          muxReadyAt: null,
-          muxReconcileAttempts: 0,
-          processingError: null,
-        },
-        create: {
-          manifestId: manifest.id,
-          assetType,
-          orderIndex,
-          sha256Hex: sha256HexDigest,
-          mimeType,
-          fileSizeBytes,
-          storageKey,
-          cdnUrl: null,
-          uploadStatus: AssetUploadStatus.PENDING,
-          processingStatus: AssetProcessingStatus.NONE,
-          muxReconcileAttempts: 0,
-        },
+    const assets = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "ContentManifest" WHERE "id" = ${manifest.id} FOR UPDATE`
+      );
+      const lockedManifest = await tx.contentManifest.findFirst({
+        where: { id: manifest.id, creatorWallet },
       });
+      if (!lockedManifest) {
+        throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
+      }
+      assertManifestAssetMutationAllowed(lockedManifest.status);
+
+      const records = [];
+      for (const assetPlan of assetPlans) {
+        const { assetType, orderIndex, sha256HexDigest, mimeType, fileSizeBytes } = assetPlan;
+        const extension = extensionForMimeType(mimeType);
+        const storageKey = `content/${lockedManifest.id}/v/${lockedManifest.version}/${orderIndex}-${sha256HexDigest.slice(
+          0,
+          12
+        )}.${extension}`;
+
+        records.push(
+          await tx.contentAsset.upsert({
+            where: {
+              manifestId_orderIndex: {
+                manifestId: lockedManifest.id,
+                orderIndex,
+              },
+            },
+            update: {
+              assetType,
+              sha256Hex: sha256HexDigest,
+              mimeType,
+              fileSizeBytes,
+              storageKey,
+              cdnUrl: null,
+              uploadStatus: AssetUploadStatus.PENDING,
+              processingStatus: AssetProcessingStatus.NONE,
+              processingSource: null,
+              muxAssetId: null,
+              muxPlaybackId: null,
+              muxLastKnownStatus: null,
+              muxWebhookReceivedAt: null,
+              muxLastCheckedAt: null,
+              muxReadyAt: null,
+              muxReconcileAttempts: 0,
+              processingError: null,
+            },
+            create: {
+              manifestId: lockedManifest.id,
+              assetType,
+              orderIndex,
+              sha256Hex: sha256HexDigest,
+              mimeType,
+              fileSizeBytes,
+              storageKey,
+              cdnUrl: null,
+              uploadStatus: AssetUploadStatus.PENDING,
+              processingStatus: AssetProcessingStatus.NONE,
+              muxReconcileAttempts: 0,
+            },
+          })
+        );
+      }
+
+      await tx.contentManifest.update({
+        where: { id: lockedManifest.id },
+        data: { status: ContentManifestStatus.UPLOADING },
+      });
+      return records;
+    });
+
+    const uploads = [];
+    for (const asset of assets) {
+      const assetType = asset.assetType;
+      const orderIndex = asset.orderIndex;
+      const mimeType = asset.mimeType;
+      const fileSizeBytes = asset.fileSizeBytes;
+      const storageKey = asset.storageKey;
 
       if (isVideoMimeType(mimeType)) {
         const multipartUpload = await r2Service.createMultipartUpload(
@@ -337,13 +399,6 @@ export const presignManifestAssets = withController(
         });
       }
     }
-
-    await prisma.contentManifest.update({
-      where: { id: manifest.id },
-      data: {
-        status: ContentManifestStatus.UPLOADING,
-      },
-    });
 
     ok(res, {
       manifestId: manifest.id,
@@ -385,6 +440,8 @@ export const completeManifestAssetUpload = withController(
       });
       return;
     }
+
+    assertManifestAssetMutationAllowed(asset.manifest.status);
 
     if (isVideoMimeType(asset.mimeType)) {
       const multipartUploadId = parseNonEmptyString(
@@ -446,60 +503,102 @@ export const finalizeContentManifest = withController("FINALIZE_MANIFEST_FAILED"
 
   const creatorWallet = requireSessionWallet(req);
   const manifestId = parseNonEmptyString(req.params.manifestId, "manifestId");
-  const manifest = await prisma.contentManifest.findFirst({
-    where: {
-      id: manifestId,
-      creatorWallet,
-    },
-    include: {
-      assets: {
-        orderBy: {
-          orderIndex: "asc",
+  const response = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "ContentManifest" WHERE "id" = ${manifestId} FOR UPDATE`
+    );
+    const manifest = await tx.contentManifest.findFirst({
+      where: { id: manifestId, creatorWallet },
+      include: {
+        assets: {
+          orderBy: { orderIndex: "asc" },
         },
       },
-    },
-  });
+    });
 
-  if (!manifest) {
-    throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
-  }
+    if (!manifest) {
+      throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
+    }
 
-  if (manifest.assets.length === 0) {
-    throw new HttpError(409, "MANIFEST_EMPTY", "manifest must contain at least one asset");
-  }
+    if (
+      manifest.status === ContentManifestStatus.READY ||
+      manifest.status === ContentManifestStatus.LOCKED ||
+      manifest.status === ContentManifestStatus.ANCHORED ||
+      manifest.status === ContentManifestStatus.PUBLISHED
+    ) {
+      if (
+        !manifest.manifestHashHex ||
+        !manifest.internalCanonicalUrl ||
+        !manifest.internalUrlDigestHex
+      ) {
+        throw new HttpError(
+          409,
+          "MANIFEST_INTEGRITY_MISMATCH",
+          "finalized manifest is missing immutable proof fields"
+        );
+      }
 
-  const incomplete = manifest.assets.find((asset) => asset.uploadStatus !== AssetUploadStatus.UPLOADED);
-  if (incomplete) {
-    throw new HttpError(
-      409,
-      "ASSET_UPLOAD_INCOMPLETE",
-      `asset ${incomplete.id} must reach UPLOADED before finalize`
+      const finalized = computeManifestFinalizeState({ manifest, assets: manifest.assets });
+      if (
+        finalized.manifestHashHex !== manifest.manifestHashHex ||
+        finalized.internalCanonicalUrl !== manifest.internalCanonicalUrl ||
+        finalized.internalUrlDigestHex !== manifest.internalUrlDigestHex
+      ) {
+        throw new HttpError(
+          409,
+          "MANIFEST_INTEGRITY_MISMATCH",
+          "stored manifest proof no longer matches its immutable content"
+        );
+      }
+
+      return {
+        ...serializeManifest(manifest),
+        internalCanonicalUrl: manifest.internalCanonicalUrl,
+        internalUrlDigestHex: manifest.internalUrlDigestHex,
+        plannedContentAnchorPda: finalized.plannedContentAnchorPda,
+      };
+    }
+
+    assertManifestAssetMutationAllowed(manifest.status);
+    if (manifest.assets.length === 0) {
+      throw new HttpError(409, "MANIFEST_EMPTY", "manifest must contain at least one asset");
+    }
+
+    const incomplete = manifest.assets.find(
+      (asset) => asset.uploadStatus !== AssetUploadStatus.UPLOADED
     );
-  }
+    if (incomplete) {
+      throw new HttpError(
+        409,
+        "ASSET_UPLOAD_INCOMPLETE",
+        `asset ${incomplete.id} must reach UPLOADED before finalize`
+      );
+    }
 
-  const finalized = computeManifestFinalizeState({
-    manifest,
-    assets: manifest.assets,
+    const finalized = computeManifestFinalizeState({ manifest, assets: manifest.assets });
+    const updated = await tx.contentManifest.update({
+      where: { id: manifest.id },
+      data: {
+        status: manifest.currentAnchorPda
+          ? ContentManifestStatus.ANCHORED
+          : ContentManifestStatus.READY,
+        captionTextHash: finalized.captionTextHash,
+        canonicalManifestJson: finalized.canonicalManifestJson as Prisma.InputJsonValue,
+        manifestHashHex: finalized.manifestHashHex,
+        internalCanonicalUrl: finalized.internalCanonicalUrl,
+        internalUrlDigestHex: finalized.internalUrlDigestHex,
+      },
+    });
+
+    return {
+      ...serializeManifest(updated),
+      internalCanonicalUrl: updated.internalCanonicalUrl,
+      internalUrlDigestHex: updated.internalUrlDigestHex,
+      plannedContentAnchorPda: finalized.plannedContentAnchorPda,
+    };
   });
 
-  const updated = await prisma.contentManifest.update({
-    where: { id: manifest.id },
-    data: {
-      status: manifest.currentAnchorPda ? ContentManifestStatus.ANCHORED : ContentManifestStatus.READY,
-      captionTextHash: finalized.captionTextHash,
-      canonicalManifestJson: finalized.canonicalManifestJson as Prisma.InputJsonValue,
-      manifestHashHex: finalized.manifestHashHex,
-      internalCanonicalUrl: finalized.internalCanonicalUrl,
-      internalUrlDigestHex: finalized.internalUrlDigestHex,
-    },
-  });
-
-  ok(res, {
-    ...serializeManifest(updated),
-    internalCanonicalUrl: updated.internalCanonicalUrl,
-    internalUrlDigestHex: updated.internalUrlDigestHex,
-    plannedContentAnchorPda: finalized.plannedContentAnchorPda,
-  });
+  ok(res, response);
 });
 
 export const createContentPublication = withController(
@@ -522,6 +621,7 @@ export const createContentPublication = withController(
     if (!manifest) {
       throw new HttpError(404, "MANIFEST_NOT_FOUND", "content manifest not found");
     }
+    assertManifestFinalized(manifest);
 
     const platform = parseNonEmptyString(req.body.platform, "platform").toUpperCase();
     const externalUrl = parseNonEmptyString(req.body.externalUrl, "externalUrl");
@@ -576,6 +676,8 @@ export const verifyContentPublication = withController(
     if (publication.manifest.creatorWallet !== creatorWallet) {
       throw new HttpError(403, "FORBIDDEN", "publication does not belong to this creator");
     }
+
+    assertManifestFinalized(publication.manifest);
 
     const verifiedAt = publication.verifiedAt ?? new Date();
     const updated = await prisma.contentPublication.update({

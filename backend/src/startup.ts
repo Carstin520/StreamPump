@@ -15,10 +15,12 @@ export const startBackgroundServices = async (runtimeConfig: RuntimeConfig): Pro
     console.error("[startup] indexer failed to start", error);
   }
 
-  try {
-    startManagedWalletJobWorker();
-  } catch (error) {
-    console.error("[startup] managed wallet job worker failed to start", error);
+  if (runtimeConfig.managedWallet.publicExecutionEnabled) {
+    try {
+      startManagedWalletJobWorker();
+    } catch (error) {
+      console.error("[startup] managed wallet job worker failed to start", error);
+    }
   }
 
   try {

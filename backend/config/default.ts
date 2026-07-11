@@ -31,6 +31,11 @@ export const config = {
     ),
   },
   managedWallet: {
+    publicExecutionEnabled: env.readBoolean(
+      process.env.PUBLIC_MANAGED_WALLET_EXECUTION_ENABLED,
+      false
+    ),
+    ephemeralSessionsEnabled: env.readBoolean(process.env.EPHEMERAL_SESSIONS_ENABLED, false),
     encryptionKey: env.readString(process.env.MANAGED_WALLET_ENCRYPTION_KEY, ""),
     jobWorkerConcurrency: env.readNumber(process.env.MANAGED_WALLET_JOB_CONCURRENCY, 5),
     jobWorkerPollMs: env.readNumber(process.env.MANAGED_WALLET_JOB_POLL_MS, 500),
@@ -99,6 +104,10 @@ export const config = {
       process.env.ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED,
       false
     ),
+    track2AutoSettlementEnabled: env.readBoolean(
+      process.env.ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED,
+      false
+    ),
     track1Cron: env.readString(process.env.ORACLE_TRACK1_CRON, "0 * * * *"),
     track2Cron: env.readString(process.env.ORACLE_TRACK2_CRON, "15 2 * * *"),
     track3Cron: env.readString(process.env.ORACLE_TRACK3_CRON, "45 2 * * *"),
@@ -140,6 +149,23 @@ export const config = {
     ipWindowMs: env.readNumber(process.env.ANTICHEAT_IP_WINDOW_MS, 5 * 60 * 1000),
     minInteractionEvents: env.readNumber(process.env.ANTICHEAT_MIN_INTERACTIONS, 3),
   },
+  pilot: {
+    s1PublicApiEnabled: env.readBoolean(process.env.S1_PUBLIC_API_ENABLED, false),
+    track2Enabled: env.readBoolean(process.env.TRACK2_ENABLED, false),
+    track3Enabled: env.readBoolean(process.env.TRACK3_ENABLED, false),
+    engagementRewardsEnabled: env.readBoolean(
+      process.env.ENGAGEMENT_REWARDS_ENABLED,
+      false
+    ),
+    track2MetricIngestionEnabled: env.readBoolean(
+      process.env.TRACK2_METRIC_INGESTION_ENABLED,
+      false
+    ),
+    prototypeRoutesEnabled: env.readBoolean(
+      process.env.PROTOTYPE_ROUTES_ENABLED,
+      process.env.NODE_ENV !== "production"
+    ),
+  },
   chainlink: {
     sourceApiBaseUrl: env.readString(
       process.env.CHAINLINK_SOURCE_API_BASE_URL,
@@ -147,6 +173,33 @@ export const config = {
     ),
     gatewayUrl: process.env.CHAINLINK_GATEWAY_URL,
   },
+};
+
+export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): string[] => {
+  const forbiddenPilotFeatures: Array<[boolean, string]> = [
+    [runtimeConfig.auth.allowLegacyWalletHeader, "AUTH_ALLOW_LEGACY_WALLET_HEADER"],
+    [runtimeConfig.auth.allowPreviewProviderExchange, "AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE"],
+    [runtimeConfig.auth.creatorAuthAllowPreviewTwitter, "CREATOR_AUTH_ALLOW_PREVIEW_TWITTER"],
+    [runtimeConfig.managedWallet.ephemeralSessionsEnabled, "EPHEMERAL_SESSIONS_ENABLED"],
+    [
+      runtimeConfig.managedWallet.publicExecutionEnabled,
+      "PUBLIC_MANAGED_WALLET_EXECUTION_ENABLED",
+    ],
+    [runtimeConfig.pilot.engagementRewardsEnabled, "ENGAGEMENT_REWARDS_ENABLED"],
+    [runtimeConfig.pilot.s1PublicApiEnabled, "S1_PUBLIC_API_ENABLED"],
+    [runtimeConfig.pilot.track2Enabled, "TRACK2_ENABLED"],
+    [runtimeConfig.pilot.track3Enabled, "TRACK3_ENABLED"],
+    [runtimeConfig.pilot.track2MetricIngestionEnabled, "TRACK2_METRIC_INGESTION_ENABLED"],
+    [runtimeConfig.pilot.prototypeRoutesEnabled, "PROTOTYPE_ROUTES_ENABLED"],
+    [runtimeConfig.s1.mockApiEnabled, "S1_MOCK_API_ENABLED"],
+    [runtimeConfig.oracle.schedulerEnabled, "ORACLE_SCHEDULER_ENABLED"],
+    [runtimeConfig.oracle.track2AutoSettlementEnabled, "ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED"],
+    [runtimeConfig.oracle.track3AutoSettlementEnabled, "ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED"],
+  ];
+
+  return forbiddenPilotFeatures
+    .filter(([enabled]) => enabled)
+    .map(([, variableName]) => variableName);
 };
 
 const validateProductionConfig = (runtimeConfig: typeof config): void => {
@@ -167,6 +220,10 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   if (runtimeConfig.email.deliveryMode === "console") {
     failures.push("EMAIL_DELIVERY_MODE=console is not allowed in production");
+  }
+
+  for (const variableName of getEnabledForbiddenPilotFeatures(runtimeConfig)) {
+    failures.push(`${variableName}=true is not allowed in the invite-only Pilot`);
   }
 
   if (!/^[0-9a-fA-F]{64}$/.test(runtimeConfig.managedWallet.encryptionKey)) {

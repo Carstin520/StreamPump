@@ -4,6 +4,7 @@
  */
 import { Router } from "express";
 
+import { config } from "../../config/default";
 import prototypeRoutes from "./prototype";
 import v1Routes from "./v1";
 import webhookRoutes from "./webhookRoutes";
@@ -11,7 +12,9 @@ import webhookRoutes from "./webhookRoutes";
 const router = Router();
 
 router.use("/v1", v1Routes);
-router.use("/prototype", prototypeRoutes);
+if (config.pilot.prototypeRoutesEnabled) {
+  router.use("/prototype", prototypeRoutes);
+}
 router.use("/webhooks", webhookRoutes);
 
 export default router;

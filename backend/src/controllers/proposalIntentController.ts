@@ -13,6 +13,7 @@ import { randomBytes } from "crypto";
 import { Request } from "express";
 import { PublicKey } from "@solana/web3.js";
 
+import { config } from "../../config/default";
 import {
   HttpError,
   ensureIdempotencyKey,
@@ -104,6 +105,42 @@ const allocateProposalNonce = async (
   throw new HttpError(409, "PROPOSAL_NONCE_COLLISION", "unable to allocate a unique proposal nonce");
 };
 
+export const assertPilotTrackBudgetsAllowed = (params: {
+  track2Enabled: boolean;
+  track3Enabled: boolean;
+  track2TargetValue: bigint;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: bigint;
+  maxEndorsementSpump: bigint;
+  track3UsdcDeposited: bigint;
+  track3DelayDays: number;
+}): void => {
+  if (
+    !params.track2Enabled &&
+    (params.track2TargetValue > 0n ||
+      params.track2MinAchievementBps > 0 ||
+      params.track2UsdcDeposited > 0n ||
+      params.maxEndorsementSpump > 0n)
+  ) {
+    throw new HttpError(
+      409,
+      "TRACK2_CLOSED_FOR_PILOT",
+      "Track 2 budgets, metrics, and endorsements are closed for the invite-only Pilot"
+    );
+  }
+
+  if (
+    !params.track3Enabled &&
+    (params.track3UsdcDeposited > 0n || params.track3DelayDays > 0)
+  ) {
+    throw new HttpError(
+      409,
+      "TRACK3_CLOSED_FOR_PILOT",
+      "Track 3 CPS settlement is closed for the invite-only Pilot"
+    );
+  }
+};
+
 export const createProposalIntent = withController(
   "CREATE_PROPOSAL_INTENT_FAILED",
   async (req, res) => {
@@ -185,6 +222,30 @@ export const createProposalIntent = withController(
       "maxEndorsementSpump",
       0n
     );
+    const track2TargetValue = parseNonNegativeBigInt(
+      req.body.track2TargetValue,
+      "track2TargetValue"
+    );
+    const track2UsdcDeposited = parseNonNegativeBigInt(
+      req.body.track2UsdcDeposited,
+      "track2UsdcDeposited"
+    );
+    const track3UsdcDeposited = parseNonNegativeBigInt(
+      req.body.track3UsdcDeposited,
+      "track3UsdcDeposited"
+    );
+    const track3DelayDays = parseNonNegativeInt(req.body.track3DelayDays, "track3DelayDays");
+
+    assertPilotTrackBudgetsAllowed({
+      track2Enabled: config.pilot.track2Enabled,
+      track3Enabled: config.pilot.track3Enabled,
+      track2TargetValue,
+      track2MinAchievementBps,
+      track2UsdcDeposited,
+      maxEndorsementSpump,
+      track3UsdcDeposited,
+      track3DelayDays,
+    });
 
     const intent = await prisma.proposalIntent.create({
       data: {
@@ -197,17 +258,11 @@ export const createProposalIntent = withController(
         nonce,
         track1BaseUsdc: parseNonNegativeBigInt(req.body.track1BaseUsdc, "track1BaseUsdc"),
         track2MetricType: parseTrack2MetricType(req.body.track2MetricType),
-        track2TargetValue: parseNonNegativeBigInt(req.body.track2TargetValue, "track2TargetValue"),
+        track2TargetValue,
         track2MinAchievementBps,
-        track2UsdcDeposited: parseNonNegativeBigInt(
-          req.body.track2UsdcDeposited,
-          "track2UsdcDeposited"
-        ),
-        track3UsdcDeposited: parseNonNegativeBigInt(
-          req.body.track3UsdcDeposited,
-          "track3UsdcDeposited"
-        ),
-        track3DelayDays: parseNonNegativeInt(req.body.track3DelayDays, "track3DelayDays"),
+        track2UsdcDeposited,
+        track3UsdcDeposited,
+        track3DelayDays,
         maxEndorsementSpump,
       },
     });

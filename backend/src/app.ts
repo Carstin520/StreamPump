@@ -67,7 +67,19 @@ export const createApp = (): Application => {
   app.use(createJsonMiddleware());
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      mode: process.env.NODE_ENV === "production" ? "INVITE_ONLY_PILOT" : "DEVELOPMENT",
+      automatedSettlement: config.oracle.schedulerEnabled,
+      publicFeatures: {
+        s1: config.pilot.s1PublicApiEnabled,
+        track2: config.pilot.track2Enabled,
+        track3: config.pilot.track3Enabled,
+        engagementRewards: config.pilot.engagementRewardsEnabled,
+        managedWalletExecution: config.managedWallet.publicExecutionEnabled,
+        ephemeralSessions: config.managedWallet.ephemeralSessionsEnabled,
+      },
+    });
   });
 
   app.use("/api", routes);
