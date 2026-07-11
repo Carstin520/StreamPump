@@ -153,6 +153,7 @@ export const config = {
     s1PublicApiEnabled: env.readBoolean(process.env.S1_PUBLIC_API_ENABLED, false),
     track2Enabled: env.readBoolean(process.env.TRACK2_ENABLED, false),
     track3Enabled: env.readBoolean(process.env.TRACK3_ENABLED, false),
+    emailAuthEnabled: env.readBoolean(process.env.EMAIL_AUTH_ENABLED, false),
     engagementRewardsEnabled: env.readBoolean(
       process.env.ENGAGEMENT_REWARDS_ENABLED,
       false
@@ -189,6 +190,7 @@ export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): 
     [runtimeConfig.pilot.s1PublicApiEnabled, "S1_PUBLIC_API_ENABLED"],
     [runtimeConfig.pilot.track2Enabled, "TRACK2_ENABLED"],
     [runtimeConfig.pilot.track3Enabled, "TRACK3_ENABLED"],
+    [runtimeConfig.pilot.emailAuthEnabled, "EMAIL_AUTH_ENABLED"],
     [runtimeConfig.pilot.track2MetricIngestionEnabled, "TRACK2_METRIC_INGESTION_ENABLED"],
     [runtimeConfig.pilot.prototypeRoutesEnabled, "PROTOTYPE_ROUTES_ENABLED"],
     [runtimeConfig.s1.mockApiEnabled, "S1_MOCK_API_ENABLED"],
@@ -218,7 +220,7 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     failures.push("CORS_ALLOWED_ORIGINS must include at least one frontend origin");
   }
 
-  if (runtimeConfig.email.deliveryMode === "console") {
+  if (runtimeConfig.pilot.emailAuthEnabled && runtimeConfig.email.deliveryMode === "console") {
     failures.push("EMAIL_DELIVERY_MODE=console is not allowed in production");
   }
 

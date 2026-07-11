@@ -78,6 +78,7 @@ export const createApp = (): Application => {
         engagementRewards: config.pilot.engagementRewardsEnabled,
         managedWalletExecution: config.managedWallet.publicExecutionEnabled,
         ephemeralSessions: config.managedWallet.ephemeralSessionsEnabled,
+        emailAuth: config.pilot.emailAuthEnabled,
       },
     });
   });

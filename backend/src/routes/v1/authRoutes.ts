@@ -28,8 +28,10 @@ router.post("/verify", verifyAuthChallenge);
 if (config.managedWallet.ephemeralSessionsEnabled) {
   router.post("/ephemeral-session", createEphemeralSession);
 }
-router.post("/email/request-code", requestEmailLoginCode);
-router.post("/email/verify-code", verifyEmailLoginCode);
+if (config.pilot.emailAuthEnabled) {
+  router.post("/email/request-code", requestEmailLoginCode);
+  router.post("/email/verify-code", verifyEmailLoginCode);
+}
 router.post("/provider-exchange", exchangeProviderSession);
 router.post("/sponsor/documents/presign", requireSessionAuth, presignSponsorDocumentUpload);
 router.post("/sponsor/register", requireSessionAuth, registerSponsorProfile);
