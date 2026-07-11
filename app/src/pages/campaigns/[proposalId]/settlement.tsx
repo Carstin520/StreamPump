@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBanner";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
+import { publicDemoEnabled } from "@/lib/feature-flags";
 import { formatUsdcAtomic } from "@/lib/formatting";
 import { useI18n } from "@/lib/i18n";
 import { findCreator, formatUsd } from "@/lib/public-data";
@@ -547,15 +548,18 @@ function SettlementPreviewNotice({
 export default function SettlementPage() {
   const router = useRouter();
   const { locale } = useI18n();
-  const [data, setData] = useState<SettlementData>(MOCK);
-  const [source, setSource] = useState<"live" | "mock">("mock");
+  // P0 truth gate: the local MOCK settlement is a demo-only fixture. Off the
+  // public demo flag, this page never seeds MOCK — it loads live campaign-proof
+  // fields or shows an honest unavailable state.
+  const demoAllowed = publicDemoEnabled();
+  const [data, setData] = useState<SettlementData | null>(demoAllowed ? MOCK : null);
+  const [source, setSource] = useState<"live" | "mock" | "loading" | "unavailable">(
+    demoAllowed ? "mock" : "loading",
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const creator = useMemo(() => findCreator("neo-park"), []);
   const creatorName = locale === "en" ? "Midnight Save" : creator.name;
   const routeProposalId = router.isReady ? String(router.query.proposalId ?? "").trim() : "";
-  const isVoided = data.status === "VOIDED";
-  const totalBudget = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
-  const totalCreatorPayout = data.track1.budgetUsd + data.track2.creatorPayoutUsd + data.track3.creatorPayoutUsd;
 
   useEffect(() => {
     if (!router.isReady || !routeProposalId) {
@@ -573,16 +577,54 @@ export default function SettlementPage() {
       })
       .catch((error) => {
         if (!cancelled) {
-          setData(MOCK);
-          setSource("mock");
           setLoadError(error instanceof Error ? error.message : String(error));
+          if (demoAllowed) {
+            setData(MOCK);
+            setSource("mock");
+          } else {
+            setData(null);
+            setSource("unavailable");
+          }
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, routeProposalId]);
+  }, [demoAllowed, router.isReady, routeProposalId]);
+
+  if (!data) {
+    return (
+      <>
+        <Head>
+          <title>StreamPump | Settlement Preview</title>
+        </Head>
+        <PageShell
+          eyebrow="S2 Settlement Preview"
+          subtitle={`Tri-track settlement view for ${creatorName} (${creator.handle}). This page reads live campaign-proof fields; it does not trigger oracle workers.`}
+          title="Settlement Dashboard Preview"
+        >
+          <div className="space-y-6">
+            <SettlementPreviewNotice error={loadError} isLive={false} proposalId={routeProposalId} />
+            <section className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-white">
+                {source === "unavailable" ? "No live settlement projection" : "Loading settlement projection…"}
+              </p>
+              <p className="mx-auto mt-2 max-w-[460px] text-xs leading-6 text-[#8ea0ba]">
+                This page does not render a local settlement fixture in production. Track budgets and
+                settlement markers load from the public campaign proof API for this proposal.
+                {loadError ? ` API reason: ${loadError}` : ""}
+              </p>
+            </section>
+          </div>
+        </PageShell>
+      </>
+    );
+  }
+
+  const isVoided = data.status === "VOIDED";
+  const totalBudget = data.track1.budgetUsd + data.track2.budgetUsd + data.track3.budgetUsd;
+  const totalCreatorPayout = data.track1.budgetUsd + data.track2.creatorPayoutUsd + data.track3.creatorPayoutUsd;
 
   return (
     <>

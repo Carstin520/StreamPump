@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { LoginPreviewMode } from "@/lib/api/types";
+import { previewProviderExchangeEnabled, publicDemoEnabled } from "@/lib/feature-flags";
 import { useI18n } from "@/lib/i18n";
 import { loginPreviewDefaultMode } from "@/lib/public-data";
 import { WORKSPACE_PATH, buildLoginHref, normalizeInternalHref } from "@/lib/routes";
@@ -21,6 +22,9 @@ const getPreviewMode = (value: string | string[] | undefined): LoginPreviewMode 
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
+  // Mirror AuthOptionsPanel's demo-auth gate: without both flags the Pilot is
+  // external-wallet-only, so the access copy must not promise social/managed entry.
+  const demoAuthEnabled = publicDemoEnabled() && previewProviderExchangeEnabled();
   const [previewMode, setPreviewMode] = useState<LoginPreviewMode>(loginPreviewDefaultMode);
   const nextHref = normalizeInternalHref(
     typeof router.query.next === "string" ? router.query.next : null,
@@ -73,7 +77,7 @@ export default function LoginPage() {
                     {t("auth.accessTitle")}
                   </h1>
                   <p className="mt-6 max-w-[440px] text-base leading-8 text-[#95a6bf]">
-                    {t("auth.accessBody")}
+                    {t(demoAuthEnabled ? "auth.accessBody" : "auth.accessBodyPilot")}
                   </p>
                 </div>
 

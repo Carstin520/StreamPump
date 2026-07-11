@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import type { GetStaticProps } from "next";
 import { useEffect, useMemo, useState } from "react";
 
@@ -10,6 +11,7 @@ import { getAccountInfluence } from "@/lib/api/influence";
 import { AccountMeRecord, CurrentUserRecord, InfluenceRecord } from "@/lib/api/types";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import { useI18n } from "@/lib/i18n";
+import { PROFILE_PATH, buildLoginHref } from "@/lib/routes";
 import {
   loadPublicFeedPageProps,
   PUBLIC_FEED_REVALIDATE_SECONDS,
@@ -26,30 +28,33 @@ const shortenWallet = (wallet: string) => `${wallet.slice(0, 4)}...${wallet.slic
 
 type Translate = (key: string, params?: Record<string, string>) => string;
 
-const buildSessionUser = (
-  baseUser: CurrentUserRecord,
-  account: AccountMeRecord | null,
-  t: Translate,
-): CurrentUserRecord => {
-  if (!account?.profile) {
-    return baseUser;
-  }
-
-  const displayName = account.profile.displayName || account.identity?.displayName || baseUser.name;
-  const handle = account.profile.handle ? `@${account.profile.handle}` : baseUser.handle;
-  const roleLabel = t(`me.role.${account.profile.role.toLowerCase()}`);
+// Build a REAL, session-backed profile from the account record only. There is no
+// mock/fixture fallback: fields we cannot know for a real user (social counts,
+// avatar photo, banner) are left neutral so nothing fake is rendered.
+const buildSessionUser = (account: AccountMeRecord, t: Translate): CurrentUserRecord => {
+  const displayName =
+    account.profile?.displayName ||
+    account.identity?.displayName ||
+    shortenWallet(account.wallet);
+  const handle = account.profile?.handle ? account.profile.handle : shortenWallet(account.wallet);
+  const roleLabel = account.profile?.role
+    ? t(`me.role.${account.profile.role.toLowerCase()}`)
+    : null;
 
   return {
-    ...baseUser,
-    id: account.profile.handle ?? account.wallet,
+    id: account.profile?.handle ?? account.wallet,
     name: displayName,
     handle,
-    bio: t("me.sessionBio", { role: roleLabel }),
+    location: "",
+    bio: roleLabel ? t("me.sessionBio", { role: roleLabel }) : "",
+    followingCount: 0,
+    followersCount: 0,
+    totalLikesAndSavesCount: 0,
     sessionMode:
-      account.storageStatus === "LIVE"
-        ? t("me.sessionLive")
-        : t("me.sessionMigration"),
-    primaryWallet: shortenWallet(account.wallet),
+      account.storageStatus === "LIVE" ? t("me.sessionLive") : t("me.sessionMigration"),
+    primaryWallet: account.wallet,
+    avatarSrc: "",
+    bannerSrc: "",
   };
 };
 
@@ -59,7 +64,6 @@ export default function MePage({
 }: PublicFeedPageProps) {
   const { t } = useI18n();
   const {
-    currentUser,
     currentUserSavedPosts,
     error,
     loading,
@@ -107,9 +111,12 @@ export default function MePage({
 
   const account = accountState.kind === "ready" ? accountState.account : null;
   const sessionBackedUser = useMemo(
-    () => buildSessionUser(currentUser, account, t),
-    [account, currentUser, t],
+    () => (account ? buildSessionUser(account, t) : null),
+    [account, t],
   );
+
+  const isSignedOut = accountState.kind === "signed-out";
+  const isChecking = accountState.kind === "checking";
 
   return (
     <>
@@ -119,21 +126,58 @@ export default function MePage({
       <PageShell hideTopbar>
         <div className="mx-auto max-w-[1280px] space-y-4 px-1 py-3">
           <MeReadinessNotice accountState={accountState} error={!loading ? error : null} />
-          {loading ? (
+          {isChecking ? (
             <div className="py-10 text-sm text-[#8ea0ba]">{t("common.loading")}</div>
+          ) : isSignedOut ? (
+            <MeSignedOut />
+          ) : sessionBackedUser ? (
+            loading ? (
+              <div className="py-10 text-sm text-[#8ea0ba]">{t("common.loading")}</div>
+            ) : (
+              <MeSurface
+                currentUser={sessionBackedUser}
+                influence={influence}
+                posts={posts}
+                savedPosts={currentUserSavedPosts}
+              />
+            )
           ) : (
-            <MeSurface
-              currentUser={sessionBackedUser}
-              influence={influence}
-              posts={posts}
-              savedPosts={currentUserSavedPosts}
-            />
+            <MeAccountUnavailable />
           )}
         </div>
       </PageShell>
     </>
   );
 }
+
+const MeSignedOut = () => {
+  const { t } = useI18n();
+  return (
+    <section className="mx-auto max-w-[520px] rounded-[20px] border border-white/[0.06] bg-white/[0.02] px-6 py-14 text-center">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-white/[0.1] bg-white/[0.04] text-2xl text-[#8ea0ba]">
+        ↳
+      </div>
+      <h1 className="mt-4 text-lg font-semibold text-white">{t("me.signedOutTitle")}</h1>
+      <p className="mx-auto mt-2 max-w-[360px] text-sm leading-6 text-[#8ea0ba]">{t("me.signedOutBody")}</p>
+      <Link
+        className="mt-5 inline-flex rounded-full bg-[#de402a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#ea523e]"
+        href={buildLoginHref({ nextPath: PROFILE_PATH })}
+      >
+        {t("me.signInCta")}
+      </Link>
+    </section>
+  );
+};
+
+const MeAccountUnavailable = () => {
+  const { t } = useI18n();
+  return (
+    <section className="mx-auto max-w-[520px] rounded-[20px] border tone-state-warning px-6 py-12 text-center">
+      <h1 className="text-lg font-semibold text-white">{t("me.accountUnavailableTitle")}</h1>
+      <p className="mx-auto mt-2 max-w-[360px] text-sm leading-6 text-[#9aabc4]">{t("me.accountUnavailableBody")}</p>
+    </section>
+  );
+};
 
 const MeReadinessNotice = ({
   accountState,

@@ -25,6 +25,7 @@ import {
   LoginPreviewMode,
 } from "@/lib/api/types";
 import { storeAuthSession } from "@/lib/auth-session";
+import { publicDemoEnabled, previewProviderExchangeEnabled } from "@/lib/feature-flags";
 import { useI18n } from "@/lib/i18n";
 import { loginAccounts, loginMethods } from "@/lib/public-data";
 import { WORKSPACE_PATH } from "@/lib/routes";
@@ -69,9 +70,16 @@ const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
   "wallet-preview-account": null,
 };
 
-const previewSocialAuthEnabled =
-  process.env.NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH === "true" ||
-  process.env.NODE_ENV === "development";
+/**
+ * P0 truth gate: every non-wallet identity path (email OTP, Google/Apple social
+ * preview, account-switch fixtures, local sessions, and the platform managed-wallet
+ * choice) is a labeled demo affordance. It may only run when BOTH the public-demo
+ * master switch and the preview provider-exchange flag are on. There is no implicit
+ * NODE_ENV=development fallback: production/default login exposes only wallet
+ * challenge + signature, and a failed real wallet auth never mints a local session.
+ */
+const isDemoAuthEnabled = () =>
+  publicDemoEnabled() && previewProviderExchangeEnabled();
 
 const PREVIEW_MANAGED_WALLET = "C8tzqwn5ghvKEgkcwf822vxQA5fgt7cmr49mqCtyK8fX";
 
@@ -132,13 +140,16 @@ export const AuthOptionsPanel = ({
 }: AuthOptionsPanelProps) => {
   const router = useRouter();
   const { t } = useI18n();
+  const demoAuthEnabled = isDemoAuthEnabled();
   const { connected, connecting, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState("alex@streampump.local");
   const [emailCode, setEmailCode] = useState("");
   const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<string>(() => t("auth.initialAction"));
+  const [lastAction, setLastAction] = useState<string>(() =>
+    t(demoAuthEnabled ? "auth.initialAction" : "auth.initialActionPilot"),
+  );
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [pendingExternalWalletBind, setPendingExternalWalletBind] = useState(false);
   const [pendingIdentitySession, setPendingIdentitySession] = useState<AuthSessionRecord | null>(null);
@@ -187,7 +198,7 @@ export const AuthOptionsPanel = ({
   }, [nextHref, pendingIdentitySession, router]);
 
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
-    if (!previewSocialAuthEnabled) {
+    if (!demoAuthEnabled) {
       setLastAction(t("auth.socialDisabled"));
       return;
     }
@@ -211,7 +222,7 @@ export const AuthOptionsPanel = ({
 
     try {
       if (!signMessage) {
-        if (!previewSocialAuthEnabled) {
+        if (!demoAuthEnabled) {
           setLastAction("Wallet message signing is unavailable, and local preview sessions are disabled.");
           return;
         }
@@ -239,7 +250,7 @@ export const AuthOptionsPanel = ({
         return;
       }
 
-      if (!previewSocialAuthEnabled) {
+      if (!demoAuthEnabled) {
         setLastAction(error instanceof Error ? error.message : "Wallet session creation failed.");
         return;
       }
@@ -251,7 +262,7 @@ export const AuthOptionsPanel = ({
     } finally {
       setBusyKey(null);
     }
-  }, [nextHref, publicKey, router, signMessage, t]);
+  }, [demoAuthEnabled, nextHref, publicKey, router, signMessage, t]);
 
   const completeExternalWalletBind = useCallback(async () => {
     if (!pendingIdentitySession) {
@@ -272,7 +283,7 @@ export const AuthOptionsPanel = ({
 
     try {
       if (!signMessage || pendingIdentitySession.accessToken.startsWith("preview-local.")) {
-        if (!previewSocialAuthEnabled) {
+        if (!demoAuthEnabled) {
           setLastAction("External wallet binding preview is disabled by environment variables.");
           return;
         }
@@ -315,7 +326,7 @@ export const AuthOptionsPanel = ({
     } finally {
       setBusyKey(null);
     }
-  }, [nextHref, pendingIdentitySession, publicKey, router, setVisible, signMessage, t]);
+  }, [demoAuthEnabled, nextHref, pendingIdentitySession, publicKey, router, setVisible, signMessage, t]);
 
   useEffect(() => {
     if (!pendingWalletLogin || !connected || !publicKey || busyKey) {
@@ -335,7 +346,7 @@ export const AuthOptionsPanel = ({
 
   const handleWalletLogin = async () => {
     if (!connected || !publicKey) {
-      if (previewSocialAuthEnabled) {
+      if (demoAuthEnabled) {
         // Fully-local wallet preview — no browser wallet extension required.
         const session = createLocalWalletSession(PREVIEW_MANAGED_WALLET);
         storeAuthSession(session);
@@ -360,7 +371,7 @@ export const AuthOptionsPanel = ({
       return;
     }
 
-    if (previewSocialAuthEnabled) {
+    if (demoAuthEnabled) {
       // Local mock OTP — no email is actually sent; any code continues.
       setEmailCode("000000");
       setEmailCodeExpiresAt(createPreviewExpiresAt());
@@ -391,7 +402,7 @@ export const AuthOptionsPanel = ({
       return;
     }
 
-    if (previewSocialAuthEnabled) {
+    if (demoAuthEnabled) {
       // Local mock verify — accept any code and build a local email identity session.
       beginWalletChoice(createLocalProviderSession(resolveMethodIdentity("email")), "邮箱 OTP");
       return;
@@ -440,24 +451,28 @@ export const AuthOptionsPanel = ({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_64%)]" />
 
       <div className="relative">
-        <div className="mb-8 flex items-center justify-end gap-2">
-          {(["welcome", "switch"] as LoginPreviewMode[]).map((previewMode) => (
-            <button
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                mode === previewMode
-                  ? "liquid-pill-active text-white"
-                  : "liquid-pill text-[#97a7bf] hover:text-white"
-              }`}
-              key={previewMode}
-              onClick={() => onModeChange(previewMode)}
-              type="button"
-            >
-              {previewMode === "welcome" ? t("auth.welcome") : t("auth.switchAccount")}
-            </button>
-          ))}
-        </div>
+        {/* Account-switch fixtures are a labeled demo affordance: hide the mode
+            switcher entirely unless demo auth is enabled. */}
+        {demoAuthEnabled ? (
+          <div className="mb-8 flex items-center justify-end gap-2">
+            {(["welcome", "switch"] as LoginPreviewMode[]).map((previewMode) => (
+              <button
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  mode === previewMode
+                    ? "liquid-pill-active text-white"
+                    : "liquid-pill text-[#97a7bf] hover:text-white"
+                }`}
+                key={previewMode}
+                onClick={() => onModeChange(previewMode)}
+                type="button"
+              >
+                {previewMode === "welcome" ? t("auth.welcome") : t("auth.switchAccount")}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-        {previewSocialAuthEnabled ? (
+        {demoAuthEnabled ? (
           <div className="mb-5 rounded-full border border-[#f3b33e]/25 bg-[#2a1f0b]/80 px-3 py-1.5 text-center text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#f8d48a]">
             Preview Session Enabled
           </div>
@@ -503,13 +518,15 @@ export const AuthOptionsPanel = ({
               </button>
             </div>
           </div>
-        ) : mode === "welcome" ? (
+        ) : !demoAuthEnabled || mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="type-h1 font-semibold text-white">{t("auth.welcomeBack")}</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.signInOrCreate")}</p>
+              <p className="mt-3 text-sm text-[#93a3bb]">{t(demoAuthEnabled ? "auth.signInOrCreate" : "auth.signInOrCreatePilot")}</p>
             </div>
 
+            {demoAuthEnabled ? (
+            <>
             <label className="block">
               <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-[#7f90ab]">
                 {t("common.email")}
@@ -550,14 +567,19 @@ export const AuthOptionsPanel = ({
                 </button>
               </div>
             ) : null}
+            </>
+            ) : null}
 
             <div className="space-y-3">
-              {loginMethods.map((method) => {
+              {(demoAuthEnabled
+                ? loginMethods
+                : loginMethods.filter((method) => method.id === "wallet")
+              ).map((method) => {
                 const identity = method.id === "wallet" ? null : resolveMethodIdentity(method.id);
                 const methodBusy = method.id === "email"
                   ? busyKey === "email" || busyKey === "email-verify"
                   : busyKey === (identity?.providerSubject ?? "wallet");
-                const socialDisabled = method.id !== "wallet" && method.id !== "email" && !previewSocialAuthEnabled;
+                const socialDisabled = method.id !== "wallet" && method.id !== "email" && !demoAuthEnabled;
 
                 return (
                   <button
@@ -584,7 +606,7 @@ export const AuthOptionsPanel = ({
                               : t("auth.sendEmailCode")
                             : socialDisabled
                               ? t("auth.socialDisabledShort")
-                              : getLoginMethodSubtitle(method.id, t)}
+                              : getLoginMethodSubtitle(method.id, t, demoAuthEnabled)}
                         </p>
                       </div>
                     </div>
@@ -703,11 +725,15 @@ const getLoginMethodLabel = (id: LoginMethodRecord["id"], t: TFunction) => {
   return t("auth.walletLogin");
 };
 
-const getLoginMethodSubtitle = (id: LoginMethodRecord["id"], t: TFunction) => {
+const getLoginMethodSubtitle = (
+  id: LoginMethodRecord["id"],
+  t: TFunction,
+  demoAuthEnabled: boolean,
+) => {
   if (id === "email") return t("auth.emailSubtitle");
   if (id === "google") return t("auth.googleSubtitle");
   if (id === "apple") return t("auth.appleSubtitle");
-  return t("auth.walletSubtitle");
+  return t(demoAuthEnabled ? "auth.walletSubtitle" : "auth.walletSubtitlePilot");
 };
 
 const getAccountSessionLabel = (id: string, t: TFunction) => {

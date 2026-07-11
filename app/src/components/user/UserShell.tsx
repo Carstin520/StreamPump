@@ -4,8 +4,8 @@ import { ReactNode } from "react";
 
 import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
 import { SettingsMenu } from "@/components/shared/SettingsMenu";
+import { shortenWalletLabel, useSessionIdentity } from "@/hooks/useSessionIdentity";
 import { useI18n } from "@/lib/i18n";
-import { currentUser } from "@/lib/public-data";
 import {
   ACTIVITY_PATH,
   EXPLORE_PATH,
@@ -14,30 +14,32 @@ import {
   REWARDS_PATH,
   TRENDING_PATH,
   WORKSPACE_PATH,
+  buildLoginHref,
   isRouteActive,
 } from "@/lib/routes";
-
-// Seeded preview value — no real SPUMP balance is wired into the consumer shell.
-const SEEDED_SPUMP_ENERGY = 215;
 
 type ShellNavItem = {
   href: string;
   glyph: string;
   labelKey: string;
   subKey?: string;
-  badge?: string;
   prefixes: string[];
   separatorBefore?: boolean;
 };
 
 const NAV_ITEMS: ShellNavItem[] = [
   { href: EXPLORE_PATH, glyph: "▦", labelKey: "nav.explore", subKey: "nav.exploreSub", prefixes: [EXPLORE_PATH, "/posts"] },
-  { href: ACTIVITY_PATH, glyph: "◉", labelKey: "nav.activity", badge: "3", prefixes: [ACTIVITY_PATH] },
+  { href: ACTIVITY_PATH, glyph: "◉", labelKey: "nav.activity", prefixes: [ACTIVITY_PATH] },
   { href: TRENDING_PATH, glyph: "✦", labelKey: "nav.trending", subKey: "nav.trendingSub", prefixes: [TRENDING_PATH] },
   { href: PORTFOLIO_PATH, glyph: "◈", labelKey: "nav.portfolio", subKey: "nav.portfolioSub", prefixes: [PORTFOLIO_PATH] },
   { href: REWARDS_PATH, glyph: "⚡", labelKey: "nav.rewards", subKey: "nav.rewardsSub", prefixes: [REWARDS_PATH] },
   { href: WORKSPACE_PATH, glyph: "✎", labelKey: "nav.workspace", prefixes: [WORKSPACE_PATH], separatorBefore: true },
 ];
+
+const initialFor = (value: string | null | undefined) => {
+  const trimmed = value?.trim().replace(/^@+/, "");
+  return trimmed ? trimmed.charAt(0).toUpperCase() : "·";
+};
 
 export const UserShell = ({
   children,
@@ -48,6 +50,22 @@ export const UserShell = ({
 }) => {
   const router = useRouter();
   const { t } = useI18n();
+  const identity = useSessionIdentity();
+  // Narrow directly on the discriminant so the signed-in fields are type-safe.
+  const profile =
+    identity.status === "signed-in"
+      ? {
+          name:
+            identity.displayName ||
+            (identity.handle ? `@${identity.handle}` : shortenWalletLabel(identity.wallet)),
+          sub:
+            identity.handle && identity.displayName
+              ? `@${identity.handle}`
+              : shortenWalletLabel(identity.wallet),
+          initial: initialFor(identity.displayName || identity.handle || identity.wallet),
+        }
+      : null;
+  const profileHref = profile ? PROFILE_PATH : buildLoginHref({ nextPath: router.asPath });
 
   return (
     <main className="relative min-h-[100dvh] bg-[#090d14] text-[#f5f7fb]">
@@ -91,21 +109,14 @@ export const UserShell = ({
                       <span className="text-[length:var(--fs-nano)] font-medium text-[#7486a1]">{t(item.subKey)}</span>
                     ) : null}
                   </span>
-                  {item.badge ? (
-                    <span
-                      className="ml-auto hidden rounded-full px-1.5 text-[length:var(--fs-nano)] font-bold leading-[18px] lg:block"
-                      style={{ color: "#ff9d8c", background: "color-mix(in srgb, var(--brand) 16%, transparent)" }}
-                    >
-                      {item.badge}
-                    </span>
-                  ) : null}
                 </Link>
               </div>
             );
           })}
         </nav>
 
-        {/* Bottom: SPUMP energy + profile + small language switch */}
+        {/* Bottom: rewards entry + real/anonymous identity + language switch.
+            No fabricated balance or fixture user is rendered here. */}
         <div className="space-y-2 border-t border-white/[0.06] p-2 lg:p-3">
           <Link className="hidden lg:block" href={REWARDS_PATH}>
             <div
@@ -117,26 +128,45 @@ export const UserShell = ({
             >
               <span className="text-base" style={{ color: "#f9bf57" }}>⚡</span>
               <span className="text-xs font-medium" style={{ color: "#f6cdb9" }}>{t("shell.spumpEnergy")}</span>
-              <span className="ml-auto font-mono text-base font-extrabold tabular-nums" style={{ color: "#ffe2cf" }}>
-                {SEEDED_SPUMP_ENERGY}
+              <span className="ml-auto text-base font-bold" style={{ color: "#ffe2cf" }} aria-hidden>
+                ›
               </span>
             </div>
           </Link>
 
           <div className="flex items-center gap-2">
-            <Link className="min-w-0 flex-1" href={PROFILE_PATH}>
-              <div className="flex items-center gap-2.5 rounded-[13px] px-2 py-1.5 transition hover:bg-white/[0.05]">
-                <img
-                  alt={currentUser.name}
-                  className="h-8 w-8 flex-none rounded-full object-cover"
-                  src={currentUser.avatarSrc}
-                />
-                <div className="hidden min-w-0 lg:block">
-                  <p className="truncate text-[13px] font-semibold text-white">{currentUser.handle}</p>
-                  <p className="truncate text-[length:var(--fs-nano)] text-[#7486a1]">{t("shell.scoutLevel")}</p>
+            {profile ? (
+              <Link className="min-w-0 flex-1" href={profileHref}>
+                <div className="flex items-center gap-2.5 rounded-[13px] px-2 py-1.5 transition hover:bg-white/[0.05]">
+                  <span
+                    aria-hidden
+                    className="grid h-8 w-8 flex-none place-items-center rounded-full text-sm font-bold text-white"
+                    style={{ background: "linear-gradient(150deg, #de402a, #f0795f)" }}
+                  >
+                    {profile.initial}
+                  </span>
+                  <div className="hidden min-w-0 lg:block">
+                    <p className="truncate text-[13px] font-semibold text-white">{profile.name}</p>
+                    <p className="truncate font-mono text-[length:var(--fs-nano)] text-[#7486a1]">{profile.sub}</p>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            ) : (
+              <Link className="min-w-0 flex-1" href={profileHref}>
+                <div className="flex items-center gap-2.5 rounded-[13px] px-2 py-1.5 transition hover:bg-white/[0.05]">
+                  <span
+                    aria-hidden
+                    className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.12] bg-white/[0.04] text-sm text-[#7486a1]"
+                  >
+                    ↳
+                  </span>
+                  <div className="hidden min-w-0 lg:block">
+                    <p className="truncate text-[13px] font-semibold text-white">{t("shell.signIn")}</p>
+                    <p className="truncate text-[length:var(--fs-nano)] text-[#7486a1]">{t("shell.signInSub")}</p>
+                  </div>
+                </div>
+              </Link>
+            )}
             <div className="hidden lg:block">
               <SettingsMenu openUp />
             </div>

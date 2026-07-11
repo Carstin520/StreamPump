@@ -1,4 +1,5 @@
 import { CommentRecord, PostRecord } from "@/lib/api/types";
+import { publicDemoEnabled } from "@/lib/feature-flags";
 import { findLocalEngagementByTitle } from "@/lib/mocks/discover";
 import { apiClient } from "./client";
 
@@ -46,8 +47,18 @@ type PublicFeedPostResponse = {
   post: PublicFeedPostApiRecord;
 };
 
-const FALLBACK_POSTER = "/mock/user-surface/posts/cat-portrait.svg";
 const PUBLIC_FEED_TIMEOUT_MS = 2500;
+
+// Honest neutral placeholder for a post that has no renderable image asset. This
+// is a generated flat panel (no borrowed/fake photo, no /mock fixture path) so a
+// missing cover reads as "no preview available", not as real seeded media.
+const createNeutralCoverDataUrl = (seed: string): string => {
+  const hash = Array.from(seed).reduce((value, char) => value + char.charCodeAt(0), 0);
+  const hue = 210 + (hash % 24);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 400"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="hsl(${hue} 18% 16%)"/><stop offset="100%" stop-color="hsl(${hue} 16% 10%)"/></linearGradient></defs><rect width="320" height="400" fill="url(#g)"/><text x="160" y="208" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="hsl(${hue} 12% 58%)">No preview</text></svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 const slugify = (value: string) =>
   value
@@ -155,19 +166,23 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   const imageAssets = sortedAssets.filter(
     (asset) => asset.assetType === "IMAGE" || asset.assetType === "COVER"
   );
-  const coverSrc = pickBestAssetUrl(coverAsset) ?? FALLBACK_POSTER;
-  const videoSrc = pickBestVideoUrl(videoAsset);
-  const gallerySrcs = imageAssets
-    .map((asset) => pickBestAssetUrl(asset))
-    .filter((value): value is string => Boolean(value));
   const creatorName = post.creatorName?.trim() || "Imported Creator";
   const creatorKey = slugify(creatorName);
   const avatarSeed = `${creatorKey}:${post.slug}`;
   const resolvedTitle = post.title?.trim() || post.slug;
-  // The public-feed projection does not carry engagement yet; enrich with the
-  // seeded local data (comments + like/save counts) when the (unique, stable)
-  // title matches.
-  const localEngagement = findLocalEngagementByTitle(resolvedTitle);
+  const coverSrc =
+    pickBestAssetUrl(coverAsset) ?? createNeutralCoverDataUrl(avatarSeed);
+  const videoSrc = pickBestVideoUrl(videoAsset);
+  const gallerySrcs = imageAssets
+    .map((asset) => pickBestAssetUrl(asset))
+    .filter((value): value is string => Boolean(value));
+  // The public-feed projection does not carry engagement. In explicit public
+  // demo mode we may enrich with seeded local data (comments + like/save counts)
+  // matched by the unique/stable title; in production nothing is inferred, so
+  // engagement stays zero/empty and never shows fabricated activity.
+  const localEngagement = publicDemoEnabled()
+    ? findLocalEngagementByTitle(resolvedTitle)
+    : null;
 
   return {
     id: post.postId,

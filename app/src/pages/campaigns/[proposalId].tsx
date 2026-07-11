@@ -13,6 +13,7 @@ import {
   ProposalDetailResponse,
   PublicCampaignProofResponse,
 } from "@/lib/api/workspace";
+import { publicDemoEnabled } from "@/lib/feature-flags";
 import { formatIsoLabel, formatUsdcAtomic, shortenWallet } from "@/lib/formatting";
 import { useI18n } from "@/lib/i18n";
 import { findCreatorStrict } from "@/lib/mocks/discover";
@@ -93,6 +94,7 @@ const resolveProposalRouteId = (
 export default function CampaignDetailPage() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const demoEnabled = publicDemoEnabled();
   const [state, setState] = useState<PageState>({ kind: "loading" });
 
   useEffect(() => {
@@ -109,10 +111,16 @@ export default function CampaignDetailPage() {
     }
 
     setState({ kind: "loading" });
-    const mockProposal = findMockProposalDetail(proposalId);
-    if (mockProposal) {
-      setState({ kind: "ready", data: mockProposal, source: "demo-fallback" });
-      return;
+
+    // P0 truth gate: only auto-select a seeded fixture proposal when the public
+    // demo flag is on. In production the route always resolves against the real
+    // campaign-proof / proposal API and surfaces an honest error on failure.
+    if (publicDemoEnabled()) {
+      const mockProposal = findMockProposalDetail(proposalId);
+      if (mockProposal) {
+        setState({ kind: "ready", data: mockProposal, source: "demo-fallback" });
+        return;
+      }
     }
 
     const loadProposal = async () => {
@@ -183,13 +191,13 @@ export default function CampaignDetailPage() {
         <title>{`StreamPump | ${pageTitle}`}</title>
       </Head>
       <PageShell
-        subtitle={t("campaign.pageSubtitle")}
+        subtitle={t(demoEnabled ? "campaign.pageSubtitle" : "campaign.pageSubtitleLive")}
         title={t("campaign.pageTitle")}
       >
         <ProductReadinessBanner
-          description={t("campaign.readinessBannerDesc")}
-          status="SEEDED_DEMO"
-          title={t("campaign.readinessBannerTitle")}
+          description={t(demoEnabled ? "campaign.readinessBannerDesc" : "campaign.readinessBannerDescLive")}
+          status={demoEnabled ? "SEEDED_DEMO" : "BACKEND_READY_UI_GAP"}
+          title={t(demoEnabled ? "campaign.readinessBannerTitle" : "campaign.readinessBannerTitleLive")}
         />
 
         {state.kind === "loading" ? <AsyncStateCard body={t("campaign.loadingBody")} title={t("campaign.loading")} /> : null}
@@ -323,7 +331,10 @@ const CampaignProofView = ({
 
   const track1Settled = p.status === "RESOLVED_SUCCESS";
   const track2Settled = Boolean(p.track2SettledAt);
-  const vaultAtomic = (
+  // Sum of the three Track budgets. This is the committed/funded budget, NOT a
+  // live on-chain vault balance. The distinct on-chain account (proposal PDA) is
+  // shown separately in the proof rows below.
+  const committedBudgetAtomic = (
     toBigSafe(p.track1BaseUsdc) + toBigSafe(p.track2UsdcDeposited) + toBigSafe(p.track3UsdcDeposited)
   ).toString();
 
@@ -352,10 +363,21 @@ const CampaignProofView = ({
         {/* LIVE CAMPAIGN panel */}
         <Panel className="space-y-3" style={{ background: "linear-gradient(160deg,rgba(101,236,175,0.08),rgba(255,255,255,0.03))", borderColor: "rgba(101,236,175,0.22)" }}>
           <div className="flex items-center gap-2.5">
-            <span className="h-[7px] w-[7px] rounded-full bg-[#65ecaf] shadow-[0_0_10px_#65ecaf]" />
-            <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#7ce0b0]">
-              {t("campaign.liveCampaignTag")}
-            </span>
+            {isDemoProposal ? (
+              <>
+                <span className="h-[7px] w-[7px] rounded-full bg-[#f3b33e] shadow-[0_0_10px_#f3b33e]" />
+                <span className="font-mono text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#f3c66e]">
+                  SEEDED_DEMO
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="h-[7px] w-[7px] rounded-full bg-[#65ecaf] shadow-[0_0_10px_#65ecaf]" />
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#7ce0b0]">
+                  {t("campaign.liveCampaignTag")}
+                </span>
+              </>
+            )}
             {proofStatus ? (
               <span className="ml-auto rounded-full border border-[#65ecaf]/30 bg-[#0e1f17]/60 px-2.5 py-0.5 text-[length:var(--fs-nano)] font-semibold text-[#8df0c4]">
                 {proofStatus}
@@ -420,7 +442,7 @@ const CampaignProofView = ({
         <Panel className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[length:var(--fs-caption)] font-semibold text-[#93a2bb]">{t("campaign.threeTrackSettlement")}</span>
-            <span className="text-[length:var(--fs-micro)] text-[#7e90aa]">{t("campaign.vaultLabel")} {formatUsdcAtomic(vaultAtomic)}</span>
+            <span className="text-[length:var(--fs-micro)] text-[#7e90aa]">{t("campaign.vaultLabel")} {formatUsdcAtomic(committedBudgetAtomic)}</span>
           </div>
           <div className="space-y-2.5">
             <TrackRow
@@ -482,7 +504,7 @@ const CampaignProofView = ({
               label={t("campaign.proofFundingTx")}
               value={p.onChainTxSignature ? shortenWallet(p.onChainTxSignature) : t("campaign.pendingPrivate")}
             />
-            <ProofRow label={t("campaign.proofVault")} value={formatUsdcAtomic(vaultAtomic)} />
+            <ProofRow label={t("campaign.proofVault")} value={formatUsdcAtomic(committedBudgetAtomic)} />
           </div>
           <p className="text-[length:var(--fs-micro)] text-[#7e90aa]">
             {t("campaign.oracleSync")}{" "}
