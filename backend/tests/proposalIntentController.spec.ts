@@ -114,28 +114,43 @@ describe("proposalIntentController helpers", () => {
       sponsorWallet: sponsor.toBase58(),
       lockedManifestHashHex: "a".repeat(64),
       deadlineUnix: 1_900_000_000n,
+      nonce: 7n,
       track1BaseUsdc: 100n,
+      track2MetricType: "VIEWS",
+      track2TargetValue: 0n,
+      track2MinAchievementBps: 0,
       track2UsdcDeposited: 0n,
       track3UsdcDeposited: 0n,
+      track3DelayDays: 0,
+      maxEndorsementSpump: 0n,
     };
     const onChain: any = {
       creator,
       sponsor,
       contentHashHex: "a".repeat(64),
       contentAnchorPda: anchor,
+      contentKind: "SHORT_VIDEO",
       deadlineUnix: 1_900_000_000n,
+      nonce: 7n,
       track1BaseUsdc: 100n,
+      track2MetricType: "VIEWS",
+      track2TargetValue: 0n,
+      track2MinAchievementBps: 0,
       track2UsdcDeposited: 0n,
       track3UsdcDeposited: 0n,
+      track3DelayDays: 0,
+      maxEndorsementSpump: 0n,
       status: "FUNDED",
     };
     expect(confirmedLaunchMismatchFields({
       intent,
+      manifestContentType: "SHORT_VIDEO",
       expectedContentAnchorPda: anchor,
       onChain,
     })).to.deep.equal([]);
     expect(confirmedLaunchMismatchFields({
       intent,
+      manifestContentType: "SHORT_VIDEO",
       expectedContentAnchorPda: anchor,
       onChain: { ...onChain, track3UsdcDeposited: 1n, status: "OPEN" },
     })).to.have.members(["track3UsdcDeposited", "status"]);

@@ -76,4 +76,5 @@ if [ "$#" -eq 0 ]; then
   set -- programs/tests/*.spec.ts
 fi
 
+export NODE_OPTIONS="${NODE_OPTIONS:-} --import=$ROOT_DIR/backend/tests/chai-cjs-compat.mjs"
 ./node_modules/.bin/ts-mocha -p ./tsconfig.json -t "$TIMEOUT_MS" "$@"

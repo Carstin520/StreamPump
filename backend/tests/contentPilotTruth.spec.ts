@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 
 import { HttpError } from "../src/controllers/http";
+import { serializeAsset } from "../src/controllers/contentManifestShared";
 import { config } from "../config/default";
 import {
   acquirePresignLocks,
@@ -124,6 +125,29 @@ describe("invite-only Pilot content truth", () => {
         uploadStatus: AssetUploadStatus.UPLOADED,
       })
     ).to.equal(false);
+  });
+
+  it("returns a stable storage verification code without exposing provider error details", () => {
+    const serialized = serializeAsset({
+      id: "asset-1",
+      assetType: "IMAGE",
+      orderIndex: 0,
+      storageKey: "verified/image.png",
+      cdnUrl: null,
+      uploadStatus: "FAILED",
+      processingStatus: "ERRORED",
+      muxAssetId: null,
+      muxPlaybackId: null,
+      muxLastKnownStatus: null,
+      storageVerificationError: "HEAD https://secret-endpoint.example?token=secret failed",
+      updatedAt: new Date("2026-07-12T00:00:00.000Z"),
+    });
+    expect(serialized).to.include({
+      hasStorageVerificationError: true,
+      storageVerificationErrorCode: "STORAGE_VERIFICATION_FAILED",
+    });
+    expect(JSON.stringify(serialized)).not.to.include("secret-endpoint");
+    expect(JSON.stringify(serialized)).not.to.include("token=secret");
   });
 
   it("keeps an already verified asset only when a repeated presign declaration is identical", () => {

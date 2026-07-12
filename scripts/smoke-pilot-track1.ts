@@ -14,6 +14,7 @@ type ApiEnvelope<T> = {
 
 type SettlementResponse = {
   status: string;
+  txSignature?: string | null;
 };
 
 type CampaignProof = {
@@ -197,11 +198,38 @@ const run = async () => {
     );
   }
 
+  activeStage = "Track1 idempotent replay assertion";
+  const settlementReplay = await request<SettlementResponse>(
+    `/internal/settlements/${encodeURIComponent(proposalPda)}/track1`,
+    {
+      method: "POST",
+      headers: {
+        "x-internal-operator-key": operatorKey,
+        "x-idempotency-key": idempotencyKey,
+      },
+      body: { confirmation: "SETTLE_TRACK1_MANUALLY" },
+    }
+  );
+  const proofAfterReplay = await request<CampaignProof>(
+    `/campaigns/${encodeURIComponent(proposalPda)}/public`
+  );
+  if (
+    settlementReplay.status !== settlement.status ||
+    proofAfterReplay.proof.latestSettlementTxSignature !==
+      campaign.proof.latestSettlementTxSignature
+  ) {
+    throw new ExpectedBlocker(
+      "TRACK1_IDEMPOTENT_REPLAY_FAILED",
+      "Replaying the same Track1 operation changed its status or settlement proof signature."
+    );
+  }
+
   console.log(
     JSON.stringify({
       ok: true,
       proposalPda,
       settlementStatus: settlement.status,
+      replayStatus: settlementReplay.status,
       proofStatus: campaign.proofStatus,
       track1Claimed: true,
       integrityVerified: true,

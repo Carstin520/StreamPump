@@ -9,6 +9,7 @@ import {
   defaultPilotChainSafetyDependencies,
   type PilotChainSafetyDependencies,
 } from "./src/services/pilotChainSafety";
+import { appStartupReadiness } from "./src/services/startupReadiness";
 import { startBackgroundServices } from "./src/startup";
 
 export const startBackend = async (
@@ -23,7 +24,11 @@ export const startBackend = async (
 
   return app.listen(port, () => {
     console.log(`[backend] listening on :${port}`);
-    void startBackgroundServices(runtimeConfig);
+    void startBackgroundServices(runtimeConfig).catch((_error) => {
+      appStartupReadiness.markFailed("database");
+      appStartupReadiness.complete();
+      console.error("[startup] unexpected background service initialization failure");
+    });
   });
 };
 

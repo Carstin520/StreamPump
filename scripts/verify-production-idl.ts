@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import path from "path";
+import { isDeepStrictEqual } from "util";
 
 const EXPECTED_PROGRAM_ADDRESS = "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp";
 const MIN_ACTIVE_INSTRUCTIONS = 35;
@@ -39,8 +40,10 @@ const idlPath = path.resolve(
   process.cwd(),
   process.argv[2] ?? "backend/idl/streampump_core.json"
 );
-const rawIdl = readFileSync(idlPath, "utf8");
-const idl = JSON.parse(rawIdl) as ProductionIdl;
+const readIdl = (filePath: string): ProductionIdl =>
+  JSON.parse(readFileSync(filePath, "utf8")) as ProductionIdl;
+
+const idl = readIdl(idlPath);
 
 if (idl.address !== EXPECTED_PROGRAM_ADDRESS) {
   fail(`unexpected program address ${String(idl.address)}`);
@@ -70,7 +73,20 @@ for (const required of REQUIRED_ACCOUNT_TYPES) {
   }
 }
 
+const authoritativePathArg = process.argv[3]?.trim();
+let authoritativeMessage = "";
+if (authoritativePathArg) {
+  const authoritativePath = path.resolve(process.cwd(), authoritativePathArg);
+  const authoritativeIdl = readIdl(authoritativePath);
+  if (!isDeepStrictEqual(idl, authoritativeIdl)) {
+    fail(
+      `packaged IDL schema drifted from generated Anchor IDL ${authoritativePath}; regenerate backend/idl/streampump_core.json`
+    );
+  }
+  authoritativeMessage = `; exact schema match ${authoritativePath}`;
+}
+
 console.log(
   `Verified production IDL ${idlPath}: ${instructions.length} instructions, ` +
-    `${accounts.length} accounts, ${types.length} types.`
+    `${accounts.length} accounts, ${types.length} types${authoritativeMessage}.`
 );

@@ -8,10 +8,12 @@
  */
 import "../backend/config/loadEnv";
 
-import { createHash, randomUUID } from "crypto";
+import { createHash } from "crypto";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 import type { Keypair } from "@solana/web3.js";
+import { ed25519 } from "@noble/curves/ed25519";
+import bs58 from "bs58";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -50,6 +52,16 @@ type AccountMeResponse = {
   };
 };
 
+type AuthChallengeResponse = {
+  nonce: string;
+  message: string;
+};
+
+type AuthSessionResponse = {
+  accessToken: string;
+  wallet: string;
+};
+
 type ContentManifestResponse = {
   manifestId: string;
   creatorWallet: string;
@@ -72,11 +84,13 @@ type PresignResponse = {
       presignedUrl: string;
     }>;
   }>;
+  completedAssets?: AssetRecord[];
 };
 
 type AssetRecord = {
   assetId: string;
   assetType: string;
+  orderIndex: number;
   processingStatus: string;
   muxAssetId: string | null;
   muxPlaybackId: string | null;
@@ -166,6 +180,24 @@ type ProposalResponse = {
   };
 };
 
+type PublicCampaignProofResponse = {
+  proposalPda: string;
+  proofStatus: string;
+  manifest: {
+    manifestId: string;
+    manifestHashHex: string | null;
+    currentAnchorPda: string | null;
+  } | null;
+  proof: {
+    contentHashHex: string | null;
+    contentAnchorPda: string | null;
+    contentAnchorTx: string | null;
+    fundingTxSignature: string | null;
+    latestSettlementTxSignature: string | null;
+  };
+  integrity?: Record<string, boolean>;
+};
+
 class ExpectedBlocker extends Error {
   readonly code: string;
   readonly details?: JsonValue;
@@ -205,9 +237,12 @@ const apiBaseUrl = normalizeBaseUrl(
 );
 
 const waitForMuxReadySeconds = Number(process.env.STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS ?? 0);
-const proposalDeadlineSeconds = Number(
-  process.env.STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_SECONDS ?? 6 * 24 * 60 * 60
-);
+const smokeRunId = (process.env.STREAM_PUMP_SMOKE_RUN_ID ?? "").trim();
+const uploadAttempt = (process.env.STREAM_PUMP_SMOKE_UPLOAD_ATTEMPT ?? "1").trim();
+const bundleAttempt = (process.env.STREAM_PUMP_SMOKE_BUNDLE_ATTEMPT ?? "1").trim();
+
+const smokeIdempotencyKey = (stage: string, attempt?: string): string =>
+  ["pilot-corridor", smokeRunId, stage, attempt].filter(Boolean).join(":");
 
 const isTruthyEnv = (name: string): boolean => {
   const value = process.env[name]?.trim().toLowerCase();
@@ -416,6 +451,25 @@ const keypairFromEnv = async (name: string): Promise<RuntimeKeypair | null> => {
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw) as number[]));
 };
 
+const signInWallet = async (wallet: RuntimeKeypair): Promise<AuthSessionResponse> => {
+  const challenge = await request<AuthChallengeResponse>("/auth/challenge", {
+    method: "POST",
+    body: { wallet: wallet.publicKey.toBase58() },
+  });
+  const signature = ed25519.sign(
+    Buffer.from(challenge.message, "utf8"),
+    wallet.secretKey.slice(0, 32)
+  );
+  return request<AuthSessionResponse>("/auth/verify", {
+    method: "POST",
+    body: {
+      wallet: wallet.publicKey.toBase58(),
+      nonce: challenge.nonce,
+      signature: bs58.encode(signature),
+    },
+  });
+};
+
 const completeUpload = async (
   creatorToken: string,
   manifestId: string,
@@ -433,7 +487,7 @@ const completeUpload = async (
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `asset-complete-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("asset-complete", uploadAttempt),
       },
     });
     return;
@@ -463,7 +517,7 @@ const completeUpload = async (
     method: "POST",
     token: creatorToken,
     headers: {
-      "x-idempotency-key": `asset-complete-${randomUUID()}`,
+      "x-idempotency-key": smokeIdempotencyKey("asset-complete", uploadAttempt),
     },
     body: {
       multipartUploadId: upload.multipartUploadId,
@@ -504,24 +558,72 @@ const pollMuxReadiness = async (
 const usdc = (value: number): string => String(Math.floor(value * 1_000_000));
 
 const proposalDeadlineUnix = (): string => {
-  const safeDeadlineSeconds =
-    Number.isFinite(proposalDeadlineSeconds) && proposalDeadlineSeconds > 0
-      ? Math.floor(proposalDeadlineSeconds)
-      : 6 * 24 * 60 * 60;
-
-  return String(Math.floor(Date.now() / 1000) + safeDeadlineSeconds);
+  const value = (process.env.STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_UNIX ?? "").trim();
+  if (!/^\d+$/.test(value) || BigInt(value) <= BigInt(Math.floor(Date.now() / 1000))) {
+    throw new ExpectedBlocker(
+      "STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_UNIX_REQUIRED",
+      "Set one stable future STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_UNIX and reuse it with the same smoke run id."
+    );
+  }
+  return value;
 };
 
 const run = async () => {
   beginStage("environment validation");
-  const creatorToken = requireEnv("STREAM_PUMP_SMOKE_CREATOR_TOKEN");
-  const sponsorWallet = requireEnv("STREAM_PUMP_SMOKE_SPONSOR_WALLET");
+  if (!smokeRunId) {
+    throw new ExpectedBlocker(
+      "STREAM_PUMP_SMOKE_RUN_ID_REQUIRED",
+      "Set a stable STREAM_PUMP_SMOKE_RUN_ID so an interrupted smoke can replay safely."
+    );
+  }
   const operatorKey = requireEnv("STREAM_PUMP_SMOKE_OPERATOR_KEY");
   const mediaPath = requireEnv("STREAM_PUMP_SMOKE_MEDIA_PATH");
+  const creatorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON");
+  const sponsorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON");
+  if (!creatorKeypair || !sponsorKeypair) {
+    throw new ExpectedBlocker(
+      "EXTERNAL_WALLET_KEYPAIRS_REQUIRED",
+      "Set disposable creator and sponsor keypairs; the smoke verifies the real wallet challenge/signature flow before using either session."
+    );
+  }
+  artifacts.runId = smokeRunId;
+
+  beginStage("external wallet authentication");
+  const creatorSession = await signInWallet(creatorKeypair);
+  const sponsorSession = await signInWallet(sponsorKeypair);
+  const creatorToken = creatorSession.accessToken;
+  const sponsorToken = sponsorSession.accessToken;
+  const sponsorWallet = sponsorKeypair.publicKey.toBase58();
+  artifacts.creatorWallet = creatorSession.wallet;
+  artifacts.sponsorWallet = sponsorSession.wallet;
+  const sponsorAccount = await request<AccountMeResponse>("/account/me", {
+    token: sponsorToken,
+  });
+  if (
+    sponsorAccount.wallet !== sponsorWallet ||
+    sponsorAccount.storageStatus !== "LIVE" ||
+    sponsorAccount.profile?.role !== "SPONSOR"
+  ) {
+    throw new ExpectedBlocker(
+      "SPONSOR_ACCOUNT_NOT_READY",
+      "The authenticated sponsor wallet must have a live SPONSOR account profile before launch.",
+      {
+        walletMatches: sponsorAccount.wallet === sponsorWallet,
+        storageStatus: sponsorAccount.storageStatus,
+        role: sponsorAccount.profile?.role ?? null,
+      }
+    );
+  }
+  addStep("creator and sponsor external-wallet challenge/signature sessions verified");
 
   beginStage("creator account verification");
   const account = await request<AccountMeResponse>("/account/me", { token: creatorToken });
-  artifacts.creatorWallet = account.wallet;
+  if (account.wallet !== creatorKeypair.publicKey.toBase58()) {
+    throw new ExpectedBlocker(
+      "CREATOR_SESSION_WALLET_MISMATCH",
+      "The authenticated creator session does not match the configured creator keypair."
+    );
+  }
   artifacts.accountStorageStatus = account.storageStatus;
 
   if (account.storageStatus !== "LIVE") {
@@ -551,7 +653,7 @@ const run = async () => {
       body: {
         role: "CREATOR",
         displayName: process.env.STREAM_PUMP_SMOKE_CREATOR_NAME?.trim() || "StreamPump Smoke Creator",
-        handle: process.env.STREAM_PUMP_SMOKE_CREATOR_HANDLE?.trim() || `smoke-${Date.now()}`,
+        handle: process.env.STREAM_PUMP_SMOKE_CREATOR_HANDLE?.trim() || `smoke-${smokeRunId}`,
         completeOnboarding: true,
       },
     });
@@ -570,11 +672,11 @@ const run = async () => {
     method: "POST",
     token: creatorToken,
     headers: {
-      "x-idempotency-key": `manifest-${randomUUID()}`,
+      "x-idempotency-key": smokeIdempotencyKey("manifest"),
     },
     body: {
       contentType: media.isVideo ? "SHORT_VIDEO" : "IMAGE_CAROUSEL",
-      title: process.env.STREAM_PUMP_SMOKE_TITLE?.trim() || `Production corridor smoke ${new Date().toISOString()}`,
+      title: process.env.STREAM_PUMP_SMOKE_TITLE?.trim() || `Production corridor smoke ${smokeRunId}`,
       captionText:
         process.env.STREAM_PUMP_SMOKE_CAPTION?.trim() ||
         "Smoke-tested content published through the real StreamPump backend pipeline.",
@@ -594,7 +696,7 @@ const run = async () => {
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `presign-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("presign", uploadAttempt),
       },
       body: {
         assets: [
@@ -610,12 +712,17 @@ const run = async () => {
     }
   );
   const upload = presign.uploads[0];
-  if (!upload) {
+  const completedAsset = presign.completedAssets?.find((asset) => asset.orderIndex === 0);
+  if (!upload && !completedAsset) {
     throw new Error("backend did not return an upload plan");
   }
-
-  await completeUpload(creatorToken, manifest.manifestId, upload, media.body, media.mimeType);
-  addStep("R2 upload completed through backend presign");
+  if (upload) {
+    await completeUpload(creatorToken, manifest.manifestId, upload, media.body, media.mimeType);
+    addStep("R2 upload completed through backend presign");
+  } else {
+    addStep("previously verified R2 asset reused for this smoke run");
+  }
+  const assetId = upload?.assetId ?? (completedAsset as AssetRecord).assetId;
 
   if (media.isVideo) {
     await request("/internal/mux/reconcile/run-once", {
@@ -630,7 +737,7 @@ const run = async () => {
     const muxAsset = await pollMuxReadiness(
       creatorToken,
       manifest.manifestId,
-      upload.assetId,
+      assetId,
       operatorKey
     );
     artifacts.muxAsset = (muxAsset ?? null) as JsonValue;
@@ -652,7 +759,7 @@ const run = async () => {
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `finalize-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("finalize"),
       },
     }
   );
@@ -675,7 +782,7 @@ const run = async () => {
     method: "POST",
     token: creatorToken,
     headers: {
-      "x-idempotency-key": `publication-${randomUUID()}`,
+      "x-idempotency-key": smokeIdempotencyKey("publication"),
     },
     body: {
       manifestId: manifest.manifestId,
@@ -747,7 +854,7 @@ const run = async () => {
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `proposal-intent-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("proposal-intent"),
       },
       body: {
         manifestId: manifest.manifestId,
@@ -782,7 +889,7 @@ const run = async () => {
     method: "POST",
     token: creatorToken,
     headers: {
-      "x-idempotency-key": `intent-lock-${randomUUID()}`,
+      "x-idempotency-key": smokeIdempotencyKey("intent-lock"),
     },
   });
   artifacts.plannedProposalPda = locked.plannedProposalPda;
@@ -795,7 +902,7 @@ const run = async () => {
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `intent-build-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("intent-build", bundleAttempt),
       },
       body: {
         submitMode: allowChainSubmit ? "SERVER_RELAY" : "CLIENT_RELAY",
@@ -808,11 +915,7 @@ const run = async () => {
   addStep("proposal launch bundle built");
 
   beginStage("proposal transaction signing");
-  const creatorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON");
-  const sponsorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON");
-  const sponsorToken = process.env.STREAM_PUMP_SMOKE_SPONSOR_TOKEN?.trim();
-
-  if (!creatorKeypair || !build.bundle.versionedTxBase64) {
+  if (!build.bundle.versionedTxBase64) {
     throw new ExpectedBlocker(
       "CREATOR_SIGNATURE_REQUIRED",
       "Set STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON for a disposable creator wallet to continue from bundle build to campaign proof.",
@@ -830,7 +933,7 @@ const run = async () => {
       method: "POST",
       token: creatorToken,
       headers: {
-        "x-idempotency-key": `intent-creator-sign-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("intent-creator-sign", bundleAttempt),
       },
       body: {
         bundleId: build.bundle.bundleId,
@@ -840,13 +943,11 @@ const run = async () => {
   );
   addStep("creator partial signature accepted");
 
-  if (!sponsorKeypair || !sponsorToken || !allowChainSubmit) {
+  if (!allowChainSubmit) {
     throw new ExpectedBlocker(
       "SPONSOR_CHAIN_SUBMIT_REQUIRED",
-      "Set STREAM_PUMP_SMOKE_SPONSOR_TOKEN, STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON, and STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT=1 to relay a fully signed proposal and verify campaign detail.",
+      "Set STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT=1 to relay the fully signed disposable-wallet proposal and verify campaign proof.",
       {
-        hasSponsorToken: Boolean(sponsorToken),
-        hasSponsorKeypair: Boolean(sponsorKeypair),
         allowChainSubmit,
       }
     );
@@ -863,7 +964,7 @@ const run = async () => {
       method: "POST",
       token: sponsorToken,
       headers: {
-        "x-idempotency-key": `intent-submit-${randomUUID()}`,
+        "x-idempotency-key": smokeIdempotencyKey("intent-submit", bundleAttempt),
       },
       body: {
         bundleId: build.bundle.bundleId,
@@ -897,7 +998,48 @@ const run = async () => {
     token: sponsorToken,
   });
   artifacts.proposal = proposal.proposal as JsonValue;
-  addStep("campaign detail proof state verified");
+  const publicProof = await request<PublicCampaignProofResponse>(
+    `/campaigns/${encodeURIComponent(proposalId)}/public`
+  );
+  const requiredIntegrity = [
+    "manifestFinalized",
+    "assetsReady",
+    "operatorApprovedPublication",
+    "contentHashMatchesManifest",
+    "contentAnchorMatchesManifest",
+    "contentAnchorTransactionPresent",
+    "track1OnlyBudget",
+  ];
+  const failedIntegrity = requiredIntegrity.filter(
+    (key) => publicProof.integrity?.[key] !== true
+  );
+  const publicProofMismatch =
+    publicProof.proposalPda !== proposalId ||
+    publicProof.manifest?.manifestId !== manifest.manifestId ||
+    publicProof.manifest?.manifestHashHex !== finalized.manifestHashHex ||
+    publicProof.proof.contentHashHex !== finalized.manifestHashHex ||
+    publicProof.manifest?.currentAnchorPda !== publicProof.proof.contentAnchorPda ||
+    !publicProof.proof.contentAnchorTx ||
+    !publicProof.proof.fundingTxSignature;
+  if (publicProofMismatch || failedIntegrity.length > 0) {
+    throw new ExpectedBlocker(
+      "PUBLIC_CAMPAIGN_PROOF_INCOMPLETE",
+      "The confirmed launch did not produce a complete public manifest/anchor/funding proof.",
+      {
+        publicProofMismatch,
+        failedIntegrity,
+      }
+    );
+  }
+  artifacts.publicCampaignProof = {
+    proposalPda: publicProof.proposalPda,
+    proofStatus: publicProof.proofStatus,
+    manifestId: publicProof.manifest.manifestId,
+    contentAnchorTx: publicProof.proof.contentAnchorTx,
+    fundingTxSignature: publicProof.proof.fundingTxSignature,
+    integrity: publicProof.integrity ?? {},
+  } as JsonValue;
+  addStep("authenticated proposal and complete public campaign proof verified");
 };
 
 run()

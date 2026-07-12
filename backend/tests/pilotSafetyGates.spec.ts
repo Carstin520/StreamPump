@@ -28,6 +28,8 @@ import {
 } from "../src/services/pilotChainSafety";
 
 describe("Pilot safety gates", () => {
+  const testOracleAuthority = Keypair.generate().publicKey.toBase58();
+
   const runConfigImport = (env: Record<string, string | undefined>) => {
     const repoRoot = path.resolve(__dirname, "../..");
     return spawnSync(
@@ -300,7 +302,11 @@ describe("Pilot safety gates", () => {
         dependencyCalls += 1;
         throw new Error("must not run");
       },
-      async fetchProtocolUsdcMint() {
+      getLocalOracleAuthority() {
+        dependencyCalls += 1;
+        throw new Error("must not run");
+      },
+      async fetchProtocolConfigSafety() {
         dependencyCalls += 1;
         throw new Error("must not run");
       },
@@ -336,9 +342,16 @@ describe("Pilot safety gates", () => {
         dependencyCalls += 1;
         return { executable: true };
       },
-      async fetchProtocolUsdcMint() {
+      getLocalOracleAuthority() {
         dependencyCalls += 1;
-        return runtimeConfig.pilot.expectedUsdcMint;
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety() {
+        dependencyCalls += 1;
+        return {
+          usdcMint: runtimeConfig.pilot.expectedUsdcMint,
+          oracleAuthority: testOracleAuthority,
+        };
       },
     };
 
@@ -365,8 +378,8 @@ describe("Pilot safety gates", () => {
     });
     const genesisCalls: Array<{ endpoint: string; timeoutMs: number }> = [];
     const programCalls: Array<{ endpoint: string; programId: string; timeoutMs: number }> = [];
-    let mintReads = 0;
-    const mintTimeouts: number[] = [];
+    let protocolReads = 0;
+    const protocolTimeouts: number[] = [];
     const dependencies: PilotChainSafetyDependencies = {
       async getGenesisHash(endpoint, timeoutMs) {
         genesisCalls.push({ endpoint, timeoutMs });
@@ -376,10 +389,13 @@ describe("Pilot safety gates", () => {
         programCalls.push({ endpoint, programId, timeoutMs });
         return { executable: true };
       },
-      async fetchProtocolUsdcMint(timeoutMs) {
-        mintReads += 1;
-        mintTimeouts.push(timeoutMs);
-        return expectedUsdcMint;
+      getLocalOracleAuthority() {
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety(timeoutMs) {
+        protocolReads += 1;
+        protocolTimeouts.push(timeoutMs);
+        return { usdcMint: expectedUsdcMint, oracleAuthority: testOracleAuthority };
       },
     };
 
@@ -400,8 +416,8 @@ describe("Pilot safety gates", () => {
         timeoutMs: 654,
       },
     ]);
-    expect(mintReads).to.equal(1);
-    expect(mintTimeouts).to.deep.equal([654]);
+    expect(protocolReads).to.equal(1);
+    expect(protocolTimeouts).to.deep.equal([654]);
   });
 
   it("rejects non-devnet or unavailable RPCs without leaking their URLs", async () => {
@@ -417,8 +433,14 @@ describe("Pilot safety gates", () => {
       async getProgramAccountInfo() {
         return { executable: true };
       },
-      async fetchProtocolUsdcMint() {
-        return runtimeConfig.pilot.expectedUsdcMint;
+      getLocalOracleAuthority() {
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety() {
+        return {
+          usdcMint: runtimeConfig.pilot.expectedUsdcMint,
+          oracleAuthority: testOracleAuthority,
+        };
       },
     };
 
@@ -468,8 +490,14 @@ describe("Pilot safety gates", () => {
       async getProgramAccountInfo() {
         return programAccount;
       },
-      async fetchProtocolUsdcMint() {
-        return runtimeConfig.pilot.expectedUsdcMint;
+      getLocalOracleAuthority() {
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety() {
+        return {
+          usdcMint: runtimeConfig.pilot.expectedUsdcMint,
+          oracleAuthority: testOracleAuthority,
+        };
       },
     });
 
@@ -510,8 +538,14 @@ describe("Pilot safety gates", () => {
           async getProgramAccountInfo(endpoint) {
             throw new Error(`RPC failed at ${endpoint}`);
           },
-          async fetchProtocolUsdcMint() {
-            return runtimeConfig.pilot.expectedUsdcMint;
+          getLocalOracleAuthority() {
+            return testOracleAuthority;
+          },
+          async fetchProtocolConfigSafety() {
+            return {
+              usdcMint: runtimeConfig.pilot.expectedUsdcMint,
+              oracleAuthority: testOracleAuthority,
+            };
           },
         },
         "production"
@@ -537,8 +571,14 @@ describe("Pilot safety gates", () => {
       async getProgramAccountInfo() {
         return { executable: true };
       },
-      async fetchProtocolUsdcMint() {
-        return Keypair.generate().publicKey.toBase58();
+      getLocalOracleAuthority() {
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety() {
+        return {
+          usdcMint: Keypair.generate().publicKey.toBase58(),
+          oracleAuthority: testOracleAuthority,
+        };
       },
     };
 
@@ -553,16 +593,64 @@ describe("Pilot safety gates", () => {
         runtimeConfig,
         {
           ...dependencies,
-          async fetchProtocolUsdcMint() {
+          async fetchProtocolConfigSafety() {
             throw new Error(`read failed via ${secretRpc}`);
           },
         },
         "production"
       )
     );
-    expect(unreadable.message).to.contain("could not read the on-chain protocol USDC mint");
+    expect(unreadable.message).to.contain("could not read the on-chain protocol configuration");
     expect(unreadable.message).not.to.contain(secretRpc);
     expect(unreadable.message).not.to.contain("do-not-log");
+  });
+
+  it("requires the manual Track 1 Oracle signer to match ProtocolConfig", async () => {
+    const runtimeConfig = pilotChainRuntimeConfig();
+    const onChainOracle = Keypair.generate().publicKey.toBase58();
+    const baseDependencies: PilotChainSafetyDependencies = {
+      async getGenesisHash() {
+        return SOLANA_DEVNET_GENESIS_HASH;
+      },
+      async getProgramAccountInfo() {
+        return { executable: true };
+      },
+      getLocalOracleAuthority() {
+        return testOracleAuthority;
+      },
+      async fetchProtocolConfigSafety() {
+        return {
+          usdcMint: runtimeConfig.pilot.expectedUsdcMint,
+          oracleAuthority: onChainOracle,
+        };
+      },
+    };
+
+    const mismatch = await captureError(
+      assertProductionPilotChainSafety(runtimeConfig, baseDependencies, "production")
+    );
+    expect(mismatch.message).to.contain(
+      "manual Track 1 Oracle signer does not match on-chain ProtocolConfig"
+    );
+    expect(mismatch.message).not.to.contain(testOracleAuthority);
+    expect(mismatch.message).not.to.contain(onChainOracle);
+
+    const missing = await captureError(
+      assertProductionPilotChainSafety(
+        runtimeConfig,
+        {
+          ...baseDependencies,
+          getLocalOracleAuthority() {
+            throw new Error("missing secret");
+          },
+        },
+        "production"
+      )
+    );
+    expect(missing.message).to.contain(
+      "manual Track 1 Oracle signer is not configured or invalid"
+    );
+    expect(missing.message).not.to.contain("missing secret");
   });
 
   it("builds a minimal private health payload from the configured access policy", () => {

@@ -74,7 +74,17 @@ export const serializeAsset = (asset: {
   muxAssetId: string | null;
   muxPlaybackId: string | null;
   muxLastKnownStatus: string | null;
+  muxWebhookReceivedAt?: Date | null;
+  muxReconcileAttempts?: number;
+  muxLastCheckedAt?: Date | null;
+  muxReadyAt?: Date | null;
+  processingSource?: string | null;
   processingError?: string | null;
+  verifiedSha256Hex?: string | null;
+  verifiedSizeBytes?: bigint | null;
+  objectEtag?: string | null;
+  storageVerifiedAt?: Date | null;
+  storageVerificationError?: string | null;
   updatedAt: Date;
 }) => {
   const muxPlaybackUrl = asset.muxPlaybackId
@@ -130,7 +140,20 @@ export const serializeAsset = (asset: {
     muxPlaybackId: asset.muxPlaybackId,
     muxPlaybackUrl,
     muxLastKnownStatus: asset.muxLastKnownStatus,
+    muxWebhookReceivedAt: asset.muxWebhookReceivedAt?.toISOString() ?? null,
+    muxReconcileAttempts: asset.muxReconcileAttempts ?? 0,
+    muxLastCheckedAt: asset.muxLastCheckedAt?.toISOString() ?? null,
+    muxReadyAt: asset.muxReadyAt?.toISOString() ?? null,
+    processingSource: asset.processingSource ?? null,
     processingError: asset.processingError ?? null,
+    verifiedSha256Hex: asset.verifiedSha256Hex ?? null,
+    verifiedSizeBytes: asset.verifiedSizeBytes?.toString() ?? null,
+    objectEtag: asset.objectEtag ?? null,
+    storageVerifiedAt: asset.storageVerifiedAt?.toISOString() ?? null,
+    hasStorageVerificationError: Boolean(asset.storageVerificationError),
+    storageVerificationErrorCode: asset.storageVerificationError
+      ? "STORAGE_VERIFICATION_FAILED"
+      : null,
     updatedAt: asset.updatedAt.toISOString(),
   };
 };
@@ -140,7 +163,12 @@ export const serializePublication = (publication: {
   platform: string;
   externalUrl: string;
   verificationStatus: string;
+  verificationSource?: string | null;
+  verificationReviewer?: string | null;
+  verificationNote?: string | null;
+  verificationEvidenceDigestHex?: string | null;
   verifiedAt: Date | null;
+  rejectedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
@@ -148,7 +176,12 @@ export const serializePublication = (publication: {
   platform: publication.platform,
   externalUrl: publication.externalUrl,
   verificationStatus: publication.verificationStatus,
+  verificationSource: publication.verificationSource ?? null,
+  verificationReviewer: publication.verificationReviewer ?? null,
+  verificationNote: publication.verificationNote ?? null,
+  verificationEvidenceDigestHex: publication.verificationEvidenceDigestHex ?? null,
   verifiedAt: publication.verifiedAt?.toISOString() ?? null,
+  rejectedAt: publication.rejectedAt?.toISOString() ?? null,
   createdAt: publication.createdAt.toISOString(),
   updatedAt: publication.updatedAt.toISOString(),
 });
@@ -169,6 +202,7 @@ export const serializeManifestDetail = (manifest: {
   internalCanonicalUrl: string | null;
   internalUrlDigestHex: string | null;
   coverAssetId: string | null;
+  isPublicFeedEligible: boolean;
   createdAt: Date;
   updatedAt: Date;
   assets: Array<{
@@ -182,7 +216,17 @@ export const serializeManifestDetail = (manifest: {
     muxAssetId: string | null;
     muxPlaybackId: string | null;
     muxLastKnownStatus: string | null;
+    muxWebhookReceivedAt?: Date | null;
+    muxReconcileAttempts?: number;
+    muxLastCheckedAt?: Date | null;
+    muxReadyAt?: Date | null;
+    processingSource?: string | null;
     processingError?: string | null;
+    verifiedSha256Hex?: string | null;
+    verifiedSizeBytes?: bigint | null;
+    objectEtag?: string | null;
+    storageVerifiedAt?: Date | null;
+    storageVerificationError?: string | null;
     updatedAt: Date;
   }>;
   publications: Array<{
@@ -190,7 +234,12 @@ export const serializeManifestDetail = (manifest: {
     platform: string;
     externalUrl: string;
     verificationStatus: string;
+    verificationSource?: string | null;
+    verificationReviewer?: string | null;
+    verificationNote?: string | null;
+    verificationEvidenceDigestHex?: string | null;
     verifiedAt: Date | null;
+    rejectedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -203,6 +252,7 @@ export const serializeManifestDetail = (manifest: {
   internalCanonicalUrl: manifest.internalCanonicalUrl,
   internalUrlDigestHex: manifest.internalUrlDigestHex,
   coverAssetId: manifest.coverAssetId,
+  isPublicFeedEligible: manifest.isPublicFeedEligible,
   assets: manifest.assets.map(serializeAsset),
   publications: manifest.publications.map(serializePublication),
 });
@@ -230,7 +280,17 @@ export const serializeManifestListItem = (manifest: {
     muxAssetId: string | null;
     muxPlaybackId: string | null;
     muxLastKnownStatus: string | null;
+    muxWebhookReceivedAt?: Date | null;
+    muxReconcileAttempts?: number;
+    muxLastCheckedAt?: Date | null;
+    muxReadyAt?: Date | null;
+    processingSource?: string | null;
     processingError?: string | null;
+    verifiedSha256Hex?: string | null;
+    verifiedSizeBytes?: bigint | null;
+    objectEtag?: string | null;
+    storageVerifiedAt?: Date | null;
+    storageVerificationError?: string | null;
     updatedAt: Date;
   }>;
 }) => ({

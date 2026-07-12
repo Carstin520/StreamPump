@@ -8,6 +8,7 @@ import {
   ok,
   parseNonEmptyString,
   parseOptionalString,
+  parsePositiveInt,
   withController,
 } from "./http";
 import { syncManifestPublicationEligibility } from "../services/contentPublicationEligibility";
@@ -17,6 +18,65 @@ import {
 } from "../services/contentPublicationReview";
 import { isAssetStorageVerified } from "../services/contentStorageVerification";
 import { prisma } from "../services/prisma";
+import {
+  getOperatorPublication,
+  listOperatorPublications,
+  normalizePublicationQueueStatus,
+  reopenContentPublication,
+  revokeContentPublication,
+} from "../services/contentPublicationRecoveryService";
+
+export const listContentPublicationsForReview = withController(
+  "LIST_CONTENT_PUBLICATIONS_FAILED",
+  async (req, res) => {
+    const status = normalizePublicationQueueStatus(req.query.status);
+    const limit = req.query.limit === undefined ? 50 : parsePositiveInt(req.query.limit, "limit");
+    if (limit > 100) {
+      throw new HttpError(400, "INVALID_INPUT", "limit must not exceed 100");
+    }
+    const publications = await listOperatorPublications({ status, limit });
+    ok(res, {
+      status,
+      count: publications.length,
+      publications,
+    });
+  }
+);
+
+export const getContentPublicationForReview = withController(
+  "GET_CONTENT_PUBLICATION_FAILED",
+  async (req, res) => {
+    const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
+    ok(res, await getOperatorPublication(publicationId));
+  }
+);
+
+export const reopenReviewedContentPublication = withController(
+  "REOPEN_CONTENT_PUBLICATION_FAILED",
+  async (req, res) => {
+    const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
+    const result = await reopenContentPublication({
+      publicationId,
+      operatorIdentity: req.operatorIdentity ?? "",
+      reason: parseNonEmptyString(req.body.reason, "reason"),
+    });
+    ok(res, result);
+  }
+);
+
+export const revokeReviewedContentPublication = withController(
+  "REVOKE_CONTENT_PUBLICATION_FAILED",
+  async (req, res) => {
+    const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
+    const result = await revokeContentPublication({
+      publicationId,
+      operatorIdentity: req.operatorIdentity ?? "",
+      reason: parseNonEmptyString(req.body.reason, "reason"),
+      evidenceDigestHex: parseOptionalString(req.body.evidenceDigestHex),
+    });
+    ok(res, result);
+  }
+);
 
 export const reviewContentPublication = withController(
   "REVIEW_CONTENT_PUBLICATION_FAILED",

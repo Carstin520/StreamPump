@@ -9,6 +9,7 @@ import {
   mergeAnchorEventsWithInstructions,
   mapInstructionAccounts,
   normalizeIndexerJson,
+  selectBackfillSignatures,
   selectPrimaryEntityPda,
 } from "../src/services/indexer";
 
@@ -184,12 +185,159 @@ describe("indexer helpers", () => {
         } as any,
         targetProgram: Keypair.generate().publicKey,
         updateCursor: false,
+        attemptStore: {
+          start: async () => undefined,
+          finish: async () => undefined,
+        },
       });
 
       expect(result.status).to.equal("NO_PROGRAM_INSTRUCTIONS");
       expect(cursorWrites).to.equal(0);
     } finally {
       (AnchorService as any).getInstance = originalAnchor;
+      (prisma as any).indexerCursor = originalIndexerCursor;
+    }
+  });
+
+  it("keeps all signatures from the cursor slot and deduplicates replay safely", () => {
+    const pending = selectBackfillSignatures(
+      [
+        { signature: "same-a", slot: 100 },
+        { signature: "same-b", slot: 100 },
+        { signature: "same-a", slot: 100 },
+        { signature: "newer", slot: 101 },
+        { signature: "older", slot: 99 },
+      ],
+      { lastSeenSlot: 100n, lastSeenSignature: "same-a" }
+    );
+
+    expect(pending.map((entry) => entry.signature)).to.deep.equal([
+      "same-a",
+      "same-b",
+      "newer",
+    ]);
+  });
+
+  it("does not advance the cursor on NOT_FOUND and later syncs the same signature", async () => {
+    const originalIndexerCursor = (prisma as any).indexerCursor;
+    let cursorWrites = 0;
+    const statuses: string[] = [];
+    let available = false;
+    (prisma as any).indexerCursor = {
+      upsert: async () => {
+        cursorWrites += 1;
+      },
+    };
+    const connection = {
+      getParsedTransaction: async () =>
+        available
+          ? {
+              slot: 200,
+              meta: { err: null, logMessages: [] },
+              transaction: { message: { instructions: [] } },
+            }
+          : null,
+      getSignatureStatuses: async () => ({ value: [{ slot: 200 }] }),
+    } as any;
+    const attemptStore = {
+      start: async () => undefined,
+      finish: async ({ status }: any) => {
+        statuses.push(status);
+      },
+    };
+
+    try {
+      const missing = await ingestConfirmedProgramTransaction("late-signature", {
+        connection,
+        targetProgram: Keypair.generate().publicKey,
+        updateCursor: true,
+        fetchMaxRetries: 1,
+        fetchRetryDelayMs: 0,
+        attemptStore,
+        decodeInstructions: () => [],
+        parseEvents: () => [],
+      });
+      expect(missing.status).to.equal("NOT_FOUND");
+      expect(cursorWrites).to.equal(0);
+
+      available = true;
+      const synced = await ingestConfirmedProgramTransaction("late-signature", {
+        connection,
+        targetProgram: Keypair.generate().publicKey,
+        updateCursor: true,
+        fetchMaxRetries: 1,
+        fetchRetryDelayMs: 0,
+        attemptStore,
+        decodeInstructions: () => [],
+        parseEvents: () => [],
+      });
+      expect(synced.status).to.equal("NO_PROGRAM_INSTRUCTIONS");
+      expect(cursorWrites).to.equal(1);
+      expect(statuses).to.deep.equal(["NOT_FOUND", "NO_PROGRAM_INSTRUCTIONS"]);
+    } finally {
+      (prisma as any).indexerCursor = originalIndexerCursor;
+    }
+  });
+
+  it("records a projection error and replays the same transaction successfully", async () => {
+    const originalIndexerCursor = (prisma as any).indexerCursor;
+    let cursorWrites = 0;
+    let persistAttempts = 0;
+    const statuses: string[] = [];
+    (prisma as any).indexerCursor = {
+      upsert: async () => {
+        cursorWrites += 1;
+      },
+    };
+    const connection = {
+      getParsedTransaction: async () => ({
+        slot: 300,
+        meta: { err: null, logMessages: [] },
+        transaction: { message: { instructions: [] } },
+      }),
+    } as any;
+    const decoded = [{
+      instructionIndex: 0,
+      instructionName: "sponsor_fund",
+      proposalPda: Keypair.generate().publicKey.toBase58(),
+      entityPda: null,
+      payload: {},
+    }];
+    const options: any = {
+      connection,
+      targetProgram: Keypair.generate().publicKey,
+      updateCursor: true,
+      attemptStore: {
+        start: async () => undefined,
+        finish: async ({ status }: any) => {
+          statuses.push(status);
+        },
+      },
+      decodeInstructions: () => decoded,
+      parseEvents: () => [],
+      persistInstructions: async () => {
+        persistAttempts += 1;
+        if (persistAttempts === 1) throw new Error("projection unavailable");
+        return 1;
+      },
+    };
+
+    try {
+      let firstError: unknown;
+      try {
+        await ingestConfirmedProgramTransaction("projection-replay", options);
+      } catch (error) {
+        firstError = error;
+      }
+      expect(firstError).to.be.instanceOf(Error);
+      expect(cursorWrites).to.equal(0);
+
+      const replayed = await ingestConfirmedProgramTransaction("projection-replay", options);
+      expect(replayed.status).to.equal("SYNCED");
+      expect(replayed.instructionCount).to.equal(1);
+      expect(cursorWrites).to.equal(1);
+      expect(statuses).to.deep.equal(["ERROR", "SYNCED"]);
+    } finally {
       (prisma as any).indexerCursor = originalIndexerCursor;
     }
   });

@@ -3,6 +3,10 @@ import express, { type Application, type RequestHandler } from "express";
 
 import { config } from "../config/default";
 import routes from "./routes";
+import {
+  appStartupReadiness,
+  type StartupReadiness,
+} from "./services/startupReadiness";
 
 const normalizeLoopbackOrigin = (origin: string): string[] => {
   try {
@@ -79,7 +83,7 @@ export const buildHealthPayload = () => {
   };
 };
 
-export const createApp = (): Application => {
+export const createApp = (readiness: StartupReadiness = appStartupReadiness): Application => {
   const app = express();
 
   // Render terminates public HTTP at one reverse-proxy hop. Trust exactly that
@@ -92,6 +96,11 @@ export const createApp = (): Application => {
 
   app.get("/health", (_req, res) => {
     res.json(buildHealthPayload());
+  });
+
+  app.get("/ready", (_req, res) => {
+    const payload = readiness.snapshot();
+    res.status(payload.ok ? 200 : 503).json(payload);
   });
 
   app.use("/api", routes);

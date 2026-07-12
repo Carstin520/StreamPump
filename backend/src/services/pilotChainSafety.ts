@@ -15,7 +15,11 @@ export interface PilotChainSafetyDependencies {
     programId: string,
     timeoutMs: number
   ): Promise<{ executable: boolean } | null>;
-  fetchProtocolUsdcMint(timeoutMs: number): Promise<string>;
+  getLocalOracleAuthority(): string;
+  fetchProtocolConfigSafety(timeoutMs: number): Promise<{
+    usdcMint: string;
+    oracleAuthority: string;
+  }>;
 }
 
 export const withPilotChainTimeout = async <T>(
@@ -51,12 +55,19 @@ export const defaultPilotChainSafetyDependencies: PilotChainSafetyDependencies =
     return account ? { executable: account.executable } : null;
   },
 
-  async fetchProtocolUsdcMint(timeoutMs) {
+  getLocalOracleAuthority() {
+    return getAnchorService().getOracleAuthorityPublicKey().toBase58();
+  },
+
+  async fetchProtocolConfigSafety(timeoutMs) {
     const account = await withPilotChainTimeout(
       getAnchorService().fetchProtocolConfigAccount(),
       timeoutMs
     );
-    return new PublicKey(account.usdcMint).toBase58();
+    return {
+      usdcMint: new PublicKey(account.usdcMint).toBase58(),
+      oracleAuthority: new PublicKey(account.oracleAuthority).toBase58(),
+    };
   },
 };
 
@@ -126,16 +137,29 @@ export const assertProductionPilotChainSafety = async (
     throw preflightError("configured program account is not executable");
   }
 
-  let actualUsdcMint: string;
+  let localOracleAuthority: string;
   try {
-    actualUsdcMint = new PublicKey(
-      await dependencies.fetchProtocolUsdcMint(timeoutMs)
-    ).toBase58();
+    localOracleAuthority = new PublicKey(dependencies.getLocalOracleAuthority()).toBase58();
   } catch (_error) {
-    throw preflightError("could not read the on-chain protocol USDC mint");
+    throw preflightError("manual Track 1 Oracle signer is not configured or invalid");
   }
 
-  if (actualUsdcMint !== runtimeConfig.pilot.expectedUsdcMint) {
+  let protocolSafety: { usdcMint: string; oracleAuthority: string };
+  try {
+    const configured = await dependencies.fetchProtocolConfigSafety(timeoutMs);
+    protocolSafety = {
+      usdcMint: new PublicKey(configured.usdcMint).toBase58(),
+      oracleAuthority: new PublicKey(configured.oracleAuthority).toBase58(),
+    };
+  } catch (_error) {
+    throw preflightError("could not read the on-chain protocol configuration");
+  }
+
+  if (protocolSafety.usdcMint !== runtimeConfig.pilot.expectedUsdcMint) {
     throw preflightError("on-chain protocol USDC mint does not match PILOT_EXPECTED_USDC_MINT");
+  }
+
+  if (localOracleAuthority !== protocolSafety.oracleAuthority) {
+    throw preflightError("manual Track 1 Oracle signer does not match on-chain ProtocolConfig");
   }
 };
