@@ -190,6 +190,7 @@ enum Track1SettlementOperationStatus {
 enum ChainIngestionStatus {
   PROCESSING
   NOT_FOUND
+  PRUNED
   TRANSACTION_FAILED
   NO_PROGRAM_INSTRUCTIONS
   SYNCED

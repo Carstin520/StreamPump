@@ -36,7 +36,13 @@ describe("startup readiness", () => {
   const successfulDependencies = (): BackgroundServiceDependencies => ({
     async checkDatabase() {},
     async startIndexer() {
-      return 123;
+      return {
+        subscriptionId: 123,
+        async probeNow() {
+          return true;
+        },
+        async stop() {},
+      };
     },
     startManagedWalletJobWorker() {},
     startMuxReconciliationScheduler() {
@@ -109,6 +115,33 @@ describe("startup readiness", () => {
     );
     expect(muxSnapshot.ok).to.equal(false);
     expect(muxSnapshot.services.muxReconciliation).to.equal("FAILED");
+  });
+
+  it("downgrades readiness when the running Indexer health monitor reports failure", async () => {
+    const readiness = new StartupReadiness();
+    const dependencies = successfulDependencies();
+    let reportUnhealthy: (() => void) | undefined;
+    dependencies.startIndexer = async (_rpcEndpoint, _programId, options) => {
+      reportUnhealthy = options.onUnhealthy;
+      return {
+        subscriptionId: 123,
+        async probeNow() {
+          return true;
+        },
+        async stop() {},
+      };
+    };
+
+    const snapshot = await startBackgroundServices(
+      pilotRuntimeConfig(),
+      readiness,
+      dependencies
+    );
+    expect(snapshot.services.indexer).to.equal("READY");
+
+    reportUnhealthy?.();
+    expect(readiness.snapshot().services.indexer).to.equal("FAILED");
+    expect(readiness.snapshot().ok).to.equal(false);
   });
 
   it("stays not ready when the database check fails without exposing its error", async () => {

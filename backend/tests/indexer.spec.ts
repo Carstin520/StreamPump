@@ -4,13 +4,17 @@ import { Keypair } from "@solana/web3.js";
 import { AnchorService } from "../src/services/AnchorService";
 import { prisma } from "../src/services/prisma";
 import {
+  createIndexerHealthMonitor,
   ingestConfirmedProgramTransaction,
+  INDEXER_NOT_FOUND_TERMINAL_ATTEMPTS,
   mapEventNameToInstructionName,
   mergeAnchorEventsWithInstructions,
   mapInstructionAccounts,
   normalizeIndexerJson,
+  processOrderedBackfill,
   selectBackfillSignatures,
   selectPrimaryEntityPda,
+  waitForInitialIndexerSlot,
 } from "../src/services/indexer";
 
 describe("indexer helpers", () => {
@@ -277,6 +281,160 @@ describe("indexer helpers", () => {
     } finally {
       (prisma as any).indexerCursor = originalIndexerCursor;
     }
+  });
+
+  it("breaks ordered backfill on retryable NOT_FOUND before the terminal threshold", async () => {
+    const processed: string[] = [];
+    await processOrderedBackfill({
+      entries: [{ signature: "missing" }, { signature: "later" }],
+      processEntry: async (entry) => {
+        processed.push(entry.signature);
+        return {
+          signature: entry.signature,
+          slot: "1",
+          status: entry.signature === "missing" ? "NOT_FOUND" : "SYNCED",
+          instructionCount: 0,
+        };
+      },
+    });
+
+    expect(processed).to.deep.equal(["missing"]);
+  });
+
+  it("marks bounded NOT_FOUND as PRUNED and continues to a later signature", async () => {
+    const processed: string[] = [];
+    const finishedStatuses: string[] = [];
+    const connection = {
+      getParsedTransaction: async () => null,
+      getSignatureStatuses: async () => ({ value: [{ slot: 400 }] }),
+    } as any;
+
+    await processOrderedBackfill({
+      entries: [{ signature: "pruned" }, { signature: "later" }],
+      processEntry: async (entry) => {
+        processed.push(entry.signature);
+        if (entry.signature === "later") {
+          return {
+            signature: entry.signature,
+            slot: "401",
+            status: "SYNCED",
+            instructionCount: 1,
+          };
+        }
+        return ingestConfirmedProgramTransaction(entry.signature, {
+          connection,
+          targetProgram: Keypair.generate().publicKey,
+          slot: 400n,
+          fetchMaxRetries: 1,
+          fetchRetryDelayMs: 0,
+          attemptStore: {
+            start: async () => INDEXER_NOT_FOUND_TERMINAL_ATTEMPTS,
+            finish: async ({ status }) => {
+              finishedStatuses.push(status);
+            },
+          },
+        });
+      },
+    });
+
+    expect(processed).to.deep.equal(["pruned", "later"]);
+    expect(finishedStatuses).to.deep.equal(["PRUNED"]);
+  });
+
+  it("allows an operator replay to reset a PRUNED attempt and finish SYNCED", async () => {
+    const transitions = ["PRUNED"];
+    const result = await ingestConfirmedProgramTransaction("operator-replay", {
+      connection: {
+        getParsedTransaction: async () => ({
+          slot: 500,
+          meta: { err: null, logMessages: [] },
+          transaction: { message: { instructions: [] } },
+        }),
+      } as any,
+      targetProgram: Keypair.generate().publicKey,
+      updateCursor: false,
+      attemptStore: {
+        start: async () => {
+          transitions.push("PROCESSING");
+          return INDEXER_NOT_FOUND_TERMINAL_ATTEMPTS + 1;
+        },
+        finish: async ({ status }) => {
+          transitions.push(status);
+        },
+      },
+      decodeInstructions: () => [
+        {
+          instructionIndex: 0,
+          instructionName: "register_user",
+          proposalPda: null,
+          entityPda: null,
+          payload: {},
+        },
+      ],
+      parseEvents: () => [],
+      persistInstructions: async () => 1,
+    });
+
+    expect(result.status).to.equal("SYNCED");
+    expect(transitions).to.deep.equal(["PRUNED", "PROCESSING", "SYNCED"]);
+  });
+
+  it("requires a server slot notification before indexer startup can be healthy", async () => {
+    let slotCallback: (() => void) | undefined;
+    let removed = 0;
+    const heartbeatPromise = waitForInitialIndexerSlot(
+      {
+        onSlotChange(callback) {
+          slotCallback = callback;
+          return 77;
+        },
+        async removeSlotChangeListener() {
+          removed += 1;
+        },
+      },
+      { timeoutMs: 100 }
+    );
+
+    slotCallback?.();
+    const heartbeat = await heartbeatPromise;
+    expect(heartbeat.subscriptionId).to.equal(77);
+    expect(heartbeat.lastNotificationAt()).to.be.greaterThan(0);
+    expect(removed).to.equal(0);
+  });
+
+  it("marks runtime unhealthy on stale websocket heartbeat or RPC probe failure and stops its timer", async () => {
+    let now = 100;
+    let lastNotificationAt = 100;
+    let probeFails = false;
+    let unhealthyCalls = 0;
+    let clearedTimers = 0;
+    const monitor = createIndexerHealthMonitor({
+      probeSlot: async () => {
+        if (probeFails) throw new Error("rpc unavailable");
+        return 123;
+      },
+      lastSlotNotificationAt: () => lastNotificationAt,
+      onUnhealthy: () => {
+        unhealthyCalls += 1;
+      },
+      now: () => now,
+      staleMs: 50,
+      setIntervalFn: () => ({ unref() {} } as any),
+      clearIntervalFn: () => {
+        clearedTimers += 1;
+      },
+    });
+
+    expect(await monitor.probeNow()).to.equal(true);
+    now = 151;
+    expect(await monitor.probeNow()).to.equal(false);
+    probeFails = true;
+    lastNotificationAt = now;
+    expect(await monitor.probeNow()).to.equal(false);
+    expect(unhealthyCalls).to.equal(1);
+    monitor.stop();
+    monitor.stop();
+    expect(clearedTimers).to.equal(1);
   });
 
   it("records a projection error and replays the same transaction successfully", async () => {

@@ -48,11 +48,14 @@ export const startBackgroundServices = async (
 
   if (runtimeConfig.indexer.enabled) {
     try {
-      const subscriptionId = await dependencies.startIndexer(
+      const indexerRuntime = await dependencies.startIndexer(
         solana.indexerRpcEndpoint,
-        solana.programId
+        solana.programId,
+        {
+          onUnhealthy: () => readiness.markFailed("indexer"),
+        }
       );
-      if (subscriptionId === null) {
+      if (indexerRuntime === null) {
         throw new Error("indexer did not create a subscription");
       }
       readiness.markReady("indexer");

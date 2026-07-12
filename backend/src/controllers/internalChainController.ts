@@ -16,7 +16,9 @@ const serializeAttempt = (attempt: any) =>
         instructionCount: attempt.instructionCount,
         hasLastError: Boolean(attempt.lastError),
         lastErrorCode: attempt.lastError
-          ? attempt.status === "NOT_FOUND"
+          ? attempt.status === "PRUNED"
+            ? "CHAIN_TRANSACTION_PRUNED"
+            : attempt.status === "NOT_FOUND"
             ? "CHAIN_TRANSACTION_NOT_FOUND"
             : "CHAIN_INGESTION_FAILED"
           : null,
