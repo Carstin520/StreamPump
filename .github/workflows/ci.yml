@@ -121,6 +121,8 @@ jobs:
       - name: Install pinned Solana and Anchor CLIs
         if: steps.chain-tool-cache.outputs.cache-hit != 'true'
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes libudev-dev
           sh -c "$(curl --proto '=https' --tlsv1.2 -sSfL https://release.anza.xyz/v2.3.0/install)"
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           cargo install --git https://github.com/solana-foundation/anchor --tag v0.32.1 anchor-cli --locked
