@@ -3,6 +3,7 @@
  * EN: On-chain log indexer that fetches transaction details by signature, decodes instructions, and syncs DB projections.
  */
 import { BN, BorshCoder, EventParser } from "@coral-xyz/anchor";
+import { ChainIngestionStatus } from "@prisma/client";
 import {
   Connection,
   ParsedInstruction,
@@ -19,6 +20,21 @@ import { prisma } from "./prisma";
 
 const INDEXER_FETCH_RETRY_DELAY_MS = 1_000;
 const INDEXER_FETCH_MAX_RETRIES = 5;
+export const INDEXER_NOT_FOUND_TERMINAL_ATTEMPTS = 3;
+export const INDEXER_HEALTH_PROBE_INTERVAL_MS = 30_000;
+export const INDEXER_SLOT_HEARTBEAT_STALE_MS = 90_000;
+export const INDEXER_STARTUP_SLOT_TIMEOUT_MS = 15_000;
+
+type ChainIngestionAttemptStore = {
+  start(params: { signature: string; slot: bigint | null }): Promise<number | void>;
+  finish(params: {
+    signature: string;
+    slot: bigint | null;
+    status: ChainIngestionStatus;
+    instructionCount: number;
+    error: string | null;
+  }): Promise<void>;
+};
 
 type DecodedChainInstruction = {
   instructionIndex: number;
@@ -78,6 +94,48 @@ const EVENT_NAME_TO_INSTRUCTION_NAME: Record<string, string> = {
 
 const asErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+const chainIngestionAttemptStore: ChainIngestionAttemptStore = {
+  async start(params) {
+    const attemptedAt = new Date();
+    const attempt = await prisma.chainIngestionAttempt.upsert({
+      where: { signature: params.signature },
+      update: {
+        ...(params.slot === null ? {} : { slot: params.slot }),
+        status: ChainIngestionStatus.PROCESSING,
+        attemptCount: { increment: 1 },
+        instructionCount: 0,
+        lastError: null,
+        lastAttemptAt: attemptedAt,
+        completedAt: null,
+      },
+      create: {
+        signature: params.signature,
+        slot: params.slot,
+        status: ChainIngestionStatus.PROCESSING,
+        attemptCount: 1,
+        lastAttemptAt: attemptedAt,
+      },
+      select: { attemptCount: true },
+    });
+    return attempt.attemptCount;
+  },
+  async finish(params) {
+    const retryable =
+      params.status === ChainIngestionStatus.NOT_FOUND ||
+      params.status === ChainIngestionStatus.ERROR;
+    await prisma.chainIngestionAttempt.update({
+      where: { signature: params.signature },
+      data: {
+        ...(params.slot === null ? {} : { slot: params.slot }),
+        status: params.status,
+        instructionCount: params.instructionCount,
+        lastError: params.error?.slice(0, 2_000) ?? null,
+        completedAt: retryable ? null : new Date(),
+      },
+    });
+  },
+};
 
 const sleep = async (delayMs: number) =>
   new Promise((resolve) => {
@@ -183,9 +241,11 @@ const extractEntityFromEventPayload = (payload: Record<string, unknown>): string
 
 const fetchParsedTransactionWithRetry = async (
   connection: Connection,
-  signature: string
+  signature: string,
+  maxRetries = INDEXER_FETCH_MAX_RETRIES,
+  retryDelayMs = INDEXER_FETCH_RETRY_DELAY_MS
 ): Promise<ParsedTransactionWithMeta | null> => {
-  for (let attempt = 0; attempt < INDEXER_FETCH_MAX_RETRIES; attempt += 1) {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     const response = await connection.getParsedTransaction(signature, {
       commitment: "confirmed",
       maxSupportedTransactionVersion: 0,
@@ -195,7 +255,9 @@ const fetchParsedTransactionWithRetry = async (
       return response;
     }
 
-    await sleep(INDEXER_FETCH_RETRY_DELAY_MS);
+    if (attempt + 1 < maxRetries && retryDelayMs > 0) {
+      await sleep(retryDelayMs);
+    }
   }
 
   return null;
@@ -431,7 +493,7 @@ const resolveSignatureSlot = async (
 export type IngestConfirmedProgramTransactionResult = {
   signature: string;
   slot: string | null;
-  status: "NOT_FOUND" | "FAILED" | "NO_PROGRAM_INSTRUCTIONS" | "SYNCED";
+  status: "NOT_FOUND" | "PRUNED" | "FAILED" | "NO_PROGRAM_INSTRUCTIONS" | "SYNCED";
   instructionCount: number;
 };
 
@@ -442,87 +504,140 @@ export const ingestConfirmedProgramTransaction = async (
     targetProgram?: PublicKey;
     slot?: bigint;
     updateCursor?: boolean;
+    fetchMaxRetries?: number;
+    fetchRetryDelayMs?: number;
+    attemptStore?: ChainIngestionAttemptStore;
+    decodeInstructions?: typeof decodeProgramInstructions;
+    parseEvents?: typeof parseAnchorEvents;
+    persistInstructions?: typeof persistChainInstructions;
   } = {}
 ): Promise<IngestConfirmedProgramTransactionResult> => {
   const connection = options.connection ?? new Connection(config.solana.indexerRpcEndpoint, "confirmed");
   const targetProgram = options.targetProgram ?? new PublicKey(config.solana.programId);
   const shouldUpdateCursor = options.updateCursor ?? false;
-  const response = await fetchParsedTransactionWithRetry(connection, signature);
-  const responseSlot =
-    typeof (response as { slot?: number } | null)?.slot === "number"
-      ? BigInt((response as { slot: number }).slot)
-      : null;
-  const slot = options.slot ?? responseSlot ?? (await resolveSignatureSlot(connection, signature));
+  const attemptStore = options.attemptStore ?? chainIngestionAttemptStore;
+  let slot = options.slot ?? null;
+  const attemptCount = (await attemptStore.start({ signature, slot })) ?? 1;
 
-  if (!response) {
+  try {
+    const response = await fetchParsedTransactionWithRetry(
+      connection,
+      signature,
+      options.fetchMaxRetries ?? INDEXER_FETCH_MAX_RETRIES,
+      options.fetchRetryDelayMs ?? INDEXER_FETCH_RETRY_DELAY_MS
+    );
+    const responseSlot =
+      typeof (response as { slot?: number } | null)?.slot === "number"
+        ? BigInt((response as { slot: number }).slot)
+        : null;
+    slot = slot ?? responseSlot ?? (await resolveSignatureSlot(connection, signature));
+
+    if (!response) {
+      const terminal = attemptCount >= INDEXER_NOT_FOUND_TERMINAL_ATTEMPTS;
+      await attemptStore.finish({
+        signature,
+        slot,
+        status: terminal ? ChainIngestionStatus.PRUNED : ChainIngestionStatus.NOT_FOUND,
+        instructionCount: 0,
+        error: terminal
+          ? "confirmed transaction remained unavailable after the bounded retry threshold"
+          : "confirmed transaction is not yet available from the indexer RPC",
+      });
+      return {
+        signature,
+        slot: slot?.toString() ?? null,
+        status: terminal ? "PRUNED" : "NOT_FOUND",
+        instructionCount: 0,
+      };
+    }
+
+    if (response.meta?.err) {
+      if (shouldUpdateCursor && slot !== null) {
+        await updateIndexerCursor(slot, signature);
+      }
+      await attemptStore.finish({
+        signature,
+        slot,
+        status: ChainIngestionStatus.TRANSACTION_FAILED,
+        instructionCount: 0,
+        error: JSON.stringify(normalizeIndexerJson(response.meta.err)),
+      });
+      return {
+        signature,
+        slot: slot?.toString() ?? null,
+        status: "FAILED",
+        instructionCount: 0,
+      };
+    }
+
+    const decodeInstructions = options.decodeInstructions ?? decodeProgramInstructions;
+    const parseEvents = options.parseEvents ?? parseAnchorEvents;
+    const decodedInstructions = decodeInstructions(response, targetProgram);
+    const parsedEvents = parseEvents({
+      logMessages: response.meta?.logMessages ?? [],
+      targetProgram,
+    });
+    const instructions =
+      parsedEvents.length > 0
+        ? mergeAnchorEventsWithInstructions({
+            events: parsedEvents,
+            instructions: decodedInstructions,
+          })
+        : decodedInstructions;
+
+    if (instructions.length === 0) {
+      if (shouldUpdateCursor && slot !== null) {
+        await updateIndexerCursor(slot, signature);
+      }
+      await attemptStore.finish({
+        signature,
+        slot,
+        status: ChainIngestionStatus.NO_PROGRAM_INSTRUCTIONS,
+        instructionCount: 0,
+        error: null,
+      });
+      return {
+        signature,
+        slot: slot?.toString() ?? null,
+        status: "NO_PROGRAM_INSTRUCTIONS",
+        instructionCount: 0,
+      };
+    }
+
+    const persistInstructions = options.persistInstructions ?? persistChainInstructions;
+    const instructionCount = await persistInstructions({
+      signature,
+      slot: slot ?? 0n,
+      programId: targetProgram.toBase58(),
+      instructions,
+    });
+
     if (shouldUpdateCursor && slot !== null) {
       await updateIndexerCursor(slot, signature);
     }
-
+    await attemptStore.finish({
+      signature,
+      slot,
+      status: ChainIngestionStatus.SYNCED,
+      instructionCount,
+      error: null,
+    });
     return {
       signature,
       slot: slot?.toString() ?? null,
-      status: "NOT_FOUND",
-      instructionCount: 0,
+      status: "SYNCED",
+      instructionCount,
     };
-  }
-
-  if (response.meta?.err) {
-    if (shouldUpdateCursor && slot !== null) {
-      await updateIndexerCursor(slot, signature);
-    }
-
-    return {
+  } catch (error) {
+    await attemptStore.finish({
       signature,
-      slot: slot?.toString() ?? null,
-      status: "FAILED",
+      slot,
+      status: ChainIngestionStatus.ERROR,
       instructionCount: 0,
-    };
+      error: asErrorMessage(error),
+    });
+    throw error;
   }
-
-  const decodedInstructions = decodeProgramInstructions(response, targetProgram);
-  const parsedEvents = parseAnchorEvents({
-    logMessages: response.meta?.logMessages ?? [],
-    targetProgram,
-  });
-  const instructions =
-    parsedEvents.length > 0
-      ? mergeAnchorEventsWithInstructions({
-          events: parsedEvents,
-          instructions: decodedInstructions,
-        })
-      : decodedInstructions;
-
-  if (instructions.length === 0) {
-    if (shouldUpdateCursor && slot !== null) {
-      await updateIndexerCursor(slot, signature);
-    }
-
-    return {
-      signature,
-      slot: slot?.toString() ?? null,
-      status: "NO_PROGRAM_INSTRUCTIONS",
-      instructionCount: 0,
-    };
-  }
-
-  const instructionCount = await persistChainInstructions({
-    signature,
-    slot: slot ?? 0n,
-    programId: targetProgram.toBase58(),
-    instructions,
-  });
-
-  if (shouldUpdateCursor && slot !== null) {
-    await updateIndexerCursor(slot, signature);
-  }
-
-  return {
-    signature,
-    slot: slot?.toString() ?? null,
-    status: "SYNCED",
-    instructionCount,
-  };
 };
 
 const processSignature = async (params: {
@@ -530,13 +645,36 @@ const processSignature = async (params: {
   targetProgram: PublicKey;
   signature: string;
   slot: bigint;
-}) => {
-  await ingestConfirmedProgramTransaction(params.signature, {
+}) =>
+  ingestConfirmedProgramTransaction(params.signature, {
     connection: params.connection,
     targetProgram: params.targetProgram,
     slot: params.slot,
     updateCursor: true,
   });
+
+export const selectBackfillSignatures = <T extends { signature: string; slot: number }>(
+  signatures: T[],
+  cursor: { lastSeenSlot: bigint; lastSeenSignature: string | null } | null
+): T[] => {
+  const unique = new Map(signatures.map((entry) => [entry.signature, entry]));
+  return [...unique.values()]
+    .filter((entry) => !cursor || BigInt(entry.slot) >= cursor.lastSeenSlot)
+    .sort((left, right) => left.slot - right.slot);
+};
+
+export const processOrderedBackfill = async <T extends { signature: string }>(params: {
+  entries: T[];
+  terminalSignatures?: ReadonlySet<string>;
+  processEntry(entry: T): Promise<IngestConfirmedProgramTransactionResult>;
+}): Promise<void> => {
+  for (const entry of params.entries) {
+    if (params.terminalSignatures?.has(entry.signature)) continue;
+    const result = await params.processEntry(entry);
+    // Preserve ordering while the RPC may still make the transaction visible.
+    // PRUNED is terminal, so it must not permanently block later signatures.
+    if (result.status === "NOT_FOUND") break;
+  }
 };
 
 const backfillRecentSignatures = async (connection: Connection, targetProgram: PublicKey) => {
@@ -550,53 +688,261 @@ const backfillRecentSignatures = async (connection: Connection, targetProgram: P
     limit: config.indexer.backfillLimit,
   });
 
-  const pending = signatures
-    .filter((entry) => !cursor || BigInt(entry.slot) > cursor.lastSeenSlot)
-    .sort((left, right) => left.slot - right.slot);
+  // Include the cursor slot itself. Multiple transactions may share a slot and
+  // event/attempt upserts make replaying the already-seen signature safe.
+  const pending = selectBackfillSignatures(signatures, cursor);
+  const terminalAttempts = pending.length
+    ? await prisma.chainIngestionAttempt.findMany({
+        where: {
+          signature: { in: pending.map((entry) => entry.signature) },
+          status: ChainIngestionStatus.PRUNED,
+        },
+        select: { signature: true },
+      })
+    : [];
 
-  for (const entry of pending) {
-    await processSignature({
-      connection,
-      targetProgram,
-      signature: entry.signature,
-      slot: BigInt(entry.slot),
-    });
+  await processOrderedBackfill({
+    entries: pending,
+    terminalSignatures: new Set(terminalAttempts.map((attempt) => attempt.signature)),
+    processEntry: (entry) =>
+      processSignature({
+        connection,
+        targetProgram,
+        signature: entry.signature,
+        slot: BigInt(entry.slot),
+      }),
+  });
+};
+
+const retryIncompleteIngestionAttempts = async (
+  connection: Connection,
+  targetProgram: PublicKey
+): Promise<void> => {
+  const attempts = await prisma.chainIngestionAttempt.findMany({
+    where: {
+      status: {
+        in: [ChainIngestionStatus.NOT_FOUND, ChainIngestionStatus.ERROR],
+      },
+    },
+    orderBy: [{ slot: "asc" }, { updatedAt: "asc" }],
+    take: config.indexer.backfillLimit,
+  });
+
+  for (const attempt of attempts) {
+    try {
+      await ingestConfirmedProgramTransaction(attempt.signature, {
+        connection,
+        targetProgram,
+        ...(attempt.slot === null ? {} : { slot: attempt.slot }),
+        updateCursor: false,
+      });
+    } catch (error) {
+      console.error(
+        `[indexer] retry failed for ${attempt.signature}`,
+        asErrorMessage(error)
+      );
+    }
   }
 };
 
-export const startIndexer = async (rpcEndpoint: string, programId: string) => {
+type IndexerHealthTimer = ReturnType<typeof setInterval>;
+
+export type IndexerHealthMonitor = {
+  probeNow(): Promise<boolean>;
+  stop(): void;
+};
+
+export const createIndexerHealthMonitor = (params: {
+  probeSlot(): Promise<number>;
+  lastSlotNotificationAt(): number;
+  onUnhealthy(): void;
+  now?: () => number;
+  intervalMs?: number;
+  staleMs?: number;
+  setIntervalFn?: (callback: () => void, intervalMs: number) => IndexerHealthTimer;
+  clearIntervalFn?: (timer: IndexerHealthTimer) => void;
+}): IndexerHealthMonitor => {
+  const now = params.now ?? Date.now;
+  const staleMs = params.staleMs ?? INDEXER_SLOT_HEARTBEAT_STALE_MS;
+  let stopped = false;
+  let unhealthy = false;
+  let probing = false;
+
+  const probeNow = async (): Promise<boolean> => {
+    if (stopped || probing) return !unhealthy;
+    probing = true;
+    try {
+      if (now() - params.lastSlotNotificationAt() > staleMs) {
+        throw new Error("indexer slot notification heartbeat is stale");
+      }
+      const slot = await params.probeSlot();
+      if (!Number.isSafeInteger(slot) || slot < 0) {
+        throw new Error("indexer RPC returned an invalid slot");
+      }
+      return true;
+    } catch (_error) {
+      if (!unhealthy) {
+        unhealthy = true;
+        params.onUnhealthy();
+      }
+      return false;
+    } finally {
+      probing = false;
+    }
+  };
+
+  const setIntervalFn = params.setIntervalFn ?? setInterval;
+  const clearIntervalFn = params.clearIntervalFn ?? clearInterval;
+  const timer = setIntervalFn(() => {
+    void probeNow();
+  }, params.intervalMs ?? INDEXER_HEALTH_PROBE_INTERVAL_MS);
+  timer.unref?.();
+
+  return {
+    probeNow,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      clearIntervalFn(timer);
+    },
+  };
+};
+
+type IndexerSlotHeartbeat = {
+  subscriptionId: number;
+  lastNotificationAt(): number;
+};
+
+export const waitForInitialIndexerSlot = async (
+  connection: Pick<Connection, "onSlotChange" | "removeSlotChangeListener">,
+  options: {
+    timeoutMs?: number;
+    now?: () => number;
+  } = {}
+): Promise<IndexerSlotHeartbeat> => {
+  const now = options.now ?? Date.now;
+  let lastNotificationAt = 0;
+  let resolveFirstNotification: (() => void) | undefined;
+  let rejectFirstNotification: ((error: Error) => void) | undefined;
+  const firstNotification = new Promise<void>((resolve, reject) => {
+    resolveFirstNotification = resolve;
+    rejectFirstNotification = reject;
+  });
+  const subscriptionId = connection.onSlotChange(() => {
+    lastNotificationAt = now();
+    resolveFirstNotification?.();
+  });
+  const timeout = setTimeout(
+    () =>
+      rejectFirstNotification?.(
+        new Error("indexer slot subscription did not receive a server notification")
+      ),
+    options.timeoutMs ?? INDEXER_STARTUP_SLOT_TIMEOUT_MS
+  );
+  timeout.unref?.();
+
+  try {
+    await firstNotification;
+    return {
+      subscriptionId,
+      lastNotificationAt: () => lastNotificationAt,
+    };
+  } catch (error) {
+    await connection.removeSlotChangeListener(subscriptionId).catch(() => undefined);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+export type IndexerRuntime = {
+  subscriptionId: number;
+  probeNow(): Promise<boolean>;
+  stop(): Promise<void>;
+};
+
+export const startIndexer = async (
+  rpcEndpoint: string,
+  programId: string,
+  options: {
+    connection?: Connection;
+    onUnhealthy?: () => void;
+    startupSlotTimeoutMs?: number;
+    healthProbeIntervalMs?: number;
+    slotHeartbeatStaleMs?: number;
+  } = {}
+): Promise<IndexerRuntime | null> => {
   if (!config.indexer.enabled) {
     console.log("[indexer] disabled by INDEXER_ENABLED=false");
     return null;
   }
 
-  const connection = new Connection(rpcEndpoint, "confirmed");
+  const connection = options.connection ?? new Connection(rpcEndpoint, "confirmed");
   const targetProgram = new PublicKey(programId);
   const inFlight = new Set<string>();
+  const slotHeartbeat = await waitForInitialIndexerSlot(connection, {
+    timeoutMs: options.startupSlotTimeoutMs,
+  });
+  let logSubscriptionId: number | null = null;
 
-  await backfillRecentSignatures(connection, targetProgram);
+  try {
+    const startupSlot = await connection.getSlot("confirmed");
+    if (!Number.isSafeInteger(startupSlot) || startupSlot < 0) {
+      throw new Error("indexer RPC returned an invalid startup slot");
+    }
+    await retryIncompleteIngestionAttempts(connection, targetProgram);
+    await backfillRecentSignatures(connection, targetProgram);
 
-  return connection.onLogs(
-    targetProgram,
-    (logs, context) => {
-      if (inFlight.has(logs.signature)) {
-        return;
-      }
+    logSubscriptionId = connection.onLogs(
+      targetProgram,
+      (logs, context) => {
+        if (inFlight.has(logs.signature)) {
+          return;
+        }
 
-      inFlight.add(logs.signature);
-      void processSignature({
-        connection,
-        targetProgram,
-        signature: logs.signature,
-        slot: BigInt(context.slot),
-      })
-        .catch((error) => {
-          console.error(`[indexer] failed to ingest ${logs.signature}`, asErrorMessage(error));
+        inFlight.add(logs.signature);
+        void processSignature({
+          connection,
+          targetProgram,
+          signature: logs.signature,
+          slot: BigInt(context.slot),
         })
-        .finally(() => {
-          inFlight.delete(logs.signature);
-        });
-    },
-    "confirmed"
-  );
+          .catch((error) => {
+            console.error(`[indexer] failed to ingest ${logs.signature}`, asErrorMessage(error));
+          })
+          .finally(() => {
+            inFlight.delete(logs.signature);
+          });
+      },
+      "confirmed"
+    );
+
+    const monitor = createIndexerHealthMonitor({
+      probeSlot: () => connection.getSlot("confirmed"),
+      lastSlotNotificationAt: slotHeartbeat.lastNotificationAt,
+      onUnhealthy: options.onUnhealthy ?? (() => undefined),
+      intervalMs: options.healthProbeIntervalMs,
+      staleMs: options.slotHeartbeatStaleMs,
+    });
+
+    return {
+      subscriptionId: logSubscriptionId,
+      probeNow: monitor.probeNow,
+      async stop() {
+        monitor.stop();
+        await Promise.allSettled([
+          connection.removeOnLogsListener(logSubscriptionId as number),
+          connection.removeSlotChangeListener(slotHeartbeat.subscriptionId),
+        ]);
+      },
+    };
+  } catch (error) {
+    if (logSubscriptionId !== null) {
+      await connection.removeOnLogsListener(logSubscriptionId).catch(() => undefined);
+    }
+    await connection
+      .removeSlotChangeListener(slotHeartbeat.subscriptionId)
+      .catch(() => undefined);
+    throw error;
+  }
 };

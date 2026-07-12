@@ -531,9 +531,15 @@ const resolveIdlPath = (): string => {
     if (existsSync(resolved)) {
       return resolved;
     }
+
+    throw new Error(`STREAMPUMP_IDL_PATH does not exist: ${resolved}`);
   }
 
   const candidates = [
+    path.resolve(process.cwd(), "backend/idl/streampump_core.json"),
+    path.resolve(process.cwd(), "idl/streampump_core.json"),
+    path.resolve(__dirname, "../../idl/streampump_core.json"),
+    path.resolve(__dirname, "../../../idl/streampump_core.json"),
     path.resolve(process.cwd(), "target/idl/streampump_core.json"),
     path.resolve(process.cwd(), "../target/idl/streampump_core.json"),
     path.resolve(__dirname, "../../../target/idl/streampump_core.json"),
@@ -547,7 +553,7 @@ const resolveIdlPath = (): string => {
   }
 
   throw new Error(
-    "Unable to find streampump_core IDL. Set STREAMPUMP_IDL_PATH or place IDL under target/idl."
+    "Unable to find streampump_core IDL. Set STREAMPUMP_IDL_PATH or deploy backend/idl/streampump_core.json."
   );
 };
 

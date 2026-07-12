@@ -27,6 +27,73 @@ import {
   submitSponsorProfile,
 } from "../services/sponsorProfile";
 
+const AUTH_RATE_LIMIT_WINDOW_MS = 60_000;
+const AUTH_CHALLENGE_IP_LIMIT = 30;
+// Challenge issuance is stateless and cheap; keep the per-wallet ceiling above
+// the per-IP ceiling so one caller cannot trivially lock a public Pilot wallet.
+const AUTH_CHALLENGE_WALLET_LIMIT = 60;
+const AUTH_VERIFY_IP_LIMIT = 60;
+const AUTH_VERIFY_WALLET_LIMIT = 12;
+
+const assertWalletAuthRateLimits = (params: {
+  operation: "challenge" | "verify";
+  ip: string;
+  wallet: string;
+}): void => {
+  const isChallenge = params.operation === "challenge";
+  assertRateLimit({
+    key: `wallet-auth:${params.operation}:ip:${params.ip}`,
+    limit: isChallenge ? AUTH_CHALLENGE_IP_LIMIT : AUTH_VERIFY_IP_LIMIT,
+    windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+    code: "AUTH_RATE_LIMITED",
+    message: "too many wallet authentication attempts",
+  });
+  assertRateLimit({
+    key: `wallet-auth:${params.operation}:wallet:${params.wallet}`,
+    limit: isChallenge ? AUTH_CHALLENGE_WALLET_LIMIT : AUTH_VERIFY_WALLET_LIMIT,
+    windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+    code: "AUTH_RATE_LIMITED",
+    message: "too many wallet authentication attempts",
+  });
+};
+
+const isAnonymousWalletVerificationFailure = (error: unknown): boolean => {
+  if (error instanceof HttpError) {
+    return error.code === "PILOT_INVITE_REQUIRED";
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error instanceof SyntaxError ||
+    /auth challenge|wallet signature|signature.*bytes|invalid signature|base58/i.test(error.message)
+  );
+};
+
+const anonymousWalletVerificationError = (): HttpError =>
+  new HttpError(
+    401,
+    "AUTH_CHALLENGE_INVALID",
+    "Wallet challenge could not be verified. Request a new challenge and try again."
+  );
+
+const shouldConcealWalletVerificationFailure = (error: unknown): boolean => {
+  if (isAnonymousWalletVerificationFailure(error)) {
+    return true;
+  }
+
+  if (!config.pilot.inviteOnly) {
+    return false;
+  }
+
+  return !(
+    error instanceof HttpError &&
+    (error.code === "INVALID_INPUT" || error.code === "AUTH_RATE_LIMITED")
+  );
+};
+
 const parseWallet = (value: unknown): string => {
   const wallet = String(value ?? "").trim();
   if (!wallet) {
@@ -80,6 +147,11 @@ const parseBearerToken = (req: Request): string | null => {
 export const createAuthChallenge = async (req: Request, res: Response) => {
   try {
     const wallet = parseWallet(req.body.wallet);
+    assertWalletAuthRateLimits({
+      operation: "challenge",
+      ip: getClientIp(req),
+      wallet,
+    });
     const challenge = await createWalletAuthChallenge(wallet);
 
     ok(res, {
@@ -97,10 +169,15 @@ export const createAuthChallenge = async (req: Request, res: Response) => {
 export const verifyAuthChallenge = async (req: Request, res: Response) => {
   try {
     const wallet = parseWallet(req.body.wallet);
+    assertWalletAuthRateLimits({
+      operation: "verify",
+      ip: getClientIp(req),
+      wallet,
+    });
     const nonce = parseNonEmptyString(req.body.nonce, "nonce");
     const signature = parseNonEmptyString(req.body.signature, "signature");
     const existingIdentityToken = parseBearerToken(req);
-    const session = existingIdentityToken
+    const session = existingIdentityToken && !config.pilot.inviteOnly
       ? await bindExternalWalletToIdentitySession({
           currentAccessToken: existingIdentityToken,
           wallet,
@@ -121,33 +198,13 @@ export const verifyAuthChallenge = async (req: Request, res: Response) => {
       identity: "identity" in session ? session.identity : null,
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes("not found")) {
-        handleControllerError(
-          res,
-          new HttpError(404, "AUTH_CHALLENGE_NOT_FOUND", error.message),
-          "VERIFY_AUTH_CHALLENGE_FAILED"
-        );
-        return;
-      }
-
-      if (error.message.includes("expired") || error.message.includes("consumed")) {
-        handleControllerError(
-          res,
-          new HttpError(409, "AUTH_CHALLENGE_INVALID", error.message),
-          "VERIFY_AUTH_CHALLENGE_FAILED"
-        );
-        return;
-      }
-
-      if (error.message.includes("signature")) {
-        handleControllerError(
-          res,
-          new HttpError(401, "AUTH_SIGNATURE_INVALID", error.message),
-          "VERIFY_AUTH_CHALLENGE_FAILED"
-        );
-        return;
-      }
+    if (shouldConcealWalletVerificationFailure(error)) {
+      handleControllerError(
+        res,
+        anonymousWalletVerificationError(),
+        "VERIFY_AUTH_CHALLENGE_FAILED"
+      );
+      return;
     }
 
     handleControllerError(res, error, "VERIFY_AUTH_CHALLENGE_FAILED");

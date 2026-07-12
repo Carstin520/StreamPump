@@ -5,13 +5,17 @@
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { ed25519 } from "@noble/curves/ed25519";
-import { AccountRole, IdentityProvider, WalletType } from "@prisma/client";
+import { AccountRole, IdentityProvider, Prisma, WalletType } from "@prisma/client";
 import bs58 from "bs58";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 import { config } from "../../config/default";
 import { HttpError } from "../controllers/http";
 import { resolveAccountProfileByWallet } from "./accountProfile";
+import {
+  assertPilotWalletInvited,
+  normalizeWalletAddress,
+} from "./pilotInvitePolicy";
 import { prisma } from "./prisma";
 import { encryptSecretKey } from "./walletEncryption";
 
@@ -34,6 +38,11 @@ const signSessionPayload = (payloadBase64Url: string): string =>
 
 const hmacHex = (value: string): string =>
   createHmac("sha256", SESSION_SECRET).update(value, "utf8").digest("hex");
+
+const signChallengePayload = (payloadBase64Url: string): string =>
+  createHmac("sha256", SESSION_SECRET)
+    .update(`wallet-auth-challenge:${payloadBase64Url}`, "utf8")
+    .digest("base64url");
 
 const getSessionDomain = (): string => {
   try {
@@ -91,6 +100,87 @@ const buildChallengeMessage = (wallet: string, nonce: string, issuedAt: Date, ex
     `Issued At: ${issuedAt.toISOString()}`,
     `Expires At: ${expiresAt.toISOString()}`,
   ].join("\n");
+};
+
+type WalletChallengeToken = {
+  version: 1;
+  wallet: string;
+  issuedAtMs: number;
+  expiresAtMs: number;
+  tokenId: string;
+};
+
+const buildWalletChallengeToken = (wallet: string, issuedAt: Date, expiresAt: Date): string => {
+  const payload = encodeBase64Url(
+    JSON.stringify({
+      version: 1,
+      wallet,
+      issuedAtMs: issuedAt.getTime(),
+      expiresAtMs: expiresAt.getTime(),
+      tokenId: randomBytes(16).toString("hex"),
+    } satisfies WalletChallengeToken)
+  );
+
+  return `${payload}.${signChallengePayload(payload)}`;
+};
+
+const parseWalletChallengeToken = (
+  nonce: string,
+  expectedWallet: string
+): {
+  issuedAt: Date;
+  expiresAt: Date;
+  message: string;
+} => {
+  const parts = nonce.trim().split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("auth challenge is invalid");
+  }
+
+  const [payloadBase64Url, providedSignature] = parts;
+  const expectedSignature = signChallengePayload(payloadBase64Url);
+  const providedBuffer = Buffer.from(providedSignature, "utf8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
+    throw new Error("auth challenge is invalid");
+  }
+
+  let payload: WalletChallengeToken;
+  try {
+    payload = JSON.parse(decodeBase64Url(payloadBase64Url).toString("utf8")) as WalletChallengeToken;
+  } catch (_error) {
+    throw new Error("auth challenge is invalid");
+  }
+
+  if (
+    payload.version !== 1 ||
+    payload.wallet !== expectedWallet ||
+    !Number.isSafeInteger(payload.issuedAtMs) ||
+    !Number.isSafeInteger(payload.expiresAtMs) ||
+    payload.expiresAtMs - payload.issuedAtMs !== CHALLENGE_TTL_MS ||
+    !/^[0-9a-f]{32}$/.test(payload.tokenId)
+  ) {
+    throw new Error("auth challenge is invalid");
+  }
+
+  const now = Date.now();
+  if (payload.issuedAtMs > now) {
+    throw new Error("auth challenge is invalid");
+  }
+  if (payload.expiresAtMs <= now) {
+    throw new Error("auth challenge has expired");
+  }
+
+  const issuedAt = new Date(payload.issuedAtMs);
+  const expiresAt = new Date(payload.expiresAtMs);
+  return {
+    issuedAt,
+    expiresAt,
+    message: buildChallengeMessage(expectedWallet, nonce, issuedAt, expiresAt),
+  };
 };
 
 const buildSessionToken = (params: {
@@ -189,27 +279,38 @@ const requestManagedWalletDevnetAirdrop = async (walletAddress: string): Promise
   }
 };
 
-export const ensureFanAccountProfile = async (
+type AccountProfileDb = Pick<Prisma.TransactionClient, "accountProfile" | "accountWallet">;
+
+const ensureFanAccountProfileWithDb = async (
+  db: AccountProfileDb,
   wallet: string,
   displayName?: string | null,
   walletType: WalletType = WalletType.EXTERNAL,
   encryptedSecretKey?: Uint8Array<ArrayBuffer>
 ) => {
-  const boundWallet = await prisma.accountWallet.findUnique({
+  const boundWallet = await db.accountWallet.findUnique({
     where: { walletAddress: wallet },
     include: { accountProfile: true },
   });
 
   if (boundWallet) {
+    if (walletType === WalletType.EXTERNAL && boundWallet.walletType !== WalletType.EXTERNAL) {
+      throw new HttpError(
+        409,
+        "WALLET_TYPE_CONFLICT",
+        "This wallet is already registered as a managed wallet."
+      );
+    }
+
     if (displayName) {
-      await prisma.accountProfile.update({
+      await db.accountProfile.update({
         where: { id: boundWallet.accountProfileId },
         data: { displayName },
       });
     }
 
     if (walletType === WalletType.MANAGED && encryptedSecretKey) {
-      await prisma.accountWallet.update({
+      await db.accountWallet.update({
         where: { walletAddress: wallet },
         data: { encryptedSecretKey },
       });
@@ -222,7 +323,7 @@ export const ensureFanAccountProfile = async (
     throw new Error("encrypted managed wallet secret is required");
   }
 
-  const profile = await prisma.accountProfile.upsert({
+  const profile = await db.accountProfile.upsert({
     where: { wallet },
     update: {
       displayName: displayName ?? undefined,
@@ -234,7 +335,7 @@ export const ensureFanAccountProfile = async (
     },
   });
 
-  await prisma.accountWallet.upsert({
+  await db.accountWallet.upsert({
     where: { walletAddress: wallet },
     update: {
       accountProfileId: profile.id,
@@ -255,6 +356,20 @@ export const ensureFanAccountProfile = async (
 
   return profile;
 };
+
+export const ensureFanAccountProfile = async (
+  wallet: string,
+  displayName?: string | null,
+  walletType: WalletType = WalletType.EXTERNAL,
+  encryptedSecretKey?: Uint8Array<ArrayBuffer>
+) =>
+  ensureFanAccountProfileWithDb(
+    prisma,
+    wallet,
+    displayName,
+    walletType,
+    encryptedSecretKey
+  );
 
 const normalizeEmail = (email: string): string => {
   const normalized = email.trim().toLowerCase();
@@ -320,48 +435,40 @@ const sendEmailOtp = async (email: string, code: string): Promise<void> => {
 };
 
 export const createWalletSession = async (wallet: string) => {
+  const normalizedWallet = assertPilotWalletInvited(wallet);
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   const accessToken = buildSessionToken({
     sessionId,
-    wallet,
+    wallet: normalizedWallet,
     expiresAt,
   });
 
   await prisma.walletSession.create({
     data: {
       id: sessionId,
-      wallet,
+      wallet: normalizedWallet,
       tokenHash: sha256Hex(accessToken),
       expiresAt,
     },
   });
 
   return {
-    wallet,
+    wallet: normalizedWallet,
     accessToken,
     expiresAt,
   };
 };
 
 export const createWalletAuthChallenge = async (wallet: string) => {
-  const normalizedWallet = new PublicKey(wallet).toBase58();
+  const normalizedWallet = normalizeWalletAddress(wallet);
   const issuedAt = new Date();
   const expiresAt = new Date(issuedAt.getTime() + CHALLENGE_TTL_MS);
-  const nonce = randomBytes(16).toString("hex");
+  const nonce = buildWalletChallengeToken(normalizedWallet, issuedAt, expiresAt);
   const message = buildChallengeMessage(normalizedWallet, nonce, issuedAt, expiresAt);
 
-  const challenge = await prisma.walletAuthChallenge.create({
-    data: {
-      wallet: normalizedWallet,
-      nonce,
-      message,
-      expiresAt,
-    },
-  });
-
   return {
-    challengeId: challenge.id,
+    challengeId: randomUUID(),
     wallet: normalizedWallet,
     nonce,
     message,
@@ -374,25 +481,8 @@ const verifyPendingWalletAuthChallenge = async (params: {
   nonce: string;
   signature: string;
 }) => {
-  const normalizedWallet = new PublicKey(params.wallet).toBase58();
-  const challenge = await prisma.walletAuthChallenge.findFirst({
-    where: {
-      wallet: normalizedWallet,
-      nonce: params.nonce,
-    },
-  });
-
-  if (!challenge) {
-    throw new Error("auth challenge not found");
-  }
-
-  if (challenge.consumedAt) {
-    throw new Error("auth challenge has already been consumed");
-  }
-
-  if (challenge.expiresAt.getTime() <= Date.now()) {
-    throw new Error("auth challenge has expired");
-  }
+  const normalizedWallet = normalizeWalletAddress(params.wallet);
+  const challenge = parseWalletChallengeToken(params.nonce, normalizedWallet);
 
   const signatureBytes = parseSignatureBytes(params.signature);
   const verified = ed25519.verify(signatureBytes, Buffer.from(challenge.message, "utf8"), new PublicKey(normalizedWallet).toBytes());
@@ -407,12 +497,82 @@ const verifyPendingWalletAuthChallenge = async (params: {
   };
 };
 
+const claimWalletAuthChallengeAndCreateSession = async (params: {
+  nonce: string;
+  message: string;
+  normalizedWallet: string;
+  sessionId: string;
+  accessToken: string;
+  expiresAt: Date;
+  challengeExpiresAt: Date;
+}): Promise<void> => {
+  const claimedAt = new Date();
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (params.challengeExpiresAt.getTime() <= claimedAt.getTime()) {
+        throw new Error("auth challenge has expired");
+      }
+
+      await tx.walletAuthChallenge.deleteMany({
+        where: {
+          wallet: params.normalizedWallet,
+          expiresAt: { lte: claimedAt },
+        },
+      });
+
+      await tx.walletAuthChallenge.create({
+        data: {
+          wallet: params.normalizedWallet,
+          nonce: params.nonce,
+          message: params.message,
+          expiresAt: params.challengeExpiresAt,
+          consumedAt: claimedAt,
+        },
+      });
+
+      await tx.walletSession.create({
+        data: {
+          id: params.sessionId,
+          wallet: params.normalizedWallet,
+          tokenHash: sha256Hex(params.accessToken),
+          expiresAt: params.expiresAt,
+        },
+      });
+
+      await ensureFanAccountProfileWithDb(
+        tx,
+        params.normalizedWallet,
+        null,
+        WalletType.EXTERNAL
+      );
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new Error("auth challenge has already been consumed");
+    }
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      throw new Error("auth challenge has already been consumed");
+    }
+    throw error;
+  }
+};
+
 export const verifyWalletAuthChallenge = async (params: {
   wallet: string;
   nonce: string;
   signature: string;
 }) => {
   const { challenge, normalizedWallet } = await verifyPendingWalletAuthChallenge(params);
+  assertPilotWalletInvited(normalizedWallet);
 
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -422,24 +582,15 @@ export const verifyWalletAuthChallenge = async (params: {
     expiresAt,
   });
 
-  await prisma.$transaction([
-    prisma.walletAuthChallenge.update({
-      where: { id: challenge.id },
-      data: {
-        consumedAt: new Date(),
-      },
-    }),
-    prisma.walletSession.create({
-      data: {
-        id: sessionId,
-        wallet: normalizedWallet,
-        tokenHash: sha256Hex(accessToken),
-        expiresAt,
-      },
-    }),
-  ]);
-
-  await ensureFanAccountProfile(normalizedWallet, null, WalletType.EXTERNAL);
+  await claimWalletAuthChallengeAndCreateSession({
+    nonce: params.nonce,
+    message: challenge.message,
+    normalizedWallet,
+    sessionId,
+    accessToken,
+    expiresAt,
+    challengeExpiresAt: challenge.expiresAt,
+  });
 
   return {
     wallet: normalizedWallet,
@@ -627,7 +778,7 @@ export const bindExternalWalletToIdentitySession = async (params: {
       WalletType.MANAGED
     ));
 
-  const normalizedWallet = new PublicKey(params.wallet).toBase58();
+  const normalizedWallet = normalizeWalletAddress(params.wallet);
   const existingWalletBinding = await prisma.accountWallet.findUnique({
     where: { walletAddress: normalizedWallet },
     include: { accountProfile: true },
@@ -648,6 +799,7 @@ export const bindExternalWalletToIdentitySession = async (params: {
     nonce: params.nonce,
     signature: params.signature,
   });
+  assertPilotWalletInvited(normalizedWallet);
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   const accessToken = buildSessionToken({
@@ -656,30 +808,58 @@ export const bindExternalWalletToIdentitySession = async (params: {
     expiresAt,
   });
 
-  await prisma.$transaction([
-    prisma.walletAuthChallenge.update({
-      where: { id: challenge.id },
-      data: {
-        consumedAt: new Date(),
-      },
-    }),
-    prisma.accountWallet.create({
-      data: {
-        accountProfileId: currentAccountProfile.id,
-        walletAddress: normalizedWallet,
-        walletType: WalletType.EXTERNAL,
-        isPrimary: false,
-      },
-    }),
-    prisma.walletSession.create({
-      data: {
-        id: sessionId,
-        wallet: normalizedWallet,
-        tokenHash: sha256Hex(accessToken),
-        expiresAt,
-      },
-    }),
-  ]);
+  const claimedAt = new Date();
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (challenge.expiresAt.getTime() <= claimedAt.getTime()) {
+        throw new Error("auth challenge has expired");
+      }
+
+      await tx.walletAuthChallenge.deleteMany({
+        where: {
+          wallet: normalizedWallet,
+          expiresAt: { lte: claimedAt },
+        },
+      });
+      await tx.walletAuthChallenge.create({
+        data: {
+          wallet: normalizedWallet,
+          nonce: params.nonce,
+          message: challenge.message,
+          expiresAt: challenge.expiresAt,
+          consumedAt: claimedAt,
+        },
+      });
+
+      await tx.accountWallet.create({
+        data: {
+          accountProfileId: currentAccountProfile.id,
+          walletAddress: normalizedWallet,
+          walletType: WalletType.EXTERNAL,
+          isPrimary: false,
+        },
+      });
+
+      await tx.walletSession.create({
+        data: {
+          id: sessionId,
+          wallet: normalizedWallet,
+          tokenHash: sha256Hex(accessToken),
+          expiresAt,
+        },
+      });
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      throw new Error("auth challenge has already been consumed");
+    }
+    throw error;
+  }
 
   return {
     wallet: normalizedWallet,
@@ -739,6 +919,22 @@ export const verifyWalletSessionToken = async (token: string) => {
 
   if (session.wallet !== parsed.wallet || session.tokenHash !== parsed.tokenHash) {
     return null;
+  }
+
+  try {
+    assertPilotWalletInvited(session.wallet);
+  } catch (_error) {
+    return null;
+  }
+
+  if (config.pilot.inviteOnly) {
+    const accountWallet = await prisma.accountWallet.findUnique({
+      where: { walletAddress: session.wallet },
+      select: { walletType: true },
+    });
+    if (accountWallet?.walletType !== WalletType.EXTERNAL) {
+      return null;
+    }
   }
 
   void prisma.walletSession.update({

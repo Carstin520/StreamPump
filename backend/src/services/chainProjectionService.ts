@@ -26,6 +26,21 @@ const shouldMarkOracleSynced = (instructionName: string): boolean =>
   instructionName === "settle_track2" ||
   instructionName === "settle_track3_cps";
 
+export const deriveProjectionTransactionSignatures = (params: {
+  instructionName: string;
+  signature: string;
+  existingFundingTxSignature: string | null;
+  existingSettlementTxSignature: string | null;
+}) => ({
+  fundingTxSignature:
+    params.instructionName === "sponsor_fund"
+      ? params.signature
+      : params.existingFundingTxSignature,
+  latestSettlementTxSignature: shouldMarkOracleSynced(params.instructionName)
+    ? params.signature
+    : params.existingSettlementTxSignature,
+});
+
 const normalizeProposalStatus = (status: OnChainProposalState["status"]): ProposalStatus => {
   switch (status) {
     case "OPEN":
@@ -48,14 +63,23 @@ const normalizeProposalStatus = (status: OnChainProposalState["status"]): Propos
 type ProofStatusInput = {
   status: ProposalStatus;
   track1Claimed: boolean;
+  track2UsdcDeposited: bigint;
+  track3UsdcDeposited: bigint;
   track2SettledAt: Date | null;
   track3SettledAt: Date | null;
   contentAnchorPda: string | null;
 };
 
-const deriveProofStatus = (input: ProofStatusInput): CampaignProofStatus => {
+export const deriveProofStatus = (input: ProofStatusInput): CampaignProofStatus => {
   if (input.status === ProposalStatus.CANCELLED) return CampaignProofStatus.CANCELLED;
   if (input.status === ProposalStatus.VOIDED) return CampaignProofStatus.VOIDED;
+  if (
+    input.track1Claimed &&
+    input.track2UsdcDeposited === 0n &&
+    input.track3UsdcDeposited === 0n
+  ) {
+    return CampaignProofStatus.SETTLED;
+  }
   if (input.track2SettledAt && input.track3SettledAt) return CampaignProofStatus.SETTLED;
   if (input.track2SettledAt || input.track3SettledAt || input.track1Claimed) {
     return CampaignProofStatus.SETTLING;
@@ -94,13 +118,19 @@ export const syncProposalProjectionFromChain = async (params: {
   const proofStatus = deriveProofStatus({
     status: normalizedStatus,
     track1Claimed: onChain.track1Claimed,
+    track2UsdcDeposited: onChain.track2UsdcDeposited,
+    track3UsdcDeposited: onChain.track3UsdcDeposited,
     track2SettledAt,
     track3SettledAt,
     contentAnchorPda: onChain.contentAnchorPda,
   });
 
-  const isSettlingOrSettled =
-    proofStatus === CampaignProofStatus.SETTLING || proofStatus === CampaignProofStatus.SETTLED;
+  const transactionSignatures = deriveProjectionTransactionSignatures({
+    instructionName: params.instructionName,
+    signature: params.signature,
+    existingFundingTxSignature: existing?.fundingTxSignature ?? null,
+    existingSettlementTxSignature: existing?.latestSettlementTxSignature ?? null,
+  });
 
   const payload = {
     creatorWallet: onChain.creator.toBase58(),
@@ -139,13 +169,7 @@ export const syncProposalProjectionFromChain = async (params: {
       ? null
       : existing?.oracleLastError ?? null,
     proofStatus,
-    fundingTxSignature:
-      normalizedStatus === ProposalStatus.FUNDED
-        ? params.signature
-        : existing?.fundingTxSignature ?? null,
-    latestSettlementTxSignature: isSettlingOrSettled
-      ? params.signature
-      : existing?.latestSettlementTxSignature ?? null,
+    ...transactionSignatures,
     endorserCount: onChain.track2EndorserCount,
     totalSpumpStaked: onChain.totalSpumpStaked,
   };

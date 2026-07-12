@@ -52,7 +52,7 @@ export const uploadDisplayVariant = async (
   }
   const variantKey = buildDisplayVariantKey(originalStorageKey);
 
-  await r2Service.putObject(variantKey, new Uint8Array(variantBuffer), "image/webp", {
+  await r2Service.putVerifiedObject(variantKey, new Uint8Array(variantBuffer), "image/webp", {
     cacheControl: DISPLAY_CACHE_CONTROL,
   });
 
@@ -60,7 +60,7 @@ export const uploadDisplayVariant = async (
 };
 
 export const backfillDisplayVariantFromStorage = async (storageKey: string) => {
-  const downloadUrl = await r2Service.generateDownloadUrl(storageKey, 15 * 60);
+  const downloadUrl = await r2Service.generateVerifiedDownloadUrl(storageKey, 15 * 60);
   const response = await fetch(downloadUrl);
 
   if (!response.ok) {

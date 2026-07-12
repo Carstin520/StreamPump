@@ -92,6 +92,14 @@ fn migrate_legacy_creator_profile(previous: LegacyCreatorProfile) -> CreatorProf
     }
 }
 
+fn assert_legacy_creator_profile_migratable(previous: &LegacyCreatorProfile) -> Result<()> {
+    require!(
+        previous.s1_supply == 0 && previous.s1_early_cohort_supply == 0,
+        StreamPumpError::LegacyCreatorProfileRequiresHolderBackfill
+    );
+    Ok(())
+}
+
 pub(crate) fn handler(ctx: Context<MigrateLegacyCreatorProfile>) -> Result<()> {
     let profile_info = ctx.accounts.creator_profile.to_account_info();
     require_keys_eq!(
@@ -119,6 +127,7 @@ pub(crate) fn handler(ctx: Context<MigrateLegacyCreatorProfile>) -> Result<()> {
         previous.bump == expected_bump,
         StreamPumpError::InvalidLegacyCreatorProfile
     );
+    assert_legacy_creator_profile_migratable(&previous)?;
 
     let payer = ctx.accounts.payer.key();
     require!(
@@ -159,15 +168,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legacy_creator_profile_migration_sets_holder_counters_to_zero() {
+    fn empty_legacy_creator_profile_migration_sets_holder_counters_to_zero() {
         let previous = LegacyCreatorProfile {
             authority: Pubkey::new_unique(),
             handle: "creator".to_string(),
             payout_usdc_ata: Pubkey::new_unique(),
             level: 1,
             status: CreatorStatus::S1_Active,
-            s1_supply: 123,
-            s1_early_cohort_supply: 45,
+            s1_supply: 0,
+            s1_early_cohort_supply: 0,
             s1_rating_bps: 10_000,
             s1_graduation_target_supply: 2_500,
             pending_s1_rating_bps: 0,
@@ -191,5 +200,32 @@ mod tests {
             migrated.s1_early_cohort_supply,
             previous.s1_early_cohort_supply
         );
+    }
+
+    #[test]
+    fn active_legacy_creator_profile_requires_holder_counter_backfill() {
+        let previous = LegacyCreatorProfile {
+            authority: Pubkey::new_unique(),
+            handle: "creator".to_string(),
+            payout_usdc_ata: Pubkey::new_unique(),
+            level: 1,
+            status: CreatorStatus::S1_Active,
+            s1_supply: 123,
+            s1_early_cohort_supply: 45,
+            s1_rating_bps: 10_000,
+            s1_graduation_target_supply: 2_500,
+            pending_s1_rating_bps: 0,
+            pending_s1_graduation_target_supply: 0,
+            pending_rating_effective_at: 0,
+            pending_rating_report_digest: [0; 32],
+            last_rating_update_at: 0,
+            last_rating_report_digest: [1; 32],
+            last_upgrade_at: 0,
+            created_at: 10,
+            updated_at: 20,
+            bump: 254,
+        };
+
+        assert!(assert_legacy_creator_profile_migratable(&previous).is_err());
     }
 }

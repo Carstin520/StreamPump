@@ -109,11 +109,21 @@ const ProfileHeader = ({ currentUser, influence }: { currentUser: CurrentUserRec
 
       <div className="relative px-4 pb-4 sm:px-5 sm:pb-5">
         <div className="-mt-10 flex items-end gap-4 sm:-mt-12">
-          <img
-            alt={currentUser.name}
-            className="h-20 w-20 rounded-2xl border-[3px] border-[#0e1420] object-cover shadow-lg sm:h-24 sm:w-24"
-            src={currentUser.avatarSrc}
-          />
+          {currentUser.avatarSrc ? (
+            <img
+              alt={currentUser.name}
+              className="h-20 w-20 rounded-2xl border-[3px] border-[#0e1420] object-cover shadow-lg sm:h-24 sm:w-24"
+              src={currentUser.avatarSrc}
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="grid h-20 w-20 place-items-center rounded-2xl border-[3px] border-[#0e1420] text-3xl font-bold text-white shadow-lg sm:h-24 sm:w-24"
+              style={{ background: "linear-gradient(150deg, #de402a, #f0795f)" }}
+            >
+              {(currentUser.name || currentUser.handle || "·").trim().replace(/^@+/, "").charAt(0).toUpperCase() || "·"}
+            </span>
+          )}
           <div className="min-w-0 flex-1 pb-0.5">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="type-h3 truncate font-bold text-white">{currentUser.name}</h1>
@@ -178,10 +188,13 @@ const SavedContent = ({ savedPosts }: { savedPosts: UserNoteRecord[] }) => {
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {savedPosts.map((note) => (
-        <NoteCard key={note.id} note={note} />
-      ))}
+    <div className="space-y-3">
+      <MockPreviewBadge />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {savedPosts.map((note) => (
+          <NoteCard key={note.id} note={note} />
+        ))}
+      </div>
     </div>
   );
 };

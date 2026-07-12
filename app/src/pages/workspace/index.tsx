@@ -6,6 +6,7 @@ import { ProductReadinessBanner } from "@/components/shared/ProductReadinessBann
 import { StagePill } from "@/components/shared/StagePill";
 import {
   ConsoleAuthRequired,
+  ConsoleError,
   ConsoleLoading,
   OverviewConsole,
 } from "@/components/workspace/OverviewConsole";
@@ -98,11 +99,13 @@ export default function WorkspacePage() {
     };
   }, [isDemoMode, router.isReady, t]);
 
-  const persona = useMemo<WorkspacePersona>(() => {
+  // Mock persona is ONLY produced in explicit ?demo=1 mode. Live sessions render
+  // the projection-backed persona; failed/absent sessions never fall back to
+  // mock persona data (fail-closed).
+  const persona = useMemo<WorkspacePersona | null>(() => {
     if (isDemoMode) return workspacePersonas[activeStage];
     if (state.status === "ready") return buildPersonaFromWorkspace(state.data);
-    if (state.status === "preview") return workspacePersonas[WORKSPACE_DEMO_STAGE];
-    return workspacePersonas[WORKSPACE_DEMO_STAGE];
+    return null;
   }, [isDemoMode, activeStage, state]);
 
   return (
@@ -110,11 +113,11 @@ export default function WorkspacePage() {
       <Head>
         <title>{t("ws.pageTitle")}</title>
       </Head>
-      <WorkspaceShell stage={persona.stage} wallet={persona.wallet}>
+      <WorkspaceShell stage={persona?.stage ?? WORKSPACE_DEMO_STAGE} wallet={persona?.wallet}>
         <ProductReadinessBanner
-          description={t("ws.readinessDesc")}
-          status="SEEDED_DEMO"
-          title={t("ws.readinessTitle")}
+          description={isDemoMode ? t("ws.readinessDescDemo") : t("ws.readinessDesc")}
+          status={isDemoMode ? "MOCK_PREVIEW" : "SEEDED_DEMO"}
+          title={isDemoMode ? t("ws.readinessTitleDemo") : t("ws.readinessTitle")}
         />
 
         {isDemoMode ? <StageSwitcher activeStage={activeStage} onChange={setActiveStage} /> : null}
@@ -124,60 +127,14 @@ export default function WorkspacePage() {
           <ConsoleAuthRequired loginHref={state.loginHref} />
         ) : null}
         {!isDemoMode && state.status === "preview" ? (
-          <WorkspacePreviewNotice
-            loginHref={state.loginHref}
-            message={state.message}
-            tone={state.tone}
-          />
+          <ConsoleError loginHref={state.loginHref} message={state.message} />
         ) : null}
 
-        {(isDemoMode || state.status === "ready" || state.status === "preview") && (
-          <OverviewConsole persona={persona} />
-        )}
+        {persona ? <OverviewConsole persona={persona} /> : null}
       </WorkspaceShell>
     </>
   );
 }
-
-const WorkspacePreviewNotice = ({
-  loginHref,
-  message,
-  tone,
-}: {
-  loginHref?: string;
-  message: string;
-  tone: PreviewTone;
-}) => {
-  const { t } = useI18n();
-  const toneClass =
-    tone === "warn"
-      ? "border-[#de402a]/22 bg-[#1f120e]/70"
-      : "border-[#67b8ff]/20 bg-[#0e1726]/70";
-  const accentClass = tone === "warn" ? "text-[#ff8a78]" : "text-[#8ad0ff]";
-  const dotClass = tone === "warn" ? "bg-[#de402a]" : "bg-[#67b8ff]";
-
-  return (
-    <section className={`rounded-xl border px-3 py-2 ${toneClass}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-          <p className={`text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] ${accentClass}`}>
-            {tone === "warn" ? t("ws.preview.sessionTag") : t("ws.preview.previewTag")}
-          </p>
-          <p className="truncate text-[length:var(--fs-micro)] text-[#9aabc4]">{message}</p>
-        </div>
-        {loginHref ? (
-          <a
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[length:var(--fs-micro)] font-medium text-[#cbd6e7] transition hover:border-white/[0.12] hover:text-white"
-            href={loginHref}
-          >
-            {t("ws.console.signInAgain")}
-          </a>
-        ) : null}
-      </div>
-    </section>
-  );
-};
 
 const StageSwitcher = ({
   activeStage,

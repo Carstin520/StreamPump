@@ -13,6 +13,7 @@ import { randomBytes } from "crypto";
 import { Request } from "express";
 import { PublicKey } from "@solana/web3.js";
 
+import { config } from "../../config/default";
 import {
   HttpError,
   ensureIdempotencyKey,
@@ -52,6 +53,15 @@ import {
 import { prisma } from "../services/prisma";
 import { getAnchorService } from "../services/AnchorService";
 import { getSponsorProfileByWallet } from "../services/sponsorProfile";
+import {
+  isOperatorApprovedPublication,
+  isSettlementAssetReady,
+} from "../services/campaignIntegrity";
+import { isAssetPublicDeliveryReady } from "../services/contentPublicationEligibility";
+import {
+  bindApiIdempotencyResource,
+  getRecoveredIdempotencyResourceId,
+} from "../services/apiIdempotency";
 
 const getRequesterWallet = (req: Request): string => requireSessionWallet(req);
 const MAX_SIGNED_BIGINT_NONCE = (1n << 63n) - 1n;
@@ -104,12 +114,145 @@ const allocateProposalNonce = async (
   throw new HttpError(409, "PROPOSAL_NONCE_COLLISION", "unable to allocate a unique proposal nonce");
 };
 
+export const assertPilotTrackBudgetsAllowed = (params: {
+  track2Enabled: boolean;
+  track3Enabled: boolean;
+  track2TargetValue: bigint;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: bigint;
+  maxEndorsementSpump: bigint;
+  track3UsdcDeposited: bigint;
+  track3DelayDays: number;
+}): void => {
+  if (
+    !params.track2Enabled &&
+    (params.track2TargetValue > 0n ||
+      params.track2MinAchievementBps > 0 ||
+      params.track2UsdcDeposited > 0n ||
+      params.maxEndorsementSpump > 0n)
+  ) {
+    throw new HttpError(
+      409,
+      "TRACK2_CLOSED_FOR_PILOT",
+      "Track 2 budgets, metrics, and endorsements are closed for the invite-only Pilot"
+    );
+  }
+
+  if (
+    !params.track3Enabled &&
+    (params.track3UsdcDeposited > 0n || params.track3DelayDays > 0)
+  ) {
+    throw new HttpError(
+      409,
+      "TRACK3_CLOSED_FOR_PILOT",
+      "Track 3 CPS settlement is closed for the invite-only Pilot"
+    );
+  }
+};
+
+type StoredPilotTrackTerms = {
+  track2TargetValue: bigint;
+  track2MinAchievementBps: number;
+  track2UsdcDeposited: bigint;
+  maxEndorsementSpump: bigint;
+  track3UsdcDeposited: bigint;
+  track3DelayDays: number;
+};
+
+export const assertStoredIntentPilotTracksAllowed = (intent: StoredPilotTrackTerms): void => {
+  assertPilotTrackBudgetsAllowed({
+    track2Enabled: config.pilot.track2Enabled,
+    track3Enabled: config.pilot.track3Enabled,
+    ...intent,
+  });
+};
+
+export const assertSponsorApprovedForFinalSubmit = (profile: {
+  status: SponsorVerificationStatus;
+} | null): void => {
+  if (!profile || profile.status !== SponsorVerificationStatus.APPROVED) {
+    throw new HttpError(
+      403,
+      "SPONSOR_KYB_NOT_APPROVED",
+      "sponsor KYB approval must still be active immediately before final submission"
+    );
+  }
+};
+
+const recheckSponsorApprovalForFinalSubmit = async (sponsorWallet: string): Promise<void> => {
+  assertSponsorApprovedForFinalSubmit(await getSponsorProfileByWallet(sponsorWallet));
+};
+
+export const assertManifestReadyForProposalIntent = (params: {
+  manifest: any;
+  track1BaseUsdc: bigint;
+  track2UsdcDeposited: bigint;
+  track3UsdcDeposited: bigint;
+}): void => {
+  const { manifest } = params;
+  if (!manifest.isPublicFeedEligible) {
+    throw new HttpError(
+      409,
+      "MANIFEST_NOT_PUBLIC_FEED_ELIGIBLE",
+      "content must be eligible for the public feed before creating a proposal intent"
+    );
+  }
+  if (
+    !Array.isArray(manifest.assets) ||
+    manifest.assets.length === 0 ||
+    !manifest.assets.every(
+      (asset: any) => isSettlementAssetReady(asset) && isAssetPublicDeliveryReady(asset)
+    )
+  ) {
+    throw new HttpError(
+      409,
+      "MANIFEST_ASSETS_NOT_VERIFIED",
+      "all manifest assets must be storage-verified and delivery-ready before creating a proposal intent"
+    );
+  }
+  if (
+    !Array.isArray(manifest.publications) ||
+    !manifest.publications.some(isOperatorApprovedPublication)
+  ) {
+    throw new HttpError(
+      409,
+      "OPERATOR_PUBLICATION_APPROVAL_REQUIRED",
+      "an operator-approved publication is required before creating a proposal intent"
+    );
+  }
+  if (
+    params.track2UsdcDeposited === 0n &&
+    params.track3UsdcDeposited === 0n &&
+    params.track1BaseUsdc <= 0n
+  ) {
+    throw new HttpError(
+      409,
+      "TRACK1_BASE_USDC_REQUIRED",
+      "Track 1-only proposals require a positive Track 1 base budget"
+    );
+  }
+};
+
 export const createProposalIntent = withController(
   "CREATE_PROPOSAL_INTENT_FAILED",
   async (req, res) => {
     ensureIdempotencyKey(req);
 
     const requesterWallet = getRequesterWallet(req);
+    const recoveredIntentId = getRecoveredIdempotencyResourceId(req, "PROPOSAL_INTENT");
+    if (recoveredIntentId) {
+      const recovered = await prisma.proposalIntent.findFirst({
+        where: {
+          id: recoveredIntentId,
+          OR: [{ creatorWallet: requesterWallet }, { sponsorWallet: requesterWallet }],
+        },
+      });
+      if (!recovered) {
+        throw new HttpError(409, "IDEMPOTENCY_RESOURCE_MISSING", "idempotent intent is missing");
+      }
+      ok(res, serializeIntent(recovered), 201);
+      return;
+    }
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const sponsorWallet = parseWallet(req.body.sponsorWallet, "sponsorWallet");
@@ -138,10 +281,9 @@ export const createProposalIntent = withController(
 
     const manifest = await prisma.contentManifest.findUnique({
       where: { id: manifestId },
-      select: {
-        id: true,
-        creatorWallet: true,
-        status: true,
+      include: {
+        assets: true,
+        publications: true,
       },
     });
 
@@ -185,31 +327,63 @@ export const createProposalIntent = withController(
       "maxEndorsementSpump",
       0n
     );
+    const track2TargetValue = parseNonNegativeBigInt(
+      req.body.track2TargetValue,
+      "track2TargetValue"
+    );
+    const track2UsdcDeposited = parseNonNegativeBigInt(
+      req.body.track2UsdcDeposited,
+      "track2UsdcDeposited"
+    );
+    const track3UsdcDeposited = parseNonNegativeBigInt(
+      req.body.track3UsdcDeposited,
+      "track3UsdcDeposited"
+    );
+    const track3DelayDays = parseNonNegativeInt(req.body.track3DelayDays, "track3DelayDays");
+    const track1BaseUsdc = parseNonNegativeBigInt(
+      req.body.track1BaseUsdc,
+      "track1BaseUsdc"
+    );
 
-    const intent = await prisma.proposalIntent.create({
-      data: {
-        creatorWallet,
-        sponsorWallet,
-        sponsorOrgId: parseOptionalString(req.body.sponsorOrgId),
-        creatorOrgId: parseOptionalString(req.body.creatorOrgId),
-        manifestId,
-        deadlineUnix,
-        nonce,
-        track1BaseUsdc: parseNonNegativeBigInt(req.body.track1BaseUsdc, "track1BaseUsdc"),
-        track2MetricType: parseTrack2MetricType(req.body.track2MetricType),
-        track2TargetValue: parseNonNegativeBigInt(req.body.track2TargetValue, "track2TargetValue"),
-        track2MinAchievementBps,
-        track2UsdcDeposited: parseNonNegativeBigInt(
-          req.body.track2UsdcDeposited,
-          "track2UsdcDeposited"
-        ),
-        track3UsdcDeposited: parseNonNegativeBigInt(
-          req.body.track3UsdcDeposited,
-          "track3UsdcDeposited"
-        ),
-        track3DelayDays: parseNonNegativeInt(req.body.track3DelayDays, "track3DelayDays"),
-        maxEndorsementSpump,
-      },
+    assertPilotTrackBudgetsAllowed({
+      track2Enabled: config.pilot.track2Enabled,
+      track3Enabled: config.pilot.track3Enabled,
+      track2TargetValue,
+      track2MinAchievementBps,
+      track2UsdcDeposited,
+      maxEndorsementSpump,
+      track3UsdcDeposited,
+      track3DelayDays,
+    });
+    assertManifestReadyForProposalIntent({
+      manifest,
+      track1BaseUsdc,
+      track2UsdcDeposited,
+      track3UsdcDeposited,
+    });
+
+    const intent = await prisma.$transaction(async (tx) => {
+      const created = await tx.proposalIntent.create({
+        data: {
+          creatorWallet,
+          sponsorWallet,
+          sponsorOrgId: parseOptionalString(req.body.sponsorOrgId),
+          creatorOrgId: parseOptionalString(req.body.creatorOrgId),
+          manifestId,
+          deadlineUnix,
+          nonce,
+          track1BaseUsdc,
+          track2MetricType: parseTrack2MetricType(req.body.track2MetricType),
+          track2TargetValue,
+          track2MinAchievementBps,
+          track2UsdcDeposited,
+          track3UsdcDeposited,
+          track3DelayDays,
+          maxEndorsementSpump,
+        },
+      });
+      await bindApiIdempotencyResource(tx, req, "PROPOSAL_INTENT", created.id);
+      return created;
     });
 
     ok(res, serializeIntent(intent), 201);
@@ -233,6 +407,19 @@ export const lockProposalIntent = withController("LOCK_PROPOSAL_INTENT_FAILED", 
   }
 
   assertProposalIntentParticipant(requesterWallet, intent);
+  assertStoredIntentPilotTracksAllowed(intent);
+
+  const recoveredLockedIntentId = getRecoveredIdempotencyResourceId(
+    req,
+    "LOCKED_PROPOSAL_INTENT"
+  );
+  if (recoveredLockedIntentId) {
+    if (recoveredLockedIntentId !== intent.id) {
+      throw new HttpError(409, "IDEMPOTENCY_RESOURCE_MISMATCH", "idempotent lock resource mismatch");
+    }
+    ok(res, serializeIntent(intent));
+    return;
+  }
 
   if (intent.status !== ProposalIntentStatus.DRAFT) {
     throw new HttpError(409, "INTENT_ALREADY_LOCKED", "proposal intent is already locked");
@@ -272,6 +459,8 @@ export const lockProposalIntent = withController("LOCK_PROPOSAL_INTENT_FAILED", 
       });
     }
 
+    await bindApiIdempotencyResource(tx, req, "LOCKED_PROPOSAL_INTENT", updatedIntent.id);
+
     return updatedIntent;
   });
 
@@ -305,6 +494,29 @@ export const buildProposalLaunchBundle = withController(
     }
 
     assertProposalIntentParticipant(requesterWallet, intent);
+    assertStoredIntentPilotTracksAllowed(intent);
+
+    const recoveredBundleId = getRecoveredIdempotencyResourceId(req, "TX_BUNDLE");
+    if (recoveredBundleId) {
+      const recoveredBundle = await prisma.txBundle.findFirst({
+        where: { id: recoveredBundleId, intentId: intent.id },
+      });
+      if (!recoveredBundle) {
+        throw new HttpError(409, "IDEMPOTENCY_RESOURCE_MISSING", "idempotent bundle is missing");
+      }
+      ok(res, {
+        intentId: intent.id,
+        plannedProposalPda: intent.plannedProposalPda,
+        plannedContentAnchorPda: derivePlannedContentAnchorPda({
+          creatorWallet: intent.creatorWallet,
+          manifest: intent.manifest,
+          lockedAnchorPda: intent.lockedAnchorPda,
+        }),
+        bundle: serializeBundle(recoveredBundle),
+        reused: true,
+      });
+      return;
+    }
 
     if (intent.txBundles[0] && !forceRebuild && isBundleReusable(intent.txBundles[0])) {
       ok(res, {
@@ -368,6 +580,8 @@ export const buildProposalLaunchBundle = withController(
         }),
       });
 
+      await bindApiIdempotencyResource(tx, req, "TX_BUNDLE", createdBundle.id);
+
       await tx.proposalIntent.update({
         where: { id: intent.id },
         data: {
@@ -421,6 +635,7 @@ export const creatorPartialSignBundle = withController(
     if (requesterWallet !== intent.creatorWallet) {
       throw new HttpError(403, "FORBIDDEN", "only the creator can submit the partial signature");
     }
+    assertStoredIntentPilotTracksAllowed(intent);
 
     const bundle = await prisma.txBundle.findFirst({
       where: {
@@ -511,6 +726,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
   if (requesterWallet !== intent.sponsorWallet) {
     throw new HttpError(403, "FORBIDDEN", "only the sponsor can submit the final signature");
   }
+  assertStoredIntentPilotTracksAllowed(intent);
 
   const bundle = await prisma.txBundle.findFirst({
     where: {
@@ -570,6 +786,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
   assertRequiredSignerPresent(fullySignedTxBase64, intent.sponsorWallet);
 
   if (bundle.submitMode === BundleSubmitMode.CLIENT_RELAY) {
+    await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet);
     if (bundle.status === BundleStatus.FULLY_SIGNED && bundle.fullySignedBase64 === fullySignedTxBase64) {
       ok(res, {
         intentId,
@@ -645,6 +862,8 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
       return;
     }
   }
+
+  await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet);
 
   const submittedBundle = await prisma.$transaction(async (tx) => {
     const updatedBundle = await tx.txBundle.update({

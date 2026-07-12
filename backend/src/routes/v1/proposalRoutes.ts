@@ -4,6 +4,7 @@
  */
 import { Router } from "express";
 
+import { config } from "../../../config/default";
 import {
   buildClaimEndorsementTransaction,
   buildEndorseProposalTransaction,
@@ -16,9 +17,11 @@ const router = Router();
 
 router.use(optionalSessionAuth);
 
-router.post("/transactions/submit", requireSessionAuth, submitProposalActionTransaction);
-router.post("/:id/endorse/build", requireSessionAuth, buildEndorseProposalTransaction);
-router.post("/:id/endorsement/claim/build", requireSessionAuth, buildClaimEndorsementTransaction);
+if (config.pilot.track2Enabled) {
+  router.post("/transactions/submit", requireSessionAuth, submitProposalActionTransaction);
+  router.post("/:id/endorse/build", requireSessionAuth, buildEndorseProposalTransaction);
+  router.post("/:id/endorsement/claim/build", requireSessionAuth, buildClaimEndorsementTransaction);
+}
 router.get("/:id", getProposalById);
 
 export default router;

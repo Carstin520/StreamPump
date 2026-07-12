@@ -3,6 +3,10 @@ import express, { type Application, type RequestHandler } from "express";
 
 import { config } from "../config/default";
 import routes from "./routes";
+import {
+  appStartupReadiness,
+  type StartupReadiness,
+} from "./services/startupReadiness";
 
 const normalizeLoopbackOrigin = (origin: string): string[] => {
   try {
@@ -60,14 +64,43 @@ const createJsonMiddleware = (): RequestHandler => {
   };
 };
 
-export const createApp = (): Application => {
+export const buildHealthPayload = () => {
+  const invitePolicyConfigured =
+    config.pilot.inviteOnly && config.pilot.inviteWallets.length > 0;
+
+  return {
+    ok: true,
+    mode: invitePolicyConfigured
+      ? "INVITE_ONLY_PILOT"
+      : config.pilot.inviteOnly
+        ? "INVITE_POLICY_MISCONFIGURED"
+        : "OPEN_DEVELOPMENT",
+    automatedSettlement: config.oracle.schedulerEnabled,
+    accessPolicy: {
+      configured: invitePolicyConfigured,
+      type: config.pilot.inviteOnly ? "invite_only" : "open",
+    },
+  };
+};
+
+export const createApp = (readiness: StartupReadiness = appStartupReadiness): Application => {
   const app = express();
+
+  // Render terminates public HTTP at one reverse-proxy hop. Trust exactly that
+  // hop so Express derives req.ip from the right-most untrusted address; rate
+  // limiting code must never parse X-Forwarded-For on its own.
+  app.set("trust proxy", 1);
 
   app.use(createCorsMiddleware());
   app.use(createJsonMiddleware());
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json(buildHealthPayload());
+  });
+
+  app.get("/ready", (_req, res) => {
+    const payload = readiness.snapshot();
+    res.status(payload.ok ? 200 : 503).json(payload);
   });
 
   app.use("/api", routes);

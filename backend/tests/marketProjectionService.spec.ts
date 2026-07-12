@@ -83,12 +83,12 @@ describe("marketProjectionService serializers", () => {
         track3CpsPayout: null,
         track3DelayDays: 7,
         track3SettledAt: null,
-        onChainTxSignature: "funding-tx",
+        onChainTxSignature: "settlement-tx",
         oracleSyncStatus: OracleSyncStatus.PENDING,
         oracleLastError: null,
         contentPublishedVerifiedAt: null,
         fundingTxSignature: "funding-tx",
-        latestSettlementTxSignature: null,
+        latestSettlementTxSignature: "settlement-tx",
         endorserCount: 0,
         totalSpumpStaked: 0n,
         claimedEndorserCount: 0,
@@ -110,7 +110,7 @@ describe("marketProjectionService serializers", () => {
           captionTextHash: null,
           manifestHashHex: "b".repeat(64),
           canonicalManifestJson: null,
-          internalCanonicalUrl: null,
+          internalCanonicalUrl: "https://api.streampump.test/content/manifests/manifest-id/v/1",
           internalUrlDigestHex: "c".repeat(64),
           currentAnchorPda: "anchor-pda",
           currentAnchorTx: "anchor-tx",
@@ -136,6 +136,9 @@ describe("marketProjectionService serializers", () => {
               muxPlaybackId: "mux-playback",
               uploadStatus: "UPLOADED",
               processingStatus: "READY",
+              verifiedSha256Hex: "d".repeat(64),
+              verifiedSizeBytes: 1024n,
+              storageVerifiedAt: now,
               updatedAt: now,
             },
           ],
@@ -148,8 +151,12 @@ describe("marketProjectionService serializers", () => {
               externalUrl: "https://x.example/post",
               externalUrlDigestHex: "e".repeat(64),
               verificationStatus: "VERIFIED",
-              verificationSource: "manual",
+              verificationSource: "OPERATOR_APPROVED",
+              verificationReviewer: "operator-wallet",
+              verificationNote: null,
+              verificationEvidenceDigestHex: "f".repeat(64),
               verifiedAt: now,
+              rejectedAt: null,
               createdAt: now,
               updatedAt: now,
             },
@@ -162,6 +169,21 @@ describe("marketProjectionService serializers", () => {
     expect(serialized.budgetTracks.track1BaseUsdc).to.equal("100");
     expect(serialized.manifest?.manifestHashHex).to.equal("b".repeat(64));
     expect(serialized.manifest?.assets[0].sha256Hex).to.equal("d".repeat(64));
+    expect(serialized.manifest?.assets[0].verifiedSha256Hex).to.equal("d".repeat(64));
+    expect(serialized.manifest?.assets[0].sha256Hex)
+      .to.equal(serialized.manifest?.assets[0].verifiedSha256Hex);
+    expect(serialized.manifest?.assets[0].verifiedSizeBytes).to.equal("1024");
+    expect(serialized.manifest?.assets[0].storageVerifiedAt).to.equal(now.toISOString());
     expect(serialized.manifest?.publications[0].externalUrlDigestHex).to.equal("e".repeat(64));
+    expect(serialized.manifest?.publications[0].verificationSource).to.equal("OPERATOR_APPROVED");
+    expect(serialized.manifest?.publications[0].verificationReviewer).to.equal("operator-wallet");
+    expect(serialized.manifest?.publications[0].verificationEvidenceDigestHex)
+      .to.equal("f".repeat(64));
+    expect(serialized.proof.fundingTxSignature).to.equal("funding-tx");
+    expect(serialized.proof.latestSettlementTxSignature).to.equal("settlement-tx");
+    expect(serialized.proof.latestChainTxSignature).to.equal("settlement-tx");
+    expect(serialized.integrity.assetsReady).to.equal(true);
+    expect(serialized.integrity.operatorApprovedPublication).to.equal(true);
+    expect(serialized.integrity.contentAnchorTransactionPresent).to.equal(true);
   });
 });

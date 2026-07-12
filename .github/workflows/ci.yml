@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/**
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+            backend/package-lock.json
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix app
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix backend
+
+      - name: Validate Prisma v6 schema
+        working-directory: backend
+        run: npx --no-install prisma validate --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://127.0.0.1:5432/streampump
+          DIRECT_URL: postgresql://127.0.0.1:5432/streampump
+
+      - name: Verify production Anchor IDL
+        run: npm run verify:production-idl
+
+      - name: Frontend lint
+        run: npm run lint --prefix app
+
+      - name: Frontend build
+        run: npm run build --prefix app
+
+      - name: Backend build
+        run: npm run build --prefix backend
+
+      - name: Backend tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const fs = require("node:fs"); const path = require("node:path"); const { Keypair } = require("@solana/web3.js"); const dir = path.join(process.env.HOME, ".config", "solana"); fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, "id.json"), JSON.stringify(Array.from(Keypair.generate().secretKey)), { mode: 0o600 });'
+          SOLANA_TX_RPC_ENDPOINT="http://127.0.0.1:8899" \
+          npm run test:backend
+        env:
+          STREAMPUMP_IDL_PATH: backend/tests/fixtures/streampump_core.test.idl.json
+
+      - name: Rust check
+        run: cargo check
+
+  pilot-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NO_DNA: "1"
+      CARGO_INCREMENTAL: "0"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      ANCHOR_TEST_TIMEOUT_MS: "300000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Cache Anchor and Solana CLIs
+        id: chain-tool-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/anchor
+            ~/.local/share/solana/install
+          key: ${{ runner.os }}-anchor-0.32.1-solana-2.3.0-v1
+
+      - name: Cache Anchor build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-anchor-build-${{ hashFiles('Cargo.lock', 'programs/**/*.rs', 'programs/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-anchor-build-
+
+      - name: Install pinned Solana and Anchor CLIs
+        if: steps.chain-tool-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libudev-dev
+          sh -c "$(curl --proto '=https' --tlsv1.2 -sSfL https://release.anza.xyz/v2.3.0/install)"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          cargo install --git https://github.com/solana-foundation/anchor --tag v0.32.1 anchor-cli --locked
+
+      - name: Activate and verify chain toolchain
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version | grep '2.3.0'
+          anchor --version | grep '0.32.1'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build Anchor program and generated IDL
+        run: |
+          mkdir -p target/idl target/types
+          npm run build:anchor -- --idl "$GITHUB_WORKSPACE/target/idl" --idl-ts "$GITHUB_WORKSPACE/target/types"
+
+      - name: Reject packaged production IDL schema drift
+        run: >-
+          npm run verify:production-idl --
+          backend/idl/streampump_core.json
+          target/idl/streampump_core.json
+
+      - name: Run P2 Track1-only local-chain test
+        run: scripts/test-anchor-local.sh programs/tests/p2-track1-only.spec.ts
+        env:
+          STREAMPUMP_TEST_LEDGER_DIR: ${{ runner.temp }}/streampump-test-validator-ledger
+          ANCHOR_WALLET: ${{ runner.temp }}/streampump-anchor-test-wallet.json
+          STREAMPUMP_TEST_VALIDATOR_LOG: ${{ runner.temp }}/streampump-test-validator.log

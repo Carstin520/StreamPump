@@ -200,6 +200,9 @@ export default function IntentDetailPage() {
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
   const intentId = String(router.query.intentId ?? "").trim();
   const isDemoMode = router.isReady && router.query.demo === "1" && intentId === "intent-neo-pulsefit";
+  // Operator/debug paste-signature controls are hidden for normal creator/sponsor
+  // users and only surface under an explicit ?operator=1 or ?demo=1 flag.
+  const operatorMode = router.isReady && (router.query.operator === "1" || router.query.demo === "1");
 
   const refreshIntent = async (token: string, id: string) => {
     const data = await getProposalIntentById(token, id);
@@ -477,11 +480,11 @@ export default function IntentDetailPage() {
           <StepProgress steps={steps} />
         </div>
 
-        {/* Track budget cards */}
+        {/* Track budget cards — Pilot corridor settles Track 1 base pay only. */}
         <div className="grid grid-cols-3 gap-3">
-          <TrackCard label="基础报酬" sublabel="Track 1" value={formatUsdcAtomic(intent.track1BaseUsdc)} />
-          <TrackCard label="绩效预算" sublabel={`Track 2 · ${intent.track2MetricType}`} value={formatUsdcAtomic(intent.track2UsdcDeposited)} />
-          <TrackCard label="延迟结算" sublabel="Track 3" value={formatUsdcAtomic(intent.track3UsdcDeposited)} />
+          <TrackCard emphasized label="基础报酬" sublabel="Track 1" value={formatUsdcAtomic(intent.track1BaseUsdc)} />
+          <TrackCard closed label="绩效预算" sublabel="Track 2 · Pilot 关闭" value="—" />
+          <TrackCard closed label="延迟结算" sublabel="Track 3 · Pilot 关闭" value="—" />
         </div>
 
         {/* Wallet mismatch warning */}
@@ -642,7 +645,9 @@ export default function IntentDetailPage() {
           )}
         </div>
 
-        {/* Operator/debug fallback for controlled demos and API verification. */}
+        {/* Operator/debug fallback for controlled demos and API verification.
+            Hidden from normal users; only shown under ?operator=1 / ?demo=1. */}
+        {operatorMode ? (
         <details className="rounded-2xl border border-white/[0.06]">
           <summary className="cursor-pointer px-4 py-3 text-[length:var(--fs-micro)] font-medium text-[#5a6b82] hover:text-[#8ea0ba]">
             Operator / Debug Fallback
@@ -694,6 +699,7 @@ export default function IntentDetailPage() {
             )}
           </div>
         </details>
+        ) : null}
 
         {actionMessage && (
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#8ea0ba]">
@@ -707,11 +713,29 @@ export default function IntentDetailPage() {
 
 (IntentDetailPage as typeof IntentDetailPage & { requiresWalletProviders?: boolean }).requiresWalletProviders = true;
 
-function TrackCard({ label, sublabel, value }: { label: string; sublabel: string; value: string }) {
+function TrackCard({
+  label,
+  sublabel,
+  value,
+  emphasized,
+  closed,
+}: {
+  label: string;
+  sublabel: string;
+  value: string;
+  emphasized?: boolean;
+  closed?: boolean;
+}) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+    <div
+      className={`rounded-2xl border p-4 ${
+        emphasized
+          ? "border-[#de402a]/30 bg-[#de402a]/[0.06]"
+          : "border-white/[0.06] bg-white/[0.03]"
+      } ${closed ? "opacity-60" : ""}`}
+    >
       <p className="text-[length:var(--fs-micro)] uppercase tracking-[0.14em] text-[#5a6b82]">{label}</p>
-      <p className="mt-1.5 text-lg font-semibold text-white">{value}</p>
+      <p className={`mt-1.5 text-lg font-semibold ${emphasized ? "text-[#ff8a78]" : "text-white"}`}>{value}</p>
       <p className="mt-1 text-[length:var(--fs-micro)] text-[#4a5568]">{sublabel}</p>
     </div>
   );

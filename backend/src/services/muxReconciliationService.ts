@@ -255,7 +255,7 @@ export const ingestUploadedVideoAssetById = async (
   }
 
   try {
-    const downloadUrl = await r2Service.generateDownloadUrl(asset.storageKey, 3600);
+    const downloadUrl = await r2Service.generateVerifiedDownloadUrl(asset.storageKey, 3600);
     const muxAssetId = await muxService.createAsset(downloadUrl);
     const updated = await prisma.contentAsset.update({
       where: { id: asset.id },

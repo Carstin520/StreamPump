@@ -4,7 +4,6 @@ import {
   CampaignProofStatus,
   ContentManifestStatus,
   OracleSyncStatus,
-  PublicationVerificationStatus,
   Proposal,
   ProposalStatus,
   ProposalIntent,
@@ -12,11 +11,15 @@ import {
   Track2MetricType,
 } from "@prisma/client";
 import bs58 from "bs58";
+import { PublicKey } from "@solana/web3.js";
 
 import { HttpError } from "./http";
 import { serializeAsset } from "./contentManifestShared";
 import { decodeVersionedTransaction, derivePlannedContentAnchorPda } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
+import { OnChainProposalState, getAnchorService } from "../services/AnchorService";
+import { trustedPublicationVerificationWhere } from "../services/contentPublicationEligibility";
+import { config } from "../../config/default";
 
 type SerializedBundleInput = {
   id: string;
@@ -287,21 +290,121 @@ export const assertProposalIntentParticipant = (
   }
 };
 
+export const confirmedLaunchMismatchFields = (params: {
+  intent: Pick<
+    ProposalIntent,
+    | "creatorWallet"
+    | "sponsorWallet"
+    | "lockedManifestHashHex"
+    | "deadlineUnix"
+    | "nonce"
+    | "track1BaseUsdc"
+    | "track2MetricType"
+    | "track2TargetValue"
+    | "track2MinAchievementBps"
+    | "track2UsdcDeposited"
+    | "track3UsdcDeposited"
+    | "track3DelayDays"
+    | "maxEndorsementSpump"
+  >;
+  manifestContentType: string;
+  expectedContentAnchorPda: string | null;
+  onChain: OnChainProposalState;
+}): string[] => {
+  const mismatches: string[] = [];
+  if (params.onChain.creator.toBase58() !== params.intent.creatorWallet) {
+    mismatches.push("creatorWallet");
+  }
+  if (params.onChain.sponsor?.toBase58() !== params.intent.sponsorWallet) {
+    mismatches.push("sponsorWallet");
+  }
+  if (
+    params.onChain.contentHashHex.toLowerCase() !==
+    String(params.intent.lockedManifestHashHex ?? "").toLowerCase()
+  ) {
+    mismatches.push("contentHashHex");
+  }
+  if (params.onChain.contentAnchorPda !== params.expectedContentAnchorPda) {
+    mismatches.push("contentAnchorPda");
+  }
+  if (params.onChain.contentKind !== params.manifestContentType) {
+    mismatches.push("contentKind");
+  }
+  if (params.onChain.deadlineUnix !== params.intent.deadlineUnix) {
+    mismatches.push("deadlineUnix");
+  }
+  if (params.onChain.nonce !== params.intent.nonce) mismatches.push("nonce");
+  if (params.onChain.track1BaseUsdc !== params.intent.track1BaseUsdc) {
+    mismatches.push("track1BaseUsdc");
+  }
+  if (params.onChain.track2MetricType !== params.intent.track2MetricType) {
+    mismatches.push("track2MetricType");
+  }
+  if (params.onChain.track2TargetValue !== params.intent.track2TargetValue) {
+    mismatches.push("track2TargetValue");
+  }
+  if (params.onChain.track2MinAchievementBps !== params.intent.track2MinAchievementBps) {
+    mismatches.push("track2MinAchievementBps");
+  }
+  if (params.onChain.track2UsdcDeposited !== params.intent.track2UsdcDeposited) {
+    mismatches.push("track2UsdcDeposited");
+  }
+  if (params.onChain.track3UsdcDeposited !== params.intent.track3UsdcDeposited) {
+    mismatches.push("track3UsdcDeposited");
+  }
+  if (params.onChain.track3DelayDays !== params.intent.track3DelayDays) {
+    mismatches.push("track3DelayDays");
+  }
+  if (params.onChain.maxEndorsementSpump !== params.intent.maxEndorsementSpump) {
+    mismatches.push("maxEndorsementSpump");
+  }
+  if (params.onChain.status !== "FUNDED") mismatches.push("status");
+  return mismatches;
+};
+
+export const assertConfirmedLaunchMatchesIntent = (params: {
+  intent: Parameters<typeof confirmedLaunchMismatchFields>[0]["intent"];
+  manifestContentType: string;
+  expectedContentAnchorPda: string | null;
+  onChain: OnChainProposalState;
+}): void => {
+  const mismatchFields = confirmedLaunchMismatchFields(params);
+  if (mismatchFields.length > 0) {
+    throw new HttpError(
+      502,
+      "CONFIRMED_PROPOSAL_CHAIN_MISMATCH",
+      `confirmed proposal does not match the locked intent: ${mismatchFields.join(", ")}`
+    );
+  }
+};
+
+export const resolveLaunchContentAnchorTx = (params: {
+  existingContentAnchorPda: string | null;
+  existingContentAnchorTx: string | null;
+  launchTxSignature: string;
+}): string | null =>
+  params.existingContentAnchorPda
+    ? params.existingContentAnchorTx
+    : params.launchTxSignature;
+
 export const finalizeConfirmedLaunchBundle = async (params: {
   intentId: string;
   bundleId: string;
   fullySignedTxBase64: string;
   chainTxSignature: string;
+}, dependencies?: {
+  prisma?: typeof prisma;
+  anchor?: Pick<ReturnType<typeof getAnchorService>, "fetchProposalState">;
 }) => {
-  const latestIntent = await prisma.proposalIntent.findUnique({
+  const db = dependencies?.prisma ?? prisma;
+  const anchor = dependencies?.anchor ?? getAnchorService();
+  const latestIntent = await db.proposalIntent.findUnique({
     where: { id: params.intentId },
     include: {
       manifest: {
         include: {
           publications: {
-            where: {
-              verificationStatus: PublicationVerificationStatus.VERIFIED,
-            },
+            where: trustedPublicationVerificationWhere(config.pilot.inviteOnly),
             orderBy: {
               verifiedAt: "desc",
             },
@@ -315,14 +418,60 @@ export const finalizeConfirmedLaunchBundle = async (params: {
   if (!latestIntent) {
     throw new HttpError(404, "INTENT_NOT_FOUND", "proposal intent not found after submission");
   }
+  if (
+    !latestIntent.lockedManifestHashHex ||
+    !latestIntent.manifest.manifestHashHex ||
+    latestIntent.lockedManifestHashHex.toLowerCase() !==
+      latestIntent.manifest.manifestHashHex.toLowerCase()
+  ) {
+    throw new HttpError(
+      409,
+      "CONFIRMED_PROPOSAL_MANIFEST_MISMATCH",
+      "stored manifest no longer matches the locked proposal intent"
+    );
+  }
+  if (
+    latestIntent.lockedAnchorPda &&
+    latestIntent.manifest.currentAnchorPda !== latestIntent.lockedAnchorPda
+  ) {
+    throw new HttpError(
+      409,
+      "CONFIRMED_PROPOSAL_ANCHOR_MISMATCH",
+      "stored manifest anchor no longer matches the locked proposal intent"
+    );
+  }
 
   const contentAnchorPda = derivePlannedContentAnchorPda({
     creatorWallet: latestIntent.creatorWallet,
     manifest: latestIntent.manifest,
     lockedAnchorPda: latestIntent.lockedAnchorPda,
   });
+  if (!latestIntent.plannedProposalPda) {
+    throw new HttpError(409, "PROPOSAL_PDA_MISSING", "intent is missing its planned proposal PDA");
+  }
+  const onChain = await anchor.fetchProposalState(
+    new PublicKey(latestIntent.plannedProposalPda)
+  );
+  if (!onChain) {
+    throw new HttpError(
+      502,
+      "CONFIRMED_PROPOSAL_NOT_FOUND_ON_CHAIN",
+      "confirmed transaction did not produce the expected proposal account"
+    );
+  }
+  assertConfirmedLaunchMatchesIntent({
+    intent: latestIntent,
+    manifestContentType: latestIntent.manifest.contentType,
+    expectedContentAnchorPda: contentAnchorPda,
+    onChain,
+  });
+  const contentAnchorTx = resolveLaunchContentAnchorTx({
+    existingContentAnchorPda: latestIntent.manifest.currentAnchorPda,
+    existingContentAnchorTx: latestIntent.manifest.currentAnchorTx,
+    launchTxSignature: params.chainTxSignature,
+  });
 
-  const updatedBundle = await prisma.$transaction(async (tx) => {
+  const updatedBundle = await db.$transaction(async (tx) => {
     const updatedBundle = await tx.txBundle.update({
       where: { id: params.bundleId },
       data: {
@@ -352,7 +501,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
       where: { id: latestIntent.manifest.id },
       data: {
         currentAnchorPda: contentAnchorPda,
-        currentAnchorTx: params.chainTxSignature,
+        currentAnchorTx: contentAnchorTx,
         status: latestIntent.manifest.currentAnchorPda
           ? latestIntent.manifest.status
           : ContentManifestStatus.ANCHORED,
@@ -377,6 +526,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         intentId: latestIntent.id,
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
+        contentAnchorTx,
         onChainTxSignature: params.chainTxSignature,
         nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
@@ -404,6 +554,7 @@ export const finalizeConfirmedLaunchBundle = async (params: {
         intentId: latestIntent.id,
         contentHashHex: latestIntent.lockedManifestHashHex,
         contentAnchorPda,
+        contentAnchorTx,
         nonce: latestIntent.nonce,
         deadlineAt: new Date(Number(latestIntent.deadlineUnix) * 1000),
         status: ProposalStatus.FUNDED,

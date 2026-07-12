@@ -59,9 +59,15 @@ export class OracleScheduler {
     this.scheduleWorker("Track1Worker", config.oracle.track1Cron, "track1", () =>
       this.runTrack1Worker()
     );
-    this.scheduleWorker("Track2Worker", config.oracle.track2Cron, "track2", () =>
-      this.runTrack2Worker()
-    );
+    if (config.oracle.track2AutoSettlementEnabled) {
+      this.scheduleWorker("Track2Worker", config.oracle.track2Cron, "track2", () =>
+        this.runTrack2Worker()
+      );
+    } else {
+      console.log(
+        "[oracle] Track2 auto-settlement disabled by ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED=false"
+      );
+    }
 
     if (config.oracle.track3AutoSettlementEnabled) {
       this.scheduleWorker("Track3Worker", config.oracle.track3Cron, "track3", () =>
@@ -75,7 +81,9 @@ export class OracleScheduler {
 
     if (config.oracle.runOnBoot) {
       void this.runWithLock("track1", () => this.runTrack1Worker());
-      void this.runWithLock("track2", () => this.runTrack2Worker());
+      if (config.oracle.track2AutoSettlementEnabled) {
+        void this.runWithLock("track2", () => this.runTrack2Worker());
+      }
       if (config.oracle.track3AutoSettlementEnabled) {
         void this.runWithLock("track3", () => this.runTrack3Worker());
       }
