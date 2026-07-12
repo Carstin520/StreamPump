@@ -101,7 +101,11 @@ const isMuxAssetReady = (a: ManifestAssetRecord) =>
 const hasAssetIssue = (a: ManifestAssetRecord) => {
   const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
     .map((status) => status?.toUpperCase?.() ?? "");
-  return Boolean(a.processingError) || statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"));
+  return (
+    Boolean(a.processingError) ||
+    Boolean(a.hasStorageVerificationError) ||
+    statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"))
+  );
 };
 const isAssetWaiting = (a: ManifestAssetRecord) => {
   if (hasAssetIssue(a)) return false;
@@ -451,12 +455,19 @@ export default function ManifestDetailPage() {
   const assetsWaiting = d.assets.filter(isAssetWaiting);
   const assetsDeliveryReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
   const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
+  const hasRejectedPublication = d.publications.some((pub) => pub.verificationStatus === "REJECTED");
   const isPublicFeedEligible = isManifestPublicFeedEligible(d);
   const publicFeedBlockedReason = !hasVerifiedPublication
-    ? "Awaiting verified publication"
+    ? t("content.feed.blockedPublication")
     : !assetsDeliveryReady
-      ? "Assets still processing"
-      : "Backend eligibility flag pending";
+      ? t("content.feed.blockedAssets")
+      : t("content.feed.blockedFlag");
+  // Immutable-content signal: once a manifest is finalized its asset set and
+  // manifest hash can no longer change; only publications/intents proceed.
+  const isFinalizedImmutable = ["READY", "LOCKED", "ANCHORED", "PUBLISHED"].includes(d.status);
+  // Operator handoff is warranted when self-recovery is exhausted: an asset is
+  // in a hard-failure state, or a publication was operator-rejected.
+  const needsOperatorHandoff = assetsWithIssues.length > 0 || hasRejectedPublication;
   const isInternalPublication = publicationPlatform === INTERNAL_PLATFORM;
   const canSubmitProposalIntent =
     ["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && isPublicFeedEligible;
@@ -485,13 +496,20 @@ export default function ManifestDetailPage() {
         </div>
       )}
 
+      {isFinalizedImmutable && (
+        <div className="liquid-card card-radius border border-[#67b8ff]/15 p-4">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.finalized.title")}</p>
+          <p className="mt-2 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{t("content.finalized.body")}</p>
+        </div>
+      )}
+
       {d.publications.length > 0 && (
         <div className="liquid-card card-radius p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
               <p className={`mt-1 text-[length:var(--fs-micro)] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
-                {isPublicFeedEligible ? "Public Feed Eligible" : publicFeedBlockedReason}
+                {isPublicFeedEligible ? t("content.feed.eligible") : publicFeedBlockedReason}
               </p>
             </div>
             <span className={`rounded-full border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
@@ -499,7 +517,7 @@ export default function ManifestDetailPage() {
                 ? "border-[#65ecaf]/30 bg-[#65ecaf]/10 text-[#8df0c4]"
                 : "border-white/10 bg-white/[0.04] text-[#8ea0ba]"
             }`}>
-              {isPublicFeedEligible ? "Eligible" : "Pending"}
+              {isPublicFeedEligible ? t("content.feed.eligibleTag") : t("content.feed.pendingTag")}
             </span>
           </div>
           {d.publications.map((pub) => (
@@ -509,16 +527,37 @@ export default function ManifestDetailPage() {
                 <span className={`rounded-full px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
                   pub.verificationStatus === "VERIFIED"
                     ? "bg-[#65ecaf]/10 text-[#8df0c4]"
-                    : "bg-[#f3b33e]/10"
+                    : pub.verificationStatus === "REJECTED"
+                      ? "bg-[#f67263]/10 text-[#f6a99e]"
+                      : "bg-[#f3b33e]/10"
                 }`}>
                   {pub.verificationStatus}
                 </span>
               </div>
               <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#5a6b82]">{pub.externalUrl}</p>
+              {/* Operator-review evidence for the verification decision. Every row
+                  is rendered only when the backend actually returns it, so an
+                  unreviewed publication never shows a fabricated reviewer. */}
+              {pub.verificationStatus === "VERIFIED" && (
+                <div className="mt-2 space-y-1">
+                  {pub.verificationSource ? <PubEvidenceRow label={t("content.pub.reviewSource")} value={pub.verificationSource} /> : null}
+                  {pub.verificationReviewer ? <PubEvidenceRow label={t("content.pub.reviewer")} value={pub.verificationReviewer} /> : null}
+                  {pub.verificationEvidenceDigestHex ? <PubEvidenceRow label={t("content.pub.evidenceDigest")} mono value={`${pub.verificationEvidenceDigestHex.slice(0, 8)}...${pub.verificationEvidenceDigestHex.slice(-6)}`} /> : null}
+                  {pub.verifiedAt ? <PubEvidenceRow label={t("content.pub.verifiedAt")} value={formatIsoLabel(pub.verifiedAt)} /> : null}
+                  {pub.verificationNote ? <p className="text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{pub.verificationNote}</p> : null}
+                </div>
+              )}
               {pub.verificationStatus === "PENDING" ? (
                 <p className="mt-2 rounded-lg border border-[#f3b33e]/20 bg-[#2a1f0b]/40 px-2.5 py-1.5 text-[length:var(--fs-micro)] leading-5 text-[#f3c66e]">
                   {t("content.publicationPendingOperator")}
                 </p>
+              ) : null}
+              {pub.verificationStatus === "REJECTED" ? (
+                <div className="mt-2 rounded-lg border border-[#f67263]/20 bg-[#2a1210]/40 px-2.5 py-1.5">
+                  <p className="text-[length:var(--fs-micro)] leading-5 text-[#f6a99e]">{t("content.pub.rejectedHint")}</p>
+                  {pub.rejectedAt ? <p className="mt-1 text-[length:var(--fs-nano)] text-[#8ea0ba]">{t("content.pub.rejectedAt")}: {formatIsoLabel(pub.rejectedAt)}</p> : null}
+                  {pub.verificationNote ? <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{pub.verificationNote}</p> : null}
+                </div>
               ) : null}
             </div>
           ))}
@@ -611,6 +650,29 @@ export default function ManifestDetailPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {needsOperatorHandoff && (
+              <div className="rounded-2xl border border-[#f67263]/20 bg-[#2a1210]/30 px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f6a99e]">{t("content.operator.title")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.operator.body")}</p>
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2">
+                  <span className="text-[length:var(--fs-micro)] text-[#7486a1]">{t("content.operator.contentId")}</span>
+                  <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{d.manifestId}</span>
+                </div>
+              </div>
+            )}
+
+            {d.assets.length > 0 && (
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.diag.title")}</p>
+                <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#6b7d96]">{t("content.diag.subtitle")}</p>
+                <div className="mt-3 space-y-2">
+                  {d.assets.map((asset) => (
+                    <AssetDiagnostics asset={asset} key={asset.assetId} />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -805,6 +867,111 @@ function HashRow({ label, value }: { label: string; value: string | null | undef
     <div className="flex items-center justify-between gap-2">
       <span className="text-[length:var(--fs-micro)] text-[#5a6b82]">{label}</span>
       <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{display}</span>
+    </div>
+  );
+}
+
+function PubEvidenceRow({ label, value, mono }: { label: string; mono?: boolean; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{label}</span>
+      <span className={`text-[length:var(--fs-nano)] text-[#93a2bb] ${mono ? "font-mono" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+const formatBytes = (value: string | null | undefined) => {
+  const n = value ? Number(value) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${n} B`;
+};
+
+// Per-asset truth panel. Storage verification (backend re-hash + size check) and
+// Mux ingest are shown as independent states — a verified upload is never
+// conflated with a ready delivery, and raw error text is never surfaced.
+function AssetDiagnostics({ asset }: { asset: ManifestAssetRecord }) {
+  const { t } = useI18n();
+  const isVideo = asset.assetType === "VIDEO";
+  const storageState: "failed" | "ok" | "pending" = asset.hasStorageVerificationError
+    ? "failed"
+    : asset.storageVerifiedAt || asset.verifiedSha256Hex
+      ? "ok"
+      : "pending";
+  const storageLabel =
+    storageState === "failed" ? t("content.diag.storageFailed") : storageState === "ok" ? t("content.diag.storageOk") : t("content.diag.storagePending");
+  const storageTone =
+    storageState === "failed" ? "text-[#f67263]" : storageState === "ok" ? "text-[#65ecaf]" : "text-[#8ea0ba]";
+  const size = formatBytes(asset.verifiedSizeBytes);
+
+  const muxState = !isVideo
+    ? "na"
+    : asset.ingestStatus === "READY"
+      ? "ready"
+      : asset.ingestStatus === "ERRORED"
+        ? "errored"
+        : asset.ingestStatus === "QUEUED"
+          ? "queued"
+          : "processing";
+  const muxLabel =
+    muxState === "na"
+      ? t("content.diag.notApplicable")
+      : muxState === "ready"
+        ? t("content.diag.muxReady")
+        : muxState === "errored"
+          ? t("content.diag.muxErrored")
+          : muxState === "queued"
+            ? t("content.diag.muxQueued")
+            : t("content.diag.muxProcessing");
+  const muxTone =
+    muxState === "ready" ? "text-[#65ecaf]" : muxState === "errored" ? "text-[#f67263]" : muxState === "na" ? "text-[#5a6b82]" : "text-[#f3b33e]";
+
+  return (
+    <div className="rounded-xl bg-white/[0.03] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[length:var(--fs-micro)] text-[#8ea0ba]">{asset.assetType} #{asset.orderIndex + 1}</span>
+        {asset.verifiedSha256Hex ? (
+          <span className="font-mono text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.sha")} {asset.verifiedSha256Hex.slice(0, 8)}…</span>
+        ) : null}
+      </div>
+      <div className="mt-2 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.storage")}</span>
+          <span className={`text-[length:var(--fs-nano)] font-semibold ${storageTone}`}>{storageLabel}</span>
+        </div>
+        {size ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.size")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{size}</span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.mux")}</span>
+          <span className={`text-[length:var(--fs-nano)] font-semibold ${muxTone}`}>{muxLabel}</span>
+        </div>
+        {isVideo && typeof asset.muxReconcileAttempts === "number" && asset.muxReconcileAttempts > 0 ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.muxAttempts")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{asset.muxReconcileAttempts}</span>
+          </div>
+        ) : null}
+        {isVideo && asset.muxLastCheckedAt ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.muxLastChecked")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{formatIsoLabel(asset.muxLastCheckedAt)}</span>
+          </div>
+        ) : null}
+        {isVideo && asset.muxWebhookReceivedAt ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.webhookReceived")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{formatIsoLabel(asset.muxWebhookReceivedAt)}</span>
+          </div>
+        ) : null}
+      </div>
+      {storageState === "failed" ? (
+        <p className="mt-2 text-[length:var(--fs-nano)] leading-4 text-[#f6a99e]">{t("content.diag.storageFailedHint")}</p>
+      ) : null}
     </div>
   );
 }

@@ -28,7 +28,8 @@
 - **仅 devnet。** 不要配置 mainnet RPC。生产环境下后端会在监听前校验每个 active RPC 的完整 Solana devnet genesis hash，不匹配即 fail-closed 拒绝启动。
 - **邀请制 gate 必填。** 生产 Pilot 必须设置 `PILOT_INVITE_ONLY=true`、`PILOT_INVITE_WALLETS`（至少一个外部真实钱包）、`PILOT_EXPECTED_USDC_MINT`（Pilot test-USDC mint 真值）、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。后端在监听前会读取链上 `ProtocolConfig.usdcMint` 并要求与 `PILOT_EXPECTED_USDC_MINT` 完全一致，且要求配置的 program 账户存在且 `executable`。
 - **关闭与 Pilot 冲突的功能。** email/social/provider 托管钱包、公开托管执行、S1、Track 2 背书、Track 3 CPS、每日/互动奖励，以及**自动结算调度器（ORACLE）**对所有 Pilot 用户关闭。Pilot 禁止的是 ORACLE 自动结算调度器（`ORACLE_SCHEDULER_ENABLED` / `ORACLE_RUN_ON_BOOT` / Track2 / Track3 自动结算均为 `false`），而**不是** indexer 或 Mux reconciliation：媒体 corridor 需要 Mux webhook/reconciliation 的可见性，financial projection 需要 indexer 保持同步。因此 Pilot 建议 `INDEXER_ENABLED=true`；在配置真实 R2/Mux 之后建议 `MUX_RECONCILIATION_ENABLED=true`、`MUX_RECONCILIATION_RUN_ON_BOOT=true`。Pilot 中的 Track 1 结算由运营人工执行。
-- **IDL 制品 blocker（未解决）。** Render 的 **Root Directory 设为 `backend`**，而后端运行时通过 `STREAMPUMP_IDL_PATH=../target/idl/streampump_core.json` 读取 IDL。构建产物位于仓库根的 `target/idl/`，**位于 `backend` 根目录之外**，因此不会进入 Render 部署的制品中。真实部署前必须先解决：把完整的生产 IDL 作为制品/包随后端一起交付（例如把 IDL 拷入 `backend/` 内的路径并相应设置 `STREAMPUMP_IDL_PATH`，或改用包含根 `target/` 的构建/根目录）。在此解决前，链上 preflight 与已部署走廊 smoke 都无法完成。
+- **IDL 制品 blocker（已解决）。** 生产 IDL 现已随后端一起打包在 backend 根目录下（`backend/idl/streampump_core.json`），运行时通过 `STREAMPUMP_IDL_PATH=./idl/streampump_core.json` 读取。因此在 Render 的 **Root Directory 设为 `backend`** 时该制品仍在部署产物内，链上 preflight 与已部署走廊 smoke 不再被此路径 blocker 阻塞。请勿再退回旧的 `../target/idl/...` 路径（它位于 `backend` 根目录之外、不会进入部署制品）。
+- **liveness 与 readiness 区分（P3）。** 后端暴露两个探针：`GET /health` 是**始终返回 200 的 liveness**（进程存活即可）；`GET /ready` 是**readiness**，在 DB + 已启用的 Indexer + 已启用的 Mux reconciliation 全部就绪前返回 **503**，就绪后返回 200。二者用途不同：平台的存活/重启探针可指向 `/health`，而"是否可接流量"的就绪判断应参考 `/ready`（例如启动后先轮询 `/ready` 到 200 再放量）。
 
 ## 部署前检查
 
@@ -198,9 +199,10 @@ Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 6
   - 生产监听前会在交易 RPC 上确认该账户存在且 `executable=true`。
 - `PILOT_EXPECTED_USDC_MINT=<Pilot test-USDC mint>`
   - 见上文 invite-only gate：监听前读取链上 `ProtocolConfig.usdcMint` 并要求完全一致，否则 fail-closed。
-- `STREAMPUMP_IDL_PATH=../target/idl/streampump_core.json`
-  - ⚠️ 见上文「IDL 制品 blocker」：Root Directory 为 `backend` 时该路径指向 `backend` 之外的根 `target/`，不会进入部署制品。真实部署前必须把完整生产 IDL 随后端一起交付并相应调整此路径。
+- `STREAMPUMP_IDL_PATH=./idl/streampump_core.json`
+  - ✅ 见上文「IDL 制品 blocker（已解决）」：生产 IDL 已打包在 `backend/idl/streampump_core.json`，Root Directory 为 `backend` 时该路径仍在部署制品内。请勿退回 `../target/idl/...`。
 - `ORACLE_AUTHORITY_KEYPAIR_PATH` 或 `ORACLE_AUTHORITY_SECRET_KEY`（仅手动 Track 1 结算用；Pilot 不启用自动调度器）
+  - **签名者必须匹配（P3）。** 该 Oracle authority 的公钥**必须等于链上 `ProtocolConfig.oracleAuthority`**。生产 preflight 会校验这一点；若手动 Track 1 结算签名者与链上 `ProtocolConfig.oracleAuthority` 不一致，则 fail-closed，不会提交。
 
 #### Storage
 - `R2_REGION=auto`
@@ -253,8 +255,15 @@ cd backend
 npm run prisma:migrate:deploy
 ```
 
+> **P3 迁移（本次工作未应用）。** 两个 P3 迁移在本次工作中于本地新增、**本次工作未应用**；实际环境/数据库的应用状态未经检查（仅依据仓库磁盘上的迁移目录列出名称）：
+> - `20260712170000_chain_ingestion_recovery`
+> - `20260712180000_pilot_operator_events`
+>
+> 这两个迁移随上面的 `prisma:migrate:deploy` 一并应用。应用前请先按 CLAUDE.md 的规则获得明确的环境所有权/审批。
+
 然后再确认：
-- `/health` 返回 200
+- `/health` 返回 200（liveness）
+- `/ready` 返回 200（readiness：DB + 已启用的 Indexer + 已启用的 Mux reconciliation 全部就绪；就绪前为 503）
 - API 路由能响应
 
 ## Step 3：把前端切到线上后端
@@ -286,11 +295,12 @@ https://api.yourdomain.com/api/webhooks/mux
 正式切流前，至少按这个顺序验一次：
 
 ### 5.1 Backend
-1. `GET /health`
-2. `POST /api/v1/auth/challenge`
-3. `POST /api/v1/auth/verify`
-4. `POST /api/v1/content/manifests`
-5. `POST /api/v1/content/manifests/:id/assets/presign`
+1. `GET /health`（liveness，始终 200）
+2. `GET /ready`（readiness；DB + 已启用的 Indexer + 已启用的 Mux reconciliation 就绪前为 503，就绪后 200 再放量）
+3. `POST /api/v1/auth/challenge`
+4. `POST /api/v1/auth/verify`
+5. `POST /api/v1/content/manifests`
+6. `POST /api/v1/content/manifests/:id/assets/presign`
 
 ### 5.2 Upload + Video
 1. 生成图片上传 presigned URL
@@ -305,7 +315,15 @@ https://api.yourdomain.com/api/webhooks/mux
 4. sponsor final sign + submit
 5. backend 确认链上状态与 DB projection 一致
 
-### 5.4 Frontend
+### 5.4 Corridor + Track 1 smoke（P3）
+生产走廊/Track 1 smoke 脚本（`smoke:production-corridor`、`smoke-pilot-track1`）在缺少真实凭证时 fail-closed，不会伪造结果。真实执行时需满足：
+1. **稳定的 run id / deadline** —— 走廊使用可复现的 run id 与固定 deadline，使幂等与复跑可对齐（非每次随机）。
+2. **真实的、一次性的、在 allowlist 内的创作者 + 赞助商钱包** —— 两侧都做真实的钱包 auth；使用可丢弃（disposable）且已加入 `PILOT_INVITE_WALLETS` 的钱包，不要用长期主钱包。
+3. **可续跑的幂等** —— 重试复用已存的幂等结果，不重复产生链上/DB 副作用。
+4. **公开 proof** —— 走廊结束后校验 `/campaigns/:id/public` 的凭证字段。
+5. **Track 1 smoke 断言 replay** —— 手动 Track 1 结算重复提交须命中 replay（no-resend），且签名者等于链上 `ProtocolConfig.oracleAuthority`。
+
+### 5.5 Frontend
 1. `/explore` 正常
 2. `/trending` 正常
 3. `/workspace` 正常
@@ -324,7 +342,7 @@ https://api.yourdomain.com/api/webhooks/mux
 
 ## 推荐的最小上线顺序
 1. 先部署 backend 到 Render
-2. 确认 `/health` 和 migration
+2. 确认 `/health`、`/ready` 和 migration（含两个未应用的 P3 迁移）
 3. 再部署 frontend 到 Vercel
 4. 再切 Mux webhook
 5. 最后做完整内容上传和 proposal launch 验证

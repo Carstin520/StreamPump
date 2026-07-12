@@ -72,11 +72,24 @@ export type ContentManifestAssetResponse = {
   muxPlaybackUrl: string | null;
   muxLastKnownStatus: string | null;
   processingError: string | null;
+  // Optional Mux ingest diagnostics. Present once the backend serializer ships
+  // them; render as honest processing state, never as a delivery claim.
+  muxWebhookReceivedAt?: string | null;
+  muxReconcileAttempts?: number;
+  muxLastCheckedAt?: string | null;
+  muxReadyAt?: string | null;
+  processingSource?: string | null;
+  objectEtag?: string | null;
   // Optional storage-verification evidence, populated once the backend has
   // re-hashed the stored object and confirmed its size against the manifest.
   verifiedSha256Hex?: string | null;
   verifiedSizeBytes?: string | null;
   storageVerifiedAt?: string | null;
+  // Storage-verification failure signal. The backend never returns the raw
+  // error text — only a boolean and a coarse code — so the UI stays honest
+  // without leaking internal diagnostics.
+  hasStorageVerificationError?: boolean;
+  storageVerificationErrorCode?: string | null;
   updatedAt: string;
 };
 
@@ -87,7 +100,11 @@ export type ContentPublicationResponse = {
   verificationStatus: string;
   verifiedAt: string | null;
   // Optional operator-review evidence for the publication verification decision.
+  // `verificationSource` distinguishes operator vs automated review; the note is
+  // an operator-authored, human-readable rationale. Present only when reviewed.
+  verificationSource?: string | null;
   verificationReviewer?: string | null;
+  verificationNote?: string | null;
   verificationEvidenceDigestHex?: string | null;
   rejectedAt?: string | null;
   createdAt: string;
