@@ -67,7 +67,12 @@ jobs:
         run: npm run build --prefix backend
 
       - name: Backend tests
-        run: npm run test:backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const fs = require("node:fs"); const path = require("node:path"); const { Keypair } = require("@solana/web3.js"); const dir = path.join(process.env.HOME, ".config", "solana"); fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, "id.json"), JSON.stringify(Array.from(Keypair.generate().secretKey)), { mode: 0o600 });'
+          SOLANA_TX_RPC_ENDPOINT="http://127.0.0.1:8899" \
+          npm run test:backend
         env:
           STREAMPUMP_IDL_PATH: backend/tests/fixtures/streampump_core.test.idl.json
 
