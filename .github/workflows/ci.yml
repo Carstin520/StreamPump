@@ -87,6 +87,9 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       ANCHOR_TEST_TIMEOUT_MS: "300000"
+      STREAMPUMP_TEST_LEDGER_DIR: ${{ runner.temp }}/streampump-test-validator-ledger
+      ANCHOR_WALLET: ${{ runner.temp }}/streampump-anchor-test-wallet.json
+      STREAMPUMP_TEST_VALIDATOR_LOG: ${{ runner.temp }}/streampump-test-validator.log
     steps:
       - name: Checkout
         uses: actions/checkout@v4
