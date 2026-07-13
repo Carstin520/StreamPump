@@ -1,0 +1,229 @@
+# P4 Rollback Bundle Manifest
+
+This file documents rollback artifacts and immutable pre-mutation identifiers. Binary backups and provider secrets are machine-local and must never be committed.
+
+Gate status: **M1 and the original M2 were approved. Buffer writing is paused pending a rotated dedicated RPC. Simulation proved the devnet loader requires a 10,240-byte minimum extension, so renewed approval is required before the revised irreversible extension; no ProgramData extend/upgrade has occurred.**
+
+M2 was subsequently approved. Buffer creation succeeded, but payload writing stopped on sustained provider 429 responses before ProgramData extension. The deployed program remains at the pre-upgrade hash/capacity. Buffer `BEwVgZ3MnBuLaMNKYiUg6NVDDLnnija7i4adFzaJ6Kof` is intentionally retained for resume/recovery; closing it to reclaim rent is itself a mutation and requires an explicit decision if M2 is abandoned.
+
+An orphaned Agave CLI writer was later found and terminated. Its process arguments exposed the RPC credential locally, so that credential is revoked/rotation-pending and the local RPC file is empty. No ProgramData mutation occurred. Final post-stop state: buffer matching prefix 25,200 bytes, 1,249 pending 900-byte chunks, deployed program SHA256 `96b114...`, capacity 1,318,104, authority unchanged, fee payer 5.7976796 devnet SOL.
+
+## Local secure bundle
+
+Path: `/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation`
+
+Directory mode must be `0700`; files must be `0600`.
+
+| Artifact | Size | SHA256 / value |
+| --- | ---: | --- |
+| `streampump_core-pre.so` | 1,318,104 bytes | `96b114bb1b130695b7a7cccc1ce9a41bf953c4acd6179120acc4a2a87e591457` |
+| `streampump_core-candidate.so` | 1,321,192 bytes | `5e881250cf64a5000ac81e66a5d90f9e25c19983280e8f8b8d6cc0ef34ac2dc4` |
+| `streampump_core-candidate-padded-1328344.so` | 1,328,344 bytes | `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732` |
+| `streampump_core-rollback-padded-1328344.so` | 1,328,344 bytes | `8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247` |
+| `program-show-pre.json` | metadata only | ProgramData `58F5kifyMnkjNkKUpGULaxUHe4kLqcrr37fhLVAwmrbs`; capacity 1,318,104 |
+
+Frozen account-data checks:
+
+- ProtocolConfig data SHA256: `9b31d5bddff4f8b4828ed4baf695d9514ca180de6c126b54cc7b22bf710fcc8d` (297 bytes; owner is the StreamPump program).
+- Pilot test-USDC mint data SHA256: `c422c88798c152d9eaf5c4f7329b9f0c1642093dfd021b69a47a9b49c393ee04` (82 bytes; legacy SPL Token owner).
+
+Program ID: `FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp`
+
+Observed upgrade authority: `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw`
+
+Required loader-compatible extension: 10,240 bytes, from 1,318,104 to 1,328,344. ProgramData capacity cannot be shrunk by rollback; only program bytes are restored. The earlier 3,088-byte padded artifact is retained only as superseded local evidence and must not be used by the revised runbook.
+
+## Migration checksums
+
+| Migration | SHA256 |
+| --- | --- |
+| `20260712120000_pilot_content_storage_truth` | `e17c50e0c3fd244ce0e475e33c28376f9f8deaf7b840aa4b264f4125f7e57033` |
+| `20260712130000_api_idempotency` | `5ae3b523428a9d0614bb5ccde15d42c6bf2e8f6913fdfc3369088bc288f5d9ec` |
+| `20260712150000_track1_settlement_audit` | `2ec0a4c26e2338ee5ef7f3c9659b816b383d5d7231dfd814278adf1585df4fce` |
+| `20260712160000_clear_unverifiable_anchor_transactions` | `ce29f29ce3a0ad4a25542febfc9bc865e0d98c871308eda915f2f1d60a86d670` |
+| `20260712170000_chain_ingestion_recovery` | `56c75a158c9695b02a392deb647f64043e20ffd4d10b2d80ce7ff99a2c8d00ae` |
+| `20260712180000_pilot_operator_events` | `8537e8d57b565d1b7d4215854c9a7c9023482faca1f204d76e7acb5e9337408d` |
+
+The `20260712170000` checksum is the merged P3 fix containing the `PRUNED` enum state; do not use its earlier pre-fix checksum.
+
+## Provider rollback identifiers
+
+| Surface | Pre-mutation rollback target | Status |
+| --- | --- | --- |
+| Git integration | `dd49e433880462a9499036e7620a8436d7c770c3` | frozen |
+| Render production | deploy `dep-d8upmol7vvec73ejb8gg`, commit `b362910c7ca204f8724af7a1a74411757e2abce1` | frozen |
+| Vercel Production | `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`, commit `cbdf76a5df896adbe88a9e07586ac3478e45f720`, ref `main` | frozen |
+| Neon | restore branch/PITR identifier | pending M3 approval and dashboard creation |
+| Mux | previous endpoint ID/status and endpoint-specific secret version | pending M5 approval; secret value must stay in dashboard/secret manager |
+
+Render service ID is `srv-d79rs0450q8c73fp2lmg`. It currently tracks `main` with auto-deploy enabled and runs `npm run prisma:migrate:deploy` as a pre-deploy command. A code rollback does not reverse a migration; the Neon restore/repoint decision is separate and must be explicit.
+
+## Program byte rollback procedure
+
+This is a mutation covered only by the approved M2 failure path. It requires
+the same dedicated devnet RPC environment and temporary mode-`0600` CLI config
+from the M2 runbook; never pass the credential-bearing URL in argv and never
+rely on CLI defaults. Do not use Agave's parallel payload writer.
+
+```bash
+set -euo pipefail
+umask 077
+
+PROGRAM_ID=FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp
+PRE_SO=/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/streampump_core-rollback-padded-1328344.so
+FEE_PAYER=/Users/jamesli/.config/solana/streampump-p4-devnet-fee-payer.json
+UPGRADE_AUTHORITY_KEYPAIR=/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/devnet-upgrade-authority.json
+SOLANA_CONFIG=/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/.solana-cli-p4.yml
+BUNDLE_DIR=/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation
+ROLLBACK_BUFFER_KEYPAIR='/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/rollback-buffer-keypair.json'
+ROLLBACK_BUFFER_DUMP='/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/rollback-buffer-dump.so'
+POST_ROLLBACK_DUMP='/Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/streampump_core-m2-post-rollback.so'
+CREATE_BUFFER='/private/tmp/streampump-p4-codex/scripts/p4-create-program-buffer.ts'
+WRITE_BUFFER='/private/tmp/streampump-p4-codex/scripts/p4-resume-buffer-write.ts'
+
+unset PILOT_TX_RPC_URL
+source /Users/jamesli/.config/streampump/p4-rpc.env
+test -n "${PILOT_TX_RPC_URL:-}"
+cleanup_p4_cli_config() { rm -f "$SOLANA_CONFIG"; }
+cleanup_p4_cli_config
+SOLANA_CONFIG="$SOLANA_CONFIG" node <<'NODE'
+const fs = require("fs");
+const path = process.env.SOLANA_CONFIG;
+const url = process.env.PILOT_TX_RPC_URL;
+if (!path || !url) throw new Error("P4 rollback CLI config inputs are missing");
+const keypairPath = "/Users/jamesli/.config/solana/streampump-p4-devnet-fee-payer.json";
+const yaml = [
+  "---",
+  `json_rpc_url: ${JSON.stringify(url)}`,
+  "websocket_url: ''",
+  `keypair_path: ${JSON.stringify(keypairPath)}`,
+  "address_labels:",
+  "  system: System Program",
+  "commitment: confirmed",
+  "",
+].join("\n");
+fs.writeFileSync(path, yaml, { mode: 0o600 });
+NODE
+chmod 600 "$SOLANA_CONFIG"
+trap cleanup_p4_cli_config EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+run_p4_ts() {
+  NODE_PATH='/Users/jamesli/Developer/Sol Projects/StreamPump/node_modules' \
+  TS_NODE_COMPILER_OPTIONS='{"module":"CommonJS","moduleResolution":"node","esModuleInterop":true}' \
+    node -r '/Users/jamesli/Developer/Sol Projects/StreamPump/node_modules/ts-node/register/transpile-only' "$@"
+}
+
+safe_rpc() {
+  local stdout_file stderr_file exit_code
+  stdout_file="$(mktemp "$BUNDLE_DIR/.rpc-stdout.XXXXXX")"
+  stderr_file="$(mktemp "$BUNDLE_DIR/.rpc-stderr.XXXXXX")"
+  if "$@" >"$stdout_file" 2>"$stderr_file"; then
+    cat "$stdout_file"
+    rm -f "$stdout_file" "$stderr_file"
+    return 0
+  else
+    exit_code=$?
+    rm -f "$stdout_file" "$stderr_file"
+    echo 'RPC command failed; credential-bearing provider details suppressed' >&2
+    return "$exit_code"
+  fi
+}
+
+test "$(stat -f %z "$PRE_SO")" = 1328344
+test "$(shasum -a 256 "$PRE_SO" | awk '{print $1}')" = 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247
+test "$(stat -f %Lp "$UPGRADE_AUTHORITY_KEYPAIR")" = 600
+test "$(solana-keygen pubkey "$UPGRADE_AUTHORITY_KEYPAIR")" = BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw
+test "$(stat -f %Lp "$SOLANA_CONFIG")" = 600
+
+test ! -e "$ROLLBACK_BUFFER_KEYPAIR"
+solana-keygen new --no-bip39-passphrase --silent --outfile "$ROLLBACK_BUFFER_KEYPAIR"
+chmod 600 "$ROLLBACK_BUFFER_KEYPAIR"
+ROLLBACK_BUFFER_ADDRESS="$(solana-keygen pubkey "$ROLLBACK_BUFFER_KEYPAIR")"
+
+export P4_BUFFER_KEYPAIR="$ROLLBACK_BUFFER_KEYPAIR"
+export P4_EXPECTED_BUFFER="$ROLLBACK_BUFFER_ADDRESS"
+export P4_BUFFER_AUTHORITY_KEYPAIR="$UPGRADE_AUTHORITY_KEYPAIR"
+export P4_FEE_PAYER_KEYPAIR="$FEE_PAYER"
+export P4_PROGRAM_SO="$PRE_SO"
+export P4_EXPECTED_SHA256='8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247'
+export P4_ARTIFACT_ROLE=rollback
+export P4_WRITE_DELAY_MS=3000
+
+# Read-only inventory first. Buffer creation is one preflighted transaction;
+# a lost response is resolved only from finalized account state.
+P4_DRY_RUN=true run_p4_ts "$CREATE_BUFFER"
+P4_CREATE_BUFFER=true run_p4_ts "$CREATE_BUFFER" \
+  > "$BUNDLE_DIR/rollback-buffer-create-result.json"
+chmod 600 "$BUNDLE_DIR/rollback-buffer-create-result.json"
+cat "$BUNDLE_DIR/rollback-buffer-create-result.json"
+
+# Write one finalized canary, re-inventory, then continue in operator-observed
+# batches no larger than 25 until pendingChunks reaches zero.
+P4_DRY_RUN=true run_p4_ts "$WRITE_BUFFER"
+P4_MAX_CHUNKS=1 run_p4_ts "$WRITE_BUFFER"
+while true; do
+  inventory="$(P4_DRY_RUN=true run_p4_ts "$WRITE_BUFFER")"
+  printf '%s\n' "$inventory"
+  pending="$(printf '%s\n' "$inventory" | jq -r 'select(.phase == "inventory") | .pendingChunks')"
+  test "$pending" -ge 0
+  if test "$pending" -eq 0; then break; fi
+  printf 'Type CONTINUE to write the next capped rollback batch: '
+  IFS= read -r reply
+  test "$reply" = CONTINUE
+  P4_MAX_CHUNKS=25 run_p4_ts "$WRITE_BUFFER"
+done
+
+# The writer appends every signed and confirmed/finalized transaction to the
+# mode-0600 rollback-buffer-write-signatures.jsonl ledger in BUNDLE_DIR.
+
+safe_rpc solana program dump "$ROLLBACK_BUFFER_ADDRESS" "$ROLLBACK_BUFFER_DUMP" \
+  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER"
+chmod 600 "$ROLLBACK_BUFFER_DUMP"
+test "$(stat -f %z "$ROLLBACK_BUFFER_DUMP")" = 1328344
+test "$(shasum -a 256 "$ROLLBACK_BUFFER_DUMP" | awk '{print $1}')" = 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247
+cmp "$PRE_SO" "$ROLLBACK_BUFFER_DUMP"
+
+safe_rpc solana program deploy \
+  --config "$SOLANA_CONFIG" \
+  --program-id "$PROGRAM_ID" \
+  --buffer "$ROLLBACK_BUFFER_KEYPAIR" \
+  --upgrade-authority "$UPGRADE_AUTHORITY_KEYPAIR" \
+  --fee-payer "$FEE_PAYER" \
+  --keypair "$FEE_PAYER" \
+  --no-auto-extend \
+  --use-rpc \
+  --max-sign-attempts 1 \
+  --commitment finalized \
+  --output json > "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
+chmod 600 "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
+cat "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
+
+safe_rpc solana program dump "$PROGRAM_ID" "$POST_ROLLBACK_DUMP" \
+  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER"
+chmod 600 "$POST_ROLLBACK_DUMP"
+test "$(stat -f %z "$POST_ROLLBACK_DUMP")" = 1328344
+test "$(shasum -a 256 "$POST_ROLLBACK_DUMP" | awk '{print $1}')" = 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247
+cmp "$PRE_SO" "$POST_ROLLBACK_DUMP"
+
+P4_EXPECTED_PROGRAM_SHA256='8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247' \
+  run_p4_ts /private/tmp/streampump-p4-codex/scripts/p4-verify-chain-baseline.ts
+```
+
+After ProgramData has been extended, the final dump/hash must match the 1,328,344-byte padded rollback artifact: `8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247`. The original unpadded artifact remains the pre-mutation evidence with SHA256 `96b114...`. If the post-rollback dump does not match the padded artifact byte-for-byte, stop and do not attempt database or platform mutation.
+
+## Evidence retention
+
+Retain without secrets:
+
+- UTC and local timestamps.
+- Exact git SHA and migration hashes.
+- Program/buffer/ProgramData addresses, transaction signatures, byte sizes, and SHA256 hashes.
+- Neon restore identifier and schema/count verification output.
+- Render/Vercel deployment identifiers and health results.
+- Mux endpoint identifier, event IDs, delivery result, and asset/playback IDs.
+- Disposable actor public keys, minimal funding amounts, proposal PDA, manifest ID/hash, and Track 1 original/replay result.
+
+Never retain private-key bytes, seed phrases, database URLs, credential-bearing RPC URLs, Mux signing secrets, R2 keys, operator keys, auth tokens, or session cookies.
