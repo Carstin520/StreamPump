@@ -2,7 +2,9 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M1 and the original M2 were approved by the human. Buffer resume remains paused because the rotated dedicated RPC is not configured. Read-only simulation proved Solana rejects a 3,088-byte extension and requires at least 10,240 bytes, so the revised irreversible extension requires renewed human approval; no ProgramData extend/upgrade has occurred.**
+Gate status: **M2 completed and passed dedicated-RPC plus independent public-devnet verification. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. M3 remains blocked on its own human approval and verified Neon restore point.**
+
+M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
 
 Dedicated-RPC preflight attempt: failed with HTTP 401 before chain verification. The CLI exposed the credential-bearing provider URL in its error output, so that API key must be rotated. The local P4 RPC file was immediately reset to an empty mode-`0600` placeholder. No transaction or chain mutation occurred.
 
@@ -42,7 +44,7 @@ No mutation is authorized by this document. Each mutation group requires its own
 - [x] Current devnet program bytes were freshly dumped to a durable, permission-restricted path and hashed.
 - [x] Local candidate bytes were copied beside the rollback binary and hashed.
 - [x] P4 fee payer exists at `/Users/jamesli/.config/solana/streampump-p4-devnet-fee-payer.json`, resolves to `Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9`, is mode `0600`, and holds 15 devnet SOL.
-- [ ] A real dedicated devnet read/transaction/indexer RPC set is selected and all endpoints pass the full devnet genesis check.
+- [x] A dedicated Solana devnet transaction RPC was selected, rotated after the credential incidents, and passed genesis plus fixed-account cross-checks for M2. M4 must separately inventory deployed read/indexer endpoints.
 - [x] A mode-`0600` devnet admin signer is locally available and resolves to the on-chain upgrade authority/admin `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw`; use still requires M1/M2 approval.
 - [x] A mode-`0600` local authority bundle contains the oracle signer `HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC`; it must be extracted/loaded through an approved mode-`0600` mechanism before M6.
 - [ ] Tighten or retire the original workspace `backend/.env.local` authority-secret copy (currently mode `0644`) under explicit user approval. It must not be used as the P4 signing source.
@@ -81,7 +83,9 @@ M1 stop conditions:
 
 Approval scope: devnet program bytes only. ProgramData expansion is irreversible; program bytes are rollback-capable.
 
-- [ ] Renew approval for the simulated loader-compatible extension: exactly 10,240 bytes, capacity 1,318,104 -> 1,328,344, rent top-up 0.0712704 devnet SOL. This supersedes only the rejected 3,088-byte extension detail; it does not broaden M2 beyond devnet program bytes.
+- [x] Renewed human approval received and executed for the simulated loader-compatible extension: exactly 10,240 bytes, capacity 1,318,104 -> 1,328,344, rent top-up 0.0712704 devnet SOL. This superseded only the rejected 3,088-byte extension detail and did not broaden M2 beyond devnet program bytes.
+
+M2 result: **complete; no rollback required.** The finalized program hash is the padded candidate `a6008d9c...a720732`; the ProgramData address and upgrade authority are unchanged; ProtocolConfig/oracle/test-USDC bytes are unchanged; the candidate buffer is closed. Do not reinterpret the successful local Track1 test as a devnet settlement replay. M6 retains the disposable real Track1-only corridor and replay requirement.
 
 Required order:
 

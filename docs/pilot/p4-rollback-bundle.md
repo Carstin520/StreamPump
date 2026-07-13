@@ -2,11 +2,13 @@
 
 This file documents rollback artifacts and immutable pre-mutation identifiers. Binary backups and provider secrets are machine-local and must never be committed.
 
-Gate status: **M1 and the original M2 were approved. Buffer writing is paused pending a rotated dedicated RPC. Simulation proved the devnet loader requires a 10,240-byte minimum extension, so renewed approval is required before the revised irreversible extension; no ProgramData extend/upgrade has occurred.**
+Gate status: **M2 completed successfully on Solana devnet after renewed approval for the exact 10,240-byte extension. The live full padded program hash is `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`; rollback was not required. M3 is a separate human gate.**
 
 M2 was subsequently approved. Buffer creation succeeded, but payload writing stopped on sustained provider 429 responses before ProgramData extension. The deployed program remains at the pre-upgrade hash/capacity. Buffer `BEwVgZ3MnBuLaMNKYiUg6NVDDLnnija7i4adFzaJ6Kof` is intentionally retained for resume/recovery; closing it to reclaim rent is itself a mutation and requires an explicit decision if M2 is abandoned.
 
 An orphaned Agave CLI writer was later found and terminated. Its process arguments exposed the RPC credential locally, so that credential is revoked/rotation-pending and the local RPC file is empty. No ProgramData mutation occurred. Final post-stop state: buffer matching prefix 25,200 bytes, 1,249 pending 900-byte chunks, deployed program SHA256 `96b114...`, capacity 1,318,104, authority unchanged, fee payer 5.7976796 devnet SOL.
+
+Final M2 superseding state: the dedicated RPC credential was rotated and fixed to devnet; all 1,249 pending chunks were written and finalized with paired signature-ledger records; the buffer dump matched the candidate. Extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR` produced capacity 1,328,344 and padded rollback hash `8f3679...`. Upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1` produced the padded candidate hash `a6008d9c...` at finalized slot 475933115. The candidate buffer is closed and independent public-devnet verification returned GO. Retain all rollback artifacts because the capacity increase is permanent even though program bytes remain rollback-capable.
 
 ## Local secure bundle
 
@@ -21,6 +23,10 @@ Directory mode must be `0700`; files must be `0600`.
 | `streampump_core-candidate-padded-1328344.so` | 1,328,344 bytes | `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732` |
 | `streampump_core-rollback-padded-1328344.so` | 1,328,344 bytes | `8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247` |
 | `program-show-pre.json` | metadata only | ProgramData `58F5kifyMnkjNkKUpGULaxUHe4kLqcrr37fhLVAwmrbs`; capacity 1,318,104 |
+| `candidate-buffer-dump.so` | 1,321,192 bytes | `5e881250cf64a5000ac81e66a5d90f9e25c19983280e8f8b8d6cc0ef34ac2dc4` |
+| `streampump_core-m2-post.so` | 1,328,344 bytes | `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732` |
+| `program-extend-m2-result.json` | transaction evidence | finalized extend signature recorded above |
+| `program-deploy-m2-result.json` | transaction evidence | finalized upgrade signature recorded above |
 
 Frozen account-data checks:
 
@@ -138,9 +144,15 @@ test "$(stat -f %Lp "$UPGRADE_AUTHORITY_KEYPAIR")" = 600
 test "$(solana-keygen pubkey "$UPGRADE_AUTHORITY_KEYPAIR")" = BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw
 test "$(stat -f %Lp "$SOLANA_CONFIG")" = 600
 
-test ! -e "$ROLLBACK_BUFFER_KEYPAIR"
-solana-keygen new --no-bip39-passphrase --silent --outfile "$ROLLBACK_BUFFER_KEYPAIR"
-chmod 600 "$ROLLBACK_BUFFER_KEYPAIR"
+# Reuse durable rollback inventory after interruption. Never delete or replace
+# an existing keypair/buffer: the same account may already contain finalized
+# chunks whose signatures and rent must remain attributable.
+if test -e "$ROLLBACK_BUFFER_KEYPAIR"; then
+  test "$(stat -f %Lp "$ROLLBACK_BUFFER_KEYPAIR")" = 600
+else
+  solana-keygen new --no-bip39-passphrase --silent --outfile "$ROLLBACK_BUFFER_KEYPAIR"
+  chmod 600 "$ROLLBACK_BUFFER_KEYPAIR"
+fi
 ROLLBACK_BUFFER_ADDRESS="$(solana-keygen pubkey "$ROLLBACK_BUFFER_KEYPAIR")"
 
 export P4_BUFFER_KEYPAIR="$ROLLBACK_BUFFER_KEYPAIR"
@@ -152,8 +164,10 @@ export P4_EXPECTED_SHA256='8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b4
 export P4_ARTIFACT_ROLE=rollback
 export P4_WRITE_DELAY_MS=3000
 
-# Read-only inventory first. Buffer creation is one preflighted transaction;
-# a lost response is resolved only from finalized account state.
+# Read-only inventory first. If the account already exists, CREATE_BUFFER
+# validates and reuses it without sending a creation transaction. If only the
+# durable keypair exists, creation is one preflighted transaction; a lost
+# response is resolved only from finalized account state. Never delete/rebuild.
 P4_DRY_RUN=true run_p4_ts "$CREATE_BUFFER"
 P4_CREATE_BUFFER=true run_p4_ts "$CREATE_BUFFER" \
   > "$BUNDLE_DIR/rollback-buffer-create-result.json"
@@ -180,12 +194,15 @@ done
 # mode-0600 rollback-buffer-write-signatures.jsonl ledger in BUNDLE_DIR.
 
 safe_rpc solana program dump "$ROLLBACK_BUFFER_ADDRESS" "$ROLLBACK_BUFFER_DUMP" \
-  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER"
+  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized
 chmod 600 "$ROLLBACK_BUFFER_DUMP"
 test "$(stat -f %z "$ROLLBACK_BUFFER_DUMP")" = 1328344
 test "$(shasum -a 256 "$ROLLBACK_BUFFER_DUMP" | awk '{print $1}')" = 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247
 cmp "$PRE_SO" "$ROLLBACK_BUFFER_DUMP"
 
+# Capture the rollback deploy exit code, but always resolve the result from a
+# finalized program dump. Never resend solely because the CLI returned nonzero.
+set +e
 safe_rpc solana program deploy \
   --config "$SOLANA_CONFIG" \
   --program-id "$PROGRAM_ID" \
@@ -198,14 +215,22 @@ safe_rpc solana program deploy \
   --max-sign-attempts 1 \
   --commitment finalized \
   --output json > "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
+ROLLBACK_DEPLOY_EXIT_CODE=$?
+set -e
 chmod 600 "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
 cat "$BUNDLE_DIR/program-deploy-m2-rollback-result.json"
+printf 'rollback deploy CLI exit code: %s\n' "$ROLLBACK_DEPLOY_EXIT_CODE"
 
+# This finalized dump is unconditional after the rollback deploy attempt.
 safe_rpc solana program dump "$PROGRAM_ID" "$POST_ROLLBACK_DUMP" \
-  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER"
+  --config "$SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized
 chmod 600 "$POST_ROLLBACK_DUMP"
 test "$(stat -f %z "$POST_ROLLBACK_DUMP")" = 1328344
-test "$(shasum -a 256 "$POST_ROLLBACK_DUMP" | awk '{print $1}')" = 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247
+ROLLBACK_POST_SHA256="$(shasum -a 256 "$POST_ROLLBACK_DUMP" | awk '{print $1}')"
+if test "$ROLLBACK_POST_SHA256" != 8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247; then
+  printf 'Rollback is not proven; finalized program hash is %s. Stop without blind resend and preserve the existing rollback keypair/buffer inventory.\n' "$ROLLBACK_POST_SHA256" >&2
+  exit 22
+fi
 cmp "$PRE_SO" "$POST_ROLLBACK_DUMP"
 
 P4_EXPECTED_PROGRAM_SHA256='8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247' \

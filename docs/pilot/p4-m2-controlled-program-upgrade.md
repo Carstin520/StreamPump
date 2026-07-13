@@ -1,6 +1,17 @@
 # P4 M2 Controlled Devnet Program Upgrade
 
-Gate status: **M1 and the original M2 approved. Buffer resume is paused until the rotated dedicated RPC is configured. Read-only simulation proved Solana rejects 3,088 bytes and requires a minimum 10,240-byte extension; renewed human approval is required before this revised irreversible step. No ProgramData extend/upgrade has occurred.**
+Gate status: **M2 completed and independently verified on Solana devnet. The human approved the revised exact 10,240-byte extension. The candidate is live at the fixed Program ID with capacity 1,328,344 and full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. M3 remains a separate human gate.**
+
+## Final M2 result (2026-07-13)
+
+- Dedicated devnet RPC genesis and the frozen Program/ProgramData/authority/ProtocolConfig/oracle/test-USDC baseline passed before every mutation group. No credential-bearing URL was placed in argv or evidence.
+- Candidate buffer `BEwVgZ3MnBuLaMNKYiUg6NVDDLnnija7i4adFzaJ6Kof` completed 1,249 retained 900-byte chunks through the paced single-threaded writer. Its finalized dump was 1,321,192 bytes with SHA256 `5e881250cf64a5000ac81e66a5d90f9e25c19983280e8f8b8d6cc0ef34ac2dc4`, and `cmp` matched the fixed candidate.
+- Exact 10,240-byte extension finalized with signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`. Capacity became 1,328,344 and the padded pre-upgrade hash was `8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247`.
+- Upgrade finalized with signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot was 475933115. The 1,328,344-byte post dump hashed to `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732` and matched the padded candidate byte-for-byte.
+- Upgrade authority, ProtocolConfig raw hash, oracle authority, test-USDC raw hash/decimals/authorities, and ProgramData address remained frozen. The candidate buffer is closed at finalized commitment and its rent returned to the devnet fee payer; the observed post-close fee-payer balance was 14.9106046 devnet SOL.
+- Independent public-devnet finalized verification returned the same program hash/capacity/authority/config/mint facts and a closed buffer. Rebuilding the exact source candidate reproduced the 1,321,192-byte candidate hash, generated IDL matched the packaged 35-instruction IDL exactly, and `programs/tests/p2-track1-only.spec.ts` passed 3/3 on a local validator.
+- `npm run smoke:pilot-track1` was intentionally not run in M2 because it performs real manual settlement and replay. The deployed-backend read-only Track1 preflight and disposable manual replay remain M6 work after M3/M4 and fixture creation; missing those prerequisites is not a candidate failure.
+- No rollback was required. The full padded rollback artifact remains available and unchanged; ProgramData capacity cannot be reduced.
 
 Preflight history: the first dedicated-RPC attempt returned HTTP 401 before any chain read completed, and the CLI included the credential-bearing URL in its error. No transaction or chain mutation occurred. That credential must be rotated before retry. The wrapper below suppresses raw RPC stderr so a future provider error cannot repeat the disclosure.
 
@@ -127,6 +138,7 @@ P4_EXPECTED_PROGRAM_SHA256='96b114bb1b130695b7a7cccc1ce9a41bf953c4acd6179120acc4
 safe_rpc solana program show "$PROGRAM_ID" \
   --config "$P4_SOLANA_CONFIG" \
   --keypair "$FEE_PAYER" \
+  --commitment finalized \
   --output json > "$BUNDLE_DIR/program-show-m2-pre.json"
 
 test "$(jq -r '.programId' "$BUNDLE_DIR/program-show-m2-pre.json")" = "$PROGRAM_ID"
@@ -136,13 +148,14 @@ test "$(jq -r '.dataLen' "$BUNDLE_DIR/program-show-m2-pre.json")" = '1318104'
 
 safe_rpc solana program dump "$PROGRAM_ID" "$BUNDLE_DIR/streampump_core-m2-pre-redump.so" \
   --config "$P4_SOLANA_CONFIG" \
-  --keypair "$FEE_PAYER"
+  --keypair "$FEE_PAYER" \
+  --commitment finalized
 chmod 600 "$BUNDLE_DIR/streampump_core-m2-pre-redump.so"
 test "$(shasum -a 256 "$BUNDLE_DIR/streampump_core-m2-pre-redump.so" | awk '{print $1}')" = '96b114bb1b130695b7a7cccc1ce9a41bf953c4acd6179120acc4a2a87e591457'
 
-safe_rpc solana account "$PROTOCOL_CONFIG" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --output json \
+safe_rpc solana account "$PROTOCOL_CONFIG" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized --output json \
   > "$BUNDLE_DIR/protocol-config-m2-pre.json"
-safe_rpc solana account "$TEST_USDC_MINT" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --output json \
+safe_rpc solana account "$TEST_USDC_MINT" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized --output json \
   > "$BUNDLE_DIR/test-usdc-m2-pre.json"
 chmod 600 "$BUNDLE_DIR"/*-m2-pre.json
 ```
@@ -162,7 +175,7 @@ be passed as a command argument.
 
 ```bash
 test "$(solana-keygen pubkey "$BUFFER_KEYPAIR")" = "$BUFFER_ADDRESS"
-test -z "$(pgrep -f 'solana.*program.*write-buffer|p4-resume-buffer-write' || true)"
+test -z "$(pgrep -f '[s]olana.*program.*write-buffer|p4-resume-buffer-writ[e]' || true)"
 
 export P4_BUFFER_KEYPAIR="$BUFFER_KEYPAIR"
 export P4_EXPECTED_BUFFER="$BUFFER_ADDRESS"
@@ -204,7 +217,8 @@ If the command times out or returns an ambiguous result, query the buffer; do no
 ```bash
 safe_rpc solana program dump "$BUFFER_ADDRESS" "$BUNDLE_DIR/candidate-buffer-dump.so" \
   --config "$P4_SOLANA_CONFIG" \
-  --keypair "$FEE_PAYER"
+  --keypair "$FEE_PAYER" \
+  --commitment finalized
 chmod 600 "$BUNDLE_DIR/candidate-buffer-dump.so"
 
 test "$(stat -f %z "$BUNDLE_DIR/candidate-buffer-dump.so")" = '1321192'
@@ -245,6 +259,7 @@ cat "$BUNDLE_DIR/program-extend-m2-result.json"
 safe_rpc solana program show "$PROGRAM_ID" \
   --config "$P4_SOLANA_CONFIG" \
   --keypair "$FEE_PAYER" \
+  --commitment finalized \
   --output json > "$BUNDLE_DIR/program-show-m2-extended.json"
 
 test "$(jq -r '.programdataAddress' "$BUNDLE_DIR/program-show-m2-extended.json")" = "$PROGRAMDATA_ID"
@@ -260,6 +275,10 @@ Expected result: finalized extend transaction, exact capacity 1,328,344, unchang
 ## E. Upgrade from the verified buffer — mutation 3
 
 ```bash
+# Capture the CLI exit code without allowing `set -e` to skip the mandatory
+# finalized post-state hash read. Never resend this deploy based on its exit
+# code alone.
+set +e
 safe_rpc solana program deploy \
   --config "$P4_SOLANA_CONFIG" \
   --program-id "$PROGRAM_ID" \
@@ -272,35 +291,57 @@ safe_rpc solana program deploy \
   --max-sign-attempts 1 \
   --commitment finalized \
   --output json > "$BUNDLE_DIR/program-deploy-m2-result.json"
+DEPLOY_EXIT_CODE=$?
+set -e
 chmod 600 "$BUNDLE_DIR/program-deploy-m2-result.json"
 cat "$BUNDLE_DIR/program-deploy-m2-result.json"
+printf 'program deploy CLI exit code: %s\n' "$DEPLOY_EXIT_CODE"
 ```
 
-Expected result: finalized upgrade transaction for the existing Program ID. An ambiguous CLI result must be resolved by post-state reads, never by blind resend.
+Expected result: finalized upgrade transaction for the existing Program ID. A
+zero or non-zero CLI result is only transport evidence; section F always
+resolves the outcome from finalized program bytes and never blindly resends.
 
 ## F. Immediate post-upgrade verification
 
 ```bash
+# This finalized dump is unconditional after the deploy attempt and is the
+# authoritative ambiguity resolver.
+safe_rpc solana program dump "$PROGRAM_ID" "$BUNDLE_DIR/streampump_core-m2-post.so" \
+  --config "$P4_SOLANA_CONFIG" \
+  --keypair "$FEE_PAYER" \
+  --commitment finalized
+chmod 600 "$BUNDLE_DIR/streampump_core-m2-post.so"
+test "$(stat -f %z "$BUNDLE_DIR/streampump_core-m2-post.so")" = '1328344'
+POST_PROGRAM_SHA256="$(shasum -a 256 "$BUNDLE_DIR/streampump_core-m2-post.so" | awk '{print $1}')"
+case "$POST_PROGRAM_SHA256" in
+  a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732)
+    printf 'Finalized post-state: candidate is live; continue verification.\n'
+    ;;
+  8f3679660d72daa6b6672b92abe3d6e2d76db690d13329121c3b466476c6b247)
+    printf 'Finalized post-state: upgrade did not land; safe stop without resend.\n' >&2
+    exit 20
+    ;;
+  *)
+    printf 'Finalized post-state hash %s is unexpected; immediately execute section G rollback.\n' "$POST_PROGRAM_SHA256" >&2
+    exit 21
+    ;;
+esac
+cmp "$CANDIDATE_PADDED_SO" "$BUNDLE_DIR/streampump_core-m2-post.so"
+
 safe_rpc solana program show "$PROGRAM_ID" \
   --config "$P4_SOLANA_CONFIG" \
   --keypair "$FEE_PAYER" \
+  --commitment finalized \
   --output json > "$BUNDLE_DIR/program-show-m2-post.json"
 
 test "$(jq -r '.programdataAddress' "$BUNDLE_DIR/program-show-m2-post.json")" = "$PROGRAMDATA_ID"
 test "$(jq -r '.authority' "$BUNDLE_DIR/program-show-m2-post.json")" = 'BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw'
 test "$(jq -r '.dataLen' "$BUNDLE_DIR/program-show-m2-post.json")" = '1328344'
 
-safe_rpc solana program dump "$PROGRAM_ID" "$BUNDLE_DIR/streampump_core-m2-post.so" \
-  --config "$P4_SOLANA_CONFIG" \
-  --keypair "$FEE_PAYER"
-chmod 600 "$BUNDLE_DIR/streampump_core-m2-post.so"
-test "$(stat -f %z "$BUNDLE_DIR/streampump_core-m2-post.so")" = '1328344'
-test "$(shasum -a 256 "$BUNDLE_DIR/streampump_core-m2-post.so" | awk '{print $1}')" = 'a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732'
-cmp "$CANDIDATE_PADDED_SO" "$BUNDLE_DIR/streampump_core-m2-post.so"
-
-safe_rpc solana account "$PROTOCOL_CONFIG" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --output json \
+safe_rpc solana account "$PROTOCOL_CONFIG" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized --output json \
   > "$BUNDLE_DIR/protocol-config-m2-post.json"
-safe_rpc solana account "$TEST_USDC_MINT" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --output json \
+safe_rpc solana account "$TEST_USDC_MINT" --config "$P4_SOLANA_CONFIG" --keypair "$FEE_PAYER" --commitment finalized --output json \
   > "$BUNDLE_DIR/test-usdc-m2-post.json"
 
 test "$(jq -r '.account.owner' "$BUNDLE_DIR/protocol-config-m2-post.json")" = "$PROGRAM_ID"
@@ -312,7 +353,11 @@ P4_EXPECTED_PROGRAM_SHA256='a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d4
   run_p4_ts /private/tmp/streampump-p4-codex/scripts/p4-verify-chain-baseline.ts
 ```
 
-Expected result: post-upgrade program bytes equal the candidate exactly; ProgramData address/authority/capacity are correct; ProtocolConfig and test-USDC account bytes are unchanged.
+Hash decision table: `a6008d...` proves the candidate landed and permits the
+remaining assertions; `8f3679...` proves the deploy did not land and requires a
+safe stop without resend; every other finalized hash requires immediate section
+G rollback. After the success branch, ProgramData address/authority/capacity
+must be correct and ProtocolConfig/test-USDC account bytes must be unchanged.
 
 The 1,321,192-byte candidate buffer is valid for the larger ProgramData account:
 Agave's upgrade processor copies the buffer payload and explicitly zero-fills
@@ -322,7 +367,12 @@ smaller source buffer.
 
 ## G. Immediate rollback
 
-Trigger rollback on any failed post-upgrade assertion, authority/config/mint anomaly, or candidate-attributable Track1-only preflight failure. Use a new rollback buffer and the same write-buffer -> hash -> deploy -> dump/hash sequence from [the rollback bundle manifest](p4-rollback-bundle.md), with `ROLLBACK_SO` as input.
+Trigger rollback on any unexpected finalized post-deploy hash, failed
+post-upgrade assertion, authority/config/mint anomaly, or
+candidate-attributable Track1-only preflight failure. Use the rollback buffer
+inventory from [the rollback bundle manifest](p4-rollback-bundle.md), with
+`ROLLBACK_SO` as input. If rollback was interrupted, resume the existing
+keypair/account and its pending inventory; never delete and recreate it.
 
 After extension, the expected restored dump is 1,328,344 bytes with SHA256:
 
