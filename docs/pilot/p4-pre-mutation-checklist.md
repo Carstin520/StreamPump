@@ -2,7 +2,7 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M2, M3, and M4 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. Render and Vercel run the exact frozen Pilot application commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19`; this is a controlled technical Pilot deployment, not a formal production or real-funds launch. M5 is in progress and dashboard-gated. M6 remains a separate human gate.**
+Gate status: **M2, M3, M4, and M5 completed successfully as controlled technical Pilot verification. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. Render deploy `dep-d9adr95aeets73dlmltg` (after the final Mux secret rotation) and Vercel Production deployment `dpl_6f9LBgHRqB8hCywV5DimXfV9YqUK` (Ready) both run the exact frozen Pilot application commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19`; this is a controlled technical Pilot deployment on Solana devnet / test-USDC, invite-only, external-wallet-first, Track 1 only, not a formal production or real-funds launch. M6 is unapproved and not started; it remains a separate human gate.**
 
 M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
 
@@ -149,9 +149,11 @@ On failure, stop application deployment. Preserve logs without URLs/secrets, kee
 
 ## M4 — Render/Vercel inventory and controlled deployment
 
-M4 and M5 were human-approved in sequence. M4 passed; M5 is now open. M6 remains a separate human gate.
+M4 and M5 were human-approved in sequence and both passed as controlled technical Pilot verification. M6 is unapproved, not started, and remains a separate human gate.
 
-**Execution result (2026-07-13): PASS.** The frozen application candidate is commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19` on `codex/p4-pilot-deployment`. Render deploy `dep-d9ac42daeets73djf58g` reached `live` at that exact commit after the read-only exact-26 Neon verifier passed; a 95.8-second production verifier recorded 16/16 passing observations covering release identity, health/readiness stability, CORS, and closed Pilot lanes. Render auto-deploy remains disabled and its deploy hook plus Neon owner credential were rotated without recording replacement values. Vercel Production deployment `dpl_26s2wP8KGqGJQbVeJH5VvXo2GmK2` rebuilt the same commit under Node 22 and owns `app.stream-pump.com` plus `stream-pump.vercel.app`. The promoted `/explore` returned 200 without the prior suspended-backend error, and the backend health/readiness/CORS probes passed immediately after alias assignment. M5 therefore opened; M6 remains closed.
+**Execution result (2026-07-13): PASS.** The frozen application candidate is commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19` on `codex/p4-pilot-deployment`. The M4 Render deploy `dep-d9ac42daeets73djf58g` reached `live` at that exact commit after the read-only exact-26 Neon verifier passed; a 95.8-second production verifier recorded 16/16 passing observations covering release identity, health/readiness stability, CORS, and closed Pilot lanes. Render auto-deploy remains disabled and its deploy hook plus Neon owner credential were rotated without recording replacement values. The M4 Vercel Production deployment `dpl_26s2wP8KGqGJQbVeJH5VvXo2GmK2` rebuilt the same commit under Node 22 and owns `app.stream-pump.com` plus `stream-pump.vercel.app`. The promoted `/explore` returned 200 without the prior suspended-backend error, and the backend health/readiness/CORS probes passed immediately after alias assignment. M5 therefore opened; it has since completed.
+
+**Current deployed state (after M5's final Mux secret rotation):** the current Render deployment is `dep-d9adr95aeets73dlmltg` and the current Vercel Production deployment is `dpl_6f9LBgHRqB8hCywV5DimXfV9YqUK` (Ready), both at the same exact commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19`. These supersede the M4 deploy identifiers above; the earlier IDs are retained as M4 execution evidence.
 
 Candidate SHA: the prior pre-doc candidate `aa59485902194af6132e430ab1c53f2c0c931038` is not remote-reachable and was not deployed. The final exact candidate `097e9805b197398ae1c04cf5bf84f1044b3b2f19` was pushed on `codex/p4-pilot-deployment` and deployed to both Render and Vercel. Auto-deploy remains disabled/controlled so neither `main` nor an unpinned branch head is deployed.
 
@@ -195,20 +197,22 @@ On Render failure, keep the service suspended. Do not automatically restore the 
 
 ## M5 — Mux webhook and media verification
 
-M5 is human-approved but conditional on M4 success; do not begin until M4 passes. M6 remains a separate human gate.
+M5 was human-approved conditional on M4 success; M4 passed first, then M5 executed. M6 is unapproved, not started, and remains a separate human gate.
 
-**Current execution state (2026-07-13): IN PROGRESS / dashboard-gated.** M4 passed. The deployed webhook route rejects an intentionally invalid `mux-signature` with 401, and the configured Mux API token can read the Video Assets API with HTTP 200. These probes prove fail-closed signature handling and API-token validity only. They do not prove a Dashboard endpoint, endpoint-specific signing-secret match, signed delivery, or media/database reconciliation. The isolated browser session is currently signed out of Mux; no endpoint was created or disabled, the temporary Render webhook value was not treated as verified, and no media corridor was started. Continue only after an operator signs into the Mux Dashboard without sharing credentials in chat. Cloudflare delivery-bucket access also remains unverified: current object credentials returned 403 for the intended distinct delivery bucket and the isolated Cloudflare dashboard session is signed out.
+**Execution result (2026-07-13): PASS as controlled technical Pilot verification.** In Mux environment `lnv5m1`, only the approved endpoint `https://api.stream-pump.com/api/webhooks/mux` is enabled; the older `onrender` and `trycloudflare` endpoints remain disabled. An endpoint-specific signed probe returned 202. A provider-backed disposable Mux test asset `vbmHviLSWRCMAPSoTk6zQG02l2BscN01Nhl79sL9v5wh8` generated `video.asset.ready` event `8e29cc91-fd05-d0f0-f453-9f5067c05d90`; its single production-endpoint attempt returned 200 and its playback `R77Hmre1a1aeUiDMPv7LiJBS01IVMe02clh018igc4k1PQ` returned HLS 200. R2 delivery is bucket `streampump-delivery-dev` at `https://media.stream-pump.com`; the 241,514-byte disposable object public GET matched SHA256 `1fc5800b7e1365de2e959c37ee47e5dd07fbb1023ded7f53279639ef485b1582`.
+
+Scoped disposable cleanup (not global bucket truth) is proven: the exact Mux asset GET returned 404, the exact R2 object HEAD returned 404 and its public URL returned 404, with deleted event `1a4b2f34-3cf8-f837-2423-cfc818a1d410`. This proves only that the single disposable asset/object was removed; it makes no claim about other objects in the bucket.
+
+Signature-handling caveat on the deployed 097e route: it rejects an invalid but present `mux-signature` with 401, but a **missing** signature still returns 500. A narrow local controller fix changes the missing/blank case to 401; the full backend suite (195 tests) passes and the backend build passes, but that fix is **not deployed yet**. The endpoint-specific signed probe (202) proves signed-delivery acceptance only; do **not** treat it alone as DB reconciliation proof.
 
 Required dashboard fields (do not paste the secret):
 
-- Environment: the intended Mux test/Pilot environment.
+- Environment: Mux `lnv5m1` (the intended Pilot environment).
 - Endpoint URL: the approved Render public backend plus `/api/webhooks/mux`.
 - Signing secret: endpoint-specific secret stored only in Render as `MUX_WEBHOOK_SECRET`.
 - Event scope: only events consumed by the current controller/reconciliation path.
 
-Read-only evidence currently proves Mux environment `lnv5m1` is a development environment and older assets/playback are healthy. It does **not** prove the current Dashboard webhook endpoint, enabled state, delivery history, or Render secret match; those remain mandatory M5 dashboard checks. The approved candidate route is `POST https://api.stream-pump.com/api/webhooks/mux`.
-
-Prefer creating/verifying a new Pilot endpoint before disabling any prior endpoint. Verify signed webhook delivery, server-observed R2 object truth, Mux asset/playback readiness, promotion to the distinct delivery bucket, and operator feed approval. On signature failures, repeated delivery failures, wrong environment, or missing reconciliation visibility, disable the new endpoint or restore the old endpoint/secret and stop before M6.
+When rotating, switch the enabled Mux endpoint and its matching signing secret as a pair; a new endpoint must be enabled and its Render `MUX_WEBHOOK_SECRET` updated together before the prior endpoint is disabled. On signature failures, repeated delivery failures, wrong environment, or missing reconciliation visibility, disable the new endpoint and stop before M6 — never restore an exposed old endpoint secret.
 
 ## M6 — disposable allowlisted corridor and manual Track 1 replay
 
