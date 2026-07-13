@@ -2,7 +2,7 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M2 and M3 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. The old Render backend remains suspended. M4 is a separate human gate and must include database-owner credential rotation before any backend resumes.**
+Gate status: **M2 and M3 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. The old Render backend remains suspended. M4 and M5 are now human-approved; M4 runs first and M5 begins only after M4 passes. M6 remains a separate human gate. M4 must rotate the database-owner credential and update Render URLs before any backend resumes.**
 
 M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
 
@@ -149,30 +149,51 @@ On failure, stop application deployment. Preserve logs without URLs/secrets, kee
 
 ## M4 — Render/Vercel inventory and controlled deployment
 
+M4 and M5 are now human-approved. M4 runs first; M5 begins only after M4 passes. M6 remains a separate human gate.
+
+Candidate SHA: the prior pre-doc candidate `aa59485902194af6132e430ab1c53f2c0c931038` is not remote-reachable and is not the deploy target. The final exact candidate SHA will be refrozen after the M4 release-guard changes, pushed only to `codex/p4-pilot-deployment`, and deployed by that exact commit. Auto-deploy must be controlled/disabled so that neither `main` nor an unpinned branch head is ever deployed.
+
 Observed production isolation:
 
-- Render service `srv-d79rs0450q8c73fp2lmg` tracks `main` with auto-deploy enabled. Its configured pre-deploy command is `npm run prisma:migrate:deploy`; therefore M4 must not begin before M3 succeeds, and an unreviewed deploy could mutate Neon.
-- Render current build command is `npm ci && npm run prisma:generate && npm run build`, which differs from the runbook's `npm ci --include=dev ...`; resolve that inventory drift before candidate deployment.
-- Vercel has no local CLI/project link in this worktree. The production deployment remains the frozen baseline; `dd49e433` has a successful Preview only. Dashboard/API ownership is required for an intentional production promotion and rollback.
+- Render service `srv-d79rs0450q8c73fp2lmg` remains suspended after M3 and tracks `main`. Auto-deploy must be disabled/controlled before M4 so no unreviewed `main` push deploys; deploy only the exact refrozen candidate from `codex/p4-pilot-deployment`.
+- Render build command must be `npm ci --include=dev && npm run prisma:generate && npm run build`. M4 must replace the write-capable pre-deploy migration command with `npm run verify:p4:neon:post`, the read-only exact-26 migration/checksum/schema/data gate. Any attempt to apply a migration is a STOP condition (M3 already applied all six).
+- Vercel has no local CLI/project link in this worktree. The Vercel project currently runs Node 24.x, but the repo `.nvmrc` and `app` engines require Node 22; M4 must pin the Vercel build to Node 22 before promotion. The production deployment remains the frozen baseline pending an intentional promotion and rollback via dashboard/API ownership.
 
-Mandatory credential incident follow-up: while injecting the recovery connection through a local operator process, its TTY echoed the inherited `neondb_owner` connection string into the local tool transcript. It was not committed or written to repository/evidence files, but the password must be treated as exposed. M4 must rotate that Neon role credential and atomically update both Render `DATABASE_URL` and `DIRECT_URL` before any backend instance is resumed or deployed. Do not paste the replacement value into chat or command output.
+Credential rotation before any backend resumes (never paste replacement values into chat or command output):
 
-Before approval, inventory values by presence/type only; never print secret values. Binding Pilot values include:
+- Rotate the Neon `neondb_owner` password and atomically update Render `DATABASE_URL` and `DIRECT_URL` before any backend instance is resumed or deployed. The password was echoed once into a local operator inspection transcript; it was not committed or written to durable evidence, but must be treated as exposed.
+- Regenerate the Render deploy hook, which also entered a local operator inspection transcript. It was not committed or written to durable evidence but must be treated as exposed.
 
-- Invite-only: `PILOT_INVITE_ONLY=true`, disposable creator+sponsor in `PILOT_INVITE_WALLETS`, frozen `PILOT_EXPECTED_USDC_MINT`.
-- External-wallet-only closures: email/provider/managed execution, S1, Track2, Track3, rewards, prototype routes all false.
-- Manual settlement only: `ORACLE_SCHEDULER_ENABLED=false`, `ORACLE_RUN_ON_BOOT=false`, Track2/Track3 automatic settlement false.
-- Chain: devnet-only dedicated RPCs, canonical Program ID, packaged IDL path, oracle signer matching chain state.
-- Media: distinct private origin and public delivery R2 buckets; real Mux credentials; reconciliation enabled only after configuration is verified.
-- Vercel: production frontend points only to the approved Render backend and devnet RPC.
+Render environment contract (verify by presence/type only; never print secret values):
 
-Controlled order: Render deploy by exact approved commit -> `/health` 200 -> `/ready` 200 and remains healthy through the indexer heartbeat window -> API/CORS/auth fail-closed checks -> Vercel deploy by exact approved commit -> browser/API smoke. Do not auto-deploy from an integration push.
+- Production mode; HTTPS API base URL; exact CORS allowed origins; non-default auth/operator secrets.
+- Read-only Neon gate inputs: `P4_EXPECTED_NEON_DATABASE=neondb`, `P4_EXPECTED_NEON_HOST_SHA256=a6c67cc9e5f1f9b94812efdeb7bbba5c558e475d183fa35d0f740f6ef4a2a678`, and `P4_EXPECTED_NEON_ROLE_SHA256=6f198191100386e1f0c093fc1c902c0520c6382059d75fb4743ec1ec75cc7842`.
+- Release identity: full `PILOT_EXPECTED_RELEASE_SHA` set to the final frozen candidate and required at runtime to equal Render's injected `RENDER_GIT_COMMIT` exactly.
+- Dedicated devnet transaction RPC and a separate indexer RPC; canonical Program ID, mint, and oracle matching frozen chain truth.
+- Distinct private-origin and public-delivery R2 buckets; real Mux credentials; reconciliation enabled but run-on-boot false.
+- Explicitly false: `AUTH_ALLOW_LEGACY_WALLET_HEADER`, `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE`, `CREATOR_AUTH_ALLOW_PREVIEW_TWITTER`, `EPHEMERAL_SESSIONS_ENABLED`, `PUBLIC_MANAGED_WALLET_EXECUTION_ENABLED`, `ENGAGEMENT_REWARDS_ENABLED`, `S1_PUBLIC_API_ENABLED`, `TRACK2_ENABLED`, `TRACK3_ENABLED`, `EMAIL_AUTH_ENABLED`, `TRACK2_METRIC_INGESTION_ENABLED`, `PROTOTYPE_ROUTES_ENABLED`, `S1_MOCK_API_ENABLED`, `ORACLE_SCHEDULER_ENABLED`, `ORACLE_RUN_ON_BOOT`, `ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED`, `ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED`.
 
-M4 stop conditions include: deployed commit mismatch; unexpected pre-deploy migration; any closed flag enabled; chain/oracle/mint preflight failure; `/health` missing the invite-only/manual-settlement runtime truth; `/ready` returning 503 or becoming unstable after the indexer heartbeat window; Mux/indexer readiness failure; CORS/API failure; or Vercel alias/commit mismatch.
+Vercel environment contract:
 
-Rollback targets are frozen above. If Render fails, restore deploy `dep-d8upmol7vvec73ejb8gg` and do not deploy Vercel. If Vercel fails, restore Production deployment `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`. A rollback to the old backend may require repointing to the pre-migration Neon restore branch because the old code predates P2/P3 schema; this compatibility decision requires a separate human check.
+- Frontend backend base is `https://api.stream-pump.com`; `NEXT_PUBLIC_API_BASE_URL` is unset.
+- Browser-safe devnet read RPC only; public demo/social/demo hints off; Web3Auth unset; R2 delivery host only.
+
+Controlled order:
+
+1. Confirm Render auto-deploy is disabled and the exact refrozen candidate is on `codex/p4-pilot-deployment` only.
+2. Deploy Render by that exact commit; the read-only pre-deploy verifier must prove exactly 26 applied migrations and all frozen post-M3 invariants without applying any migration.
+3. `/health` returns 200 with exact invite-only/manual-settlement truth.
+4. `/ready` returns READY with DB, indexer, and Mux ready, and remains stable for more than 90 seconds.
+5. CORS allow-and-deny checks pass; provider exchange returns 403; prototype/S1 read+write/email/ephemeral/Track2 routes are closed; operator endpoints return 403 unauthenticated.
+6. Only after Render passes, pin Vercel to Node 22 and promote Vercel Production by the exact approved commit; run browser/API smoke.
+
+M4 stop conditions include: deployed commit is not the exact refrozen `codex/p4-pilot-deployment` candidate; `main` or an unpinned branch head would deploy; the read-only pre-deploy verifier fails or any migration command attempts a write; any closed flag enabled; chain/oracle/mint preflight failure; `/health` missing the invite-only/manual-settlement runtime truth; `/ready` returning 503 or becoming unstable within the 90-second window; DB/indexer/Mux readiness failure; CORS/provider-exchange/operator fail-closed check failure; Vercel not pinned to Node 22; or Vercel alias/commit mismatch.
+
+On Render failure, keep the service suspended. Do not automatically restore the old deploy against migrated Neon; the old backend predates P2/P3 schema, so an old rollback may require a separately approved repoint to the pre-migration recovery branch `br-frosty-fire-an0lsiq2`, and Vercel must not be deployed. Only after Render passes may the exact Vercel Production promotion occur; the Vercel rollback target is `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`.
 
 ## M5 — Mux webhook and media verification
+
+M5 is human-approved but conditional on M4 success; do not begin until M4 passes. M6 remains a separate human gate.
 
 Required dashboard fields (do not paste the secret):
 

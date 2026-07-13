@@ -281,6 +281,65 @@ export const isPilotRuntimeSafetyRequired = (
   return nodeEnv === "production" || explicitPilotRuntime || hostedRuntime;
 };
 
+const FULL_GIT_COMMIT_SHA = /^[0-9a-fA-F]{40}$/;
+
+export const isHostedPilotRuntime = (
+  runtimeEnvironment: NodeJS.ProcessEnv = process.env
+): boolean =>
+  runtimeEnvironment.RENDER === "true" ||
+  Boolean(runtimeEnvironment.K_SERVICE) ||
+  Boolean(runtimeEnvironment.RAILWAY_ENVIRONMENT);
+
+export const getHostedPilotRuntimeFailures = (
+  runtimeEnvironment: NodeJS.ProcessEnv = process.env,
+  nodeVersion: string = process.versions.node
+): string[] => {
+  if (!isHostedPilotRuntime(runtimeEnvironment)) {
+    return [];
+  }
+
+  const failures: string[] = [];
+  const nodeMajor = Number.parseInt(nodeVersion.split(".")[0] ?? "", 10);
+  if (nodeMajor !== 22) {
+    failures.push("Hosted Pilot runtime requires Node.js major 22");
+  }
+
+  const expectedReleaseSha = runtimeEnvironment.PILOT_EXPECTED_RELEASE_SHA?.trim() ?? "";
+  if (!FULL_GIT_COMMIT_SHA.test(expectedReleaseSha)) {
+    failures.push(
+      "PILOT_EXPECTED_RELEASE_SHA must be a complete 40-character hexadecimal Git commit SHA on hosted Pilot runtimes"
+    );
+  }
+
+  if (runtimeEnvironment.RENDER === "true") {
+    const renderGitCommit = runtimeEnvironment.RENDER_GIT_COMMIT?.trim() ?? "";
+    if (!FULL_GIT_COMMIT_SHA.test(renderGitCommit)) {
+      failures.push(
+        "RENDER_GIT_COMMIT must be a complete 40-character hexadecimal Git commit SHA"
+      );
+    } else if (
+      FULL_GIT_COMMIT_SHA.test(expectedReleaseSha) &&
+      expectedReleaseSha !== renderGitCommit
+    ) {
+      failures.push("PILOT_EXPECTED_RELEASE_SHA must exactly match RENDER_GIT_COMMIT");
+    }
+  }
+
+  if (runtimeEnvironment.RAILWAY_ENVIRONMENT) {
+    const railwayGitCommit = runtimeEnvironment.RAILWAY_GIT_COMMIT_SHA?.trim() ?? "";
+    if (
+      railwayGitCommit &&
+      (!FULL_GIT_COMMIT_SHA.test(railwayGitCommit) || expectedReleaseSha !== railwayGitCommit)
+    ) {
+      failures.push(
+        "PILOT_EXPECTED_RELEASE_SHA must exactly match the complete RAILWAY_GIT_COMMIT_SHA when Railway provides it"
+      );
+    }
+  }
+
+  return failures;
+};
+
 const validateProductionConfig = (runtimeConfig: typeof config): void => {
   if (!isPilotRuntimeSafetyRequired(runtimeConfig)) {
     return;
@@ -288,6 +347,8 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
 
   const failures: string[] = [];
   const warnings: string[] = [];
+
+  failures.push(...getHostedPilotRuntimeFailures());
 
   if (runtimeConfig.auth.sessionSecret === DEFAULT_AUTH_SESSION_SECRET) {
     failures.push("AUTH_SESSION_SECRET must be set to a non-default value");

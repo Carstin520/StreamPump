@@ -7,6 +7,7 @@ import { Keypair } from "@solana/web3.js";
 import { buildHealthPayload } from "../src/app";
 import {
   config,
+  getHostedPilotRuntimeFailures,
   getEnabledForbiddenPilotFeatures,
   isManagedWalletEncryptionKeyRequired,
   isPilotRuntimeSafetyRequired,
@@ -362,6 +363,67 @@ describe("Pilot safety gates", () => {
     );
     expect(hostedError.message).to.match(/not Solana devnet/);
     expect(dependencyCalls).to.be.greaterThan(0);
+  });
+
+  it("fails closed on hosted Node or release identity drift without echoing supplied values", () => {
+    const expectedReleaseSha = "a".repeat(40);
+    const deployedReleaseSha = "b".repeat(40);
+    const failures = getHostedPilotRuntimeFailures(
+      {
+        RENDER: "true",
+        PILOT_EXPECTED_RELEASE_SHA: expectedReleaseSha,
+        RENDER_GIT_COMMIT: deployedReleaseSha,
+      },
+      "20.10.0"
+    );
+
+    expect(failures).to.include("Hosted Pilot runtime requires Node.js major 22");
+    expect(failures).to.include(
+      "PILOT_EXPECTED_RELEASE_SHA must exactly match RENDER_GIT_COMMIT"
+    );
+    expect(failures.join(" ")).not.to.contain(expectedReleaseSha);
+    expect(failures.join(" ")).not.to.contain(deployedReleaseSha);
+  });
+
+  it("accepts only an exact full Render release identity on Node 22", () => {
+    const releaseSha = "0123456789abcdef0123456789abcdef01234567";
+    expect(
+      getHostedPilotRuntimeFailures(
+        {
+          RENDER: "true",
+          PILOT_EXPECTED_RELEASE_SHA: releaseSha,
+          RENDER_GIT_COMMIT: releaseSha,
+        },
+        "22.14.0"
+      )
+    ).to.deep.equal([]);
+
+    const incomplete = getHostedPilotRuntimeFailures(
+      {
+        RENDER: "true",
+        PILOT_EXPECTED_RELEASE_SHA: releaseSha.slice(0, 39),
+        RENDER_GIT_COMMIT: releaseSha,
+      },
+      "22.14.0"
+    );
+    expect(incomplete.join(" ")).to.contain("complete 40-character hexadecimal");
+  });
+
+  it("requires release identity syntax but not Render metadata on other hosted runtimes", () => {
+    const releaseSha = "c".repeat(40);
+    expect(
+      getHostedPilotRuntimeFailures(
+        { K_SERVICE: "streampump", PILOT_EXPECTED_RELEASE_SHA: releaseSha },
+        "22.0.0"
+      )
+    ).to.deep.equal([]);
+
+    expect(
+      getHostedPilotRuntimeFailures(
+        { K_SERVICE: "streampump", PILOT_EXPECTED_RELEASE_SHA: "not-a-sha" },
+        "22.0.0"
+      ).join(" ")
+    ).to.contain("PILOT_EXPECTED_RELEASE_SHA");
   });
 
   it("verifies every unique active RPC, the executable program, and protocol USDC mint", async () => {

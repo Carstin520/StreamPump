@@ -44,7 +44,9 @@
 本仓库已补好的部署前置项：
 - 后端支持 `CORS_ALLOWED_ORIGINS`
 - 前端有 [app/.env.example](../../app/.env.example)
-- 后端有 `npm run prisma:migrate:deploy`
+- 后端有只读迁移校验 gate `npm run verify:p4:neon:post`（exact-26/checksum/schema/data，只读事务，不写库）
+
+> **P4 迁移状态（当前真值）。** Neon 生产已完成 M3：**恰好 26 个迁移全部应用，0 失败、0 回滚**，含全部 P3 迁移；M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留。因此 **M4/首次上线不再执行 `prisma migrate deploy`**——不再有待应用迁移。Render 预部署改用只读 `npm run verify:p4:neon:post` 作为 exact-26/checksum/schema/data gate。**任何迁移写操作都是 STOP 条件。** `prisma:migrate:deploy` 仅保留为常规工具，P4 路径不使用。
 
 ## 架构建议
 
@@ -126,10 +128,18 @@ npm ci --include=dev && npm run prisma:generate && npm run build
 npm run start
 ```
 
+- Node 版本：**必须 Node 22**（`backend/package.json` engines 与 repo `.nvmrc` 均要求 22.x）。Render runtime 需固定到 Node 22。
+
 - Health Check Path
 ```text
 /health
 ```
+
+> **release SHA 锚定（Pilot 必需）。** Hosted Pilot 要求完整的 `PILOT_EXPECTED_RELEASE_SHA` **完全等于** Render 注入的 `RENDER_GIT_COMMIT`。只部署 `codex/p4-pilot-deployment` 上的那个精确候选 commit；auto-deploy 必须受控/关闭，`main` 或未固定的分支 head 永远不得部署。
+
+> **只读 Neon gate 指纹。** Render 还必须设置 `P4_EXPECTED_NEON_DATABASE=neondb`、`P4_EXPECTED_NEON_HOST_SHA256=a6c67cc9e5f1f9b94812efdeb7bbba5c558e475d183fa35d0f740f6ef4a2a678`、`P4_EXPECTED_NEON_ROLE_SHA256=6f198191100386e1f0c093fc1c902c0520c6382059d75fb4743ec1ec75cc7842`。这些是目标绑定指纹，不是数据库凭据；缺失或不匹配时 pre-deploy 必须失败。
+>
+> **Render 保持 suspended。** 在 M4 的 exact-SHA env/runtime 检查就绪之前，Render service 保持 suspended，不恢复、不部署。
 
 ### 2.3 Render 环境变量
 按 [backend/.env.example](../../backend/.env.example) 填，重点是这些：
@@ -245,21 +255,17 @@ Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 6
 - `ORACLE_WORKER_BATCH_SIZE=200`
 - `ORACLE_RPC_TIMEOUT_MS=25000`
 
-### 2.4 首次上线后执行数据库 migration
-Render Web Service 默认不会替你自动做 Prisma deploy migration。
+### 2.4 数据库迁移已完成——预部署只做只读校验
 
-首次上线后，需要在 Render shell 或本地连同一个生产数据库执行：
+> **不要在 M4/首次上线运行 `prisma migrate deploy`。** Neon 生产的 M3 已经完成：**恰好 26 个迁移全部应用，0 失败、0 回滚**，含全部 P3 迁移（`20260712170000_chain_ingestion_recovery`、`20260712180000_pilot_operator_events` 等）。没有待应用迁移。
+
+Render 预部署命令必须是只读的 exact-26/checksum/schema/data gate：
 
 ```bash
-cd backend
-npm run prisma:migrate:deploy
+npm run verify:p4:neon:post
 ```
 
-> **P3 迁移（本次工作未应用）。** 两个 P3 迁移在早前 P3 工作中于本地新增、**本次工作未应用**；实际环境/数据库的应用状态未经检查（仅依据仓库磁盘上的迁移目录列出名称）；后续修复 `96e9075` 是在既有 P3 schema/迁移上修改，未新增迁移：
-> - `20260712170000_chain_ingestion_recovery`
-> - `20260712180000_pilot_operator_events`
->
-> 这两个迁移随上面的 `prisma:migrate:deploy` 一并应用。应用前请先按 CLAUDE.md 的规则获得明确的环境所有权/审批。
+它在只读事务中校验恰好 26 个已应用迁移、校验和、schema 与数据不变量，**不写数据库**。**任何试图应用/写迁移的命令都是 STOP 条件**——不要用它替代或补充迁移应用；M3 已应用全部六个 P3 迁移。M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留作为回退目标。
 
 然后再确认：
 - `/health` 返回 200（liveness）
@@ -340,12 +346,17 @@ https://api.yourdomain.com/api/webhooks/mux
    - `app.yourdomain.com`
    - `api.yourdomain.com`
 
-## 推荐的最小上线顺序
-1. 先部署 backend 到 Render
-2. 确认 `/health`、`/ready` 和 migration（含两个未应用的 P3 迁移）
-3. 再部署 frontend 到 Vercel
-4. 再切 Mux webhook
-5. 最后做完整内容上传和 proposal launch 验证
+## Pilot 部署顺序（受控）
+
+这是**邀请制 devnet / test-USDC / 仅 Track 1 的技术 Pilot**，不是生产上线、也不提供真实资金可用性。按此顺序执行：
+
+1. 确认 Render auto-deploy 已关闭，且精确候选 commit 只在 `codex/p4-pilot-deployment` 上；`PILOT_EXPECTED_RELEASE_SHA` 完全等于 Render `RENDER_GIT_COMMIT`。
+2. 用该精确 commit 部署 Render 候选；只读预部署校验（`npm run verify:p4:neon:post`）必须证明恰好 26 个已应用迁移与全部 M3 后不变量，且**不应用任何迁移**。
+3. `/health` 返回 200 且带 invite-only/manual-settlement 运行时真值；`/ready` 就绪（DB + indexer + Mux）并**稳定超过 90 秒**。
+4. CORS allow/deny 通过、provider exchange 返回 403、prototype/S1/email/ephemeral/Track2 等封闭路由关闭、operator endpoint 未鉴权返回 403。
+5. **仅在 Render 通过后**，将 Vercel 固定到 Node 22，再用该精确 approved commit 促发 Vercel Production promotion，并做浏览器/API smoke。
+
+（上述通用小节保留作参考；Pilot 落地以本受控顺序与 [`docs/pilot/p4-pre-mutation-checklist.md`](../pilot/p4-pre-mutation-checklist.md) 的 M4 gate 为准。）
 
 ## 备注
 - 当前仓库适合先走 `Vercel + Render`，而不是把前后端都塞进同一个 serverless 平台

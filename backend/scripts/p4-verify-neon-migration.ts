@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { readFileSync, readdirSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 
 type QueryResult<Row> = { rows: Row[] };
@@ -124,8 +124,20 @@ const assertEqual = (actual: unknown, expected: unknown, label: string): void =>
 const safeErrorCode = (error: unknown): string =>
   typeof error === "object" && error && "code" in error ? String(error.code) : "INVARIANT";
 
+export const resolveMigrationsDir = (scriptDirectory: string = __dirname): string => {
+  const candidates = [
+    path.resolve(scriptDirectory, "../prisma/migrations"),
+    path.resolve(scriptDirectory, "../../prisma/migrations"),
+  ];
+  const migrationsDir = candidates.find((candidate) => existsSync(candidate));
+  if (!migrationsDir) {
+    throw new Error("invariant failed: local Prisma migrations directory");
+  }
+  return migrationsDir;
+};
+
 const localMigrationChecksums = (): Map<string, string> => {
-  const migrationsDir = path.resolve(__dirname, "../prisma/migrations");
+  const migrationsDir = resolveMigrationsDir();
   const result = new Map<string, string>();
   for (const name of readdirSync(migrationsDir).sort()) {
     const sqlPath = path.join(migrationsDir, name, "migration.sql");
@@ -461,7 +473,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-void main().catch((error) => {
-  process.stderr.write(`${JSON.stringify({ ok: false, errorCode: safeErrorCode(error) })}\n`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  void main().catch((error) => {
+    process.stderr.write(`${JSON.stringify({ ok: false, errorCode: safeErrorCode(error) })}\n`);
+    process.exitCode = 1;
+  });
+}

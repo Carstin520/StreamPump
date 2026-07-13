@@ -19,6 +19,8 @@
     "loadtest:demo-day": "k6 run scripts/loadtest-demo-day.js",
     "smoke:production-corridor": "ts-node --transpile-only scripts/smoke-production-corridor.ts",
     "smoke:pilot-track1": "ts-node --transpile-only scripts/smoke-pilot-track1.ts",
+    "verify:p4:deployment": "ts-node --transpile-only scripts/p4-verify-deployment.ts",
+    "test:p4:deployment-verifier": "ts-node --transpile-only scripts/p4-verify-deployment.ts --self-test",
     "verify:production-idl": "ts-node --transpile-only scripts/verify-production-idl.ts",
     "test:anchor": "scripts/test-anchor-local.sh",
     "test:backend": "TS_NODE_PROJECT=backend/tsconfig.test.json TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS='--import=./backend/tests/chai-cjs-compat.mjs' ts-mocha --require ts-node/register -p backend/tsconfig.test.json backend/tests/**/*.spec.ts",

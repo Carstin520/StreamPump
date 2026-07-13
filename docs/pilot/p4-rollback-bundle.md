@@ -60,13 +60,13 @@ The `20260712170000` checksum is the merged P3 fix containing the `PRUNED` enum 
 | Render production | deploy `dep-d8upmol7vvec73ejb8gg`, commit `b362910c7ca204f8724af7a1a74411757e2abce1` | frozen |
 | Vercel Production | `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`, commit `cbdf76a5df896adbe88a9e07586ac3478e45f720`, ref `main` | frozen |
 | Neon | project `jolly-recipe-31299801`; source `production` / `br-orange-bar-ancofkw5`; recovery `p4-m3-pre-20260713T093116Z` / `br-frosty-fire-an0lsiq2` | verified pre-migration snapshot; unchanged after M3; retain through H4 |
-| Mux | previous endpoint ID/status and endpoint-specific secret version | pending M5 approval; secret value must stay in dashboard/secret manager |
+| Mux | previous endpoint ID/status and endpoint-specific secret version | M5 approved but conditional on M4 success; secret value must stay in dashboard/secret manager |
 
-Render service ID is `srv-d79rs0450q8c73fp2lmg`. It currently tracks `main` with auto-deploy enabled and runs `npm run prisma:migrate:deploy` as a pre-deploy command. A code rollback does not reverse a migration; the Neon restore/repoint decision is separate and must be explicit.
+Render service ID is `srv-d79rs0450q8c73fp2lmg`. It remains suspended after M3 and tracks `main`; auto-deploy must be disabled/controlled before M4 so no unreviewed `main` push deploys, and only the exact refrozen `codex/p4-pilot-deployment` candidate may be deployed. M4 replaces the write-capable migration pre-deploy command with the read-only `npm run verify:p4:neon:post` exact-26 gate. A code rollback does not reverse a migration; the Neon restore/repoint decision is separate and must be explicit.
 
 M3 execution and recovery authority are defined in [`p4-m3-neon-migration.md`](./p4-m3-neon-migration.md). The old Render backend must be write-inert before the final Neon preflight and remain so until M4 readiness succeeds. The named current-point child branch is a recovery source, not authorization to reset production or repoint Render; either action requires a separate human decision.
 
-Credential containment: the inherited `neondb_owner` connection string was echoed once into the local operator tool transcript during recovery verification. No secret is stored in Git or the durable evidence bundle. Treat the role password as exposed and rotate it under M4, updating Render pooled/direct URLs atomically before resuming any backend.
+Credential containment: the inherited `neondb_owner` connection string was echoed once into the local operator tool transcript during recovery verification, and the Render deploy hook also entered a local operator inspection transcript. Neither secret is stored in Git or the durable evidence bundle. Under M4, treat the role password as exposed and rotate it, atomically updating Render `DATABASE_URL` and `DIRECT_URL` before resuming any backend; also regenerate the Render deploy hook. Never paste replacement values into chat or command output.
 
 ## Program byte rollback procedure
 
