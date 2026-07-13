@@ -2,7 +2,7 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M2 and M3 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. The old Render backend remains suspended. M4 and M5 are now human-approved; M4 runs first and M5 begins only after M4 passes. M6 remains a separate human gate. M4 must rotate the database-owner credential and update Render URLs before any backend resumes.**
+Gate status: **M2, M3, and M4 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. Render and Vercel run the exact frozen Pilot application commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19`; this is a controlled technical Pilot deployment, not a formal production or real-funds launch. M5 is in progress and dashboard-gated. M6 remains a separate human gate.**
 
 M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
 
@@ -149,20 +149,22 @@ On failure, stop application deployment. Preserve logs without URLs/secrets, kee
 
 ## M4 — Render/Vercel inventory and controlled deployment
 
-M4 and M5 are now human-approved. M4 runs first; M5 begins only after M4 passes. M6 remains a separate human gate.
+M4 and M5 were human-approved in sequence. M4 passed; M5 is now open. M6 remains a separate human gate.
 
-Candidate SHA: the prior pre-doc candidate `aa59485902194af6132e430ab1c53f2c0c931038` is not remote-reachable and is not the deploy target. The final exact candidate SHA will be refrozen after the M4 release-guard changes, pushed only to `codex/p4-pilot-deployment`, and deployed by that exact commit. Auto-deploy must be controlled/disabled so that neither `main` nor an unpinned branch head is ever deployed.
+**Execution result (2026-07-13): PASS.** The frozen application candidate is commit `097e9805b197398ae1c04cf5bf84f1044b3b2f19` on `codex/p4-pilot-deployment`. Render deploy `dep-d9ac42daeets73djf58g` reached `live` at that exact commit after the read-only exact-26 Neon verifier passed; a 95.8-second production verifier recorded 16/16 passing observations covering release identity, health/readiness stability, CORS, and closed Pilot lanes. Render auto-deploy remains disabled and its deploy hook plus Neon owner credential were rotated without recording replacement values. Vercel Production deployment `dpl_26s2wP8KGqGJQbVeJH5VvXo2GmK2` rebuilt the same commit under Node 22 and owns `app.stream-pump.com` plus `stream-pump.vercel.app`. The promoted `/explore` returned 200 without the prior suspended-backend error, and the backend health/readiness/CORS probes passed immediately after alias assignment. M5 therefore opened; M6 remains closed.
 
-Observed production isolation:
+Candidate SHA: the prior pre-doc candidate `aa59485902194af6132e430ab1c53f2c0c931038` is not remote-reachable and was not deployed. The final exact candidate `097e9805b197398ae1c04cf5bf84f1044b3b2f19` was pushed on `codex/p4-pilot-deployment` and deployed to both Render and Vercel. Auto-deploy remains disabled/controlled so neither `main` nor an unpinned branch head is deployed.
 
-- Render service `srv-d79rs0450q8c73fp2lmg` remains suspended after M3 and tracks `main`. Auto-deploy must be disabled/controlled before M4 so no unreviewed `main` push deploys; deploy only the exact refrozen candidate from `codex/p4-pilot-deployment`.
-- Render build command must be `npm ci --include=dev && npm run prisma:generate && npm run build`. M4 must replace the write-capable pre-deploy migration command with `npm run verify:p4:neon:post`, the read-only exact-26 migration/checksum/schema/data gate. Any attempt to apply a migration is a STOP condition (M3 already applied all six).
-- Vercel has no local CLI/project link in this worktree. The Vercel project currently runs Node 24.x, but the repo `.nvmrc` and `app` engines require Node 22; M4 must pin the Vercel build to Node 22 before promotion. The production deployment remains the frozen baseline pending an intentional promotion and rollback via dashboard/API ownership.
+Historical pre-M4 isolation snapshot and completed actions:
 
-Credential rotation before any backend resumes (never paste replacement values into chat or command output):
+- After M3, Render service `srv-d79rs0450q8c73fp2lmg` was suspended and tracked `main`. M4 changed the branch to `codex/p4-pilot-deployment`, disabled auto-deploy, and deployed only the exact frozen candidate.
+- Render now builds with `npm ci --include=dev && npm run prisma:generate && npm run build`; its pre-deploy command is `npm run verify:p4:neon:post`, the read-only exact-26 migration/checksum/schema/data gate. Any future attempt to apply a migration remains a STOP condition.
+- Vercel was previously on Node 24.x with the old production baseline. M4 pinned the project to Node 22, rebuilt the exact candidate with current environment values, verified the Preview, and intentionally promoted it.
 
-- Rotate the Neon `neondb_owner` password and atomically update Render `DATABASE_URL` and `DIRECT_URL` before any backend instance is resumed or deployed. The password was echoed once into a local operator inspection transcript; it was not committed or written to durable evidence, but must be treated as exposed.
-- Regenerate the Render deploy hook, which also entered a local operator inspection transcript. It was not committed or written to durable evidence but must be treated as exposed.
+Credential rotation completed before the backend resumed (never paste replacement values into chat or command output):
+
+- The Neon `neondb_owner` password was rotated and Render `DATABASE_URL` plus `DIRECT_URL` were updated atomically before the successful candidate deployment. Replacement values were not committed or written to durable evidence.
+- The Render deploy hook was regenerated. Its replacement value was not committed or written to durable evidence.
 
 Render environment contract (verify by presence/type only; never print secret values):
 
@@ -194,6 +196,8 @@ On Render failure, keep the service suspended. Do not automatically restore the 
 ## M5 — Mux webhook and media verification
 
 M5 is human-approved but conditional on M4 success; do not begin until M4 passes. M6 remains a separate human gate.
+
+**Current execution state (2026-07-13): IN PROGRESS / dashboard-gated.** M4 passed. The deployed webhook route rejects an intentionally invalid `mux-signature` with 401, and the configured Mux API token can read the Video Assets API with HTTP 200. These probes prove fail-closed signature handling and API-token validity only. They do not prove a Dashboard endpoint, endpoint-specific signing-secret match, signed delivery, or media/database reconciliation. The isolated browser session is currently signed out of Mux; no endpoint was created or disabled, the temporary Render webhook value was not treated as verified, and no media corridor was started. Continue only after an operator signs into the Mux Dashboard without sharing credentials in chat. Cloudflare delivery-bucket access also remains unverified: current object credentials returned 403 for the intended distinct delivery bucket and the isolated Cloudflare dashboard session is signed out.
 
 Required dashboard fields (do not paste the secret):
 
