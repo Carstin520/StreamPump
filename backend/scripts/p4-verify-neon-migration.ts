@@ -233,16 +233,59 @@ const main = async (): Promise<void> => {
     const appliedNames = applied.map((row) => row.migration_name).sort();
     assertEqual(appliedNames, expectedAppliedNames, "exact applied migration names");
 
-    const clientBackends = await client.query<{ other_client_backends: string }>(`
-      SELECT count(*)::text AS other_client_backends
+    const clientBackends = await client.query<{
+      other_client_backends: string;
+      idle_pooler_backends: string;
+      blocking_client_backends: string;
+    }>(`
+      SELECT
+        count(*)::text AS other_client_backends,
+        count(*) FILTER (
+          WHERE application_name = 'pgbouncer'
+            AND state = 'idle'
+            AND xact_start IS NULL
+            AND backend_xid IS NULL
+            AND backend_xmin IS NULL
+            AND wait_event_type = 'Client'
+            AND wait_event = 'ClientRead'
+            AND state_change <= now() - interval '5 seconds'
+        )::text AS idle_pooler_backends,
+        count(*) FILTER (
+          WHERE (
+            application_name = 'pgbouncer'
+            AND state = 'idle'
+            AND xact_start IS NULL
+            AND backend_xid IS NULL
+            AND backend_xmin IS NULL
+            AND wait_event_type = 'Client'
+            AND wait_event = 'ClientRead'
+            AND state_change <= now() - interval '5 seconds'
+          ) IS NOT TRUE
+        )::text AS blocking_client_backends
       FROM pg_stat_activity
       WHERE datname = current_database()
         AND pid <> pg_backend_pid()
         AND backend_type = 'client backend'
     `);
     const otherClientBackends = clientBackends.rows[0].other_client_backends;
+    const idlePoolerBackends = clientBackends.rows[0].idle_pooler_backends;
+    const blockingClientBackends = clientBackends.rows[0].blocking_client_backends;
+    const allowSingleIdleNeonPoolerArtifact =
+      process.env.P4_M3_ALLOW_SINGLE_IDLE_NEON_POOLER_ARTIFACT === "true";
     if (process.env.P4_M3_REQUIRE_QUIESCED === "true") {
-      assertEqual(otherClientBackends, "0", "other client backends during quiescence");
+      assertEqual(blockingClientBackends, "0", "blocking client backends during quiescence");
+      if (allowSingleIdleNeonPoolerArtifact) {
+        assertEqual(
+          otherClientBackends,
+          idlePoolerBackends,
+          "all other clients must be the exact idle Neon pooler artifact"
+        );
+        if (Number(idlePoolerBackends) > 1) {
+          throw new Error("multiple idle Neon pooler artifacts during quiescence");
+        }
+      } else {
+        assertEqual(otherClientBackends, "0", "other client backends during quiescence");
+      }
     }
 
     const impact = await client.query<{
@@ -397,6 +440,9 @@ const main = async (): Promise<void> => {
       quiescence: {
         required: process.env.P4_M3_REQUIRE_QUIESCED === "true",
         otherClientBackends,
+        idlePoolerBackends,
+        blockingClientBackends,
+        allowSingleIdleNeonPoolerArtifact,
       },
       data: impact.rows[0],
       schema: schemaEvidence,

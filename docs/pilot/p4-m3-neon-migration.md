@@ -75,7 +75,11 @@ The verifier requires approved host and role fingerprints. It requires both URLs
 
 ### 1. Enter write quiescence
 
-Human approval is required before changing Render state. Confirm there is no active Render deploy or separate migration runner, then suspend/make the current backend write-inert. Record the service/deploy ID and UTC time. Verify repeated write attempts cannot reach the old application, then wait for old application database sessions to drain. The final verifier requires zero other PostgreSQL client backends in `neondb`; do not treat `/health` alone as evidence.
+Human approval is required before changing Render state. Confirm there is no active Render deploy or separate migration runner, then suspend/make the current backend write-inert. Record the service/deploy ID and UTC time. Verify repeated write attempts cannot reach the old application, then wait for old application database sessions to drain. The final verifier requires zero blocking PostgreSQL client backends in `neondb`; do not treat `/health` alone as evidence.
+
+Neon's management connection can leave an inert PgBouncer server slot visible in `pg_stat_activity` after the pooled client disconnects. The default remains zero other clients. Only after Render reports `suspended`, repeated public write-shaped probes fail at the Render edge, and there is no active deploy or separate migration runner may the operator explicitly set `P4_M3_ALLOW_SINGLE_IDLE_NEON_POOLER_ARTIFACT=true`. With that flag, the verifier allows at most one row that simultaneously reports `application_name=pgbouncer`, `state=idle` for at least five seconds, no transaction/XID/XMIN, and `ClientRead`. Any active or recently changed pooler row, transaction-bearing row, direct client, other application, or multiple pooler artifacts remains blocking.
+
+Do not try to terminate the artifact with the application role. After the final production preflight begins, do not run Neon MCP SQL/activity queries before the recovery snapshot comparison and migration; those management queries can create or reuse the same pooler artifact.
 
 Stop if the backend cannot be made write-inert without an unapproved deployment or credential change.
 
@@ -102,6 +106,7 @@ export P4_EXPECTED_NEON_HOST_SHA256='<sha256 of the approved normalized direct e
 export P4_EXPECTED_NEON_ROLE_SHA256='<sha256 of the approved production role name>'
 export P4_M3_EXPECTED_PHASE=pre
 export P4_M3_REQUIRE_QUIESCED=true
+export P4_M3_ALLOW_SINGLE_IDLE_NEON_POOLER_ARTIFACT=true
 
 set +e
 ./backend/node_modules/.bin/ts-node --transpile-only backend/scripts/p4-verify-neon-migration.ts \
@@ -113,7 +118,7 @@ chmod 600 /Users/jamesli/.local/share/streampump/p4/2026-07-13-pre-mutation/neon
 test "$VERIFY_EXIT" = 0
 ```
 
-Expected: `ok=true`, phase `pre`, 26 local migrations, the exact 20-name applied set with matching checksums, no failed/rolled-back migration, and `otherClientBackends=0`.
+Expected: `ok=true`, phase `pre`, 26 local migrations, the exact 20-name applied set with matching checksums, no failed/rolled-back migration, `blockingClientBackends=0`, and `idlePoolerBackends` in `{0,1}`. `otherClientBackends` and the explicit allowance flag remain recorded.
 
 ### 3. Create and verify the recovery branch
 
@@ -143,6 +148,7 @@ export P4_EXPECTED_NEON_HOST_SHA256='<sha256 of the approved normalized producti
 export P4_EXPECTED_NEON_ROLE_SHA256='<sha256 of the approved production role name>'
 export P4_M3_EXPECTED_PHASE=pre
 export P4_M3_REQUIRE_QUIESCED=true
+export P4_M3_ALLOW_SINGLE_IDLE_NEON_POOLER_ARTIFACT=true
 
 # Re-prove the production target after leaving the recovery-branch check.
 set +e
