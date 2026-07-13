@@ -8,7 +8,9 @@ import { Keypair } from "@solana/web3.js";
 
 import { prisma } from "../src/services/prisma";
 import {
+  buildPilotTestSponsorReviewNote,
   listPendingSponsorProfiles,
+  parsePilotTestSponsorReviewNote,
   reviewSponsorProfile,
   submitSponsorProfile,
 } from "../src/services/sponsorProfile";
@@ -34,6 +36,7 @@ type SponsorProfileRecord = {
 const installMockSponsorPrisma = () => {
   const sponsors = new Map<string, SponsorProfileRecord>();
   const accountRoles = new Map<string, AccountRole>();
+  const reviewEvents: Array<Record<string, unknown>> = [];
   let sponsorCounter = 0;
 
   const prismaAny = prisma as any;
@@ -41,8 +44,11 @@ const installMockSponsorPrisma = () => {
     sponsorProfile: {
       upsert: prisma.sponsorProfile.upsert,
       findMany: prisma.sponsorProfile.findMany,
+      findUnique: prisma.sponsorProfile.findUnique,
       update: prisma.sponsorProfile.update,
     },
+    sponsorReviewEventCreate: prisma.sponsorReviewEvent.create,
+    transaction: prisma.$transaction,
     accountProfile: {
       findUnique: prisma.accountProfile.findUnique,
       upsert: prisma.accountProfile.upsert,
@@ -87,6 +93,11 @@ const installMockSponsorPrisma = () => {
     Array.from(sponsors.values()).filter(
       (sponsor) => sponsor.status === SponsorVerificationStatus.PENDING_REVIEW
     );
+
+  prismaAny.sponsorProfile.findUnique = async ({ where }: { where: { id?: string; wallet?: string } }) =>
+    Array.from(sponsors.values()).find(
+      (sponsor) => sponsor.id === where.id || sponsor.wallet === where.wallet
+    ) ?? null;
 
   prismaAny.sponsorProfile.update = async ({
     where,
@@ -144,13 +155,25 @@ const installMockSponsorPrisma = () => {
     };
   };
 
+  prismaAny.sponsorReviewEvent.create = async ({ data }: { data: Record<string, unknown> }) => {
+    const event = { id: `review-${reviewEvents.length + 1}`, ...data, createdAt: new Date() };
+    reviewEvents.push(event);
+    return event;
+  };
+  prismaAny.$transaction = async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+    callback(prisma);
+
   return {
     sponsors,
     accountRoles,
+    reviewEvents,
     restore: () => {
       prismaAny.sponsorProfile.upsert = original.sponsorProfile.upsert;
       prismaAny.sponsorProfile.findMany = original.sponsorProfile.findMany;
+      prismaAny.sponsorProfile.findUnique = original.sponsorProfile.findUnique;
       prismaAny.sponsorProfile.update = original.sponsorProfile.update;
+      prismaAny.sponsorReviewEvent.create = original.sponsorReviewEventCreate;
+      prismaAny.$transaction = original.transaction;
       prismaAny.accountProfile.findUnique = original.accountProfile.findUnique;
       prismaAny.accountProfile.upsert = original.accountProfile.upsert;
     },
@@ -206,11 +229,16 @@ describe("sponsor profile service", () => {
     const approved = await reviewSponsorProfile({
       id: profile.id,
       decision: "APPROVED",
+      reviewerWallet: "INTERNAL_KEY:test",
+      note: buildPilotTestSponsorReviewNote({ runId: "p4m6-test", wallet }),
     });
 
     expect(approved.status).to.equal(SponsorVerificationStatus.APPROVED);
     expect(approved.approvedAt).to.be.instanceOf(Date);
     expect(approved.rejectReason).to.equal(null);
+    expect(mock?.reviewEvents).to.have.length(1);
+    const marker = parsePilotTestSponsorReviewNote(String(mock?.reviewEvents[0]?.note));
+    expect(marker).to.deep.equal({ runId: "p4m6-test", wallet });
   });
 
   it("rejects sponsor onboarding for an existing creator wallet", async () => {

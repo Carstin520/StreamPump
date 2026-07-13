@@ -8,6 +8,7 @@ import {
   buildProposalLaunchBundle,
   createProposalIntent,
   creatorPartialSignBundle,
+  getProposalIntentReadiness,
   getProposalIntentById,
   getProposalIntentStatus,
   listProposalIntents,
@@ -22,6 +23,7 @@ const router = Router();
 router.use(requireSessionAuth);
 
 router.get("/", listProposalIntents);
+router.get("/readiness", getProposalIntentReadiness);
 router.post("/", durableApiIdempotency({ scope: "proposal-intent.create" }), createProposalIntent);
 router.get("/:intentId", getProposalIntentById);
 router.post(

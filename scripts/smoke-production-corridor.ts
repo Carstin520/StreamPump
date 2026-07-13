@@ -1,5 +1,5 @@
 /**
- * End-to-end smoke for the first production corridor:
+ * End-to-end smoke for the controlled technical Pilot corridor:
  * real session -> R2/Mux/backend content publish -> backend feed/detail ->
  * proposal intent -> optional signed launch/proposal proof.
  *
@@ -11,9 +11,26 @@ import "../backend/config/loadEnv";
 import { createHash } from "crypto";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
-import type { Keypair } from "@solana/web3.js";
+import {
+  getAccount,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { Connection, PublicKey, type Keypair } from "@solana/web3.js";
 import { ed25519 } from "@noble/curves/ed25519";
 import bs58 from "bs58";
+import {
+  PilotCorridorConfigError,
+  M6_PILOT_TEST_USDC_MINT,
+  M6_TRACK1_BASE_RAW,
+  assertDedicatedDevnetRpcUrl,
+  buildPilotTestSponsorProfile,
+  buildPilotTestSponsorReviewMarker,
+  formatRawUsdc,
+  loadExclusiveKeypairInput,
+  loadM6ActorPrepEvidence,
+  parseTrack1BaseRaw,
+} from "./pilot-corridor-config";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -50,6 +67,41 @@ type AccountMeResponse = {
     handle: string | null;
     onboardingCompletedAt: string | null;
   };
+};
+
+type ProposalIntentReadinessResponse = {
+  ready: boolean;
+  creator: {
+    wallet: string;
+    source: "SOLANA_CHAIN";
+    profileFound: boolean;
+    level: number | null;
+    status: string | null;
+    ready: boolean;
+  };
+  sponsor: {
+    wallet: string;
+    source: "DATABASE";
+    status: string | null;
+    ready: boolean;
+    classification: "UNAPPROVED" | "KYB_APPROVED" | "PILOT_TEST_ONLY";
+  };
+  blockers: Array<{ code: string; message: string }>;
+};
+
+type SponsorDocumentPresignResponse = {
+  storageKey: string;
+  mimeType: string;
+  fileName: string;
+  documentType: string;
+  presignedUrl: string;
+};
+
+type SponsorProfileResponse = {
+  id: string;
+  wallet: string;
+  companyName: string;
+  status: string;
 };
 
 type AuthChallengeResponse = {
@@ -236,7 +288,7 @@ const apiBaseUrl = normalizeBaseUrl(
     "http://localhost:4000/api/v1"
 );
 
-const waitForMuxReadySeconds = Number(process.env.STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS ?? 0);
+let waitForMuxReadySeconds = 0;
 const smokeRunId = (process.env.STREAM_PUMP_SMOKE_RUN_ID ?? "").trim();
 const uploadAttempt = (process.env.STREAM_PUMP_SMOKE_UPLOAD_ATTEMPT ?? "1").trim();
 const bundleAttempt = (process.env.STREAM_PUMP_SMOKE_BUNDLE_ATTEMPT ?? "1").trim();
@@ -244,9 +296,42 @@ const bundleAttempt = (process.env.STREAM_PUMP_SMOKE_BUNDLE_ATTEMPT ?? "1").trim
 const smokeIdempotencyKey = (stage: string, attempt?: string): string =>
   ["pilot-corridor", smokeRunId, stage, attempt].filter(Boolean).join(":");
 
-const isTruthyEnv = (name: string): boolean => {
-  const value = process.env[name]?.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes";
+const readBooleanEnv = (name: string, fallback = false): boolean => {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes"].includes(raw)) return true;
+  if (["0", "false", "no"].includes(raw)) return false;
+  throw new ExpectedBlocker(
+    `${name}_INVALID_BOOLEAN`,
+    `${name} must be one of 1/true/yes or 0/false/no.`
+  );
+};
+
+const readMuxWaitSeconds = (m6Mode: boolean): number => {
+  const raw = process.env.STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS?.trim();
+  if (!raw) {
+    if (m6Mode) {
+      throw new ExpectedBlocker(
+        "STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS_REQUIRED",
+        "M6 requires a positive bounded Mux readiness wait before any API mutation."
+      );
+    }
+    return 0;
+  }
+  if (!/^\d+$/.test(raw)) {
+    throw new ExpectedBlocker(
+      "STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS_INVALID",
+      "STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS must be an integer from 0 to 1800."
+    );
+  }
+  const seconds = Number(raw);
+  if (!Number.isSafeInteger(seconds) || seconds > 1800 || (m6Mode && seconds <= 0)) {
+    throw new ExpectedBlocker(
+      "STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS_INVALID",
+      "STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS must be an integer from 0 to 1800 and positive in M6."
+    );
+  }
+  return seconds;
 };
 
 const addStep = (step: string) => {
@@ -289,7 +374,7 @@ const requireEnv = (name: string): string => {
   if (!value) {
     throw new ExpectedBlocker(
       `${name}_REQUIRED`,
-      `Set ${name} before running the production corridor smoke.`
+      `Set ${name} before running the controlled Pilot corridor smoke.`
     );
   }
   return value;
@@ -411,6 +496,8 @@ const getMediaBuffer = (
   };
 };
 
+type LoadedMedia = ReturnType<typeof getMediaBuffer>;
+
 const sha256Hex = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
 
 const stableJson = (value: unknown): string => {
@@ -441,14 +528,89 @@ const signTransactionBase64 = async (
   return Buffer.from(tx.serialize()).toString("base64");
 };
 
-const keypairFromEnv = async (name: string): Promise<RuntimeKeypair | null> => {
-  const raw = process.env[name]?.trim();
-  if (!raw) {
-    return null;
+const simulateFullySignedPilotTransaction = async (transactionBase64: string): Promise<void> => {
+  const rpcEndpoint = requireEnv("PILOT_TX_RPC_URL");
+  let rpcUrl: URL;
+  try {
+    rpcUrl = new URL(rpcEndpoint);
+  } catch {
+    throw new ExpectedBlocker("DEDICATED_RPC_REQUIRED", "PILOT_TX_RPC_URL must be an absolute URL.");
   }
+  if (
+    rpcUrl.protocol !== "https:" ||
+    rpcUrl.username ||
+    rpcUrl.password ||
+    ["api.devnet.solana.com", "api.mainnet-beta.solana.com"].includes(rpcUrl.hostname.toLowerCase())
+  ) {
+    throw new ExpectedBlocker(
+      "DEDICATED_RPC_REQUIRED",
+      "PILOT_TX_RPC_URL must be a credential-free dedicated HTTPS devnet endpoint."
+    );
+  }
+  const { Connection, VersionedTransaction } = await loadSolanaWeb3();
+  const connection = new Connection(rpcEndpoint, "confirmed");
+  const genesis = await connection.getGenesisHash();
+  if (genesis !== "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG") {
+    throw new ExpectedBlocker("SOLANA_DEVNET_REQUIRED", "PILOT_TX_RPC_URL is not Solana devnet.");
+  }
+  const transaction = VersionedTransaction.deserialize(Buffer.from(transactionBase64, "base64"));
+  const simulation = await connection.simulateTransaction(transaction, {
+    commitment: "confirmed",
+    sigVerify: true,
+  });
+  if (simulation.value.err) {
+    throw new ExpectedBlocker(
+      "PROPOSAL_TRANSACTION_SIMULATION_FAILED",
+      "The fully signed Track1-only launch transaction failed simulation; no submission was attempted."
+    );
+  }
+  artifacts.chainSimulation = {
+    cluster: "SOLANA_DEVNET",
+    rpcHost: rpcUrl.hostname,
+    signatureVerification: true,
+    passed: true,
+    unitsConsumed: simulation.value.unitsConsumed ?? null,
+  };
+  addStep("fully signed Track1-only launch transaction simulated on devnet");
+};
 
+const keypairFromConfiguredInput = async (
+  pathName: string,
+  jsonName: string,
+  pathOnly = false
+): Promise<{ keypair: RuntimeKeypair; source: string }> => {
+  let input;
+  try {
+    input = loadExclusiveKeypairInput(process.env, pathName, jsonName, { pathOnly });
+  } catch (error) {
+    if (error instanceof PilotCorridorConfigError) {
+      throw new ExpectedBlocker(error.code, error.message);
+    }
+    throw error;
+  }
   const { Keypair } = await loadSolanaWeb3();
-  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw) as number[]));
+  try {
+    return {
+      keypair: Keypair.fromSecretKey(Uint8Array.from(input.secretKey)),
+      source: input.source,
+    };
+  } catch {
+    throw new ExpectedBlocker(
+      `${pathName}_INVALID_KEYPAIR`,
+      `${pathName} or legacy ${jsonName} does not contain a valid Solana keypair.`
+    );
+  }
+};
+
+const getTrack1BaseRaw = (): bigint => {
+  try {
+    return parseTrack1BaseRaw(process.env.STREAM_PUMP_SMOKE_TRACK1_BASE_RAW);
+  } catch (error) {
+    if (error instanceof PilotCorridorConfigError) {
+      throw new ExpectedBlocker(error.code, error.message);
+    }
+    throw error;
+  }
 };
 
 const signInWallet = async (wallet: RuntimeKeypair): Promise<AuthSessionResponse> => {
@@ -555,7 +717,147 @@ const pollMuxReadiness = async (
   return detail.assets.find((candidate) => candidate.assetId === assetId) ?? null;
 };
 
-const usdc = (value: number): string => String(Math.floor(value * 1_000_000));
+const fetchReadiness = (
+  token: string,
+  creatorWallet: string,
+  sponsorWallet: string
+): Promise<ProposalIntentReadinessResponse> =>
+  request<ProposalIntentReadinessResponse>(
+    `/proposal-intents/readiness?creatorWallet=${encodeURIComponent(creatorWallet)}&sponsorWallet=${encodeURIComponent(sponsorWallet)}`,
+    { token, headers: { "x-pilot-run-id": smokeRunId } }
+  );
+
+const preparePilotTestSponsor = async (params: {
+  sponsorToken: string;
+  sponsorWallet: string;
+  operatorKey: string;
+  authorized: boolean;
+  document: LoadedMedia | null;
+}) => {
+  if (!params.authorized) {
+    throw new ExpectedBlocker(
+      "TEST_SPONSOR_PREP_NOT_AUTHORIZED",
+      "Sponsor readiness is not approved. Set STREAM_PUMP_SMOKE_ALLOW_TEST_SPONSOR_PREP=1 only for an explicitly authorized disposable PILOT TEST ONLY sponsor."
+    );
+  }
+  const document = params.document;
+  if (!document || document.isVideo) {
+    throw new ExpectedBlocker(
+      "SPONSOR_DOCUMENT_IMAGE_REQUIRED",
+      "An explicitly prevalidated, independent PILOT TEST ONLY sponsor document image is required."
+    );
+  }
+
+  const presign = await request<SponsorDocumentPresignResponse>(
+    "/auth/sponsor/documents/presign",
+    {
+      method: "POST",
+      token: params.sponsorToken,
+      body: {
+        documentType: "BUSINESS_LICENSE",
+        fileName: `PILOT-TEST-ONLY-${smokeRunId}${path.extname(document.source)}`,
+        mimeType: document.mimeType,
+        fileSizeBytes: document.body.length,
+      },
+    }
+  );
+  await uploadToPresignedUrl(presign.presignedUrl, document.body, document.mimeType);
+  const profile = await request<SponsorProfileResponse>("/auth/sponsor/register", {
+    method: "POST",
+    token: params.sponsorToken,
+    body: buildPilotTestSponsorProfile(smokeRunId, presign.storageKey),
+  });
+  if (profile.wallet !== params.sponsorWallet || profile.status !== "PENDING_REVIEW") {
+    throw new ExpectedBlocker(
+      "TEST_SPONSOR_REGISTRATION_INCOMPLETE",
+      "The PILOT TEST ONLY SponsorProfile did not enter PENDING_REVIEW for the disposable sponsor wallet."
+    );
+  }
+  const reviewed = await request<SponsorProfileResponse>(
+    `/internal/sponsors/${encodeURIComponent(profile.id)}/verify`,
+    {
+      method: "POST",
+      headers: { "x-internal-operator-key": params.operatorKey },
+      body: {
+        decision: "APPROVED",
+        note: JSON.stringify(buildPilotTestSponsorReviewMarker(smokeRunId, params.sponsorWallet)),
+      },
+    }
+  );
+  if (reviewed.wallet !== params.sponsorWallet || reviewed.status !== "APPROVED") {
+    throw new ExpectedBlocker(
+      "TEST_SPONSOR_OPERATOR_APPROVAL_INCOMPLETE",
+      "Operator review did not approve the disposable PILOT TEST ONLY sponsor profile."
+    );
+  }
+
+  artifacts.testSponsorPreparation = {
+    classification: "PILOT_TEST_ONLY_NOT_REAL_KYB",
+    documentMimeType: document.mimeType,
+    documentBytes: document.body.length,
+    documentSha256Hex: sha256Hex(document.body),
+    profileId: profile.id,
+    status: reviewed.status,
+  };
+  addStep("explicitly authorized PILOT TEST ONLY sponsor profile prepared and operator-approved");
+};
+
+const ensureCreatorAccount = async (params: {
+  creatorToken: string;
+  creatorWallet: string;
+  allowProfileUpdate: boolean;
+}): Promise<AccountMeResponse> => {
+  beginStage("creator account verification");
+  let account = await request<AccountMeResponse>("/account/me", { token: params.creatorToken });
+  if (account.wallet !== params.creatorWallet) {
+    throw new ExpectedBlocker(
+      "CREATOR_SESSION_WALLET_MISMATCH",
+      "The authenticated creator session does not match the configured creator keypair."
+    );
+  }
+  artifacts.accountStorageStatus = account.storageStatus;
+  if (account.storageStatus !== "LIVE") {
+    throw new ExpectedBlocker(
+      "ACCOUNT_PROFILE_MIGRATION_REQUIRED",
+      "AccountProfile storage is not live for the current backend database. Apply the approved Pilot migration before running the corridor.",
+      { storageStatus: account.storageStatus }
+    );
+  }
+  if (account.profile?.role !== "CREATOR" || account.profile.onboardingCompletedAt === null) {
+    if (!params.allowProfileUpdate) {
+      throw new ExpectedBlocker(
+        "CREATOR_PROFILE_REQUIRED",
+        "The authenticated account is not an onboarded creator and disposable profile update was not explicitly authorized.",
+        { profile: account.profile as JsonValue }
+      );
+    }
+    account = await request<AccountMeResponse>("/account/me", {
+      method: "PUT",
+      token: params.creatorToken,
+      body: {
+        role: "CREATOR",
+        displayName: process.env.STREAM_PUMP_SMOKE_CREATOR_NAME?.trim() || "PILOT TEST ONLY Creator",
+        handle: process.env.STREAM_PUMP_SMOKE_CREATOR_HANDLE?.trim() || `smoke-${smokeRunId}`,
+        completeOnboarding: true,
+      },
+    });
+    if (
+      account.wallet !== params.creatorWallet ||
+      account.storageStatus !== "LIVE" ||
+      account.profile?.role !== "CREATOR" ||
+      account.profile.onboardingCompletedAt === null
+    ) {
+      throw new ExpectedBlocker(
+        "CREATOR_PROFILE_UPDATE_INCOMPLETE",
+        "The explicitly authorized disposable creator profile update did not persist a live onboarded creator."
+      );
+    }
+    artifacts.updatedCreatorProfile = account.profile as JsonValue;
+    addStep("PILOT TEST ONLY creator profile persisted");
+  }
+  addStep("authenticated creator account verified");
+  return account;
+};
 
 const proposalDeadlineUnix = (): string => {
   const value = (process.env.STREAM_PUMP_SMOKE_PROPOSAL_DEADLINE_UNIX ?? "").trim();
@@ -568,6 +870,19 @@ const proposalDeadlineUnix = (): string => {
   return value;
 };
 
+const M6_DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+
+const runConfigCheck = <T>(operation: () => T): T => {
+  try {
+    return operation();
+  } catch (error) {
+    if (error instanceof PilotCorridorConfigError) {
+      throw new ExpectedBlocker(error.code, error.message);
+    }
+    throw error;
+  }
+};
+
 const run = async () => {
   beginStage("environment validation");
   if (!smokeRunId) {
@@ -576,26 +891,248 @@ const run = async () => {
       "Set a stable STREAM_PUMP_SMOKE_RUN_ID so an interrupted smoke can replay safely."
     );
   }
-  const operatorKey = requireEnv("STREAM_PUMP_SMOKE_OPERATOR_KEY");
-  const mediaPath = requireEnv("STREAM_PUMP_SMOKE_MEDIA_PATH");
-  const creatorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON");
-  const sponsorKeypair = await keypairFromEnv("STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON");
-  if (!creatorKeypair || !sponsorKeypair) {
+  const m6Mode = readBooleanEnv("STREAM_PUMP_SMOKE_M6_MODE");
+  const allowChainSubmit = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT");
+  const allowProfileUpdate = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_PROFILE_UPDATE");
+  const allowTestSponsorPrep = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_TEST_SPONSOR_PREP");
+  waitForMuxReadySeconds = readMuxWaitSeconds(m6Mode);
+  try {
+    const configuredApiUrl = new URL(apiBaseUrl);
+    if (configuredApiUrl.username || configuredApiUrl.password || (m6Mode && configuredApiUrl.protocol !== "https:")) {
+      throw new Error("unsafe API URL");
+    }
+  } catch {
     throw new ExpectedBlocker(
-      "EXTERNAL_WALLET_KEYPAIRS_REQUIRED",
-      "Set disposable creator and sponsor keypairs; the smoke verifies the real wallet challenge/signature flow before using either session."
+      "STREAM_PUMP_SMOKE_API_BASE_URL_INVALID",
+      "The API base URL must be absolute, credential-free, and HTTPS in M6."
     );
   }
+  const operatorKey = requireEnv("STREAM_PUMP_SMOKE_OPERATOR_KEY");
+  const mediaPath = requireEnv("STREAM_PUMP_SMOKE_MEDIA_PATH");
+  const proposalDeadline = proposalDeadlineUnix();
+  const track1BaseRaw = getTrack1BaseRaw();
+  if (!allowChainSubmit) {
+    throw new ExpectedBlocker(
+      "SPONSOR_CHAIN_SUBMIT_REQUIRED",
+      "Set STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT=1 before any API mutation for the full corridor smoke."
+    );
+  }
+  if (m6Mode && track1BaseRaw !== M6_TRACK1_BASE_RAW) {
+    throw new ExpectedBlocker(
+      "M6_TRACK1_EXACT_BUDGET_REQUIRED",
+      `M6 requires the exact ${M6_TRACK1_BASE_RAW} raw test-USDC Track1 budget.`
+    );
+  }
+  if (m6Mode && (!allowProfileUpdate || !allowTestSponsorPrep)) {
+    throw new ExpectedBlocker(
+      "M6_DISPOSABLE_PROFILE_PREP_AUTHORIZATION_REQUIRED",
+      "M6 requires explicit creator profile update and PILOT TEST ONLY sponsor preparation authorization before any API mutation."
+    );
+  }
+  const creatorInput = await keypairFromConfiguredInput(
+    "STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_PATH",
+    "STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON",
+    m6Mode
+  );
+  const sponsorInput = await keypairFromConfiguredInput(
+    "STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_PATH",
+    "STREAM_PUMP_SMOKE_SPONSOR_KEYPAIR_JSON",
+    m6Mode
+  );
+  const creatorKeypair = creatorInput.keypair;
+  const sponsorKeypair = sponsorInput.keypair;
+  if (creatorKeypair.publicKey.equals(sponsorKeypair.publicKey)) {
+    throw new ExpectedBlocker(
+      "DISTINCT_EXTERNAL_WALLETS_REQUIRED",
+      "Disposable creator and sponsor must be distinct external wallets."
+    );
+  }
+  const creatorWallet = creatorKeypair.publicKey.toBase58();
+  const sponsorWallet = sponsorKeypair.publicKey.toBase58();
+  const media = getMediaBuffer(mediaPath);
+  if (m6Mode && !media.isVideo) {
+    throw new ExpectedBlocker(
+      "M6_VIDEO_MEDIA_REQUIRED",
+      "M6 requires a real mp4 or mov video so the R2, Mux, webhook, and playback corridor is exercised."
+    );
+  }
+  const explicitPublicationUrl = process.env.STREAM_PUMP_SMOKE_PUBLICATION_URL?.trim();
+  const publicationPlatform = explicitPublicationUrl
+    ? requireEnv("STREAM_PUMP_SMOKE_PUBLICATION_PLATFORM")
+    : "STREAMPUMP";
+  if (explicitPublicationUrl) {
+    try {
+      const url = new URL(explicitPublicationUrl);
+      if (url.protocol !== "https:" || url.username || url.password) throw new Error("unsafe URL");
+    } catch {
+      throw new ExpectedBlocker(
+        "STREAM_PUMP_SMOKE_PUBLICATION_URL_INVALID",
+        "An explicit publication URL must be credential-free HTTPS before any API mutation."
+      );
+    }
+  }
+  let sponsorDocument: LoadedMedia | null = null;
+  if (allowTestSponsorPrep) {
+    const documentPath = requireEnv("STREAM_PUMP_SMOKE_SPONSOR_DOCUMENT_IMAGE_PATH");
+    if (path.resolve(documentPath) === path.resolve(mediaPath)) {
+      throw new ExpectedBlocker(
+        "INDEPENDENT_SPONSOR_DOCUMENT_REQUIRED",
+        "The PILOT TEST ONLY sponsor document must be separate from creator media."
+      );
+    }
+    sponsorDocument = getMediaBuffer(documentPath);
+    if (sponsorDocument.isVideo || sponsorDocument.body.length > 12 * 1024 * 1024) {
+      throw new ExpectedBlocker(
+        "SPONSOR_DOCUMENT_IMAGE_REQUIRED",
+        "The prevalidated sponsor document must be a png, jpg, or webp image no larger than 12 MiB."
+      );
+    }
+  }
+
+  if (m6Mode) {
+    const actorEvidencePath = requireEnv("STREAM_PUMP_SMOKE_ACTOR_PREP_EVIDENCE_PATH");
+    const actorBinding = runConfigCheck(() =>
+      loadM6ActorPrepEvidence({
+        evidencePath: actorEvidencePath,
+        runId: smokeRunId,
+        creator: creatorWallet,
+        sponsor: sponsorWallet,
+      })
+    );
+    const expectedMint = requireEnv("PILOT_EXPECTED_USDC_MINT");
+    if (expectedMint !== M6_PILOT_TEST_USDC_MINT) {
+      throw new ExpectedBlocker(
+        "M6_TEST_USDC_MINT_MISMATCH",
+        "PILOT_EXPECTED_USDC_MINT must match the frozen M6 test-USDC mint."
+      );
+    }
+    const rpcEndpoint = runConfigCheck(() =>
+      assertDedicatedDevnetRpcUrl(requireEnv("PILOT_TX_RPC_URL"))
+    );
+    beginStage("M6 dedicated devnet sponsor budget preflight");
+    const connection = new Connection(rpcEndpoint, "confirmed");
+    let sponsorAtaBalance: bigint;
+    let sponsorAta: PublicKey;
+    try {
+      if ((await connection.getGenesisHash()) !== M6_DEVNET_GENESIS) {
+        throw new ExpectedBlocker("M6_DEVNET_REQUIRED", "PILOT_TX_RPC_URL is not Solana devnet.");
+      }
+      const mint = new PublicKey(M6_PILOT_TEST_USDC_MINT);
+      sponsorAta = getAssociatedTokenAddressSync(mint, sponsorKeypair.publicKey, false, TOKEN_PROGRAM_ID);
+      const account = await getAccount(connection, sponsorAta, "confirmed", TOKEN_PROGRAM_ID);
+      if (!account.owner.equals(sponsorKeypair.publicKey) || !account.mint.equals(mint)) {
+        throw new ExpectedBlocker(
+          "M6_SPONSOR_ATA_AUTHORITY_MISMATCH",
+          "The disposable sponsor ATA owner or mint does not match actor-prep evidence."
+        );
+      }
+      sponsorAtaBalance = account.amount;
+    } catch (error) {
+      if (error instanceof ExpectedBlocker) throw error;
+      throw new ExpectedBlocker(
+        "M6_SPONSOR_BUDGET_PREFLIGHT_FAILED",
+        "The dedicated devnet RPC could not prove the disposable sponsor test-USDC ATA."
+      );
+    }
+    if (sponsorAtaBalance < M6_TRACK1_BASE_RAW) {
+      throw new ExpectedBlocker(
+        "M6_SPONSOR_BUDGET_INSUFFICIENT",
+        "The disposable sponsor ATA has less than the exact M6 Track1 test-USDC budget."
+      );
+    }
+    artifacts.actorPrepEvidence = actorBinding as unknown as JsonValue;
+    artifacts.sponsorBudgetPreflight = {
+      ata: sponsorAta.toBase58(),
+      mint: M6_PILOT_TEST_USDC_MINT,
+      balanceRaw: sponsorAtaBalance.toString(),
+      requiredRaw: M6_TRACK1_BASE_RAW.toString(),
+      dedicatedDevnetRpcVerified: true,
+    };
+  }
   artifacts.runId = smokeRunId;
+  artifacts.pilotBoundaries = {
+    m6Mode,
+    inviteOnly: true,
+    externalWalletFirst: true,
+    network: "SOLANA_DEVNET",
+    asset: "TEST_USDC_ONLY",
+    settlement: "TRACK1_MANUAL_OPERATOR_ONLY",
+    realFunds: false,
+  };
+  artifacts.budgetEvidence = {
+    track1BaseRaw: track1BaseRaw.toString(),
+    track1BaseTestUsdc: formatRawUsdc(track1BaseRaw),
+    track2Raw: "0",
+    track3Raw: "0",
+    safetyCapRaw: "25000000",
+  };
+  artifacts.mediaSource = media.source;
+  artifacts.mediaMimeType = media.mimeType;
+  artifacts.mediaBytes = media.body.length;
 
   beginStage("external wallet authentication");
   const creatorSession = await signInWallet(creatorKeypair);
   const sponsorSession = await signInWallet(sponsorKeypair);
   const creatorToken = creatorSession.accessToken;
   const sponsorToken = sponsorSession.accessToken;
-  const sponsorWallet = sponsorKeypair.publicKey.toBase58();
   artifacts.creatorWallet = creatorSession.wallet;
   artifacts.sponsorWallet = sponsorSession.wallet;
+  artifacts.actorEvidence = {
+    creator: { wallet: creatorWallet, keypairInput: creatorInput.source },
+    sponsor: { wallet: sponsorWallet, keypairInput: sponsorInput.source },
+    distinctWallets: true,
+  };
+  if (creatorSession.wallet !== creatorWallet || sponsorSession.wallet !== sponsorWallet) {
+    throw new ExpectedBlocker(
+      "EXTERNAL_WALLET_SESSION_MISMATCH",
+      "Wallet challenge sessions must match both configured disposable external wallets."
+    );
+  }
+  addStep("creator and sponsor external-wallet challenge/signature sessions verified");
+
+  beginStage("read-only creator chain and sponsor database readiness preflight");
+  let readiness = await fetchReadiness(sponsorToken, creatorWallet, sponsorWallet);
+  artifacts.initialReadiness = readiness as unknown as JsonValue;
+  if (!readiness.creator.ready) {
+    throw new ExpectedBlocker(
+      "CREATOR_NOT_S2_READY",
+      "Read-only product API preflight did not verify an on-chain S2_ACTIVE creator profile with level >= 2. No media or manifest mutation was attempted.",
+      readiness.creator as unknown as JsonValue
+    );
+  }
+  const account = await ensureCreatorAccount({
+    creatorToken,
+    creatorWallet,
+    allowProfileUpdate,
+  });
+  if (!readiness.sponsor.ready) {
+    beginStage("explicitly authorized PILOT TEST ONLY sponsor preparation");
+    await preparePilotTestSponsor({
+      sponsorToken,
+      sponsorWallet,
+      operatorKey,
+      authorized: allowTestSponsorPrep,
+      document: sponsorDocument,
+    });
+    beginStage("post-preparation read-only readiness preflight");
+    readiness = await fetchReadiness(sponsorToken, creatorWallet, sponsorWallet);
+  }
+  artifacts.finalReadiness = readiness as unknown as JsonValue;
+  if (!readiness.ready || !readiness.creator.ready || !readiness.sponsor.ready) {
+    throw new ExpectedBlocker(
+      "PILOT_ACTOR_READINESS_NOT_VERIFIED",
+      "Read-only product API did not verify both chain-sourced creator readiness and database-sourced sponsor approval. No media or manifest mutation was attempted.",
+      { blockers: readiness.blockers } as unknown as JsonValue
+    );
+  }
+  if (m6Mode && readiness.sponsor.classification !== "PILOT_TEST_ONLY") {
+    throw new ExpectedBlocker(
+      "M6_TEST_SPONSOR_CLASSIFICATION_REQUIRED",
+      "M6 requires the disposable sponsor approval to be durably classified as PILOT TEST ONLY for this run."
+    );
+  }
+  addStep("read-only chain creator and database sponsor readiness verified before content mutation");
+
   const sponsorAccount = await request<AccountMeResponse>("/account/me", {
     token: sponsorToken,
   });
@@ -614,58 +1151,6 @@ const run = async () => {
       }
     );
   }
-  addStep("creator and sponsor external-wallet challenge/signature sessions verified");
-
-  beginStage("creator account verification");
-  const account = await request<AccountMeResponse>("/account/me", { token: creatorToken });
-  if (account.wallet !== creatorKeypair.publicKey.toBase58()) {
-    throw new ExpectedBlocker(
-      "CREATOR_SESSION_WALLET_MISMATCH",
-      "The authenticated creator session does not match the configured creator keypair."
-    );
-  }
-  artifacts.accountStorageStatus = account.storageStatus;
-
-  if (account.storageStatus !== "LIVE") {
-    throw new ExpectedBlocker(
-      "ACCOUNT_PROFILE_MIGRATION_REQUIRED",
-      "AccountProfile storage is not live for the current backend database. Apply the account profile Prisma migration before running the production corridor.",
-      { storageStatus: account.storageStatus }
-    );
-  }
-  addStep("authenticated creator session");
-
-  if (
-    account.profile?.role !== "CREATOR" ||
-    account.profile.onboardingCompletedAt === null
-  ) {
-    if (!isTruthyEnv("STREAM_PUMP_SMOKE_ALLOW_PROFILE_UPDATE")) {
-      throw new ExpectedBlocker(
-        "CREATOR_PROFILE_REQUIRED",
-        "The authenticated account is not an onboarded creator. Set STREAM_PUMP_SMOKE_ALLOW_PROFILE_UPDATE=1 for a disposable smoke account, or complete creator onboarding in the app.",
-        { profile: account.profile as JsonValue }
-      );
-    }
-
-    const updated = await request<AccountMeResponse>("/account/me", {
-      method: "PUT",
-      token: creatorToken,
-      body: {
-        role: "CREATOR",
-        displayName: process.env.STREAM_PUMP_SMOKE_CREATOR_NAME?.trim() || "StreamPump Smoke Creator",
-        handle: process.env.STREAM_PUMP_SMOKE_CREATOR_HANDLE?.trim() || `smoke-${smokeRunId}`,
-        completeOnboarding: true,
-      },
-    });
-    artifacts.updatedCreatorProfile = updated.profile as JsonValue;
-    addStep("creator profile persisted");
-  }
-
-  beginStage("real media loading");
-  const media = getMediaBuffer(mediaPath);
-  artifacts.mediaSource = media.source;
-  artifacts.mediaMimeType = media.mimeType;
-  artifacts.mediaBytes = media.body.length;
 
   beginStage("content manifest creation");
   const manifest = await request<ContentManifestResponse>("/content/manifests", {
@@ -676,11 +1161,11 @@ const run = async () => {
     },
     body: {
       contentType: media.isVideo ? "SHORT_VIDEO" : "IMAGE_CAROUSEL",
-      title: process.env.STREAM_PUMP_SMOKE_TITLE?.trim() || `Production corridor smoke ${smokeRunId}`,
+      title: process.env.STREAM_PUMP_SMOKE_TITLE?.trim() || `PILOT TEST ONLY corridor ${smokeRunId}`,
       captionText:
         process.env.STREAM_PUMP_SMOKE_CAPTION?.trim() ||
-        "Smoke-tested content published through the real StreamPump backend pipeline.",
-      tags: ["smoke", "production-corridor"],
+        "PILOT TEST ONLY content sent through the controlled StreamPump technical corridor.",
+      tags: ["smoke", "pilot-test-only"],
       metadata: {
         smoke: true,
         source: "scripts/smoke-production-corridor.ts",
@@ -725,15 +1210,17 @@ const run = async () => {
   const assetId = upload?.assetId ?? (completedAsset as AssetRecord).assetId;
 
   if (media.isVideo) {
-    await request("/internal/mux/reconcile/run-once", {
-      method: "POST",
-      headers: { "x-internal-operator-key": operatorKey },
-    }).catch(() => {
-      addBlocker(
+    try {
+      await request("/internal/mux/reconcile/run-once", {
+        method: "POST",
+        headers: { "x-internal-operator-key": operatorKey },
+      });
+    } catch {
+      throw new ExpectedBlocker(
         "MUX_RECONCILIATION_TRIGGER_FAILED",
-        "Mux reconciliation could not be triggered during the media readiness stage."
+        "Mux reconciliation could not be verified; the Pilot corridor stopped before proposal creation."
       );
-    });
+    }
     const muxAsset = await pollMuxReadiness(
       creatorToken,
       manifest.manifestId,
@@ -744,7 +1231,7 @@ const run = async () => {
     if (muxAsset?.processingStatus === "READY" && muxAsset.muxPlaybackId) {
       addStep("Mux playback ready");
     } else {
-      addBlocker(
+      throw new ExpectedBlocker(
         "MUX_READY_NOT_VERIFIED",
         "Video upload reached the backend/R2 path, but Mux playback is not READY yet. Increase STREAM_PUMP_SMOKE_WAIT_FOR_MUX_READY_SECONDS or inspect Mux reconciliation/webhook status.",
         (muxAsset ?? { waitForMuxReadySeconds }) as JsonValue
@@ -767,10 +1254,6 @@ const run = async () => {
   addStep("content manifest finalized");
 
   beginStage("publication creation and operator approval");
-  const explicitPublicationUrl = process.env.STREAM_PUMP_SMOKE_PUBLICATION_URL?.trim();
-  const publicationPlatform = explicitPublicationUrl
-    ? requireEnv("STREAM_PUMP_SMOKE_PUBLICATION_PLATFORM")
-    : "STREAMPUMP";
   const publicationUrl = explicitPublicationUrl ?? finalized.internalCanonicalUrl;
   if (!publicationUrl) {
     throw new ExpectedBlocker(
@@ -812,7 +1295,7 @@ const run = async () => {
       headers: { "x-internal-operator-key": operatorKey },
       body: {
         decision: "APPROVE",
-        note: "Production corridor smoke evidence verified by operator.",
+        note: "PILOT TEST ONLY technical corridor evidence verified by operator; not production truth.",
         evidenceDigestHex,
       },
     }
@@ -855,13 +1338,14 @@ const run = async () => {
       token: creatorToken,
       headers: {
         "x-idempotency-key": smokeIdempotencyKey("proposal-intent"),
+        "x-pilot-run-id": smokeRunId,
       },
       body: {
         manifestId: manifest.manifestId,
         creatorWallet: account.wallet,
         sponsorWallet,
-        deadlineUnix: proposalDeadlineUnix(),
-        track1BaseUsdc: usdc(25),
+        deadlineUnix: proposalDeadline,
+        track1BaseUsdc: track1BaseRaw.toString(),
         track2MetricType: "VIEWS",
         track2TargetValue: "0",
         track2MinAchievementBps: 0,
@@ -895,7 +1379,6 @@ const run = async () => {
   artifacts.plannedProposalPda = locked.plannedProposalPda;
   addStep("proposal terms locked");
 
-  const allowChainSubmit = isTruthyEnv("STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT");
   const build = await request<BuildBundleResponse>(
     `/proposal-intents/${intent.intentId}/build-bundle`,
     {
@@ -918,7 +1401,7 @@ const run = async () => {
   if (!build.bundle.versionedTxBase64) {
     throw new ExpectedBlocker(
       "CREATOR_SIGNATURE_REQUIRED",
-      "Set STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON for a disposable creator wallet to continue from bundle build to campaign proof.",
+      "Provide the disposable creator keypair via STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_PATH (preferred) or legacy STREAM_PUMP_SMOKE_CREATOR_KEYPAIR_JSON to continue.",
       { bundleId: build.bundle.bundleId }
     );
   }
@@ -943,20 +1426,12 @@ const run = async () => {
   );
   addStep("creator partial signature accepted");
 
-  if (!allowChainSubmit) {
-    throw new ExpectedBlocker(
-      "SPONSOR_CHAIN_SUBMIT_REQUIRED",
-      "Set STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT=1 to relay the fully signed disposable-wallet proposal and verify campaign proof.",
-      {
-        allowChainSubmit,
-      }
-    );
-  }
-
   const fullySignedTxBase64 = await signTransactionBase64(
     creatorSigned.bundle.partiallySignedTxBase64 ?? partiallySignedTxBase64,
     sponsorKeypair
   );
+  beginStage("proposal transaction simulation");
+  await simulateFullySignedPilotTransaction(fullySignedTxBase64);
   beginStage("proposal transaction submission");
   const submitted = await request<SubmitBundleResponse>(
     `/proposal-intents/${intent.intentId}/submit`,
@@ -965,6 +1440,7 @@ const run = async () => {
       token: sponsorToken,
       headers: {
         "x-idempotency-key": smokeIdempotencyKey("intent-submit", bundleAttempt),
+        "x-pilot-run-id": smokeRunId,
       },
       body: {
         bundleId: build.bundle.bundleId,

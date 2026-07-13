@@ -52,7 +52,10 @@ import {
 } from "../services/proposalLaunchService";
 import { prisma } from "../services/prisma";
 import { getAnchorService } from "../services/AnchorService";
-import { getSponsorProfileByWallet } from "../services/sponsorProfile";
+import {
+  getSponsorProfileByWallet,
+  parsePilotTestSponsorReviewNote,
+} from "../services/sponsorProfile";
 import {
   isOperatorApprovedPublication,
   isSettlementAssetReady,
@@ -65,6 +68,149 @@ import {
 
 const getRequesterWallet = (req: Request): string => requireSessionWallet(req);
 const MAX_SIGNED_BIGINT_NONCE = (1n << 63n) - 1n;
+
+type ProposalIntentReadinessDeps = {
+  fetchCreatorProfile: (wallet: PublicKey) => Promise<{
+    level: number;
+    status: string;
+  } | null>;
+  fetchSponsorProfile: (wallet: string) => Promise<{
+    status: SponsorVerificationStatus;
+    wallet?: string;
+    companyName?: string;
+    registrationNumber?: string;
+    reviewEvents?: Array<{ note: string | null; newStatus: SponsorVerificationStatus }>;
+  } | null>;
+};
+
+type SponsorApprovalProfile = {
+  status: SponsorVerificationStatus;
+  wallet?: string;
+  companyName?: string;
+  registrationNumber?: string;
+  reviewEvents?: Array<{ note: string | null; newStatus: SponsorVerificationStatus }>;
+} | null;
+
+const parsePilotRunId = (req: Request): string | null => {
+  const value = String(req.header("x-pilot-run-id") ?? "").trim();
+  if (!value) return null;
+  if (!/^[a-z0-9][a-z0-9_-]{5,47}$/.test(value)) {
+    throw new HttpError(400, "INVALID_PILOT_RUN_ID", "x-pilot-run-id has an invalid format");
+  }
+  return value;
+};
+
+export const assessSponsorApprovalForUse = (
+  profile: SponsorApprovalProfile,
+  pilotRunId: string | null
+) => {
+  if (!profile || profile.status !== SponsorVerificationStatus.APPROVED) {
+    return { approved: false, classification: "UNAPPROVED" as const };
+  }
+  const pilotFields = [profile.companyName, profile.registrationNumber]
+    .filter((value): value is string => typeof value === "string")
+    .some((value) => value.startsWith("PILOT TEST ONLY") || value.startsWith("PILOT-TEST-ONLY"));
+  if (!pilotFields) return { approved: true, classification: "KYB_APPROVED" as const };
+
+  const latestReview = profile.reviewEvents?.[0];
+  const marker = parsePilotTestSponsorReviewNote(latestReview?.note);
+  const wallet = typeof profile.wallet === "string" ? profile.wallet : null;
+  const inviteAllowed = Boolean(wallet && config.pilot.inviteWallets.includes(wallet));
+  const approved = Boolean(
+    marker &&
+    latestReview?.newStatus === SponsorVerificationStatus.APPROVED &&
+    wallet === marker.wallet &&
+    pilotRunId === marker.runId &&
+    inviteAllowed
+  );
+  return {
+    approved,
+    classification: "PILOT_TEST_ONLY" as const,
+    runIdMatched: Boolean(marker && pilotRunId === marker.runId),
+    inviteAllowed,
+  };
+};
+
+export const resolveProposalIntentReadiness = async (params: {
+  creatorWallet: string;
+  sponsorWallet: string;
+  pilotRunId?: string | null;
+  deps?: ProposalIntentReadinessDeps;
+}) => {
+  if (params.creatorWallet === params.sponsorWallet) {
+    throw new HttpError(400, "DISTINCT_PARTICIPANTS_REQUIRED", "creator and sponsor must be distinct wallets");
+  }
+  const deps = params.deps ?? {
+    fetchCreatorProfile: (wallet: PublicKey) =>
+      getAnchorService().fetchCreatorProfileByWallet(wallet),
+    fetchSponsorProfile: getSponsorProfileByWallet,
+  };
+  const [creatorProfile, sponsorProfile] = await Promise.all([
+    deps.fetchCreatorProfile(new PublicKey(params.creatorWallet)),
+    deps.fetchSponsorProfile(params.sponsorWallet),
+  ]);
+  const creatorReady = Boolean(
+    creatorProfile && creatorProfile.level >= 2 && creatorProfile.status === "S2_ACTIVE"
+  );
+  const sponsorApproval = assessSponsorApprovalForUse(sponsorProfile, params.pilotRunId ?? null);
+  const sponsorReady = sponsorApproval.approved;
+  const blockers = [
+    ...(creatorReady
+      ? []
+      : [{
+          code: "CREATOR_NOT_S2_READY",
+          message: "creator chain profile must be S2_ACTIVE with level >= 2",
+        }]),
+    ...(sponsorReady
+      ? []
+      : [{
+          code: "SPONSOR_KYB_NOT_APPROVED",
+          message: "sponsor database profile must be APPROVED",
+        }]),
+  ];
+
+  return {
+    ready: creatorReady && sponsorReady,
+    creator: {
+      wallet: params.creatorWallet,
+      source: "SOLANA_CHAIN" as const,
+      profileFound: creatorProfile !== null,
+      level: creatorProfile?.level ?? null,
+      status: creatorProfile?.status ?? null,
+      ready: creatorReady,
+    },
+    sponsor: {
+      wallet: params.sponsorWallet,
+      source: "DATABASE" as const,
+      status: sponsorProfile?.status ?? null,
+      ready: sponsorReady,
+      classification: sponsorApproval.classification,
+    },
+    blockers,
+  };
+};
+
+export const getProposalIntentReadiness = withController(
+  "GET_PROPOSAL_INTENT_READINESS_FAILED",
+  async (req, res) => {
+    const requesterWallet = getRequesterWallet(req);
+    const creatorWallet = parseWallet(req.query.creatorWallet, "creatorWallet");
+    const sponsorWallet = parseWallet(req.query.sponsorWallet, "sponsorWallet");
+    if (requesterWallet !== sponsorWallet) {
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "the sponsor wallet must authorize readiness lookup"
+      );
+    }
+
+    ok(res, await resolveProposalIntentReadiness({
+      creatorWallet,
+      sponsorWallet,
+      pilotRunId: parsePilotRunId(req),
+    }));
+  }
+);
 
 const parseOptionalNonNegativeBigInt = (
   value: unknown,
@@ -167,10 +313,11 @@ export const assertStoredIntentPilotTracksAllowed = (intent: StoredPilotTrackTer
   });
 };
 
-export const assertSponsorApprovedForFinalSubmit = (profile: {
-  status: SponsorVerificationStatus;
-} | null): void => {
-  if (!profile || profile.status !== SponsorVerificationStatus.APPROVED) {
+export const assertSponsorApprovedForFinalSubmit = (
+  profile: SponsorApprovalProfile,
+  pilotRunId: string | null = null
+): void => {
+  if (!assessSponsorApprovalForUse(profile, pilotRunId).approved) {
     throw new HttpError(
       403,
       "SPONSOR_KYB_NOT_APPROVED",
@@ -179,8 +326,11 @@ export const assertSponsorApprovedForFinalSubmit = (profile: {
   }
 };
 
-const recheckSponsorApprovalForFinalSubmit = async (sponsorWallet: string): Promise<void> => {
-  assertSponsorApprovedForFinalSubmit(await getSponsorProfileByWallet(sponsorWallet));
+const recheckSponsorApprovalForFinalSubmit = async (
+  sponsorWallet: string,
+  pilotRunId: string | null
+): Promise<void> => {
+  assertSponsorApprovedForFinalSubmit(await getSponsorProfileByWallet(sponsorWallet), pilotRunId);
 };
 
 export const assertManifestReadyForProposalIntent = (params: {
@@ -256,19 +406,16 @@ export const createProposalIntent = withController(
     const manifestId = parseNonEmptyString(req.body.manifestId, "manifestId");
     const creatorWallet = parseWallet(req.body.creatorWallet, "creatorWallet");
     const sponsorWallet = parseWallet(req.body.sponsorWallet, "sponsorWallet");
+    if (creatorWallet === sponsorWallet) {
+      throw new HttpError(400, "DISTINCT_PARTICIPANTS_REQUIRED", "creator and sponsor must be distinct wallets");
+    }
 
     if (requesterWallet !== creatorWallet && requesterWallet !== sponsorWallet) {
       throw new HttpError(403, "FORBIDDEN", "requester must be either creatorWallet or sponsorWallet");
     }
 
     const sponsorProfile = await getSponsorProfileByWallet(sponsorWallet);
-    if (!sponsorProfile || sponsorProfile.status !== SponsorVerificationStatus.APPROVED) {
-      throw new HttpError(
-        403,
-        "SPONSOR_KYB_NOT_APPROVED",
-        "sponsor KYB profile must be approved before creating production proposal intents"
-      );
-    }
+    assertSponsorApprovedForFinalSubmit(sponsorProfile, parsePilotRunId(req));
 
     const track2MinAchievementBps = parseNonNegativeInt(
       req.body.track2MinAchievementBps,
@@ -786,7 +933,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
   assertRequiredSignerPresent(fullySignedTxBase64, intent.sponsorWallet);
 
   if (bundle.submitMode === BundleSubmitMode.CLIENT_RELAY) {
-    await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet);
+    await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet, parsePilotRunId(req));
     if (bundle.status === BundleStatus.FULLY_SIGNED && bundle.fullySignedBase64 === fullySignedTxBase64) {
       ok(res, {
         intentId,
@@ -863,7 +1010,7 @@ export const submitProposalBundle = withController("SUBMIT_PROPOSAL_BUNDLE_FAILE
     }
   }
 
-  await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet);
+  await recheckSponsorApprovalForFinalSubmit(intent.sponsorWallet, parsePilotRunId(req));
 
   const submittedBundle = await prisma.$transaction(async (tx) => {
     const updatedBundle = await tx.txBundle.update({
