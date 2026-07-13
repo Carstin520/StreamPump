@@ -225,7 +225,7 @@ export const getSponsorProfileByWallet = (wallet: string) =>
     },
     include: {
       reviewEvents: {
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: 1,
         select: {
           reviewerWallet: true,

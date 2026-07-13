@@ -721,15 +721,18 @@ describe("Pilot safety gates", () => {
       inviteOnly: config.pilot.inviteOnly,
       inviteWallets: config.pilot.inviteWallets,
       scheduler: config.oracle.schedulerEnabled,
+      releaseSha: config.app.releaseSha,
     };
 
     try {
       config.pilot.inviteOnly = true;
       config.pilot.inviteWallets = [wallet];
       config.oracle.schedulerEnabled = false;
+      config.app.releaseSha = "0123456789abcdef0123456789abcdef01234567";
 
       expect(buildHealthPayload()).to.deep.equal({
         ok: true,
+        releaseSha: "0123456789abcdef0123456789abcdef01234567",
         mode: "INVITE_ONLY_PILOT",
         automatedSettlement: false,
         accessPolicy: {
@@ -743,6 +746,7 @@ describe("Pilot safety gates", () => {
       config.pilot.inviteWallets = [];
       expect(buildHealthPayload()).to.deep.equal({
         ok: true,
+        releaseSha: "0123456789abcdef0123456789abcdef01234567",
         mode: "INVITE_POLICY_MISCONFIGURED",
         automatedSettlement: false,
         accessPolicy: {
@@ -754,6 +758,7 @@ describe("Pilot safety gates", () => {
       config.pilot.inviteOnly = original.inviteOnly;
       config.pilot.inviteWallets = original.inviteWallets;
       config.oracle.schedulerEnabled = original.scheduler;
+      config.app.releaseSha = original.releaseSha;
     }
   });
 

@@ -70,6 +70,7 @@ export const buildHealthPayload = () => {
 
   return {
     ok: true,
+    releaseSha: config.app.releaseSha || null,
     mode: invitePolicyConfigured
       ? "INVITE_ONLY_PILOT"
       : config.pilot.inviteOnly

@@ -46,6 +46,7 @@ const normalizeOptionalPublicKey = (rawValue: string | undefined, variableName: 
 export const config = {
   app: {
     apiBaseUrl: env.readString(process.env.API_BASE_URL, "http://localhost:4000/api/v1"),
+    releaseSha: env.readString(process.env.PILOT_EXPECTED_RELEASE_SHA, ""),
     // CORS_ALLOWED_ORIGINS / 允许访问后端 API 的前端来源列表
     // CN: 生产环境建议显式填写逗号分隔的前端域名，例如 https://app.example.com。
     // EN: Comma-separated frontend origins allowed to call the backend API in production.

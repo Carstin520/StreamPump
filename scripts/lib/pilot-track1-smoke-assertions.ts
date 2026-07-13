@@ -20,7 +20,7 @@ export type PilotHealth = {
   ok: boolean;
   mode: string;
   automatedSettlement: boolean;
-  releaseSha?: string;
+  releaseSha?: string | null;
   accessPolicy?: {
     configured?: boolean;
     type?: string;
@@ -158,7 +158,7 @@ const FULL_GIT_SHA = /^[0-9a-f]{40}$/;
 export const assertReleaseIdentity = (params: {
   expected: string;
   deployed: string;
-  healthRelease?: string;
+  healthRelease?: string | null;
   phase: "before" | "after";
 }): void => {
   const expected = params.expected.trim().toLowerCase();
@@ -168,8 +168,9 @@ export const assertReleaseIdentity = (params: {
     !FULL_GIT_SHA.test(expected) ||
     !FULL_GIT_SHA.test(deployed) ||
     expected !== deployed ||
-    (healthRelease !== undefined &&
-      (!FULL_GIT_SHA.test(healthRelease) || healthRelease !== expected))
+    !healthRelease ||
+    !FULL_GIT_SHA.test(healthRelease) ||
+    healthRelease !== expected
   ) {
     fail(
       "PILOT_RELEASE_IDENTITY_FAILED",
