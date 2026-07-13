@@ -2,7 +2,7 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M2 completed and passed dedicated-RPC plus independent public-devnet verification. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. M3 local/read-only preparation is complete, but M3 remains blocked on its own human approval, a write-quiesced old Render backend, and a verified Neon recovery branch.**
+Gate status: **M2 and M3 completed successfully. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. Neon production has exactly 26 applied migrations and the verified pre-migration recovery branch is retained. The old Render backend remains suspended. M4 is a separate human gate and must include database-owner credential rotation before any backend resumes.**
 
 M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
 
@@ -110,13 +110,13 @@ Canonical execution and recovery procedure: [`p4-m3-neon-migration.md`](./p4-m3-
 
 Frozen live target: project `jolly-recipe-31299801`, source/default branch `production` (`br-orange-bar-ancofkw5`), database `neondb`, PostgreSQL `17.10`; current history retention is 21,600 seconds (6 hours). The source branch is currently unprotected.
 
-Human/dashboard prerequisite:
+Completed M3 controls:
 
-- [ ] Explicit M3 approval covers temporary old-Render write quiescence, recovery-branch creation/verification, and exactly six production migrations; it does not cover an M4 deployment.
-- [ ] Confirm no Render deploy or other Prisma migration runner is active; make the old Render backend write-inert before the final preflight and keep it write-inert until the M4 candidate passes readiness.
-- [ ] Create a Neon restore branch or PITR restore point from the production branch immediately before migration.
-- [ ] Record the Neon project, source branch, restore branch/point identifier, source timestamp/LSN if exposed, and verification timestamp outside Git. Do not record connection strings.
-- [ ] Verify the restore branch is connectable and contains the same 20 applied migrations and the expected pre-migration row counts.
+- [x] Explicit M3 approval covered temporary old-Render write quiescence, recovery-branch creation/verification, and exactly six production migrations; it did not cover an M4 deployment.
+- [x] Render service `srv-d79rs0450q8c73fp2lmg` was suspended at `2026-07-13T09:18:34Z`; no deploy/runner was active and repeated public write-shaped probes returned `503`.
+- [x] Current-point recovery branch `p4-m3-pre-20260713T093116Z` (`br-frosty-fire-an0lsiq2`) was created from `br-orange-bar-ancofkw5`; compute `ep-tiny-mouse-an4mgy4d` was created at `2026-07-13T09:31:25Z`.
+- [x] The recovery branch was connectable, contained the exact 20-migration pre-state, matched the production final-pre `{migrations,data}` snapshot, and remained unchanged after production migration.
+- [x] Exactly six migrations applied once; final production verification reports 26 applied, 0 failed, 0 rolled back, all frozen schema objects present, Prisma status current, and fail-closed cleanup counts at zero.
 
 Pending migrations, in order:
 
@@ -154,6 +154,8 @@ Observed production isolation:
 - Render service `srv-d79rs0450q8c73fp2lmg` tracks `main` with auto-deploy enabled. Its configured pre-deploy command is `npm run prisma:migrate:deploy`; therefore M4 must not begin before M3 succeeds, and an unreviewed deploy could mutate Neon.
 - Render current build command is `npm ci && npm run prisma:generate && npm run build`, which differs from the runbook's `npm ci --include=dev ...`; resolve that inventory drift before candidate deployment.
 - Vercel has no local CLI/project link in this worktree. The production deployment remains the frozen baseline; `dd49e433` has a successful Preview only. Dashboard/API ownership is required for an intentional production promotion and rollback.
+
+Mandatory credential incident follow-up: while injecting the recovery connection through a local operator process, its TTY echoed the inherited `neondb_owner` connection string into the local tool transcript. It was not committed or written to repository/evidence files, but the password must be treated as exposed. M4 must rotate that Neon role credential and atomically update both Render `DATABASE_URL` and `DIRECT_URL` before any backend instance is resumed or deployed. Do not paste the replacement value into chat or command output.
 
 Before approval, inventory values by presence/type only; never print secret values. Binding Pilot values include:
 

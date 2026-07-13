@@ -2,7 +2,7 @@
 
 This file documents rollback artifacts and immutable pre-mutation identifiers. Binary backups and provider secrets are machine-local and must never be committed.
 
-Gate status: **M2 completed successfully on Solana devnet after renewed approval for the exact 10,240-byte extension. The live full padded program hash is `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`; rollback was not required. M3 is a separate human gate.**
+Gate status: **M2 and M3 completed successfully. The live full padded program hash is `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`; chain rollback was not required. Neon production has 26 applied migrations and current-point recovery branch `br-frosty-fire-an0lsiq2` is retained unchanged. The old Render backend remains suspended pending M4.**
 
 M2 was subsequently approved. Buffer creation succeeded, but payload writing stopped on sustained provider 429 responses before ProgramData extension. The deployed program remains at the pre-upgrade hash/capacity. Buffer `BEwVgZ3MnBuLaMNKYiUg6NVDDLnnija7i4adFzaJ6Kof` is intentionally retained for resume/recovery; closing it to reclaim rent is itself a mutation and requires an explicit decision if M2 is abandoned.
 
@@ -59,12 +59,14 @@ The `20260712170000` checksum is the merged P3 fix containing the `PRUNED` enum 
 | Git integration | `dd49e433880462a9499036e7620a8436d7c770c3` | frozen |
 | Render production | deploy `dep-d8upmol7vvec73ejb8gg`, commit `b362910c7ca204f8724af7a1a74411757e2abce1` | frozen |
 | Vercel Production | `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`, commit `cbdf76a5df896adbe88a9e07586ac3478e45f720`, ref `main` | frozen |
-| Neon | project `jolly-recipe-31299801`; source `production` / `br-orange-bar-ancofkw5`; current-point child recovery branch ID | pending M3 approval, write quiescence, creation, and verification; retain through H4 |
+| Neon | project `jolly-recipe-31299801`; source `production` / `br-orange-bar-ancofkw5`; recovery `p4-m3-pre-20260713T093116Z` / `br-frosty-fire-an0lsiq2` | verified pre-migration snapshot; unchanged after M3; retain through H4 |
 | Mux | previous endpoint ID/status and endpoint-specific secret version | pending M5 approval; secret value must stay in dashboard/secret manager |
 
 Render service ID is `srv-d79rs0450q8c73fp2lmg`. It currently tracks `main` with auto-deploy enabled and runs `npm run prisma:migrate:deploy` as a pre-deploy command. A code rollback does not reverse a migration; the Neon restore/repoint decision is separate and must be explicit.
 
 M3 execution and recovery authority are defined in [`p4-m3-neon-migration.md`](./p4-m3-neon-migration.md). The old Render backend must be write-inert before the final Neon preflight and remain so until M4 readiness succeeds. The named current-point child branch is a recovery source, not authorization to reset production or repoint Render; either action requires a separate human decision.
+
+Credential containment: the inherited `neondb_owner` connection string was echoed once into the local operator tool transcript during recovery verification. No secret is stored in Git or the durable evidence bundle. Treat the role password as exposed and rotate it under M4, updating Render pooled/direct URLs atomically before resuming any backend.
 
 ## Program byte rollback procedure
 

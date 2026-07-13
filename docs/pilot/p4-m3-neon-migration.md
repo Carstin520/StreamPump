@@ -2,7 +2,18 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Status: **prepared only; M3 is not approved and Neon production is unchanged.** This is an invite-only technical Pilot on Solana devnet/test-USDC, not a production launch or real-funds release.
+Status: **completed successfully at `2026-07-13T09:40:21Z`; Neon production has exactly 26 applied migrations and the verified recovery branch remains unchanged. The old Render backend is still suspended.** This is an invite-only technical Pilot on Solana devnet/test-USDC, not a production launch or real-funds release.
+
+## Execution result
+
+- M3 approval was received before any Render or Neon mutation.
+- Render service `srv-d79rs0450q8c73fp2lmg` entered `suspended` at `2026-07-13T09:18:34Z`; no deploy/runner was active and both public write-shaped probes returned `503`.
+- Final production preflight at `2026-07-13T09:37:15Z`: 20 applied, 0 failed/rolled back, frozen data digests unchanged, and zero blocking client backends.
+- Recovery branch `p4-m3-pre-20260713T093116Z` (`br-frosty-fire-an0lsiq2`) was created from `br-orange-bar-ancofkw5`; compute `ep-tiny-mouse-an4mgy4d` was created at `2026-07-13T09:31:25Z`. Normalized host SHA256 is `07a3e1e3e19cd9a89330601f9b54903cb64dcae893fb71e62447141109aab7e4`.
+- Recovery and production final-pre `{migrations,data}` snapshots matched exactly. The recovery snapshot was re-run after migration and remained unchanged.
+- All six frozen migrations applied once. Final production verification: 26 applied, 0 failed, 0 rolled back; all nine columns, four tables, four enums, thirteen indexes, and the Track1 foreign key exist; Prisma status is current; all fail-closed cleanup counts are zero.
+- No restore/repoint was required. The recovery branch must remain through H4 and the old backend must remain suspended until M4 readiness succeeds.
+- During ephemeral recovery connection injection, a TTY echoed the inherited `neondb_owner` connection string into the local tool transcript. It was not committed or written to durable evidence, but M4 must rotate that role credential and atomically replace Render pooled/direct URLs before any backend resumes.
 
 ## Frozen target and scope
 
