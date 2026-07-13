@@ -59,10 +59,12 @@ The `20260712170000` checksum is the merged P3 fix containing the `PRUNED` enum 
 | Git integration | `dd49e433880462a9499036e7620a8436d7c770c3` | frozen |
 | Render production | deploy `dep-d8upmol7vvec73ejb8gg`, commit `b362910c7ca204f8724af7a1a74411757e2abce1` | frozen |
 | Vercel Production | `dpl_DmwV2BsLVjmS2ifqCDat9hQpAETV`, commit `cbdf76a5df896adbe88a9e07586ac3478e45f720`, ref `main` | frozen |
-| Neon | restore branch/PITR identifier | pending M3 approval and dashboard creation |
+| Neon | project `jolly-recipe-31299801`; source `production` / `br-orange-bar-ancofkw5`; current-point child recovery branch ID | pending M3 approval, write quiescence, creation, and verification; retain through H4 |
 | Mux | previous endpoint ID/status and endpoint-specific secret version | pending M5 approval; secret value must stay in dashboard/secret manager |
 
 Render service ID is `srv-d79rs0450q8c73fp2lmg`. It currently tracks `main` with auto-deploy enabled and runs `npm run prisma:migrate:deploy` as a pre-deploy command. A code rollback does not reverse a migration; the Neon restore/repoint decision is separate and must be explicit.
+
+M3 execution and recovery authority are defined in [`p4-m3-neon-migration.md`](./p4-m3-neon-migration.md). The old Render backend must be write-inert before the final Neon preflight and remain so until M4 readiness succeeds. The named current-point child branch is a recovery source, not authorization to reset production or repoint Render; either action requires a separate human decision.
 
 ## Program byte rollback procedure
 

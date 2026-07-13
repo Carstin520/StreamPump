@@ -2,9 +2,11 @@
 
 Date: 2026-07-13 (Asia/Shanghai)
 
-Gate status: **M2 completed and passed dedicated-RPC plus independent public-devnet verification. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. M3 remains blocked on its own human approval and verified Neon restore point.**
+Gate status: **M2 completed and passed dedicated-RPC plus independent public-devnet verification. The live devnet program is the fixed candidate at capacity 1,328,344 with full padded SHA256 `a6008d9c11304c73324db9f5645ccd4e303015f0e0f03671f3d41fd42a720732`. M3 local/read-only preparation is complete, but M3 remains blocked on its own human approval, a write-quiesced old Render backend, and a verified Neon recovery branch.**
 
 M2 completion evidence: the human approved the revised exact 10,240-byte extension; candidate buffer writes completed with 1,249 signed/confirmed ledger pairs and a byte-identical finalized dump; extend signature `y5nHSXckht6d6iEKATcBejYYdH5UVPxqN5DJS8iXCg8Za2TSyrX7zZztxoAd7yS8Fm3zwveTjyioRkBrg9BxHQR`; upgrade signature `A2xT2qeH6sX3bfUsvPcqmtDU1F8QNsykv8AnKqvvcXwX8ySsKHUZjaVdm86c3gs1ydXSV66HDvu6PR8c7Hri5v1`; finalized deploy slot 475933115; candidate buffer closed; authority/config/oracle/mint invariants unchanged. Independent public-devnet verification returned GO. Exact candidate rebuild/hash, generated-versus-packaged IDL, and local Track1-only tests passed (3/3). Real manual Track1 settlement/replay remains M6-only.
+
+The following RPC/buffer paragraphs are retained as historical M2 incident evidence, not current chain or credential state. The authoritative current state is the successful M2 completion evidence above and the finalized evidence bundle.
 
 Dedicated-RPC preflight attempt: failed with HTTP 401 before chain verification. The CLI exposed the credential-bearing provider URL in its error output, so that API key must be rotated. The local P4 RPC file was immediately reset to an empty mode-`0600` placeholder. No transaction or chain mutation occurred.
 
@@ -43,7 +45,7 @@ No mutation is authorized by this document. Each mutation group requires its own
 - [x] Migration impact was previewed inside a read-only transaction and rolled back.
 - [x] Current devnet program bytes were freshly dumped to a durable, permission-restricted path and hashed.
 - [x] Local candidate bytes were copied beside the rollback binary and hashed.
-- [x] P4 fee payer exists at `/Users/jamesli/.config/solana/streampump-p4-devnet-fee-payer.json`, resolves to `Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9`, is mode `0600`, and holds 15 devnet SOL.
+- [x] P4 fee payer exists at `/Users/jamesli/.config/solana/streampump-p4-devnet-fee-payer.json`, resolves to `Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9`, is mode `0600`, and held `14.9106046` devnet SOL after the completed M2 buffer close.
 - [x] A dedicated Solana devnet transaction RPC was selected, rotated after the credential incidents, and passed genesis plus fixed-account cross-checks for M2. M4 must separately inventory deployed read/indexer endpoints.
 - [x] A mode-`0600` devnet admin signer is locally available and resolves to the on-chain upgrade authority/admin `BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw`; use still requires M1/M2 approval.
 - [x] A mode-`0600` local authority bundle contains the oracle signer `HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC`; it must be extracted/loaded through an approved mode-`0600` mechanism before M6.
@@ -104,8 +106,14 @@ Immediate rollback trigger: any unexpected program/config/mint/oracle value, fai
 
 ## M3 — Neon restore point and six migrations
 
+Canonical execution and recovery procedure: [`p4-m3-neon-migration.md`](./p4-m3-neon-migration.md). The verifier is `backend/scripts/p4-verify-neon-migration.ts` and uses a read-only transaction.
+
+Frozen live target: project `jolly-recipe-31299801`, source/default branch `production` (`br-orange-bar-ancofkw5`), database `neondb`, PostgreSQL `17.10`; current history retention is 21,600 seconds (6 hours). The source branch is currently unprotected.
+
 Human/dashboard prerequisite:
 
+- [ ] Explicit M3 approval covers temporary old-Render write quiescence, recovery-branch creation/verification, and exactly six production migrations; it does not cover an M4 deployment.
+- [ ] Confirm no Render deploy or other Prisma migration runner is active; make the old Render backend write-inert before the final preflight and keep it write-inert until the M4 candidate passes readiness.
 - [ ] Create a Neon restore branch or PITR restore point from the production branch immediately before migration.
 - [ ] Record the Neon project, source branch, restore branch/point identifier, source timestamp/LSN if exposed, and verification timestamp outside Git. Do not record connection strings.
 - [ ] Verify the restore branch is connectable and contains the same 20 applied migrations and the expected pre-migration row counts.
@@ -127,18 +135,12 @@ Expected impact from the read-only preview:
 - 8 manifest `currentAnchorTx` claims are cleared because 0/8 have durable matching chain-event proof.
 - 0 proposal `contentAnchorTx` claims are currently present.
 
-Migration command after M3 approval and verified restore point only:
-
-```bash
-cd /private/tmp/streampump-p4-codex/backend
-DIRECT_URL='<secret direct Neon URL supplied outside chat>' \
-DATABASE_URL='<secret pooled Neon URL supplied outside chat>' \
-npm run prisma:migrate:deploy
-```
+The final migration command, target fingerprint guard, unconditional post-state resolution, and evidence paths are frozen in the canonical M3 runbook. Database URLs must come from a repository-external mode-`0600` dotenv file and must never be pasted into chat or stored in Git.
 
 M3 stop conditions:
 
 - Restore branch/point is absent, cannot be connected to, or does not reproduce the pre-migration state.
+- The old Render backend is still writable, a Render deployment is running, or another migration runner may race this operation.
 - Any applied checksum differs from the integration tree or any migration is failed/rolled back.
 - Pending list/order differs from the six frozen migrations.
 - Migration execution returns an error, applies a different count, or post-migration row/schema checks differ from the preview.
