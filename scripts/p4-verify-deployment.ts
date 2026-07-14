@@ -262,6 +262,20 @@ const requireStatus = (probe: ProbeResult, expected: number, label: string): voi
   }
 };
 
+export const assertControlPlaneHeaders = (probe: ProbeResult, label: string): void => {
+  const cacheControl = probe.headers.get("cache-control") ?? "";
+  const surrogateControl = probe.headers.get("surrogate-control") ?? "";
+  if (!cacheControl.split(",").some((value) => value.trim().toLowerCase() === "no-store")) {
+    fail(`${label} omitted Cache-Control: no-store`);
+  }
+  if (!surrogateControl.split(",").some((value) => value.trim().toLowerCase() === "no-store")) {
+    fail(`${label} omitted Surrogate-Control: no-store`);
+  }
+  if (probe.headers.get("x-powered-by") !== null) {
+    fail(`${label} exposed X-Powered-By`);
+  }
+};
+
 export const assertClosedPostProbe = (probe: ProbeResult, label: string): void => {
   requireStatus(probe, 404, label);
 };
@@ -282,6 +296,7 @@ const verifyCors = async (fetchImpl: FetchLike, config: DeploymentVerificationCo
     { parseJson: true }
   );
   requireStatus(allowed, 200, "allowed-origin health probe");
+  assertControlPlaneHeaders(allowed, "allowed-origin health probe");
   requireExactValue(
     allowed.headers.get("access-control-allow-origin"),
     config.allowedOrigin,
@@ -336,6 +351,7 @@ const verifyClosedSurfaces = async (
     { parseJson: true }
   );
   requireStatus(operator, 403, "unauthenticated operator probe");
+  assertControlPlaneHeaders(operator, "unauthenticated operator probe");
   assertErrorCode(operator, "OPERATOR_AUTH_REQUIRED", "unauthenticated operator probe");
 
   const s1MarketRead = await request(
@@ -382,7 +398,19 @@ const verifyHealthAndReadiness = async (
     { parseJson: true }
   );
   requireStatus(health, 200, "health probe");
+  assertControlPlaneHeaders(health, "health probe");
   assertHealthPayload(health.json, config.expectedReleaseSha);
+
+  const healthAlias = await request(
+    fetchImpl,
+    config.apiOrigin,
+    "/HEALTH",
+    { method: "GET" },
+    { parseJson: true }
+  );
+  requireStatus(healthAlias, 200, "health alias probe");
+  assertControlPlaneHeaders(healthAlias, "health alias probe");
+  assertHealthPayload(healthAlias.json, config.expectedReleaseSha);
 
   const ready = await request(
     fetchImpl,
@@ -392,7 +420,19 @@ const verifyHealthAndReadiness = async (
     { parseJson: true }
   );
   requireStatus(ready, 200, "readiness probe");
+  assertControlPlaneHeaders(ready, "readiness probe");
   assertReadyPayload(ready.json);
+
+  const readyAlias = await request(
+    fetchImpl,
+    config.apiOrigin,
+    "/ready/",
+    { method: "GET" },
+    { parseJson: true }
+  );
+  requireStatus(readyAlias, 200, "readiness alias probe");
+  assertControlPlaneHeaders(readyAlias, "readiness alias probe");
+  assertReadyPayload(readyAlias.json);
 };
 
 export const runDeploymentVerification = async (
@@ -530,6 +570,46 @@ const runSelfTest = async (): Promise<void> => {
       assertClosedPostProbe({ status: 401, headers: new Headers() }, "open route"),
     /expected 404/
   );
+  assertControlPlaneHeaders(
+    {
+      status: 200,
+      headers: new Headers({
+        "cache-control": "private, no-store",
+        "surrogate-control": "no-store",
+      }),
+    },
+    "control-plane response"
+  );
+  assert.throws(
+    () => assertControlPlaneHeaders({ status: 200, headers: new Headers() }, "stale response"),
+    /Cache-Control/
+  );
+  assert.throws(
+    () =>
+      assertControlPlaneHeaders(
+        {
+          status: 200,
+          headers: new Headers({ "cache-control": "no-store" }),
+        },
+        "edge-stale response"
+      ),
+    /Surrogate-Control/
+  );
+  assert.throws(
+    () =>
+      assertControlPlaneHeaders(
+        {
+          status: 200,
+          headers: new Headers({
+            "cache-control": "no-store",
+            "surrogate-control": "no-store",
+            "x-powered-by": "Express",
+          }),
+        },
+        "disclosing response"
+      ),
+    /X-Powered-By/
+  );
 
   const shortConfig = parseDeploymentVerificationArgs(
     [...baseArgs, "--observation-seconds", "1", "--poll-interval-ms", "1000"],
@@ -545,6 +625,7 @@ const runSelfTest = async (): Promise<void> => {
   }> = [];
   const mockFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
+    const normalizedPathname = url.pathname.toLowerCase().replace(/\/+$/, "");
     const method = init?.method ?? "GET";
     const requestHeaders = new Headers(init?.headers);
     observedRequests.push({
@@ -574,26 +655,34 @@ const runSelfTest = async (): Promise<void> => {
             headers: {
               "access-control-allow-origin": origin,
               "access-control-allow-credentials": "true",
+              "cache-control": "no-store",
+              "surrogate-control": "no-store",
             },
           }
         );
       }
     }
-    if (url.pathname === "/health") {
-      return Response.json({
-        ok: true,
-        mode: "INVITE_ONLY_PILOT",
-        automatedSettlement: false,
-        releaseSha: sha,
-        accessPolicy: { configured: true, type: "invite_only" },
-      });
+    if (normalizedPathname === "/health") {
+      return Response.json(
+        {
+          ok: true,
+          mode: "INVITE_ONLY_PILOT",
+          automatedSettlement: false,
+          releaseSha: sha,
+          accessPolicy: { configured: true, type: "invite_only" },
+        },
+        { headers: { "cache-control": "no-store", "surrogate-control": "no-store" } }
+      );
     }
-    if (url.pathname === "/ready") {
-      return Response.json({
-        ok: true,
-        status: "READY",
-        services: { database: "READY", indexer: "READY", muxReconciliation: "READY" },
-      });
+    if (normalizedPathname === "/ready") {
+      return Response.json(
+        {
+          ok: true,
+          status: "READY",
+          services: { database: "READY", indexer: "READY", muxReconciliation: "READY" },
+        },
+        { headers: { "cache-control": "no-store", "surrogate-control": "no-store" } }
+      );
     }
     if (url.pathname === "/api/v1/auth/provider-exchange") {
       return Response.json(
@@ -604,7 +693,10 @@ const runSelfTest = async (): Promise<void> => {
     if (url.pathname === "/api/v1/internal/content/publications") {
       return Response.json(
         { ok: false, error: { code: "OPERATOR_AUTH_REQUIRED" } },
-        { status: 403 }
+        {
+          status: 403,
+          headers: { "cache-control": "no-store", "surrogate-control": "no-store" },
+        }
       );
     }
     return new Response(undefined, { status: 404 });
@@ -620,6 +712,18 @@ const runSelfTest = async (): Promise<void> => {
   assert.equal(result.observations, 2);
   assert.equal(result.elapsedSeconds, 1);
   assert.equal(result.releaseEvidence, "health_payload_and_render_deployment_metadata");
+  for (const path of [
+    "/HEALTH",
+    "/ready/",
+    "/api/v1/internal/content/publications",
+  ]) {
+    assert.ok(
+      observedRequests.some(({ method, path: observedPath }) =>
+        method === "GET" && observedPath === path
+      ),
+      `deployment verification did not request ${path}`
+    );
+  }
   const postRequests = observedRequests.filter(({ method }) => method === "POST");
   assert.equal(postRequests.length, 9);
   assert.ok(postRequests.every(({ body }) => body === "{}"));

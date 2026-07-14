@@ -64,6 +64,27 @@ const createJsonMiddleware = (): RequestHandler => {
   };
 };
 
+const isControlPlanePath = (path: string): boolean => {
+  const normalizedPath = path.toLowerCase().replace(/\/+$/, "");
+
+  return (
+    normalizedPath === "/health" ||
+    normalizedPath === "/ready" ||
+    normalizedPath === "/api/v1/internal" ||
+    normalizedPath.startsWith("/api/v1/internal/")
+  );
+};
+
+const createControlPlaneHeadersMiddleware = (): RequestHandler =>
+  (req, res, next) => {
+    if (isControlPlanePath(req.path)) {
+      res.set("Cache-Control", "no-store");
+      res.set("Surrogate-Control", "no-store");
+    }
+
+    next();
+  };
+
 export const buildHealthPayload = () => {
   const invitePolicyConfigured =
     config.pilot.inviteOnly && config.pilot.inviteWallets.length > 0;
@@ -87,11 +108,14 @@ export const buildHealthPayload = () => {
 export const createApp = (readiness: StartupReadiness = appStartupReadiness): Application => {
   const app = express();
 
+  app.disable("x-powered-by");
+
   // Render terminates public HTTP at one reverse-proxy hop. Trust exactly that
   // hop so Express derives req.ip from the right-most untrusted address; rate
   // limiting code must never parse X-Forwarded-For on its own.
   app.set("trust proxy", 1);
 
+  app.use(createControlPlaneHeadersMiddleware());
   app.use(createCorsMiddleware());
   app.use(createJsonMiddleware());
 

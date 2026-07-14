@@ -1,5 +1,7 @@
 # StreamPump P5/P6 新窗口交接 Prompt
 
+> 历史交接记录：H4 与 H5 均已于 2026-07-14 获得明确批准，P5 已在 `f72c33d` 完成并通过 Fable 5 closure；当前阶段为 P6，必须停在 H6。当前真值以 canonical roadmap 与 [`p6-final-audit-and-release-handoff.md`](p6-final-audit-and-release-handoff.md) 为准。
+
 请继续 StreamPump，但必须先停在 H4 gate：**只有我在新窗口明确批准 H4 后，才可开始 P5；P5 到 H5、P6 到 H6 都必须再次停在人审。** 不得把本交接视为 H4 批准。
 
 ## 先读与工作区
