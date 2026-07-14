@@ -756,6 +756,7 @@ export const createIndexerHealthMonitor = (params: {
   probeSlot(): Promise<number>;
   lastSlotNotificationAt(): number;
   onUnhealthy(): void;
+  onHealthy?(): void;
   now?: () => number;
   intervalMs?: number;
   staleMs?: number;
@@ -778,6 +779,10 @@ export const createIndexerHealthMonitor = (params: {
       const slot = await params.probeSlot();
       if (!Number.isSafeInteger(slot) || slot < 0) {
         throw new Error("indexer RPC returned an invalid slot");
+      }
+      if (unhealthy) {
+        unhealthy = false;
+        params.onHealthy?.();
       }
       return true;
     } catch (_error) {
@@ -867,6 +872,8 @@ export const startIndexer = async (
   options: {
     connection?: Connection;
     onUnhealthy?: () => void;
+    onHealthy?: () => void;
+    wsEndpoint?: string;
     startupSlotTimeoutMs?: number;
     healthProbeIntervalMs?: number;
     slotHeartbeatStaleMs?: number;
@@ -877,7 +884,12 @@ export const startIndexer = async (
     return null;
   }
 
-  const connection = options.connection ?? new Connection(rpcEndpoint, "confirmed");
+  const connection =
+    options.connection ??
+    new Connection(rpcEndpoint, {
+      commitment: "confirmed",
+      ...(options.wsEndpoint ? { wsEndpoint: options.wsEndpoint } : {}),
+    });
   const targetProgram = new PublicKey(programId);
   const inFlight = new Set<string>();
   const slotHeartbeat = await waitForInitialIndexerSlot(connection, {
@@ -921,6 +933,7 @@ export const startIndexer = async (
       probeSlot: () => connection.getSlot("confirmed"),
       lastSlotNotificationAt: slotHeartbeat.lastNotificationAt,
       onUnhealthy: options.onUnhealthy ?? (() => undefined),
+      onHealthy: options.onHealthy,
       intervalMs: options.healthProbeIntervalMs,
       staleMs: options.slotHeartbeatStaleMs,
     });

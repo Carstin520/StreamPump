@@ -407,6 +407,7 @@ describe("indexer helpers", () => {
     let lastNotificationAt = 100;
     let probeFails = false;
     let unhealthyCalls = 0;
+    let healthyCalls = 0;
     let clearedTimers = 0;
     const monitor = createIndexerHealthMonitor({
       probeSlot: async () => {
@@ -416,6 +417,9 @@ describe("indexer helpers", () => {
       lastSlotNotificationAt: () => lastNotificationAt,
       onUnhealthy: () => {
         unhealthyCalls += 1;
+      },
+      onHealthy: () => {
+        healthyCalls += 1;
       },
       now: () => now,
       staleMs: 50,
@@ -432,6 +436,12 @@ describe("indexer helpers", () => {
     lastNotificationAt = now;
     expect(await monitor.probeNow()).to.equal(false);
     expect(unhealthyCalls).to.equal(1);
+    expect(healthyCalls).to.equal(0);
+    probeFails = false;
+    expect(await monitor.probeNow()).to.equal(true);
+    expect(healthyCalls).to.equal(1);
+    expect(await monitor.probeNow()).to.equal(true);
+    expect(healthyCalls).to.equal(1);
     monitor.stop();
     monitor.stop();
     expect(clearedTimers).to.equal(1);

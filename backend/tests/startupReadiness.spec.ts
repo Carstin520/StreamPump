@@ -93,6 +93,28 @@ describe("startup readiness", () => {
     });
   });
 
+  it("passes the configured WebSocket endpoint to the Indexer runtime", async () => {
+    const readiness = new StartupReadiness();
+    const runtimeConfig = pilotRuntimeConfig();
+    runtimeConfig.solana.indexerWsEndpoint = "wss://indexer.example.com";
+    const dependencies = successfulDependencies();
+    let observedWsEndpoint: string | undefined;
+    dependencies.startIndexer = async (_rpcEndpoint, _programId, options) => {
+      observedWsEndpoint = options.wsEndpoint;
+      return {
+        subscriptionId: 123,
+        async probeNow() {
+          return true;
+        },
+        async stop() {},
+      };
+    };
+
+    const snapshot = await startBackgroundServices(runtimeConfig, readiness, dependencies);
+    expect(snapshot.ok).to.equal(true);
+    expect(observedWsEndpoint).to.equal("wss://indexer.example.com");
+  });
+
   it("stays not ready when the Indexer or Mux scheduler fails", async () => {
     const indexerReadiness = new StartupReadiness();
     const indexerFailure = successfulDependencies();
@@ -121,8 +143,10 @@ describe("startup readiness", () => {
     const readiness = new StartupReadiness();
     const dependencies = successfulDependencies();
     let reportUnhealthy: (() => void) | undefined;
+    let reportHealthy: (() => void) | undefined;
     dependencies.startIndexer = async (_rpcEndpoint, _programId, options) => {
       reportUnhealthy = options.onUnhealthy;
+      reportHealthy = options.onHealthy;
       return {
         subscriptionId: 123,
         async probeNow() {
@@ -142,6 +166,10 @@ describe("startup readiness", () => {
     reportUnhealthy?.();
     expect(readiness.snapshot().services.indexer).to.equal("FAILED");
     expect(readiness.snapshot().ok).to.equal(false);
+
+    reportHealthy?.();
+    expect(readiness.snapshot().services.indexer).to.equal("READY");
+    expect(readiness.snapshot().ok).to.equal(true);
   });
 
   it("stays not ready when the database check fails without exposing its error", async () => {

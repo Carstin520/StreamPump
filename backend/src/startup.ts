@@ -53,6 +53,8 @@ export const startBackgroundServices = async (
         solana.programId,
         {
           onUnhealthy: () => readiness.markFailed("indexer"),
+          onHealthy: () => readiness.markReady("indexer"),
+          wsEndpoint: solana.indexerWsEndpoint || undefined,
         }
       );
       if (indexerRuntime === null) {

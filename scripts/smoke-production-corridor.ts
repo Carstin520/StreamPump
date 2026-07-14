@@ -31,6 +31,12 @@ import {
   loadM6ActorPrepEvidence,
   parseTrack1BaseRaw,
 } from "./pilot-corridor-config";
+import {
+  assertPilotHealth,
+  assertReleaseIdentity,
+  PilotTrack1SmokeAssertionError,
+  type PilotHealth,
+} from "./lib/pilot-track1-smoke-assertions";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -432,6 +438,64 @@ const request = async <T>(
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const assertM6ReleaseGate = async (params: {
+  expectedReleaseSha: string;
+  deployedReleaseSha: string;
+  checkpoint: "before-mutation" | "before-chain-submit";
+}): Promise<void> => {
+  const healthUrl = new URL("/health", new URL(apiBaseUrl).origin).toString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  let response: Response;
+  let health: PilotHealth;
+  try {
+    response = await fetch(healthUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new ExpectedBlocker(
+        "PILOT_RELEASE_HEALTH_UNAVAILABLE",
+        `The ${params.checkpoint} release health probe returned HTTP ${response.status}.`
+      );
+    }
+    health = (await response.json()) as PilotHealth;
+  } catch (error) {
+    if (error instanceof ExpectedBlocker) throw error;
+    throw new ExpectedBlocker(
+      "PILOT_RELEASE_HEALTH_UNAVAILABLE",
+      `The ${params.checkpoint} release health probe failed before any further mutation.`
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  try {
+    assertPilotHealth(health, "before");
+    assertReleaseIdentity({
+      expected: params.expectedReleaseSha,
+      deployed: params.deployedReleaseSha,
+      healthRelease: health.releaseSha,
+      phase: "before",
+    });
+  } catch (error) {
+    if (error instanceof PilotTrack1SmokeAssertionError) {
+      throw new ExpectedBlocker(error.code, error.message, error.details);
+    }
+    throw error;
+  }
+
+  artifacts.releaseIdentity = {
+    expectedReleaseSha: params.expectedReleaseSha.trim().toLowerCase(),
+    deployedReleaseSha: params.deployedReleaseSha.trim().toLowerCase(),
+    healthReleaseSha: health.releaseSha?.trim().toLowerCase() ?? null,
+    lastCheckpoint: params.checkpoint,
+  };
+  addStep(`fixed release identity verified at ${params.checkpoint}`);
 };
 
 const uploadToPresignedUrl = async (
@@ -895,6 +959,12 @@ const run = async () => {
   const allowChainSubmit = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_CHAIN_SUBMIT");
   const allowProfileUpdate = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_PROFILE_UPDATE");
   const allowTestSponsorPrep = readBooleanEnv("STREAM_PUMP_SMOKE_ALLOW_TEST_SPONSOR_PREP");
+  const expectedReleaseSha = m6Mode
+    ? requireEnv("STREAM_PUMP_SMOKE_EXPECTED_RELEASE_SHA")
+    : "";
+  const deployedReleaseSha = m6Mode
+    ? requireEnv("STREAM_PUMP_SMOKE_DEPLOYED_RELEASE_SHA")
+    : "";
   waitForMuxReadySeconds = readMuxWaitSeconds(m6Mode);
   try {
     const configuredApiUrl = new URL(apiBaseUrl);
@@ -1069,6 +1139,15 @@ const run = async () => {
   artifacts.mediaSource = media.source;
   artifacts.mediaMimeType = media.mimeType;
   artifacts.mediaBytes = media.body.length;
+
+  if (m6Mode) {
+    beginStage("pre-mutation fixed release identity verification");
+    await assertM6ReleaseGate({
+      expectedReleaseSha,
+      deployedReleaseSha,
+      checkpoint: "before-mutation",
+    });
+  }
 
   beginStage("external wallet authentication");
   const creatorSession = await signInWallet(creatorKeypair);
@@ -1432,6 +1511,14 @@ const run = async () => {
   );
   beginStage("proposal transaction simulation");
   await simulateFullySignedPilotTransaction(fullySignedTxBase64);
+  if (m6Mode) {
+    beginStage("pre-submit fixed release identity verification");
+    await assertM6ReleaseGate({
+      expectedReleaseSha,
+      deployedReleaseSha,
+      checkpoint: "before-chain-submit",
+    });
+  }
   beginStage("proposal transaction submission");
   const submitted = await request<SubmitBundleResponse>(
     `/proposal-intents/${intent.intentId}/submit`,

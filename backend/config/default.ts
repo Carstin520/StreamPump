@@ -3,11 +3,38 @@
  * EN: Runtime backend configuration entry that reads environment variables and applies defaults.
  */
 import { PublicKey } from "@solana/web3.js";
+import { BlockList, isIP } from "node:net";
 
 import { env } from "./env";
 import "./loadEnv";
 
 const DEFAULT_AUTH_SESSION_SECRET = "dev-only-session-secret-change-me";
+
+const privateNetworkBlocks = new BlockList();
+privateNetworkBlocks.addSubnet("0.0.0.0", 8, "ipv4");
+privateNetworkBlocks.addSubnet("10.0.0.0", 8, "ipv4");
+privateNetworkBlocks.addSubnet("127.0.0.0", 8, "ipv4");
+privateNetworkBlocks.addSubnet("169.254.0.0", 16, "ipv4");
+privateNetworkBlocks.addSubnet("172.16.0.0", 12, "ipv4");
+privateNetworkBlocks.addSubnet("192.168.0.0", 16, "ipv4");
+privateNetworkBlocks.addAddress("::", "ipv6");
+privateNetworkBlocks.addAddress("::1", "ipv6");
+privateNetworkBlocks.addSubnet("::ffff:0:0", 96, "ipv6");
+privateNetworkBlocks.addSubnet("fc00::", 7, "ipv6");
+privateNetworkBlocks.addSubnet("fe80::", 10, "ipv6");
+
+const isLocalOrPrivateHostname = (rawHostname: string): boolean => {
+  const hostname = rawHostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (hostname === "localhost") {
+    return true;
+  }
+  const ipVersion = isIP(hostname);
+  return ipVersion === 4
+    ? privateNetworkBlocks.check(hostname, "ipv4")
+    : ipVersion === 6
+      ? privateNetworkBlocks.check(hostname, "ipv6")
+      : false;
+};
 
 export const normalizePilotInviteWallets = (rawWallets: string[]): string[] => {
   const normalized = new Set<string>();
@@ -114,6 +141,7 @@ export const config = {
       process.env.SOLANA_INDEXER_RPC_ENDPOINT,
       env.readString(process.env.SOLANA_RPC_ENDPOINT, "https://api.devnet.solana.com")
     ),
+    indexerWsEndpoint: env.readString(process.env.SOLANA_INDEXER_WS_ENDPOINT, ""),
     isDevnet: env.readBoolean(
       process.env.SOLANA_IS_DEVNET,
       (process.env.SOLANA_RPC_ENDPOINT ?? "https://api.devnet.solana.com").includes("devnet")
@@ -429,6 +457,46 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     failures.push(
       "SOLANA_INDEXER_RPC_ENDPOINT must be separate from SOLANA_TX_RPC_ENDPOINT when INDEXER_ENABLED=true"
     );
+  }
+
+  if (runtimeConfig.indexer.enabled) {
+    try {
+      const indexerRpcEndpoint = new URL(runtimeConfig.solana.indexerRpcEndpoint);
+      const indexerWsEndpoint = new URL(runtimeConfig.solana.indexerWsEndpoint);
+      if (
+        indexerRpcEndpoint.protocol !== "https:" ||
+        isLocalOrPrivateHostname(indexerRpcEndpoint.hostname) ||
+        indexerRpcEndpoint.username ||
+        indexerRpcEndpoint.password
+      ) {
+        failures.push(
+          "SOLANA_INDEXER_RPC_ENDPOINT must be a public credential-free https:// endpoint when INDEXER_ENABLED=true"
+        );
+      }
+      if (
+        indexerWsEndpoint.protocol !== "wss:" ||
+        isLocalOrPrivateHostname(indexerWsEndpoint.hostname) ||
+        indexerWsEndpoint.username ||
+        indexerWsEndpoint.password
+      ) {
+        failures.push(
+          "SOLANA_INDEXER_WS_ENDPOINT must be a public wss:// endpoint when INDEXER_ENABLED=true"
+        );
+      }
+      if (
+        indexerWsEndpoint.host !== indexerRpcEndpoint.host ||
+        indexerWsEndpoint.pathname !== indexerRpcEndpoint.pathname ||
+        indexerWsEndpoint.search !== indexerRpcEndpoint.search
+      ) {
+        failures.push(
+          "SOLANA_INDEXER_WS_ENDPOINT must match SOLANA_INDEXER_RPC_ENDPOINT host, port, path, and query"
+        );
+      }
+    } catch (_error) {
+      failures.push(
+        "SOLANA_INDEXER_RPC_ENDPOINT and SOLANA_INDEXER_WS_ENDPOINT must be valid public HTTPS/WSS endpoints when INDEXER_ENABLED=true"
+      );
+    }
   }
 
   if (!runtimeConfig.indexer.enabled) {

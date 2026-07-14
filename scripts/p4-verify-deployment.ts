@@ -185,13 +185,15 @@ export const assertHealthPayload = (payload: unknown, expectedReleaseSha: string
   requireExactValue(accessPolicy.configured, true, "health.accessPolicy.configured");
   requireExactValue(accessPolicy.type, "invite_only", "health.accessPolicy.type");
 
-  if (health.releaseSha !== undefined) {
-    requireExactValue(
-      normalizeGitSha(String(health.releaseSha), "health.releaseSha"),
-      expectedReleaseSha,
-      "health.releaseSha"
-    );
+  const releaseSha = health.releaseSha;
+  if (typeof releaseSha !== "string" || releaseSha.trim() === "") {
+    fail("health.releaseSha must be present as a full 40-character Git SHA");
   }
+  requireExactValue(
+    normalizeGitSha(releaseSha, "health.releaseSha"),
+    expectedReleaseSha,
+    "health.releaseSha"
+  );
 };
 
 export const assertReadyPayload = (payload: unknown): void => {
@@ -401,8 +403,8 @@ export const runDeploymentVerification = async (
   const now = dependencies.now ?? (() => performance.now());
   const sleep = dependencies.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
 
-  // The health payload currently has no release field. This mandatory comparison
-  // binds the smoke to the full SHA read from Render deployment metadata.
+  // Bind both Render deployment metadata and the live process health payload to
+  // the exact fixed candidate before accepting any observation.
   requireExactValue(
     config.deployedReleaseSha,
     config.expectedReleaseSha,
@@ -424,7 +426,7 @@ export const runDeploymentVerification = async (
       return {
         observations,
         elapsedSeconds: (currentTime - startedAt) / 1_000,
-        releaseEvidence: "render_deployment_metadata",
+        releaseEvidence: "health_payload_and_render_deployment_metadata",
       };
     }
     await sleep(Math.min(config.pollIntervalMs, deadline - currentTime));
@@ -474,10 +476,27 @@ const runSelfTest = async (): Promise<void> => {
       ok: true,
       mode: "INVITE_ONLY_PILOT",
       automatedSettlement: false,
+      releaseSha: sha,
       accessPolicy: { configured: true, type: "invite_only" },
     },
     sha
   );
+  for (const releaseSha of [undefined, null, "b".repeat(40)]) {
+    assert.throws(
+      () =>
+        assertHealthPayload(
+          {
+            ok: true,
+            mode: "INVITE_ONLY_PILOT",
+            automatedSettlement: false,
+            releaseSha,
+            accessPolicy: { configured: true, type: "invite_only" },
+          },
+          sha
+        ),
+      /health\.releaseSha/
+    );
+  }
   assert.throws(
     () =>
       assertHealthPayload(
@@ -547,6 +566,7 @@ const runSelfTest = async (): Promise<void> => {
             ok: true,
             mode: "INVITE_ONLY_PILOT",
             automatedSettlement: false,
+            releaseSha: sha,
             accessPolicy: { configured: true, type: "invite_only" },
           },
           {
@@ -564,6 +584,7 @@ const runSelfTest = async (): Promise<void> => {
         ok: true,
         mode: "INVITE_ONLY_PILOT",
         automatedSettlement: false,
+        releaseSha: sha,
         accessPolicy: { configured: true, type: "invite_only" },
       });
     }
@@ -598,7 +619,7 @@ const runSelfTest = async (): Promise<void> => {
   });
   assert.equal(result.observations, 2);
   assert.equal(result.elapsedSeconds, 1);
-  assert.equal(result.releaseEvidence, "render_deployment_metadata");
+  assert.equal(result.releaseEvidence, "health_payload_and_render_deployment_metadata");
   const postRequests = observedRequests.filter(({ method }) => method === "POST");
   assert.equal(postRequests.length, 9);
   assert.ok(postRequests.every(({ body }) => body === "{}"));

@@ -246,6 +246,16 @@ describe("Pilot Track1 smoke assertions", () => {
         assertReleaseIdentity({
           expected: "a".repeat(40),
           deployed: "a".repeat(40),
+          healthRelease: null,
+          phase: "before",
+        }),
+      "PILOT_RELEASE_IDENTITY_FAILED"
+    );
+    expectCode(
+      () =>
+        assertReleaseIdentity({
+          expected: "a".repeat(40),
+          deployed: "a".repeat(40),
           healthRelease: "b".repeat(40),
           phase: "after",
         }),

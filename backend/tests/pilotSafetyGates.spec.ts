@@ -68,6 +68,7 @@ describe("Pilot safety gates", () => {
     SOLANA_IS_DEVNET: "true",
     SOLANA_TX_RPC_ENDPOINT: "https://dedicated-rpc.example.com",
     SOLANA_INDEXER_RPC_ENDPOINT: "https://dedicated-indexer-rpc.example.com",
+    SOLANA_INDEXER_WS_ENDPOINT: "wss://dedicated-indexer-rpc.example.com",
     INDEXER_ENABLED: "true",
     R2_BUCKET: "pilot-origin",
     R2_DELIVERY_BUCKET: "pilot-delivery",
@@ -260,6 +261,54 @@ describe("Pilot safety gates", () => {
     expect(`${mainnet.stderr}${mainnet.stdout}`).to.contain(
       "SOLANA_IS_DEVNET=true"
     );
+  });
+
+  it("requires an explicit secure WebSocket endpoint for the hosted Pilot indexer", function () {
+    this.timeout(10_000);
+    const wallet = Keypair.generate().publicKey.toBase58();
+
+    for (const invalidEndpoint of [
+      "",
+      "https://dedicated-indexer-rpc.example.com",
+      "wss://wrong-network.example.com",
+      "wss://dedicated-indexer-rpc.example.com/wrong-path",
+    ]) {
+      const result = runConfigImport({
+        ...validProductionEnv(wallet),
+        SOLANA_INDEXER_WS_ENDPOINT: invalidEndpoint,
+      });
+      expect(result.status).not.to.equal(0);
+      expect(`${result.stderr}${result.stdout}`).to.contain(
+        "SOLANA_INDEXER_WS_ENDPOINT"
+      );
+    }
+
+    for (const privateHost of [
+      "localhost.",
+      "127.0.0.1",
+      "192.168.1.2",
+      "[::1]",
+      "[::]",
+      "[::ffff:7f00:1]",
+      "[fe90::1]",
+    ]) {
+      const result = runConfigImport({
+        ...validProductionEnv(wallet),
+        SOLANA_INDEXER_RPC_ENDPOINT: `https://${privateHost}`,
+        SOLANA_INDEXER_WS_ENDPOINT: `wss://${privateHost}`,
+      });
+      expect(result.status).not.to.equal(0);
+      expect(`${result.stderr}${result.stdout}`).to.contain("public");
+    }
+
+    for (const publicHostname of ["fcdn.example.com", "fd-provider.example.com"]) {
+      const result = runConfigImport({
+        ...validProductionEnv(wallet),
+        SOLANA_INDEXER_RPC_ENDPOINT: `https://${publicHostname}`,
+        SOLANA_INDEXER_WS_ENDPOINT: `wss://${publicHostname}`,
+      });
+      expect(result.status).to.equal(0);
+    }
   });
 
   it("does not require a managed-wallet encryption key when all managed-wallet features are closed", () => {

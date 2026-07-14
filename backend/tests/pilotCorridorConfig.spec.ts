@@ -227,8 +227,28 @@ describe("Pilot corridor configuration", () => {
     );
     const authentication = implementation.indexOf('beginStage("external wallet authentication")');
     const manifestMutation = implementation.indexOf('beginStage("content manifest creation")');
+    const preMutationReleaseGate = implementation.indexOf(
+      'checkpoint: "before-mutation"',
+      implementation.indexOf("const run = async")
+    );
+    const chainSubmit = implementation.indexOf(
+      'beginStage("proposal transaction submission")'
+    );
+    const preSubmitReleaseGate = implementation.indexOf(
+      'checkpoint: "before-chain-submit"',
+      implementation.indexOf("const run = async")
+    );
     expect(authentication).to.be.greaterThan(0);
     expect(manifestMutation).to.be.greaterThan(authentication);
+    expect(preMutationReleaseGate).to.be.greaterThan(0).and.lessThan(authentication);
+    expect(preSubmitReleaseGate).to.be.greaterThan(manifestMutation).and.lessThan(chainSubmit);
+    expect(implementation).to.include(
+      'requireEnv("STREAM_PUMP_SMOKE_EXPECTED_RELEASE_SHA")'
+    );
+    expect(implementation).to.include(
+      'requireEnv("STREAM_PUMP_SMOKE_DEPLOYED_RELEASE_SHA")'
+    );
+    expect(implementation).to.include("healthRelease: health.releaseSha");
     for (const requiredPreflight of [
       "proposalDeadlineUnix()",
       "getMediaBuffer(mediaPath)",
