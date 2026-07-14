@@ -97,7 +97,7 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 | 🛡️ **反投机护栏** | 非转让 token、每日买入上限、动态退出税、延迟评级、背书上限 |
 | 🎞️ **真实媒体管线** | Cloudflare R2 存储 + Mux 视频处理 + 进入公开 feed 前的发布验证 |
 
-> **边界——以上是协议/代码能力，不代表当前 Pilot 的可用性。** 邀请制 Pilot 候选版本仅运行在 devnet/test-USDC 上，**未部署、未上线、无真实资金**。对 Pilot 用户唯一开放的通道是：外部钱包认证 → 媒体 → feed → proposal intent → 创作者 + 赞助方双签 → 后端 relay → 手动 Track 1 → 活动凭证。S1 发现/买断、粉丝背书池、Track 2/3 结算、以及 email/social 托管钱包在代码中存在，但**对所有 Pilot 用户关闭**（见[当前状态](#-当前状态)）。
+> **边界——以上是协议/代码能力，不代表当前 Pilot 的可用性。** 已部署的受控技术 Pilot 仅运行在 devnet/test-USDC 上，保持邀请制，**不是公开生产上线且无真实资金**。对 Pilot 用户唯一开放的通道是：外部钱包认证 → 媒体 → feed → proposal intent → 创作者 + 赞助方双签 → 后端 relay → 手动 Track 1 → 活动凭证。S1 发现/买断、粉丝背书池、Track 2/3 结算、以及 email/social 托管钱包在代码中存在，但**对所有 Pilot 用户关闭**（见[当前状态](#-当前状态)）。
 
 ---
 
@@ -210,9 +210,9 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——尚未部署生产、尚未上线。** H0、H1 与 H2 人工门均已批准。最新的 **P3** pilot 恢复 + readiness 门控工作（集成的 Codex 后端 commit `d14a20f`，加上本次前端/文档真实性 pass）**仅在本地实现并验证——尚未部署、迁移已在本地新增但本次工作未应用、未进行线上/真实凭证 smoke。其强制的 Fable 5 复审现已 PASS（2026-07-12，无 blocker/major）；H3 已于 2026-07-12 批准；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择——下一道门是一次显式的生产变更审批（P4）。** 所有链上活动都指向 **Solana devnet 与一枚 test-USDC mint；从不涉及任何真实资金。** 端到端走廊（外部钱包创作者 → 媒体上传 → 公开 feed → proposal → 双签发起 → 后端 relay → 手动 Track 1 → 链上活动凭证）已在 devnet 上完成代码验证，但未部署。readiness 标签保持如实。
+StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana devnet/test-USDC、邀请制、external-wallet-first、Track1-only、无真实资金，且不是公开生产上线。** H0–H4 均已批准。P4 已完成固定 devnet program 升级、26 项 Neon migration（恢复分支继续保留）、固定版本的前后端部署、真实 R2/Mux/feed/proposal 走廊验证、手动 Track 1 恰好一次结算/重放，以及 allowlist 清理。Render 当前运行后端 `88c0debad6ecb7eacfe9e24793951f3794353f4c`（`dep-d9auio7lk1mc73c4r18g`）；Vercel 仍为前端 `097e9805b197398ae1c04cf5bf84f1044b3b2f19`。P5 只获准进行有界的 Pilot 运营、可靠性、安全与可观测性加固，并必须停在 H5；P6 与所有关闭通道仍未获授权。
 
-### 邀请制 Pilot（P1）——候选版本，非线上发布
+### 邀请制 Pilot——受控技术部署，非公开上线
 
 访问由**外部真实钱包白名单**门控。auth challenge 对每一个有效钱包**形态完全相同**，邀请校验**只在有效签名之后**执行——白名单无法被提前探测。
 
@@ -228,19 +228,19 @@ StreamPump 目前是一个**经代码验证的邀请制 Pilot 候选版本——
 
 **Track 1 结算真实性（P2）。** 手动 Track 1 operator 结算是**证据绑定、幂等、租约围栏（lease-fenced）且签名校验**的；活动凭证**区分 anchor、funding 与 settlement 签名**。历史上无法证明的 anchor-tx 签名已由 **migration 清除**，而非当作凭证展示。
 
-**不得声称**（不要表述为已完成）：第三方 publication 独立验证；program 侧白名单强制；安全审计；生产部署；真实资金。
+**不得声称**（不要表述为已完成）：第三方 publication 独立验证；program 侧白名单强制；安全审计；公开/真实资金生产上线；真实资金。
 
 **生产监听门（fail-closed）。** 生产环境下，除非每个 active RPC 都返回完整的 Solana devnet genesis hash、所配置的 program 账户存在且 `executable`、且链上 `ProtocolConfig.usdcMint` 与 `PILOT_EXPECTED_USDC_MINT` 完全一致，后端才会启动。相关 env：`PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS`、`PILOT_EXPECTED_USDC_MINT`、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。P2 新增运行时/配置：`R2_DELIVERY_BUCKET`（必须与 `R2_BUCKET` 不同）、内部 operator 密钥 `INTERNAL_OPERATOR_API_KEY`、`INDEXER_ENABLED`/`MUX_RECONCILIATION_ENABLED` 门控，以及打包在 backend 根目录下的**生产 IDL**（`STREAMPUMP_IDL_PATH=./idl/streampump_core.json`）。
 
 **验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Fable 5 审查；人工门 **H1 已批准**。**P2（`d78815b..e0b6028`）已通过一次独立的 Fable 5 审查（PASS，2026-07-12，无 blocker/major 问题），且人工门 H2 已批准——已实现并在本地验证，但尚未部署、尚未对真实资金上线；未进行任何部署、迁移应用、真实凭证 smoke 或 readiness 提升。** **P3**（pilot 恢复 + readiness 门控，集成的 Codex 后端基座 commit `d14a20f` 加后续修复 `96e9075`）新增 `/health` 存活探针与独立的 `/ready`（在 DB + 已启用的 Indexer + 已启用的 Mux 就绪前返回 503）、要求手动 Track 1 的 Oracle 签名者等于链上 `ProtocolConfig.oracleAuthority` 的 preflight、经审计且仅限 operator 的链上 replay / publication 重开-撤销 / Mux requeue / no-resend Track 1 对账，以及带 `isPublicFeedEligible` 的安全创作者 manifest 诊断。后续修复 `96e9075` 强化 indexer 使其 fail-closed：启动时要求真实的公共 `onSlotChange` 通知加 `getSlot`，运行时若 slot 心跳停滞（90s）或 RPC 探测失败，则将 readiness 的 Indexer 信号降级为 FAILED，使 `/ready` 返回 503；有序签名回填在第三次有界 NOT_FOUND 时把签名标记为终态 `PRUNED`（operator replay 可将其重置为 PROCESSING 并随后 SYNCED）。**对初始 P3 范围（`84c3415..109767f`）的首次 Fable 5 审查未发现 blocker，但有 2 项 major 问题；两者均已在 `96e9075` 本地修复。对固定范围 `84c3415..d783301` 的强制 Fable 5 复审现已 PASS（2026-07-12，无 blocker/major 残留）。Fable 自身的 Bash 测试重跑因权限被拒，故其 PASS 结论基于代码/测试检查加下述编排器已执行的证据——不得暗示 Fable 本身运行了测试套件。** H3（人工审查节点）现已于 2026-07-12 批准；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择；下一道且当前唯一的门是一次显式的生产变更审批（P4）。其两个 P3 迁移（`20260712170000_chain_ingestion_recovery`、`20260712180000_pilot_operator_events`）**在早前 P3 工作中于本地新增、本次工作未应用**（实际环境/数据库的应用状态未经检查）；后续修复是在既有 P3 schema/迁移上修改，未新增迁移。P3 后端验证（修复后）：Prisma validate PASS；后端 build PASS；聚焦套件 **20/20**；**完整后端 187/187 通过**；精确生产 IDL 校验器（**35 instructions / 13 accounts / 66 types / 87 errors**）；Anchor 构建加 P2 Track1-only 本地链上套件（**3 项通过**）；app lint 与生产 build **PASS**；`git diff --check` 于编辑后运行。P2 本地已验证：Prisma generate + validate；后端构建；**150 项后端测试**；生产 IDL 校验器（**35 instructions / 13 accounts / 66 types / 87 errors**）；Anchor 构建；**12 项关键本地链上测试**；app lint + build；以及 `git diff --check`。最终 Opus UI 真实性修复（`5ad0065`）修正 onboarding 的外部钱包/Track 1 文案，不带 preview/seeded 徽标，并将 portfolio/rewards 从正常 Pilot 导航中移除（legacy 路由仍保留标签、仅可直链访问）。已在 in-app Browser 中于 `/onboarding` 与 `/campaigns/not-a-pda` 桌面端与 390px 移动端浏览器验证：控制台干净、无框架 overlay 或横向溢出、外部钱包登录导航可用，且活动错误 fail-closed、无本地回退。**真实生产走廊与 Track 1 smoke 未执行**，因为缺少可用的 Pilot 凭证与线上 proposal——smoke 脚本 fail-closed 并给出明确 blocker，因此走廊**尚未**被称为线上或生产就绪。此次 Fable 5 审查记录了两条非门控观察：(1) 在 Render/Cloud Run/Railway 已识别标记之外的托管平台，仍依赖 `NODE_ENV=production` 或显式 `PILOT_INVITE_ONLY` 才能进入生产门控路径；(2) 月度上传配额归属以 asset `createdAt` 为键，因此跨月重新 presign 的归属为近似值。
 
-**下一道门：** P2 与 P3 均已通过独立的 **Fable 5** 审查（**P3 复审 2026-07-12 PASS，无 blocker/major**），且**人工门 H0/H1/H2/H3 均已批准（H3 于 2026-07-12）。** H3 已获批准；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择。**下一道且当前唯一的门是一次显式的生产变更审批（P4）**，涵盖 program extend（3,088 字节）+ 受控 upgrade/rollback、Neon 恢复点 + 迁移应用、受控 Render/Vercel 部署、Mux webhook 配置，以及一次性 allowlist 钱包走廊 + Track 1 replay smoke——仅 devnet/test-USDC，无真实资金。剩余的外部上线 blocker 依旧存在：真实的专用 devnet RPC、对已识别 Pilot test-USDC mint 的正式冻结/批准、真实的部署链上 preflight、使用真实凭证的已部署走廊 + Track 1 smoke，以及外部安全审计与法律审查。
+**下一道门：** H4 已于 2026-07-14 获得明确批准。P5 将冻结一个有界的 control-plane 加固 candidate，只运行风险对应检查，并仅把未覆盖的 `34f3d96..candidate` 范围交给 Fable 5。获得 0 blocker/major 后，工作停在 **H5**；没有单独的 H5 批准不得开始 P6。
 
-**真实 Pilot 上线前的剩余 blocker：** 一个真实专用 devnet RPC；对已识别 Pilot test-USDC mint 的正式冻结/批准；一次真实部署链上 preflight；一次带真实凭证的已部署走廊 + Track 1 smoke；以及外部安全审计 + 法律审查。
+**任何公开或真实资金上线前的剩余 blocker：** 外部安全审计、法律/代币定性审查、生产政策与司法辖区/KYC 决策，以及对每条当前关闭通道的单独批准。即使到 H6，也不会自动免除这些前置条件。
 
 | 区域 | Readiness | 当前真实能力 |
 |---|---|---|
-| **Pilot 走廊（邀请制）** | 已在 devnet 代码验证 · 未部署 | 外部钱包认证 → R2/Mux 媒体 → feed → proposal intent → 双签 → 后端 relay → 手动 Track 1 → 活动凭证 |
+| **Pilot 走廊（邀请制）** | 已部署的受控技术 Pilot · 仅 devnet/test-USDC | 外部钱包认证 → R2/Mux 媒体 → feed → proposal intent → 双签 → 后端 relay → 手动 Track 1 → 活动凭证 |
 | **S1 市场 / portfolio / 买断** | Pilot 关闭（代码为 `SEEDED_DEMO`） | 买卖/领取/买断代码针对种子 devnet 状态存在，但对 Pilot 用户禁用 |
 | **S2 proposal 发起** | 已在 devnet 代码验证 | 双签发起走廊已验证；是 Pilot 中唯一开放的资金流 |
 | **S2 背书** | Pilot 关闭（代码为 `BACKEND_READY_UI_GAP`） | 种子 proposal 的链上 burn + 后端 builder 存在，但对 Pilot 用户禁用 |
@@ -421,12 +421,14 @@ cd backend && npm run prisma:migrate:deploy
 
 ## 🗺 路线图
 
-当前优先级（邀请制 Pilot 候选——devnet/test-USDC，未部署、未上线）。H0、H1、H2 与 H3 均已批准（H3 于 2026-07-12）；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择，下一道门是一次显式的生产变更审批（P4）：
+当前优先级：**P5 有界的 Pilot 运营、可靠性、安全与可观测性加固**；边界仍是邀请制、devnet/test-USDC、external-wallet-first、Track1-only、manual/operator-only、无真实资金。P4 已完成且 H4 已批准；P5 必须通过 exact-range Fable 5 gate，并停在 H5。
+
+- **P4 门控顺序（历史，已完成）：** 受控 program/Neon/Render/Vercel/Mux 变更、真实一次性钱包走廊、手动 Track 1 恰好一次结算/重放与 allowlist 清理，均在各自 mutation gate 下完成。当前后端为 `88c0deb`，allowlist 仅保留人类批准的外部钱包。
+- **P5 门控顺序（当前）：** 从已接受边界 `34f3d96` 冻结有界 hardening candidate，只运行风险对应验证，对未覆盖范围做一次 Fable 5 审查，关闭 blocker/major，然后停在 H5。P5 不包含关闭通道或 readiness 提升。
 
 - **P2 门控顺序（历史，已完成）：** (1) 固定 P2 commit 范围 `d78815b..e0b6028`，(2) 对其取得一次独立的 **Fable 5** 审查——**2026-07-12 PASS，无 blocker/major 问题**，(3) 未提出任何 blocker/major 问题，因此无需重跑，然后 (4) **人工门 H2 已批准**。
-- **P3 门控顺序（下一步）：** 集成的 Codex 后端 `d14a20f` 加后续修复 `96e9075` 及本次前端/文档 pass 仅在本地验证。(1) 对初始范围 `84c3415..109767f` 的首次独立 **Fable 5** 审查未发现 blocker、但有 2 项 major，(2) 两者均已在 `96e9075` 修复，(3) 对固定范围 `84c3415..d783301` 的强制 **Fable 5** 复审现已 **2026-07-12 PASS，无 blocker/major**，因此 (4) **人工审查节点 H3 已于 2026-07-12 批准**；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择。下一道且当前唯一的门是一次显式的**生产变更审批（P4）**（program extend + upgrade/rollback、Neon 恢复点 + 迁移、受控 Render/Vercel 部署、Mux webhook、一次性 allowlist 钱包走廊 + Track 1 replay smoke）；agent 在此处停下并移交人工。
-- 搭建真实专用 devnet RPC、对已识别 Pilot test-USDC mint 的正式冻结/批准（生产 IDL 制品已打包在 backend 根目录下）。
-- 执行一次真实部署链上 preflight 与一次带真实 Pilot 凭证的已部署走廊 + Track 1 smoke。
+- **P3 门控顺序（历史，已完成）：** 首次 Fable 5 审查发现 2 项 major，均在 `96e9075` 修复；固定范围 `84c3415..d783301` 通过复审，H3 于 2026-07-12 获批。
+- 保留 P4 已验证的专用 devnet RPC、run-scoped test-USDC freeze、打包 IDL、rollback evidence、部署 identity 与受控走廊/Track 1 proof，不把一次性 smoke 当作日常重复验证。
 - 在任何真实资金或公开上线前完成外部安全审计 + 法律审查。
 
 Post-Pilot backlog（对所有 Pilot 用户关闭——每项都需要后续 H 门以及各自的审计/法律/供应方前置条件）：

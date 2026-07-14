@@ -201,15 +201,30 @@ describe("startup readiness", () => {
       expect(healthBefore.status).to.equal(200);
       expect(healthPayload.ok).to.equal(true);
       expect(healthPayload).not.to.have.property("services");
+      expect(healthBefore.headers.get("cache-control")).to.equal("no-store");
+      expect(healthBefore.headers.get("surrogate-control")).to.equal("no-store");
+      expect(healthBefore.headers.get("x-powered-by")).to.equal(null);
 
       const readyBefore = await fetch(`http://127.0.0.1:${port}/ready`);
       expect(readyBefore.status).to.equal(503);
       expect(await readyBefore.json()).to.deep.equal(readiness.snapshot());
+      expect(readyBefore.headers.get("cache-control")).to.equal("no-store");
+      expect(readyBefore.headers.get("surrogate-control")).to.equal("no-store");
+      expect(readyBefore.headers.get("x-powered-by")).to.equal(null);
+
+      const internalNotFound = await fetch(
+        `http://127.0.0.1:${port}/api/v1/internal/not-mounted`
+      );
+      expect(internalNotFound.status).to.equal(404);
+      expect(internalNotFound.headers.get("cache-control")).to.equal("no-store");
+      expect(internalNotFound.headers.get("surrogate-control")).to.equal("no-store");
+      expect(internalNotFound.headers.get("x-powered-by")).to.equal(null);
 
       await startBackgroundServices(runtimeConfig, readiness, successfulDependencies());
       const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);
       expect(readyAfter.status).to.equal(200);
       expect(await readyAfter.json()).to.deep.equal(readiness.snapshot());
+      expect(readyAfter.headers.get("cache-control")).to.equal("no-store");
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
