@@ -1,5 +1,6 @@
 import { closeSync, constants, fstatSync, openSync, readFileSync } from "fs";
 import path from "path";
+import * as anchor from "@coral-xyz/anchor";
 
 export class PilotCorridorConfigError extends Error {
   readonly code: string;
@@ -182,6 +183,49 @@ const M6_FROZEN_AUTHORITIES = {
   oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
 };
 
+const M6_FRESH_TRANSACTION_SEQUENCE = [
+  "fund_disposable_creator_sol",
+  "fund_disposable_sponsor_sol",
+  "create_fee_payer_test_usdc_ata",
+  "create_creator_test_usdc_ata",
+  "create_sponsor_test_usdc_ata",
+  "mint_approved_test_usdc_to_fee_payer_ata",
+  "transfer_approved_test_usdc_to_sponsor",
+  "oracle_authorized_register_disposable_creator",
+  "create_pilot_test_only_s2_upgrade_receipt",
+] as const;
+
+const M6_RESUMED_TRANSACTION_SEQUENCE = [
+  ...M6_FRESH_TRANSACTION_SEQUENCE.slice(0, 7),
+  "resume_fund_disposable_creator_rent_floor",
+  ...M6_FRESH_TRANSACTION_SEQUENCE.slice(7),
+] as const;
+
+const M6_CREATOR_PROFILE_ACCOUNT_SPACE = 263;
+const M6_UPGRADE_RECEIPT_ACCOUNT_SPACE = 164;
+const M6_CREATOR_PROFILE_RENT_LAMPORTS = 2_721_360n;
+const M6_SYSTEM_WALLET_RENT_LAMPORTS = 890_880n;
+const M6_CREATOR_FUNDING_FLOOR_LAMPORTS = 3_612_240n;
+const M6_RECOVERY_TOP_UP_LAMPORTS = 612_240n;
+
+const exactIntegerString = (value: unknown): bigint | null => {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+};
+
+const isValidSolanaSignature = (value: unknown): value is string => {
+  if (typeof value !== "string") return false;
+  try {
+    return anchor.utils.bytes.bs58.decode(value).length === 64;
+  } catch {
+    return false;
+  }
+};
+
 export type M6ActorPrepEvidenceBinding = {
   runId: string;
   creator: string;
@@ -217,10 +261,51 @@ export const loadM6ActorPrepEvidence = (params: {
   const postflight = asRecord(root?.postflight);
   const upgrade = asRecord(root?.pilotTestUpgradeReport);
   const report = asRecord(upgrade?.report);
+  const recovery = asRecord(root?.recovery);
   const transactions = Array.isArray(root?.transactions) ? root.transactions : [];
+  const expectedSequence = recovery
+    ? M6_RESUMED_TRANSACTION_SEQUENCE
+    : M6_FRESH_TRANSACTION_SEQUENCE;
+  const transactionRecords = transactions.map(asRecord);
+  const signatures = transactionRecords.map((transaction) => transaction?.signature);
+  const supplyBefore = exactIntegerString(postflight?.testUsdcSupplyBeforeRaw);
+  const supplyAfter = exactIntegerString(postflight?.testUsdcSupplyAfterRaw);
+  const creatorTarget = exactIntegerString(amounts?.creatorTargetLamports);
+  const recoveryProfileRent = exactIntegerString(recovery?.creatorProfileRentLamports);
+  const recoveryWalletRent = exactIntegerString(recovery?.creatorSystemWalletRentLamports);
+  const recoveryFundingFloor = exactIntegerString(recovery?.requiredCreatorFundingFloorLamports);
+  const recoveryBalanceBefore = exactIntegerString(recovery?.creatorBalanceBeforeRecoveryLamports);
+  const recoveryTopUp = exactIntegerString(recovery?.supplementalCreatorTopUpLamports);
+  const approvedRecoveryTopUp = exactIntegerString(amounts?.creatorRecoveryTopUpLamports);
+  const recoveryInvalid = recovery
+    ? recovery.causeCode !== "CREATOR_PROFILE_AND_SYSTEM_RENT_FLOOR_OMITTED" ||
+      recovery.originalTransactionCount !== 7 ||
+      recovery.priorTransactionsFinalizedAndBound !== true ||
+      recovery.creatorProfileAccountSpace !== M6_CREATOR_PROFILE_ACCOUNT_SPACE ||
+      recoveryProfileRent !== M6_CREATOR_PROFILE_RENT_LAMPORTS ||
+      recoveryWalletRent !== M6_SYSTEM_WALLET_RENT_LAMPORTS ||
+      recoveryFundingFloor !== M6_CREATOR_FUNDING_FLOOR_LAMPORTS ||
+      recoveryBalanceBefore !== 3_000_000n ||
+      recoveryTopUp !== M6_RECOVERY_TOP_UP_LAMPORTS ||
+      approvedRecoveryTopUp !== M6_RECOVERY_TOP_UP_LAMPORTS ||
+      creatorTarget !== recoveryBalanceBefore ||
+      postflight?.recoveryTopUpLamports !== M6_RECOVERY_TOP_UP_LAMPORTS.toString() ||
+      recoveryProfileRent === null ||
+      recoveryWalletRent === null ||
+      recoveryFundingFloor === null ||
+      recoveryBalanceBefore === null ||
+      recoveryTopUp === null ||
+      recoveryProfileRent + recoveryWalletRent !== recoveryFundingFloor ||
+      recoveryBalanceBefore + recoveryTopUp !== recoveryFundingFloor ||
+      recovery.noBlindResend !== true
+    : amounts?.creatorRecoveryTopUpLamports !== undefined ||
+      postflight?.recoveryTopUpLamports !== undefined ||
+      creatorTarget === null ||
+      creatorTarget < M6_CREATOR_FUNDING_FLOOR_LAMPORTS;
   const invalid =
     root?.schemaVersion !== 1 ||
     root?.phase !== "actor_chain_preparation_complete" ||
+    (root?.recovery !== undefined && !recovery) ||
     typeof root.completedAt !== "string" ||
     report?.runId !== params.runId ||
     actors?.creator !== params.creator ||
@@ -237,16 +322,32 @@ export const loadM6ActorPrepEvidence = (params: {
     amounts?.mintToFeePayerTestUsdcRaw !== M6_TRACK1_BASE_RAW.toString() ||
     amounts?.transferToSponsorTestUsdcRaw !== M6_TRACK1_BASE_RAW.toString() ||
     postflight?.allTransactionsFinalized !== true ||
+    postflight?.transactionCount !== transactions.length ||
+    supplyBefore === null ||
+    supplyAfter === null ||
+    supplyAfter - supplyBefore !== M6_TRACK1_BASE_RAW ||
     postflight?.feePayerTestUsdcRaw !== "0" ||
+    postflight?.creatorTestUsdcRaw !== "0" ||
     postflight?.sponsorTestUsdcRaw !== M6_TRACK1_BASE_RAW.toString() ||
     postflight?.creatorLevel !== 2 ||
     String(postflight?.creatorStatus ?? "").replace(/_/g, "").toLowerCase() !== "s2active" ||
+    postflight?.receiptDigestVerified !== true ||
+    postflight?.receiptReportIdVerified !== true ||
+    postflight?.creatorProfileAccountSpace !== M6_CREATOR_PROFILE_ACCOUNT_SPACE ||
+    postflight?.upgradeReceiptAccountSpace !== M6_UPGRADE_RECEIPT_ACCOUNT_SPACE ||
     postflight?.forbiddenLaneInstructionsSent !== 0 ||
-    transactions.length === 0 ||
-    transactions.some((entry) => {
-      const transaction = asRecord(entry);
-      return transaction?.state !== "finalized" || transaction.confirmationStatus !== "finalized";
-    });
+    transactions.length !== expectedSequence.length ||
+    transactionRecords.some(
+      (transaction, index) =>
+        !transaction ||
+        transaction.step !== expectedSequence[index] ||
+        transaction.simulation !== "passed" ||
+        transaction.state !== "finalized" ||
+        transaction.confirmationStatus !== "finalized" ||
+        !isValidSolanaSignature(transaction.signature)
+    ) ||
+    new Set(signatures).size !== signatures.length ||
+    recoveryInvalid;
   if (invalid) {
     throw new PilotCorridorConfigError(
       "M6_ACTOR_PREP_EVIDENCE_MISMATCH",

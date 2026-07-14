@@ -17,6 +17,7 @@ import path from "node:path";
 import * as anchor from "@coral-xyz/anchor";
 import {
   Account,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
   createMintToCheckedInstruction,
   createTransferCheckedInstruction,
@@ -41,6 +42,8 @@ import {
   assertSeparatedRoles,
   assertTokenAccountIdentity,
   buildPilotTestReport,
+  calculateCreatorFundingFloor,
+  calculateCreatorRecoveryTopUp,
   extractKeypairBytes,
   M6_CONSTANTS,
   parseDedicatedRpcEnv,
@@ -75,12 +78,32 @@ type Evidence = {
     confirmationStatus?: "finalized";
   }>;
   postflight?: Record<string, unknown>;
+  recovery?: Record<string, unknown>;
   stopConditions: string[];
   irreversibleWarning: string[];
 };
 
 const fail = (message: string): never => {
   throw new Error(message);
+};
+
+const asRecord = (value: unknown, label: string): Record<string, unknown> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${label} must be an object`);
+  return value as Record<string, unknown>;
+};
+
+const readEvidence = (filePath: string): Evidence => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readPrivateRegularFile(filePath, "existing evidence"));
+  } catch {
+    return fail("existing evidence is not valid mode-0600 JSON");
+  }
+  const root = asRecord(parsed, "existing evidence");
+  if (root.schemaVersion !== 1 || !Array.isArray(root.transactions)) {
+    fail("existing evidence schema is not resumable");
+  }
+  return root as unknown as Evidence;
 };
 
 const sha256 = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
@@ -342,7 +365,10 @@ const main = async () => {
   const rpcUrl = parseDedicatedRpcEnv(
     readPrivateRegularFile(config.rpcEnvPath, "RPC env file")
   );
-  const evidencePath = assertPrivateEvidenceDestination(config.evidencePath);
+  const evidencePath = config.resumeExistingEvidence
+    ? path.resolve(config.evidencePath)
+    : assertPrivateEvidenceDestination(config.evidencePath);
+  const resumeEvidence = config.resumeExistingEvidence ? readEvidence(evidencePath) : undefined;
 
   const feePayer = loadKeypair(config.feePayerPath, "fee payer keypair");
   const admin = loadKeypair(config.adminMintAuthorityPath, "admin/mint-authority keypair");
@@ -407,8 +433,12 @@ const main = async () => {
   if (!protocolInfo.owner.equals(programId) || sha256(protocolInfo.data) !== M6_CONSTANTS.protocolConfigSha256) {
     fail("ProtocolConfig owner/hash mismatch");
   }
-  if (!mintInfo.owner.equals(TOKEN_PROGRAM_ID) || sha256(mintInfo.data) !== M6_CONSTANTS.testUsdcMintSha256) {
-    fail("test-USDC mint owner/preparation hash mismatch");
+  if (!mintInfo.owner.equals(TOKEN_PROGRAM_ID)) fail("test-USDC mint owner mismatch");
+  if (
+    !config.resumeExistingEvidence &&
+    sha256(mintInfo.data) !== M6_CONSTANTS.testUsdcMintSha256
+  ) {
+    fail("test-USDC mint pre-mutation hash mismatch");
   }
 
   const idl = JSON.parse(
@@ -453,28 +483,27 @@ const main = async () => {
       safeRpc("oracle balance", () => connection.getBalance(oracle.publicKey, "confirmed")),
     ]);
   const tokenAmount = (account: Account | null) => account?.amount ?? 0n;
-  if (tokenAmount(feePayerToken) !== 0n) fail("fee-payer test-USDC ATA must start empty");
-  if (tokenAmount(creatorToken) > config.maxActorStartingTestUsdcRaw) {
-    fail("creator test-USDC exceeds the explicitly approved starting ceiling");
+  if (!config.resumeExistingEvidence) {
+    if (feePayerToken || creatorToken || sponsorToken) {
+      fail("fresh preparation requires all three test-USDC ATAs to be absent");
+    }
+    if (creatorLamports !== 0 || sponsorLamports !== 0) {
+      fail("fresh preparation requires unfunded disposable creator and sponsor wallets");
+    }
   }
-  if (tokenAmount(sponsorToken) > config.maxActorStartingTestUsdcRaw) {
-    fail("sponsor test-USDC exceeds the explicitly approved starting ceiling");
-  }
-  if (BigInt(creatorLamports) > config.maxCreatorStartingLamports) {
-    fail("creator SOL exceeds the explicitly approved starting ceiling");
-  }
-  if (BigInt(sponsorLamports) > config.maxSponsorStartingLamports) {
-    fail("sponsor SOL exceeds the explicitly approved starting ceiling");
-  }
-  if (BigInt(creatorLamports) > config.creatorTargetLamports) fail("creator already exceeds approved target SOL");
-  if (BigInt(sponsorLamports) > config.sponsorTargetLamports) fail("sponsor already exceeds approved target SOL");
 
   const creatorProfile = PublicKey.findProgramAddressSync(
     [Buffer.from("creator"), creator.publicKey.toBuffer()],
     programId
   )[0];
   const handle = `p4m6_${config.runId.replace(/[-_]/g, "").slice(0, 20)}`;
-  const observedAt = Math.floor(Date.now() / 1_000) - 5;
+  const resumeReport = resumeEvidence
+    ? asRecord(asRecord(resumeEvidence.pilotTestUpgradeReport, "existing upgrade report").report, "existing report")
+    : undefined;
+  const observedAt = resumeReport
+    ? Number(resumeReport.observedAt)
+    : Math.floor(Date.now() / 1_000) - 5;
+  if (!Number.isSafeInteger(observedAt) || observedAt <= 0) fail("report observedAt is invalid");
   const testReport = buildPilotTestReport({
     runId: config.runId,
     creator: creator.publicKey.toBase58(),
@@ -496,27 +525,59 @@ const main = async () => {
   if (upgradeReceiptInfo) fail("deterministic PILOT TEST ONLY upgrade receipt already exists");
 
   const creatorProfileRent = await safeRpc("creator profile rent", () =>
-    connection.getMinimumBalanceForRentExemption(coder.size("CreatorProfile"), "confirmed")
+    connection.getMinimumBalanceForRentExemption(
+      M6_CONSTANTS.creatorProfileAccountSpace,
+      "confirmed"
+    )
+  );
+  const creatorSystemWalletRent = await safeRpc("creator system-wallet rent floor", () =>
+    connection.getMinimumBalanceForRentExemption(0, "confirmed")
   );
   const upgradeReceiptRent = await safeRpc("upgrade receipt rent", () =>
-    connection.getMinimumBalanceForRentExemption(coder.size("UpgradeReceipt"), "confirmed")
+    connection.getMinimumBalanceForRentExemption(
+      M6_CONSTANTS.upgradeReceiptAccountSpace,
+      "confirmed"
+    )
   );
   const tokenAccountRent = await safeRpc("token account rent", () =>
     connection.getMinimumBalanceForRentExemption(165, "confirmed")
   );
-  if (config.creatorTargetLamports < BigInt(creatorProfileRent)) {
-    fail("creator target SOL is below CreatorProfile rent; increase the explicitly approved target");
+  const creatorFundingFloor = calculateCreatorFundingFloor({
+    creatorProfileRentLamports: BigInt(creatorProfileRent),
+    systemWalletRentLamports: BigInt(creatorSystemWalletRent),
+  });
+  if (!config.resumeExistingEvidence && config.creatorTargetLamports < creatorFundingFloor) {
+    fail(
+      "creator target SOL is below CreatorProfile rent plus the system-wallet rent floor; increase the explicitly approved target"
+    );
   }
-  if (oracleLamports < upgradeReceiptRent) fail("oracle authority lacks rent for the PILOT TEST ONLY receipt");
-  const creatorTopUp = config.creatorTargetLamports - BigInt(creatorLamports);
-  const sponsorTopUp = config.sponsorTargetLamports - BigInt(sponsorLamports);
+  if (BigInt(oracleLamports) < BigInt(upgradeReceiptRent) + BigInt(creatorSystemWalletRent)) {
+    fail("oracle authority lacks receipt rent plus the system-wallet rent floor");
+  }
+  const creatorTopUp = config.resumeExistingEvidence
+    ? 0n
+    : config.creatorTargetLamports - BigInt(creatorLamports);
+  const creatorRecoveryTopUp = config.resumeExistingEvidence
+    ? calculateCreatorRecoveryTopUp({
+        currentLamports: BigInt(creatorLamports),
+        creatorProfileRentLamports: BigInt(creatorProfileRent),
+        systemWalletRentLamports: BigInt(creatorSystemWalletRent),
+      })
+    : 0n;
+  const sponsorTopUp = config.resumeExistingEvidence
+    ? 0n
+    : config.sponsorTargetLamports - BigInt(sponsorLamports);
   const missingAtaCount = [feePayerToken, creatorToken, sponsorToken].filter((entry) => !entry).length;
   const conservativeFeeReserve = 100_000n;
   const requiredFeePayerLamports =
-    creatorTopUp + sponsorTopUp + BigInt(missingAtaCount * tokenAccountRent) + conservativeFeeReserve;
+    creatorTopUp +
+    creatorRecoveryTopUp +
+    sponsorTopUp +
+    BigInt(missingAtaCount * tokenAccountRent) +
+    conservativeFeeReserve;
   if (BigInt(feePayerLamports) < requiredFeePayerLamports) fail("fee payer lacks the approved funding plus rent/fee reserve");
 
-  const evidence: Evidence = {
+  const freshEvidence: Evidence = {
     schemaVersion: 1,
     phase: config.execute ? "execution_started" : "read_only_preflight_passed",
     generatedAt: new Date().toISOString(),
@@ -575,7 +636,15 @@ const main = async () => {
         creatorTestUsdcRaw: tokenAmount(creatorToken).toString(),
         sponsorTestUsdcRaw: tokenAmount(sponsorToken).toString(),
       },
-      accountRents: { creatorProfileRent, upgradeReceiptRent, tokenAccountRent },
+      accountRents: {
+        creatorProfileAccountSpace: M6_CONSTANTS.creatorProfileAccountSpace,
+        creatorProfileRent,
+        creatorSystemWalletRent,
+        creatorFundingFloorLamports: creatorFundingFloor.toString(),
+        upgradeReceiptAccountSpace: M6_CONSTANTS.upgradeReceiptAccountSpace,
+        upgradeReceiptRent,
+        tokenAccountRent,
+      },
       signerPublicKeysVerified: true,
       roleSeparationVerified: true,
       creatorProfileAbsent: true,
@@ -622,107 +691,350 @@ const main = async () => {
     ],
   };
 
+  const evidence = resumeEvidence ?? freshEvidence;
+
+  let resumeSourceEvidenceSha256: string | undefined;
+  if (resumeEvidence) {
+    const existingConstants = asRecord(resumeEvidence.constants, "existing constants");
+    const existingActors = asRecord(resumeEvidence.actors, "existing actors");
+    const existingAmounts = asRecord(resumeEvidence.approvedAmounts, "existing approved amounts");
+    const existingPreflight = asRecord(resumeEvidence.preflight, "existing preflight");
+    const existingBalances = asRecord(existingPreflight.balancesBefore, "existing starting balances");
+    const existingUpgrade = asRecord(
+      resumeEvidence.pilotTestUpgradeReport,
+      "existing upgrade report"
+    );
+    const existingReport = asRecord(existingUpgrade.report, "existing report");
+    const expectedPriorSteps = [
+      "fund_disposable_creator_sol",
+      "fund_disposable_sponsor_sol",
+      "create_fee_payer_test_usdc_ata",
+      "create_creator_test_usdc_ata",
+      "create_sponsor_test_usdc_ata",
+      "mint_approved_test_usdc_to_fee_payer_ata",
+      "transfer_approved_test_usdc_to_sponsor",
+    ];
+    const actorExpectations: Record<string, string> = {
+      feePayer: feePayer.publicKey.toBase58(),
+      adminMintAuthority: admin.publicKey.toBase58(),
+      oracleAuthority: oracle.publicKey.toBase58(),
+      creator: creator.publicKey.toBase58(),
+      sponsor: sponsor.publicKey.toBase58(),
+      feePayerTestUsdcAta: feePayerAta.toBase58(),
+      creatorTestUsdcAta: creatorAta.toBase58(),
+      sponsorTestUsdcAta: sponsorAta.toBase58(),
+      creatorProfile: creatorProfile.toBase58(),
+      upgradeReceipt: upgradeReceipt.toBase58(),
+    };
+    const constantExpectations: Record<string, string> = {
+      devnetGenesis: M6_CONSTANTS.devnetGenesis,
+      programId: M6_CONSTANTS.programId,
+      programData: M6_CONSTANTS.programData,
+      programSha256: M6_CONSTANTS.programSha256,
+      protocolConfig: M6_CONSTANTS.protocolConfig,
+      protocolConfigSha256: M6_CONSTANTS.protocolConfigSha256,
+      testUsdcMint: M6_CONSTANTS.testUsdcMint,
+      oracleAuthority: M6_CONSTANTS.oracleAuthority,
+      adminMintAuthority: M6_CONSTANTS.adminMintAuthority,
+      feePayer: M6_CONSTANTS.feePayer,
+    };
+    if (resumeEvidence.phase !== "execution_started" || resumeEvidence.completedAt || resumeEvidence.postflight) {
+      fail("existing evidence is not an incomplete resumable execution");
+    }
+    for (const [key, expected] of Object.entries(actorExpectations)) {
+      if (existingActors[key] !== expected) fail(`existing evidence actor binding mismatch: ${key}`);
+    }
+    for (const [key, expected] of Object.entries(constantExpectations)) {
+      if (existingConstants[key] !== expected) fail(`existing evidence constant mismatch: ${key}`);
+    }
+    if (
+      existingConstants.programCapacity !== M6_CONSTANTS.programCapacity ||
+      existingReport.runId !== config.runId ||
+      existingReport.creator !== creator.publicKey.toBase58() ||
+      existingReport.creatorProfile !== creatorProfile.toBase58() ||
+      Number(existingReport.metricValue) !== metricValue ||
+      Number(existingReport.observedAt) !== observedAt ||
+      existingUpgrade.canonicalJson !== testReport.canonical ||
+      existingUpgrade.reportIdHex !== testReport.reportIdHex ||
+      existingUpgrade.reportDigestSha256 !== testReport.digestHex ||
+      JSON.stringify(existingReport) !== JSON.stringify(testReport.report)
+    ) {
+      fail("existing PILOT TEST ONLY report binding mismatch");
+    }
+    if (
+      existingAmounts.creatorStartingCeilingLamports !== config.maxCreatorStartingLamports.toString() ||
+      existingAmounts.sponsorStartingCeilingLamports !== config.maxSponsorStartingLamports.toString() ||
+      existingAmounts.actorStartingCeilingTestUsdcRaw !== config.maxActorStartingTestUsdcRaw.toString() ||
+      existingAmounts.creatorTargetLamports !== config.creatorTargetLamports.toString() ||
+      existingAmounts.sponsorTargetLamports !== config.sponsorTargetLamports.toString() ||
+      existingAmounts.mintToFeePayerTestUsdcRaw !== config.mintTestUsdcRaw.toString() ||
+      existingAmounts.transferToSponsorTestUsdcRaw !== config.sponsorTestUsdcRaw.toString()
+    ) {
+      fail("resume arguments do not exactly match the original approved amounts");
+    }
+    for (const key of [
+      "creatorLamports",
+      "sponsorLamports",
+      "feePayerTestUsdcRaw",
+      "creatorTestUsdcRaw",
+      "sponsorTestUsdcRaw",
+    ]) {
+      if (existingBalances[key] !== "0") fail(`existing evidence starting balance mismatch: ${key}`);
+    }
+    if (
+      resumeEvidence.transactions.length !== expectedPriorSteps.length ||
+      resumeEvidence.transactions.some(
+        (entry, index) =>
+          entry.step !== expectedPriorSteps[index] ||
+          entry.state !== "finalized" ||
+          entry.confirmationStatus !== "finalized" ||
+          entry.simulation !== "passed"
+      )
+    ) {
+      fail("existing evidence does not contain the exact seven-step finalized prefix");
+    }
+    const priorSignatures = resumeEvidence.transactions.map((entry) => entry.signature);
+    if (
+      new Set(priorSignatures).size !== priorSignatures.length ||
+      priorSignatures.some((signature) => {
+        try {
+          return anchor.utils.bytes.bs58.decode(signature).length !== 64;
+        } catch {
+          return true;
+        }
+      })
+    ) {
+      fail("existing evidence contains an invalid or duplicate transaction signature");
+    }
+    const [priorStatuses, priorTransactions] = await Promise.all([
+      safeRpc("existing signature statuses", () =>
+        connection.getSignatureStatuses(priorSignatures, { searchTransactionHistory: true })
+      ),
+      Promise.all(
+        priorSignatures.map((signature) =>
+          safeRpc(`existing finalized transaction ${signature}`, () =>
+            connection.getTransaction(signature, {
+              commitment: "finalized",
+              maxSupportedTransactionVersion: 0,
+            })
+          )
+        )
+      ),
+    ]);
+    const expectedAccountKeys: Record<string, string[]> = {
+      fund_disposable_creator_sol: [feePayer.publicKey.toBase58(), creator.publicKey.toBase58(), SystemProgram.programId.toBase58()],
+      fund_disposable_sponsor_sol: [feePayer.publicKey.toBase58(), sponsor.publicKey.toBase58(), SystemProgram.programId.toBase58()],
+      create_fee_payer_test_usdc_ata: [feePayer.publicKey.toBase58(), feePayerAta.toBase58(), mintAddress.toBase58(), ASSOCIATED_TOKEN_PROGRAM_ID.toBase58()],
+      create_creator_test_usdc_ata: [feePayer.publicKey.toBase58(), creatorAta.toBase58(), creator.publicKey.toBase58(), mintAddress.toBase58(), ASSOCIATED_TOKEN_PROGRAM_ID.toBase58()],
+      create_sponsor_test_usdc_ata: [feePayer.publicKey.toBase58(), sponsorAta.toBase58(), sponsor.publicKey.toBase58(), mintAddress.toBase58(), ASSOCIATED_TOKEN_PROGRAM_ID.toBase58()],
+      mint_approved_test_usdc_to_fee_payer_ata: [mintAddress.toBase58(), feePayerAta.toBase58(), admin.publicKey.toBase58(), TOKEN_PROGRAM_ID.toBase58()],
+      transfer_approved_test_usdc_to_sponsor: [feePayerAta.toBase58(), sponsorAta.toBase58(), feePayer.publicKey.toBase58(), mintAddress.toBase58(), TOKEN_PROGRAM_ID.toBase58()],
+    };
+    for (let index = 0; index < priorSignatures.length; index += 1) {
+      const status = priorStatuses.value[index];
+      const transaction = priorTransactions[index];
+      if (
+        !status ||
+        status.err ||
+        status.confirmationStatus !== "finalized" ||
+        !transaction ||
+        transaction.meta?.err ||
+        transaction.transaction.signatures[0] !== priorSignatures[index]
+      ) {
+        fail(`existing transaction is not finalized cleanly: ${expectedPriorSteps[index]}`);
+      }
+      const message = transaction.transaction.message as unknown as {
+        staticAccountKeys?: PublicKey[];
+        accountKeys?: PublicKey[];
+      };
+      const accountKeys = (message.staticAccountKeys ?? message.accountKeys ?? []).map((key) =>
+        key.toBase58()
+      );
+      for (const expectedKey of expectedAccountKeys[expectedPriorSteps[index]]) {
+        if (!accountKeys.includes(expectedKey)) {
+          fail(`existing transaction account binding mismatch: ${expectedPriorSteps[index]}`);
+        }
+      }
+    }
+    const expectedPostMintSupply =
+      BigInt(String(existingPreflight.testUsdcSupplyRaw)) + config.mintTestUsdcRaw;
+    if (
+      mint.supply !== expectedPostMintSupply ||
+      tokenAmount(feePayerToken) !== 0n ||
+      tokenAmount(creatorToken) !== 0n ||
+      tokenAmount(sponsorToken) !== config.sponsorTestUsdcRaw ||
+      BigInt(creatorLamports) !== config.creatorTargetLamports ||
+      BigInt(sponsorLamports) !== config.sponsorTargetLamports ||
+      creatorProfileInfo ||
+      upgradeReceiptInfo ||
+      creatorRecoveryTopUp <= 0n
+    ) {
+      fail("live chain state does not exactly match the resumable seven-step prefix");
+    }
+    const sourceRaw = readPrivateRegularFile(evidencePath, "existing evidence");
+    resumeSourceEvidenceSha256 = sha256(Buffer.from(sourceRaw, "utf8"));
+    const recoveryPlan = {
+      causeCode: "CREATOR_PROFILE_AND_SYSTEM_RENT_FLOOR_OMITTED",
+      sourceEvidenceSha256: resumeSourceEvidenceSha256,
+      originalTransactionCount: priorSignatures.length,
+      priorTransactionsFinalizedAndBound: true,
+      creatorProfileAccountSpace: M6_CONSTANTS.creatorProfileAccountSpace,
+      creatorProfileRentLamports: creatorProfileRent.toString(),
+      creatorSystemWalletRentLamports: creatorSystemWalletRent.toString(),
+      requiredCreatorFundingFloorLamports: creatorFundingFloor.toString(),
+      creatorBalanceBeforeRecoveryLamports: creatorLamports.toString(),
+      supplementalCreatorTopUpLamports: creatorRecoveryTopUp.toString(),
+      noBlindResend: true,
+    };
+    if (!config.execute) {
+      console.log(
+        JSON.stringify(
+          toJsonSafe({
+            phase: "read_only_resume_preflight_passed",
+            evidencePath,
+            recoveryPlan,
+            nextMutation: "resume_fund_disposable_creator_rent_floor",
+            sentTransactions: 0,
+          }),
+          null,
+          2
+        )
+      );
+      return;
+    }
+    if (
+      sha256(Buffer.from(readPrivateRegularFile(evidencePath, "existing evidence"), "utf8")) !==
+      resumeSourceEvidenceSha256
+    ) {
+      fail("existing evidence changed during resume preflight");
+    }
+    evidence.recovery = { ...recoveryPlan, resumedAt: new Date().toISOString() };
+    asRecord(evidence.approvedAmounts, "approved amounts").creatorRecoveryTopUpLamports =
+      creatorRecoveryTopUp.toString();
+    evidence.plannedMutations.push({
+      step: "resume_fund_disposable_creator_rent_floor",
+      rawAmount: creatorRecoveryTopUp.toString(),
+    });
+  }
+
   if (!config.execute) {
     console.log(JSON.stringify(toJsonSafe(evidence), null, 2));
     return;
   }
 
   writeEvidence(evidencePath, evidence);
-  if (creatorTopUp > 0n) {
+  if (config.resumeExistingEvidence) {
     await sendVerified(
       connection,
       new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: feePayer.publicKey,
           toPubkey: creator.publicKey,
-          lamports: creatorTopUp,
+          lamports: creatorRecoveryTopUp,
         })
       ),
       [feePayer],
-      "fund_disposable_creator_sol",
+      "resume_fund_disposable_creator_rent_floor",
       evidencePath,
       evidence
     );
-  }
-  if (sponsorTopUp > 0n) {
-    await sendVerified(
-      connection,
-      new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: feePayer.publicKey,
-          toPubkey: sponsor.publicKey,
-          lamports: sponsorTopUp,
-        })
-      ),
-      [feePayer],
-      "fund_disposable_sponsor_sol",
-      evidencePath,
-      evidence
-    );
-  }
+  } else {
+    if (creatorTopUp > 0n) {
+      await sendVerified(
+        connection,
+        new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: feePayer.publicKey,
+            toPubkey: creator.publicKey,
+            lamports: creatorTopUp,
+          })
+        ),
+        [feePayer],
+        "fund_disposable_creator_sol",
+        evidencePath,
+        evidence
+      );
+    }
+    if (sponsorTopUp > 0n) {
+      await sendVerified(
+        connection,
+        new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: feePayer.publicKey,
+            toPubkey: sponsor.publicKey,
+            lamports: sponsorTopUp,
+          })
+        ),
+        [feePayer],
+        "fund_disposable_sponsor_sol",
+        evidencePath,
+        evidence
+      );
+    }
 
-  const ataPlans: Array<[string, PublicKey, PublicKey, Account | null]> = [
-    ["create_fee_payer_test_usdc_ata", feePayerAta, feePayer.publicKey, feePayerToken],
-    ["create_creator_test_usdc_ata", creatorAta, creator.publicKey, creatorToken],
-    ["create_sponsor_test_usdc_ata", sponsorAta, sponsor.publicKey, sponsorToken],
-  ];
-  for (const [step, ata, owner, prior] of ataPlans) {
-    if (prior) continue;
+    const ataPlans: Array<[string, PublicKey, PublicKey, Account | null]> = [
+      ["create_fee_payer_test_usdc_ata", feePayerAta, feePayer.publicKey, feePayerToken],
+      ["create_creator_test_usdc_ata", creatorAta, creator.publicKey, creatorToken],
+      ["create_sponsor_test_usdc_ata", sponsorAta, sponsor.publicKey, sponsorToken],
+    ];
+    for (const [step, ata, owner, prior] of ataPlans) {
+      if (prior) continue;
+      await sendVerified(
+        connection,
+        new Transaction().add(
+          createAssociatedTokenAccountInstruction(
+            feePayer.publicKey,
+            ata,
+            owner,
+            mintAddress,
+            TOKEN_PROGRAM_ID
+          )
+        ),
+        [feePayer],
+        step,
+        evidencePath,
+        evidence
+      );
+    }
+
     await sendVerified(
       connection,
       new Transaction().add(
-        createAssociatedTokenAccountInstruction(
-          feePayer.publicKey,
-          ata,
-          owner,
+        createMintToCheckedInstruction(
           mintAddress,
+          feePayerAta,
+          admin.publicKey,
+          config.mintTestUsdcRaw,
+          6,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      ),
+      [feePayer, admin],
+      "mint_approved_test_usdc_to_fee_payer_ata",
+      evidencePath,
+      evidence
+    );
+    await sendVerified(
+      connection,
+      new Transaction().add(
+        createTransferCheckedInstruction(
+          feePayerAta,
+          mintAddress,
+          sponsorAta,
+          feePayer.publicKey,
+          config.sponsorTestUsdcRaw,
+          6,
+          [],
           TOKEN_PROGRAM_ID
         )
       ),
       [feePayer],
-      step,
+      "transfer_approved_test_usdc_to_sponsor",
       evidencePath,
       evidence
     );
   }
-
-  await sendVerified(
-    connection,
-    new Transaction().add(
-      createMintToCheckedInstruction(
-        mintAddress,
-        feePayerAta,
-        admin.publicKey,
-        config.mintTestUsdcRaw,
-        6,
-        [],
-        TOKEN_PROGRAM_ID
-      )
-    ),
-    [feePayer, admin],
-    "mint_approved_test_usdc_to_fee_payer_ata",
-    evidencePath,
-    evidence
-  );
-  await sendVerified(
-    connection,
-    new Transaction().add(
-      createTransferCheckedInstruction(
-        feePayerAta,
-        mintAddress,
-        sponsorAta,
-        feePayer.publicKey,
-        config.sponsorTestUsdcRaw,
-        6,
-        [],
-        TOKEN_PROGRAM_ID
-      )
-    ),
-    [feePayer],
-    "transfer_approved_test_usdc_to_sponsor",
-    evidencePath,
-    evidence
-  );
 
   const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(feePayer), {
     commitment: "confirmed",
@@ -788,15 +1100,50 @@ const main = async () => {
       safeRpc("post sponsor SOL", () => connection.getBalance(sponsor.publicKey, "finalized")),
       safeRpc("post oracle SOL", () => connection.getBalance(oracle.publicKey, "finalized")),
     ]);
-  if (postMint.supply !== mint.supply + config.mintTestUsdcRaw) fail("test-USDC supply delta mismatch");
+  const originalPreflight = asRecord(evidence.preflight, "evidence preflight");
+  const originalBalances = asRecord(
+    originalPreflight.balancesBefore,
+    "evidence starting balances"
+  );
+  const originalSupply = BigInt(String(originalPreflight.testUsdcSupplyRaw));
+  const originalCreatorTestUsdc = BigInt(String(originalBalances.creatorTestUsdcRaw));
+  const originalSponsorTestUsdc = BigInt(String(originalBalances.sponsorTestUsdcRaw));
+  if (postMint.supply !== originalSupply + config.mintTestUsdcRaw) {
+    fail("test-USDC supply delta mismatch against original evidence baseline");
+  }
   if (!postFeePayerToken || postFeePayerToken.amount !== 0n) fail("fee-payer test-USDC ATA did not end at zero");
-  if (!postCreatorToken || postCreatorToken.amount !== tokenAmount(creatorToken)) {
+  if (!postCreatorToken || postCreatorToken.amount !== originalCreatorTestUsdc) {
     fail("creator test-USDC ATA changed unexpectedly");
   }
-  if (!postSponsorToken || postSponsorToken.amount !== tokenAmount(sponsorToken) + config.sponsorTestUsdcRaw) {
+  if (
+    !postSponsorToken ||
+    postSponsorToken.amount !== originalSponsorTestUsdc + config.sponsorTestUsdcRaw
+  ) {
     fail("sponsor test-USDC balance delta mismatch");
   }
   if (!postCreatorProfile || !postReceipt) fail("creator profile or PILOT TEST ONLY receipt missing postflight");
+  if (
+    !postCreatorProfile.owner.equals(programId) ||
+    postCreatorProfile.data.length !== M6_CONSTANTS.creatorProfileAccountSpace ||
+    !postCreatorProfile.data
+      .subarray(0, 8)
+      .equals(coder.accountDiscriminator("CreatorProfile"))
+  ) {
+    fail("creator profile owner, allocation, or discriminator mismatch postflight");
+  }
+  if (
+    !postReceipt.owner.equals(programId) ||
+    postReceipt.data.length !== M6_CONSTANTS.upgradeReceiptAccountSpace ||
+    !postReceipt.data.subarray(0, 8).equals(coder.accountDiscriminator("UpgradeReceipt"))
+  ) {
+    fail("upgrade receipt owner, allocation, or discriminator mismatch postflight");
+  }
+  if (BigInt(postCreatorSol) < BigInt(creatorSystemWalletRent)) {
+    fail("creator system wallet fell below its rent-exempt floor postflight");
+  }
+  if (BigInt(postOracleSol) < BigInt(creatorSystemWalletRent)) {
+    fail("oracle system wallet fell below its rent-exempt floor postflight");
+  }
   const decodedCreator = coder.decode("CreatorProfile", postCreatorProfile.data) as Record<string, unknown>;
   const decodedReceipt = coder.decode("UpgradeReceipt", postReceipt.data) as Record<string, unknown>;
   const creatorLevel = Number(valueOf<number>(decodedCreator, "level", "level"));
@@ -819,7 +1166,7 @@ const main = async () => {
   evidence.postflight = {
     allTransactionsFinalized: true,
     transactionCount: evidence.transactions.length,
-    testUsdcSupplyBeforeRaw: mint.supply.toString(),
+    testUsdcSupplyBeforeRaw: originalSupply.toString(),
     testUsdcSupplyAfterRaw: postMint.supply.toString(),
     feePayerTestUsdcRaw: postFeePayerToken.amount.toString(),
     creatorTestUsdcRaw: postCreatorToken.amount.toString(),
@@ -828,6 +1175,15 @@ const main = async () => {
     creatorLamports: postCreatorSol.toString(),
     sponsorLamports: postSponsorSol.toString(),
     oracleLamports: postOracleSol.toString(),
+    creatorProfileAccountSpace: M6_CONSTANTS.creatorProfileAccountSpace,
+    creatorProfileRentLamports: creatorProfileRent.toString(),
+    creatorSystemWalletRentLamports: creatorSystemWalletRent.toString(),
+    creatorFundingFloorLamports: creatorFundingFloor.toString(),
+    upgradeReceiptAccountSpace: M6_CONSTANTS.upgradeReceiptAccountSpace,
+    upgradeReceiptRentLamports: upgradeReceiptRent.toString(),
+    ...(config.resumeExistingEvidence
+      ? { recoveryTopUpLamports: creatorRecoveryTopUp.toString() }
+      : {}),
     creatorLevel,
     creatorStatus,
     receiptDigestVerified: true,

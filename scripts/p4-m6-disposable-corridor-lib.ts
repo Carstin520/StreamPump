@@ -13,6 +13,8 @@ export const M6_CONSTANTS = Object.freeze({
   oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
   adminMintAuthority: "BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw",
   feePayer: "Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9",
+  creatorProfileAccountSpace: 263,
+  upgradeReceiptAccountSpace: 164,
   hardActorTargetLamportsCap: 50_000_000,
   hardTestUsdcRawCap: 25_000_000,
   irreversibleAcknowledgement: "PILOT_TEST_ONLY_DEVNET",
@@ -20,6 +22,7 @@ export const M6_CONSTANTS = Object.freeze({
 
 export type M6Config = {
   execute: boolean;
+  resumeExistingEvidence: boolean;
   rpcEnvPath: string;
   feePayerPath: string;
   adminMintAuthorityPath: string;
@@ -70,10 +73,12 @@ const parseRawAmount = (value: string, flag: string, allowZero: boolean): bigint
 export const parseM6Args = (argv: string[]): M6Config => {
   const values = new Map<string, string>();
   let execute = false;
+  let resumeExistingEvidence = false;
   let acknowledgement: string | undefined;
   const supported = new Set<string>([
     ...REQUIRED_VALUE_FLAGS,
     "--execute",
+    "--resume-existing-evidence",
     "--acknowledge-irreversible",
   ]);
 
@@ -83,6 +88,11 @@ export const parseM6Args = (argv: string[]): M6Config => {
     if (flag === "--execute") {
       if (execute) fail("duplicate argument: --execute");
       execute = true;
+      continue;
+    }
+    if (flag === "--resume-existing-evidence") {
+      if (resumeExistingEvidence) fail("duplicate argument: --resume-existing-evidence");
+      resumeExistingEvidence = true;
       continue;
     }
     const value = argv[index + 1];
@@ -114,6 +124,7 @@ export const parseM6Args = (argv: string[]): M6Config => {
   }
   const config: M6Config = {
     execute,
+    resumeExistingEvidence,
     rpcEnvPath: required("--rpc-env-path"),
     feePayerPath: required("--fee-payer-path"),
     adminMintAuthorityPath: required("--admin-mint-authority-path"),
@@ -177,6 +188,30 @@ export const parseM6Args = (argv: string[]): M6Config => {
     fail("test-USDC amount exceeds the fixed disposable Pilot safety cap");
   }
   return config;
+};
+
+export const calculateCreatorFundingFloor = (params: {
+  creatorProfileRentLamports: bigint;
+  systemWalletRentLamports: bigint;
+}): bigint => {
+  if (params.creatorProfileRentLamports <= 0n || params.systemWalletRentLamports <= 0n) {
+    fail("creator funding floor requires positive profile and system-wallet rent values");
+  }
+  const floor = params.creatorProfileRentLamports + params.systemWalletRentLamports;
+  if (floor > BigInt(M6_CONSTANTS.hardActorTargetLamportsCap)) {
+    fail("creator funding floor exceeds the fixed disposable Pilot safety cap");
+  }
+  return floor;
+};
+
+export const calculateCreatorRecoveryTopUp = (params: {
+  currentLamports: bigint;
+  creatorProfileRentLamports: bigint;
+  systemWalletRentLamports: bigint;
+}): bigint => {
+  if (params.currentLamports < 0n) fail("creator current balance cannot be negative");
+  const floor = calculateCreatorFundingFloor(params);
+  return params.currentLamports >= floor ? 0n : floor - params.currentLamports;
 };
 
 export const parseDedicatedRpcEnv = (text: string): string => {

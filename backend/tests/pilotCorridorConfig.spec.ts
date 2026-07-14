@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import os from "os";
 import path from "path";
+import * as anchor from "@coral-xyz/anchor";
 
 import {
   PilotCorridorConfigError,
@@ -17,6 +18,93 @@ import {
 
 describe("Pilot corridor configuration", () => {
   const keypairBytes = Array.from({ length: 64 }, (_, index) => index);
+  const freshTransactionSteps = [
+    "fund_disposable_creator_sol",
+    "fund_disposable_sponsor_sol",
+    "create_fee_payer_test_usdc_ata",
+    "create_creator_test_usdc_ata",
+    "create_sponsor_test_usdc_ata",
+    "mint_approved_test_usdc_to_fee_payer_ata",
+    "transfer_approved_test_usdc_to_sponsor",
+    "oracle_authorized_register_disposable_creator",
+    "create_pilot_test_only_s2_upgrade_receipt",
+  ];
+  const resumedTransactionSteps = [
+    ...freshTransactionSteps.slice(0, 7),
+    "resume_fund_disposable_creator_rent_floor",
+    ...freshTransactionSteps.slice(7),
+  ];
+  const transactionFor = (step: string, index: number) => ({
+    step,
+    signature: anchor.utils.bytes.bs58.encode(Buffer.alloc(64, index + 1)),
+    simulation: "passed",
+    state: "finalized",
+    confirmationStatus: "finalized",
+  });
+  const actorPrepEvidence = (resumed = false) => {
+    const steps = resumed ? resumedTransactionSteps : freshTransactionSteps;
+    return {
+      schemaVersion: 1,
+      phase: "actor_chain_preparation_complete",
+      completedAt: "2026-07-13T00:00:00.000Z",
+      constants: {
+        programId: "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp",
+        testUsdcMint: M6_PILOT_TEST_USDC_MINT,
+        feePayer: "Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9",
+        adminMintAuthority: "BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw",
+        oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
+      },
+      actors: {
+        feePayer: "Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9",
+        adminMintAuthority: "BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw",
+        oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
+        creator: "creator-wallet",
+        sponsor: "sponsor-wallet",
+      },
+      approvedAmounts: {
+        actorStartingCeilingTestUsdcRaw: "0",
+        creatorTargetLamports: resumed ? "3000000" : "3612240",
+        mintToFeePayerTestUsdcRaw: "1000000",
+        transferToSponsorTestUsdcRaw: "1000000",
+        ...(resumed ? { creatorRecoveryTopUpLamports: "612240" } : {}),
+      },
+      pilotTestUpgradeReport: { report: { runId: "m6-run" } },
+      transactions: steps.map(transactionFor),
+      postflight: {
+        allTransactionsFinalized: true,
+        transactionCount: steps.length,
+        testUsdcSupplyBeforeRaw: "32529200000",
+        testUsdcSupplyAfterRaw: "32530200000",
+        feePayerTestUsdcRaw: "0",
+        creatorTestUsdcRaw: "0",
+        sponsorTestUsdcRaw: "1000000",
+        creatorLevel: 2,
+        creatorStatus: "S2_ACTIVE",
+        receiptDigestVerified: true,
+        receiptReportIdVerified: true,
+        creatorProfileAccountSpace: 263,
+        upgradeReceiptAccountSpace: 164,
+        ...(resumed ? { recoveryTopUpLamports: "612240" } : {}),
+        forbiddenLaneInstructionsSent: 0,
+      },
+      ...(resumed
+        ? {
+            recovery: {
+              causeCode: "CREATOR_PROFILE_AND_SYSTEM_RENT_FLOOR_OMITTED",
+              originalTransactionCount: 7,
+              priorTransactionsFinalizedAndBound: true,
+              creatorProfileAccountSpace: 263,
+              creatorProfileRentLamports: "2721360",
+              creatorSystemWalletRentLamports: "890880",
+              requiredCreatorFundingFloorLamports: "3612240",
+              creatorBalanceBeforeRecoveryLamports: "3000000",
+              supplementalCreatorTopUpLamports: "612240",
+              noBlindResend: true,
+            },
+          }
+        : {}),
+    };
+  };
 
   it("loads a mode-0600 keypair path without requiring secret JSON in the environment", () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "pilot-keypair-"));
@@ -122,87 +210,144 @@ describe("Pilot corridor configuration", () => {
     });
   });
 
-  it("loads only complete mode-0600 actor-prep evidence bound to the exact M6 run", () => {
+  it("loads complete fresh and incident-resumed M6 actor-prep evidence", () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "pilot-evidence-"));
     const evidencePath = path.join(tempDir, "evidence.json");
-    const evidence = {
-      schemaVersion: 1,
-      phase: "actor_chain_preparation_complete",
-      completedAt: "2026-07-13T00:00:00.000Z",
-      constants: {
-        programId: "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp",
-        testUsdcMint: M6_PILOT_TEST_USDC_MINT,
-        feePayer: "Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9",
-        adminMintAuthority: "BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw",
-        oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
-      },
-      actors: {
-        feePayer: "Aq93mJjs8Ed6VumxjQD4n3zPPf6CUvmJSqMTW14WPFf9",
-        adminMintAuthority: "BNQPL5p13QnCVUq9S8mMjgGNDHSAxLtSVctQs85Wkfiw",
-        oracleAuthority: "HnGFioZidhFVUsXT1ecJSLNsmzniMGCcKA1bfuv6sUvC",
-        creator: "creator-wallet",
-        sponsor: "sponsor-wallet",
-      },
-      approvedAmounts: {
-        actorStartingCeilingTestUsdcRaw: "0",
-        mintToFeePayerTestUsdcRaw: "1000000",
-        transferToSponsorTestUsdcRaw: "1000000",
-      },
-      pilotTestUpgradeReport: { report: { runId: "m6-run" } },
-      transactions: [{ state: "finalized", confirmationStatus: "finalized" }],
-      postflight: {
-        allTransactionsFinalized: true,
-        feePayerTestUsdcRaw: "0",
-        sponsorTestUsdcRaw: "1000000",
-        creatorLevel: 2,
-        creatorStatus: "S2_ACTIVE",
-        forbiddenLaneInstructionsSent: 0,
-      },
-    };
     try {
-      writeFileSync(evidencePath, JSON.stringify(evidence), { mode: 0o600 });
-      chmodSync(evidencePath, 0o600);
-      expect(loadM6ActorPrepEvidence({
-        evidencePath,
-        runId: "m6-run",
-        creator: "creator-wallet",
-        sponsor: "sponsor-wallet",
-      })).to.deep.include({
-        runId: "m6-run",
-        creator: "creator-wallet",
-        sponsor: "sponsor-wallet",
-        mint: M6_PILOT_TEST_USDC_MINT,
-        sponsorTestUsdcRaw: "1000000",
-        phase: "actor_chain_preparation_complete",
-      });
+      for (const resumed of [false, true]) {
+        const evidence = actorPrepEvidence(resumed);
+        writeFileSync(evidencePath, JSON.stringify(evidence), { mode: 0o600 });
+        chmodSync(evidencePath, 0o600);
+        expect(loadM6ActorPrepEvidence({
+          evidencePath,
+          runId: "m6-run",
+          creator: "creator-wallet",
+          sponsor: "sponsor-wallet",
+        })).to.deep.include({
+          runId: "m6-run",
+          creator: "creator-wallet",
+          sponsor: "sponsor-wallet",
+          mint: M6_PILOT_TEST_USDC_MINT,
+          sponsorTestUsdcRaw: "1000000",
+          phase: "actor_chain_preparation_complete",
+          transactionCount: resumed ? 10 : 9,
+        });
+      }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
-      writeFileSync(evidencePath, JSON.stringify({ ...evidence, phase: "execution_started" }));
-      expect(() => loadM6ActorPrepEvidence({
-        evidencePath,
-        runId: "m6-run",
-        creator: "creator-wallet",
-        sponsor: "sponsor-wallet",
-      })).to.throw(PilotCorridorConfigError).with.property(
-        "code",
-        "M6_ACTOR_PREP_EVIDENCE_MISMATCH"
-      );
-
-      writeFileSync(evidencePath, JSON.stringify({
-        ...evidence,
-        approvedAmounts: {
-          ...evidence.approvedAmounts,
-          transferToSponsorTestUsdcRaw: "2000000",
+  it("rejects unknown/reordered steps, duplicate or malformed signatures, and count mismatches", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "pilot-evidence-"));
+    const evidencePath = path.join(tempDir, "evidence.json");
+    const load = () => loadM6ActorPrepEvidence({
+      evidencePath,
+      runId: "m6-run",
+      creator: "creator-wallet",
+      sponsor: "sponsor-wallet",
+    });
+    try {
+      const cases = [
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[0].step = "unknown_operator_step";
         },
-      }));
-      expect(() => loadM6ActorPrepEvidence({
-        evidencePath,
-        runId: "m6-run",
-        creator: "creator-wallet",
-        sponsor: "sponsor-wallet",
-      })).to.throw(PilotCorridorConfigError).with.property(
-        "code",
-        "M6_ACTOR_PREP_EVIDENCE_MISMATCH"
-      );
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[1].signature = evidence.transactions[0].signature;
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[0].signature = "not-base58";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.transactionCount -= 1;
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[0].simulation = "skipped";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[0].state = "prepared";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.transactions[0].confirmationStatus = "confirmed";
+        },
+      ];
+      for (const mutate of cases) {
+        const evidence = actorPrepEvidence();
+        mutate(evidence);
+        writeFileSync(evidencePath, JSON.stringify(evidence), { mode: 0o600 });
+        chmodSync(evidencePath, 0o600);
+        expect(load).to.throw(PilotCorridorConfigError).with.property(
+          "code",
+          "M6_ACTOR_PREP_EVIDENCE_MISMATCH"
+        );
+      }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects incorrect supply, account-space, receipt, ATA, and recovery rent-floor evidence", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "pilot-evidence-"));
+    const evidencePath = path.join(tempDir, "evidence.json");
+    const load = () => loadM6ActorPrepEvidence({
+      evidencePath,
+      runId: "m6-run",
+      creator: "creator-wallet",
+      sponsor: "sponsor-wallet",
+    });
+    try {
+      const cases = [
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.testUsdcSupplyAfterRaw = "32530200001";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.creatorProfileAccountSpace = 228;
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.receiptReportIdVerified = false;
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.creatorTestUsdcRaw = "1";
+        },
+      ];
+      for (const mutate of cases) {
+        const evidence = actorPrepEvidence();
+        mutate(evidence);
+        writeFileSync(evidencePath, JSON.stringify(evidence), { mode: 0o600 });
+        chmodSync(evidencePath, 0o600);
+        expect(load).to.throw(PilotCorridorConfigError).with.property(
+          "code",
+          "M6_ACTOR_PREP_EVIDENCE_MISMATCH"
+        );
+      }
+
+      const recoveryCases = [
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.recovery!.supplementalCreatorTopUpLamports = "612239";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.recovery!.requiredCreatorFundingFloorLamports = "3612239";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.approvedAmounts.creatorRecoveryTopUpLamports = "612241";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.postflight.recoveryTopUpLamports = "612241";
+        },
+        (evidence: ReturnType<typeof actorPrepEvidence>) => {
+          evidence.recovery!.noBlindResend = false;
+        },
+      ];
+      for (const mutate of recoveryCases) {
+        const evidence = actorPrepEvidence(true);
+        mutate(evidence);
+        writeFileSync(evidencePath, JSON.stringify(evidence), { mode: 0o600 });
+        chmodSync(evidencePath, 0o600);
+        expect(load).to.throw(PilotCorridorConfigError).with.property(
+          "code",
+          "M6_ACTOR_PREP_EVIDENCE_MISMATCH"
+        );
+      }
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

@@ -6,6 +6,8 @@ import {
   assertSeparatedRoles,
   assertTokenAccountIdentity,
   buildPilotTestReport,
+  calculateCreatorFundingFloor,
+  calculateCreatorRecoveryTopUp,
   extractKeypairBytes,
   M6_CONSTANTS,
   parseDedicatedRpcEnv,
@@ -35,6 +37,7 @@ const expectFailure = (operation: () => unknown, pattern: RegExp) =>
 
 const dryRun = parseM6Args(requiredArgs);
 assert.equal(dryRun.execute, false);
+assert.equal(dryRun.resumeExistingEvidence, false);
 assert.equal(dryRun.mintTestUsdcRaw, 1_000_000n);
 
 expectFailure(
@@ -48,6 +51,22 @@ const execute = parseM6Args([
   M6_CONSTANTS.irreversibleAcknowledgement,
 ]);
 assert.equal(execute.execute, true);
+const resumeDryRun = parseM6Args([...requiredArgs, "--resume-existing-evidence"]);
+assert.equal(resumeDryRun.resumeExistingEvidence, true);
+assert.equal(resumeDryRun.execute, false);
+const resumeExecute = parseM6Args([
+  ...requiredArgs,
+  "--resume-existing-evidence",
+  "--execute",
+  "--acknowledge-irreversible",
+  M6_CONSTANTS.irreversibleAcknowledgement,
+]);
+assert.equal(resumeExecute.resumeExistingEvidence, true);
+assert.equal(resumeExecute.execute, true);
+expectFailure(
+  () => parseM6Args([...requiredArgs, "--resume-existing-evidence", "--resume-existing-evidence"]),
+  /duplicate argument/
+);
 expectFailure(
   () =>
     parseM6Args([
@@ -57,6 +76,32 @@ expectFailure(
   /must match/
 );
 expectFailure(() => parseM6Args([...requiredArgs, "--unknown", "value"]), /unsupported/);
+
+assert.equal(
+  calculateCreatorFundingFloor({
+    creatorProfileRentLamports: 2_721_360n,
+    systemWalletRentLamports: 890_880n,
+  }),
+  3_612_240n
+);
+assert.equal(
+  calculateCreatorRecoveryTopUp({
+    currentLamports: 3_000_000n,
+    creatorProfileRentLamports: 2_721_360n,
+    systemWalletRentLamports: 890_880n,
+  }),
+  612_240n
+);
+assert.equal(
+  calculateCreatorRecoveryTopUp({
+    currentLamports: 3_612_240n,
+    creatorProfileRentLamports: 2_721_360n,
+    systemWalletRentLamports: 890_880n,
+  }),
+  0n
+);
+assert.equal(M6_CONSTANTS.creatorProfileAccountSpace, 263);
+assert.equal(M6_CONSTANTS.upgradeReceiptAccountSpace, 164);
 const excessiveSolArgs = [...requiredArgs];
 excessiveSolArgs[excessiveSolArgs.indexOf("--creator-target-lamports") + 1] = "50000001";
 expectFailure(() => parseM6Args(excessiveSolArgs), /fixed disposable Pilot safety cap/);
@@ -144,6 +189,34 @@ const implementation = readFileSync(
   path.join(__dirname, "p4-m6-prepare-disposable-corridor.ts"),
   "utf8"
 );
+const stateSource = readFileSync(
+  path.join(__dirname, "../programs/streampump-core/src/state.rs"),
+  "utf8"
+);
+const registerCreatorSource = readFileSync(
+  path.join(__dirname, "../programs/streampump-core/src/instructions/register_creator.rs"),
+  "utf8"
+);
+const upgradeCreatorSource = readFileSync(
+  path.join(__dirname, "../programs/streampump-core/src/instructions/upgrade_creator.rs"),
+  "utf8"
+);
+assert.match(registerCreatorSource, /space\s*=\s*8\s*\+\s*CreatorProfile::INIT_SPACE/);
+assert.match(upgradeCreatorSource, /space\s*=\s*8\s*\+\s*UpgradeReceipt::INIT_SPACE/);
+assert.match(stateSource, /impl CreatorProfile\s*\{[\s\S]*?pub const INIT_SPACE: usize/);
+assert.match(stateSource, /impl UpgradeReceipt\s*\{[\s\S]*?pub const INIT_SPACE: usize/);
+assert.match(implementation, /M6_CONSTANTS\.creatorProfileAccountSpace/);
+assert.match(implementation, /M6_CONSTANTS\.upgradeReceiptAccountSpace/);
+assert.equal(implementation.includes('coder.size("CreatorProfile")'), false);
+assert.equal(implementation.includes('coder.size("UpgradeReceipt")'), false);
+assert.match(implementation, /postCreatorProfile\.owner\.equals\(programId\)/);
+assert.match(implementation, /postCreatorProfile\.data\.length\s*!==\s*M6_CONSTANTS\.creatorProfileAccountSpace/);
+assert.match(implementation, /coder\.accountDiscriminator\("CreatorProfile"\)/);
+assert.match(implementation, /coder\.accountDiscriminator\("UpgradeReceipt"\)/);
+assert.match(implementation, /postCreatorSol[\s\S]*creatorSystemWalletRent/);
+assert.match(implementation, /test-USDC supply delta mismatch against original evidence baseline/);
+assert.match(implementation, /fresh preparation requires all three test-USDC ATAs to be absent/);
+assert.match(implementation, /fresh preparation requires unfunded disposable creator and sponsor wallets/);
 assert.match(implementation, /\.registerCreator\(/);
 assert.match(implementation, /\.upgradeCreator\(/);
 assert.match(implementation, /constants\.O_NOFOLLOW/);
