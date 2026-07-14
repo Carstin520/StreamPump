@@ -44,9 +44,9 @@
 本仓库已补好的部署前置项：
 - 后端支持 `CORS_ALLOWED_ORIGINS`
 - 前端有 [app/.env.example](../../app/.env.example)
-- 后端有只读迁移校验 gate `npm run verify:p4:neon:post`（exact-26/checksum/schema/data，只读事务，不写库）
+- 后端有两个只读迁移校验 gate：`npm run verify:p4:neon:post` 是稳态重部署 gate，证明 exact-26 迁移/checksum/schema、数值计数与 scoped truth 关系，同时允许 M3 后合法的 Pilot 数据；`npm run verify:p4:neon:baseline` 保留严格的 M3 零值清理断言，仅用于 M3 基线/恢复取证。两者都使用只读事务，不写库。
 
-> **P4 迁移状态（当前真值）。** Neon 生产已完成 M3：**恰好 26 个迁移全部应用，0 失败、0 回滚**，含全部 P3 迁移；M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留。因此 **M4/首次上线不再执行 `prisma migrate deploy`**——不再有待应用迁移。Render 预部署改用只读 `npm run verify:p4:neon:post` 作为 exact-26/checksum/schema/data gate。**任何迁移写操作都是 STOP 条件。** `prisma:migrate:deploy` 仅保留为常规工具，P4 路径不使用。
+> **P4 迁移状态（当前真值）。** Neon 生产已完成 M3：**恰好 26 个迁移全部应用，0 失败、0 回滚**，含全部 P3 迁移；M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留。因此 **M4/首次上线不再执行 `prisma migrate deploy`**——不再有待应用迁移。Render 稳态预部署使用只读 `npm run verify:p4:neon:post`（runtime 模式）；M3 零值基线/恢复取证另用 `npm run verify:p4:neon:baseline`（migration-baseline 模式），不用于每次重部署。取证记录会写明 `postDataMode`。**任何迁移写操作都是 STOP 条件。** `prisma:migrate:deploy` 仅保留为常规工具，P4 路径不使用。
 
 ## 架构建议
 
@@ -259,13 +259,13 @@ Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 6
 
 > **不要在 M4/首次上线运行 `prisma migrate deploy`。** Neon 生产的 M3 已经完成：**恰好 26 个迁移全部应用，0 失败、0 回滚**，含全部 P3 迁移（`20260712170000_chain_ingestion_recovery`、`20260712180000_pilot_operator_events` 等）。没有待应用迁移。
 
-Render 预部署命令必须是只读的 exact-26/checksum/schema/data gate：
+Render 稳态预部署命令必须是只读的 runtime gate：
 
 ```bash
 npm run verify:p4:neon:post
 ```
 
-它在只读事务中校验恰好 26 个已应用迁移、校验和、schema 与数据不变量，**不写数据库**。**任何试图应用/写迁移的命令都是 STOP 条件**——不要用它替代或补充迁移应用；M3 已应用全部六个 P3 迁移。M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留作为回退目标。
+它在只读事务中校验恰好 26 个已应用迁移、校验和、schema、数值计数及 `scoped_proposals_with_publication_truth <= scoped_proposals`，**不写数据库**，并允许 M3 后合法的 Pilot 数据；取证记录包含 `postDataMode`。M3 零值基线/恢复取证使用 `npm run verify:p4:neon:baseline`，额外断言 verified publications、feed eligibility、scoped publication truth 与 anchor claims 等原始清理计数为零；该命令不用于每次重部署。**任何试图应用/写迁移的命令都是 STOP 条件**——不要用它替代或补充迁移应用；M3 已应用全部六个 P3 迁移。M3 前的可复原恢复分支 `br-frosty-fire-an0lsiq2` 保留作为回退目标。
 
 然后再确认：
 - `/health` 返回 200（liveness）

@@ -22,6 +22,13 @@ const { Client } = require("pg") as {
 type Phase = "pre" | "post";
 export type PostDataMode = "migration-baseline" | "runtime";
 
+export class VerifierInvariantError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VerifierInvariantError";
+  }
+}
+
 export type PostMigrationImpact = {
   verified_publications: string;
   feed_eligible_manifests: string;
@@ -110,7 +117,7 @@ const expectedEnums: Record<string, string[]> = {
 
 const required = (name: string): string => {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`missing ${name}`);
+  if (!value) throw new VerifierInvariantError(`missing ${name}`);
   return value;
 };
 
@@ -127,8 +134,16 @@ const sorted = (values: string[]): string[] => [...values].sort();
 
 const assertEqual = (actual: unknown, expected: unknown, label: string): void => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error(`invariant failed: ${label}`);
+    throw new VerifierInvariantError(`invariant failed: ${label}`);
   }
+};
+
+export const resolvePostDataMode = (value: string | undefined): PostDataMode => {
+  const mode = value?.trim() || "migration-baseline";
+  if (mode !== "migration-baseline" && mode !== "runtime") {
+    throw new VerifierInvariantError("invalid post data mode");
+  }
+  return mode;
 };
 
 export const assertPostMigrationDataInvariants = (
@@ -146,7 +161,9 @@ export const assertPostMigrationDataInvariants = (
   const counts = Object.fromEntries(
     countKeys.map((key) => {
       const value = impact[key];
-      if (!/^\d+$/.test(value)) throw new Error(`invariant failed: ${key} count`);
+      if (!/^\d+$/.test(value)) {
+        throw new VerifierInvariantError(`invariant failed: ${key} count`);
+      }
       return [key, Number(value)];
     })
   ) as Record<keyof PostMigrationImpact, number>;
@@ -168,19 +185,19 @@ export const assertPostMigrationDataInvariants = (
     return;
   }
 
-  if (mode !== "runtime") throw new Error("invalid post data mode");
+  if (mode !== "runtime") throw new VerifierInvariantError("invalid post data mode");
   if (counts.scoped_proposals_with_publication_truth > counts.scoped_proposals) {
-    throw new Error("invariant failed: scoped proposal publication truth count");
+    throw new VerifierInvariantError(
+      "invariant failed: scoped proposal publication truth count"
+    );
   }
 };
 
 const safeErrorCode = (error: unknown): string =>
   typeof error === "object" && error && "code" in error ? String(error.code) : "INVARIANT";
 
-const safeErrorDetail = (error: unknown): string | undefined => {
-  const message = error instanceof Error ? error.message : "";
-  return /^(invariant failed:|invalid )/.test(message) ? message : undefined;
-};
+export const safeErrorDetail = (error: unknown): string | undefined =>
+  error instanceof VerifierInvariantError ? error.message : undefined;
 
 export const resolveMigrationsDir = (scriptDirectory: string = __dirname): string => {
   const candidates = [
@@ -189,7 +206,9 @@ export const resolveMigrationsDir = (scriptDirectory: string = __dirname): strin
   ];
   const migrationsDir = candidates.find((candidate) => existsSync(candidate));
   if (!migrationsDir) {
-    throw new Error("invariant failed: local Prisma migrations directory");
+    throw new VerifierInvariantError(
+      "invariant failed: local Prisma migrations directory"
+    );
   }
   return migrationsDir;
 };
@@ -210,9 +229,10 @@ const localMigrationChecksums = (): Map<string, string> => {
 
 const main = async (): Promise<void> => {
   const phase = required("P4_M3_EXPECTED_PHASE") as Phase;
-  if (phase !== "pre" && phase !== "post") throw new Error("invalid phase");
-  const postDataMode = (process.env.P4_M3_POST_DATA_MODE?.trim() ||
-    "migration-baseline") as PostDataMode;
+  if (phase !== "pre" && phase !== "post") {
+    throw new VerifierInvariantError("invalid phase");
+  }
+  const postDataMode = resolvePostDataMode(process.env.P4_M3_POST_DATA_MODE);
 
   const connectionString = required("DIRECT_URL");
   const pooledConnectionString = required("DATABASE_URL");
@@ -353,7 +373,9 @@ const main = async (): Promise<void> => {
           "all other clients must be the exact idle Neon pooler artifact"
         );
         if (Number(idlePoolerBackends) > 1) {
-          throw new Error("multiple idle Neon pooler artifacts during quiescence");
+          throw new VerifierInvariantError(
+            "multiple idle Neon pooler artifacts during quiescence"
+          );
         }
       } else {
         assertEqual(otherClientBackends, "0", "other client backends during quiescence");

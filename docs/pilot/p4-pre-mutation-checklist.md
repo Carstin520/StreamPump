@@ -118,7 +118,7 @@ Completed M3 controls:
 - [x] Render service `srv-d79rs0450q8c73fp2lmg` was suspended at `2026-07-13T09:18:34Z`; no deploy/runner was active and repeated public write-shaped probes returned `503`.
 - [x] Current-point recovery branch `p4-m3-pre-20260713T093116Z` (`br-frosty-fire-an0lsiq2`) was created from `br-orange-bar-ancofkw5`; compute `ep-tiny-mouse-an4mgy4d` was created at `2026-07-13T09:31:25Z`.
 - [x] The recovery branch was connectable, contained the exact 20-migration pre-state, matched the production final-pre `{migrations,data}` snapshot, and remained unchanged after production migration.
-- [x] Exactly six migrations applied once; final production verification reports 26 applied, 0 failed, 0 rolled back, all frozen schema objects present, Prisma status current, and fail-closed cleanup counts at zero.
+- [x] Exactly six migrations applied once; final production verification reports 26 applied, 0 failed, 0 rolled back, all frozen schema objects present, Prisma status current, and fail-closed cleanup counts at zero. That point-in-time M3 evidence corresponds to `npm run verify:p4:neon:baseline` (`migration-baseline` mode).
 
 Pending migrations, in order:
 
@@ -162,7 +162,7 @@ Candidate SHA history: the prior pre-doc candidate `aa59485902194af6132e430ab1c5
 Historical pre-M4 isolation snapshot and completed actions:
 
 - After M3, Render service `srv-d79rs0450q8c73fp2lmg` was suspended and tracked `main`. M4 changed the branch to `codex/p4-pilot-deployment`, disabled auto-deploy, and deployed only the exact frozen candidate.
-- Render now builds with `npm ci --include=dev && npm run prisma:generate && npm run build`; its pre-deploy command is `npm run verify:p4:neon:post`, the read-only exact-26 migration/checksum/schema/data gate. Any future attempt to apply a migration remains a STOP condition.
+- Render now builds with `npm ci --include=dev && npm run prisma:generate && npm run build`; its steady-state pre-deploy command is `npm run verify:p4:neon:post`, the read-only runtime gate that proves exactly 26 applied migrations, checksums, schema, numeric counts, and the scoped truth relationship while permitting legitimate post-M3 Pilot data. Evidence records `postDataMode`. The stricter `npm run verify:p4:neon:baseline` (`migration-baseline` mode) preserves the original zero-count cleanup assertions for M3 baseline/recovery evidence and is not run on every redeploy. Any future attempt to apply a migration remains a STOP condition.
 - Vercel was previously on Node 24.x with the old production baseline. M4 pinned the project to Node 22, rebuilt the exact candidate with current environment values, verified the Preview, and intentionally promoted it.
 
 Credential rotation completed before the backend resumed (never paste replacement values into chat or command output):
