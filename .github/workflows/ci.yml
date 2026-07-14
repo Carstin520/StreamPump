@@ -76,6 +76,9 @@ jobs:
         env:
           STREAMPUMP_IDL_PATH: backend/tests/fixtures/streampump_core.test.idl.json
 
+      - name: Deployment verifier self-test
+        run: npm run test:p4:deployment-verifier
+
       - name: Rust check
         run: cargo check
 

@@ -210,7 +210,7 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana devnet/test-USDC、邀请制、external-wallet-first、Track1-only、无真实资金，且不是公开生产上线。** H0–H4 均已批准。P4 已完成固定 devnet program 升级、26 项 Neon migration（恢复分支继续保留）、固定版本的前后端部署、真实 R2/Mux/feed/proposal 走廊验证、手动 Track 1 恰好一次结算/重放，以及 allowlist 清理。Render 当前运行后端 `88c0debad6ecb7eacfe9e24793951f3794353f4c`（`dep-d9auio7lk1mc73c4r18g`）；Vercel 仍为前端 `097e9805b197398ae1c04cf5bf84f1044b3b2f19`。P5 只获准进行有界的 Pilot 运营、可靠性、安全与可观测性加固，并必须停在 H5；P6 与所有关闭通道仍未获授权。
+StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana devnet/test-USDC、邀请制、external-wallet-first、Track1-only、无真实资金，且不是公开生产上线。** H0–H5 均已批准。P4 已完成固定 devnet program 升级、26 项 Neon migration（恢复分支继续保留）、固定版本的前后端部署、真实 R2/Mux/feed/proposal 走廊验证、手动 Track 1 恰好一次结算/重放，以及 allowlist 清理。Render 当前运行后端 `88c0debad6ecb7eacfe9e24793951f3794353f4c`（`dep-d9auio7lk1mc73c4r18g`）；Vercel 仍为前端 `097e9805b197398ae1c04cf5bf84f1044b3b2f19`。P5 在 `f72c33d` 完成，alias-path major 已修复，Fable 5 closure 为 0 blocker/major。H5 已批准；P6 只获准进行最终 release-gate 审计整改与发布准备，并必须停在 H6。所有关闭通道仍未获授权。
 
 ### 邀请制 Pilot——受控技术部署，非公开上线
 
@@ -234,7 +234,7 @@ StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana de
 
 **验证。** P0 安全修复（`5a7f355..6ee771e`）通过 Fable 5 审查；人工门 **H0 已批准**。P1 后端硬化（`b393bac`）通过 Fable 5 审查；人工门 **H1 已批准**。**P2（`d78815b..e0b6028`）已通过一次独立的 Fable 5 审查（PASS，2026-07-12，无 blocker/major 问题），且人工门 H2 已批准——已实现并在本地验证，但尚未部署、尚未对真实资金上线；未进行任何部署、迁移应用、真实凭证 smoke 或 readiness 提升。** **P3**（pilot 恢复 + readiness 门控，集成的 Codex 后端基座 commit `d14a20f` 加后续修复 `96e9075`）新增 `/health` 存活探针与独立的 `/ready`（在 DB + 已启用的 Indexer + 已启用的 Mux 就绪前返回 503）、要求手动 Track 1 的 Oracle 签名者等于链上 `ProtocolConfig.oracleAuthority` 的 preflight、经审计且仅限 operator 的链上 replay / publication 重开-撤销 / Mux requeue / no-resend Track 1 对账，以及带 `isPublicFeedEligible` 的安全创作者 manifest 诊断。后续修复 `96e9075` 强化 indexer 使其 fail-closed：启动时要求真实的公共 `onSlotChange` 通知加 `getSlot`，运行时若 slot 心跳停滞（90s）或 RPC 探测失败，则将 readiness 的 Indexer 信号降级为 FAILED，使 `/ready` 返回 503；有序签名回填在第三次有界 NOT_FOUND 时把签名标记为终态 `PRUNED`（operator replay 可将其重置为 PROCESSING 并随后 SYNCED）。**对初始 P3 范围（`84c3415..109767f`）的首次 Fable 5 审查未发现 blocker，但有 2 项 major 问题；两者均已在 `96e9075` 本地修复。对固定范围 `84c3415..d783301` 的强制 Fable 5 复审现已 PASS（2026-07-12，无 blocker/major 残留）。Fable 自身的 Bash 测试重跑因权限被拒，故其 PASS 结论基于代码/测试检查加下述编排器已执行的证据——不得暗示 Fable 本身运行了测试套件。** H3（人工审查节点）现已于 2026-07-12 批准；人类随后授权了一次 commit/push/merge 轮次，且本次执行轮次针对 `codex/post-deadline-phase-0` 集成分支而非生产 `main`，作为避免触发 Render/Vercel 生产的操作安全选择；下一道且当前唯一的门是一次显式的生产变更审批（P4）。其两个 P3 迁移（`20260712170000_chain_ingestion_recovery`、`20260712180000_pilot_operator_events`）**在早前 P3 工作中于本地新增、本次工作未应用**（实际环境/数据库的应用状态未经检查）；后续修复是在既有 P3 schema/迁移上修改，未新增迁移。P3 后端验证（修复后）：Prisma validate PASS；后端 build PASS；聚焦套件 **20/20**；**完整后端 187/187 通过**；精确生产 IDL 校验器（**35 instructions / 13 accounts / 66 types / 87 errors**）；Anchor 构建加 P2 Track1-only 本地链上套件（**3 项通过**）；app lint 与生产 build **PASS**；`git diff --check` 于编辑后运行。P2 本地已验证：Prisma generate + validate；后端构建；**150 项后端测试**；生产 IDL 校验器（**35 instructions / 13 accounts / 66 types / 87 errors**）；Anchor 构建；**12 项关键本地链上测试**；app lint + build；以及 `git diff --check`。最终 Opus UI 真实性修复（`5ad0065`）修正 onboarding 的外部钱包/Track 1 文案，不带 preview/seeded 徽标，并将 portfolio/rewards 从正常 Pilot 导航中移除（legacy 路由仍保留标签、仅可直链访问）。已在 in-app Browser 中于 `/onboarding` 与 `/campaigns/not-a-pda` 桌面端与 390px 移动端浏览器验证：控制台干净、无框架 overlay 或横向溢出、外部钱包登录导航可用，且活动错误 fail-closed、无本地回退。**真实生产走廊与 Track 1 smoke 未执行**，因为缺少可用的 Pilot 凭证与线上 proposal——smoke 脚本 fail-closed 并给出明确 blocker，因此走廊**尚未**被称为线上或生产就绪。此次 Fable 5 审查记录了两条非门控观察：(1) 在 Render/Cloud Run/Railway 已识别标记之外的托管平台，仍依赖 `NODE_ENV=production` 或显式 `PILOT_INVITE_ONLY` 才能进入生产门控路径；(2) 月度上传配额归属以 asset `createdAt` 为键，因此跨月重新 presign 的归属为近似值。
 
-**下一道门：** H4 已于 2026-07-14 获得明确批准。P5 将冻结一个有界的 control-plane 加固 candidate，只运行风险对应检查，并仅把未覆盖的 `34f3d96..candidate` 范围交给 Fable 5。获得 0 blocker/major 后，工作停在 **H5**；没有单独的 H5 批准不得开始 P6。
+**下一道门：** H5 已于 2026-07-14 明确批准；此前 P5 commit `f72c33d` 的 fix-only Fable 5 closure 为 0 blocker/major。P6 仅包含已接受 deployment verifier 的 CI 连续性，以及 exact-SHA 部署/回滚交接；只审查 `f72c33d..candidate`，取得 0 blocker/major 后停在 **H6**。H6 仅代表发布准备完成，不等于部署或公开/真实资金上线批准。
 
 **任何公开或真实资金上线前的剩余 blocker：** 外部安全审计、法律/代币定性审查、生产政策与司法辖区/KYC 决策，以及对每条当前关闭通道的单独批准。即使到 H6，也不会自动免除这些前置条件。
 
@@ -421,10 +421,12 @@ cd backend && npm run prisma:migrate:deploy
 
 ## 🗺 路线图
 
-当前优先级：**P5 有界的 Pilot 运营、可靠性、安全与可观测性加固**；边界仍是邀请制、devnet/test-USDC、external-wallet-first、Track1-only、manual/operator-only、无真实资金。P4 已完成且 H4 已批准；P5 必须通过 exact-range Fable 5 gate，并停在 H5。
+当前优先级：**P6 最终 release-gate 审计整改与发布准备**；边界仍是邀请制、devnet/test-USDC、external-wallet-first、Track1-only、manual/operator-only、无真实资金。P5 已完成且 H5 已批准；P6 必须通过 exact-range Fable 5 gate，并停在 H6。
 
 - **P4 门控顺序（历史，已完成）：** 受控 program/Neon/Render/Vercel/Mux 变更、真实一次性钱包走廊、手动 Track 1 恰好一次结算/重放与 allowlist 清理，均在各自 mutation gate 下完成。当前后端为 `88c0deb`，allowlist 仅保留人类批准的外部钱包。
-- **P5 门控顺序（当前）：** 从已接受边界 `34f3d96` 冻结有界 hardening candidate，只运行风险对应验证，对未覆盖范围做一次 Fable 5 审查，关闭 blocker/major，然后停在 H5。P5 不包含关闭通道或 readiness 提升。
+- **P5 门控顺序（历史，已完成）：** 已接受 commit `f72c33d`；backend build、聚焦 readiness 套件 6/6、deployment-verifier 自测、diff/protected 检查与 Fable 5 fix-only closure 均通过，0 blocker/major。H5 于 2026-07-14 获批。
+- **P6 门控顺序（当前）：** 将已接受的 deployment-verifier 自测加入 CI，冻结 post-H6 exact-SHA 部署/回滚交接，只运行风险对应检查，对 `f72c33d..candidate` 做一次 Fable 5 审查，关闭 blocker/major，然后停在 H6。P6 不包含部署、关闭通道或 readiness 提升。
+- **Post-H6 发布交接：** [`docs/pilot/p6-final-audit-and-release-handoff.md`](docs/pilot/p6-final-audit-and-release-handoff.md)。任何 Render 部署前仍需单独的明确 mutation approval。
 
 - **P2 门控顺序（历史，已完成）：** (1) 固定 P2 commit 范围 `d78815b..e0b6028`，(2) 对其取得一次独立的 **Fable 5** 审查——**2026-07-12 PASS，无 blocker/major 问题**，(3) 未提出任何 blocker/major 问题，因此无需重跑，然后 (4) **人工门 H2 已批准**。
 - **P3 门控顺序（历史，已完成）：** 首次 Fable 5 审查发现 2 项 major，均在 `96e9075` 修复；固定范围 `84c3415..d783301` 通过复审，H3 于 2026-07-12 获批。

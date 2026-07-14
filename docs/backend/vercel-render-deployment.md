@@ -135,7 +135,7 @@ npm run start
 /health
 ```
 
-> **release SHA 锚定（Pilot 必需）。** Hosted Pilot 要求完整的 `PILOT_EXPECTED_RELEASE_SHA` **完全等于** Render 注入的 `RENDER_GIT_COMMIT`。只部署 `codex/p4-pilot-deployment` 上的那个精确候选 commit；auto-deploy 必须受控/关闭，`main` 或未固定的分支 head 永远不得部署。
+> **release SHA 锚定（Pilot 必需）。** Hosted Pilot 要求完整的 `PILOT_EXPECTED_RELEASE_SHA` **完全等于** Render 注入的 `RENDER_GIT_COMMIT`。P4 历史部署来自 `codex/p4-pilot-deployment`；后续只允许部署对应人工 H gate 已接受的完整 commit SHA，auto-deploy 必须受控/关闭，`main` 或未固定的分支 head 永远不得部署。P6 后的精确 preflight、postflight 与 rollback 契约见 [`docs/pilot/p6-final-audit-and-release-handoff.md`](../pilot/p6-final-audit-and-release-handoff.md)。
 
 > **只读 Neon gate 指纹。** Render 还必须设置 `P4_EXPECTED_NEON_DATABASE=neondb`、`P4_EXPECTED_NEON_HOST_SHA256=a6c67cc9e5f1f9b94812efdeb7bbba5c558e475d183fa35d0f740f6ef4a2a678`、`P4_EXPECTED_NEON_ROLE_SHA256=6f198191100386e1f0c093fc1c902c0520c6382059d75fb4743ec1ec75cc7842`。这些是目标绑定指纹，不是数据库凭据；缺失或不匹配时 pre-deploy 必须失败。
 >
@@ -350,7 +350,7 @@ https://api.yourdomain.com/api/webhooks/mux
 
 这是**邀请制 devnet / test-USDC / 仅 Track 1 的技术 Pilot**，不是生产上线、也不提供真实资金可用性。按此顺序执行：
 
-1. 确认 Render auto-deploy 已关闭，且精确候选 commit 只在 `codex/p4-pilot-deployment` 上；`PILOT_EXPECTED_RELEASE_SHA` 完全等于 Render `RENDER_GIT_COMMIT`。
+1. 确认 Render auto-deploy 已关闭，且精确候选 commit 已通过对应人工 H gate；`PILOT_EXPECTED_RELEASE_SHA` 完全等于 Render `RENDER_GIT_COMMIT`。P4 之后的候选还必须遵守 [`docs/pilot/p6-final-audit-and-release-handoff.md`](../pilot/p6-final-audit-and-release-handoff.md) 的单次 mutation 与 rollback 契约。
 2. 用该精确 commit 部署 Render 候选；只读预部署校验（`npm run verify:p4:neon:post`）必须证明恰好 26 个已应用迁移与全部 M3 后不变量，且**不应用任何迁移**。
 3. `/health` 返回 200 且带 invite-only/manual-settlement 运行时真值；`/ready` 就绪（DB + indexer + Mux）并**稳定超过 90 秒**。
 4. CORS allow/deny 通过、provider exchange 返回 403、prototype/S1/email/ephemeral/Track2 等封闭路由关闭、operator endpoint 未鉴权返回 403。
