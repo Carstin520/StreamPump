@@ -401,6 +401,17 @@ const verifyHealthAndReadiness = async (
   assertControlPlaneHeaders(health, "health probe");
   assertHealthPayload(health.json, config.expectedReleaseSha);
 
+  const healthAlias = await request(
+    fetchImpl,
+    config.apiOrigin,
+    "/HEALTH",
+    { method: "GET" },
+    { parseJson: true }
+  );
+  requireStatus(healthAlias, 200, "health alias probe");
+  assertControlPlaneHeaders(healthAlias, "health alias probe");
+  assertHealthPayload(healthAlias.json, config.expectedReleaseSha);
+
   const ready = await request(
     fetchImpl,
     config.apiOrigin,
@@ -411,6 +422,17 @@ const verifyHealthAndReadiness = async (
   requireStatus(ready, 200, "readiness probe");
   assertControlPlaneHeaders(ready, "readiness probe");
   assertReadyPayload(ready.json);
+
+  const readyAlias = await request(
+    fetchImpl,
+    config.apiOrigin,
+    "/ready/",
+    { method: "GET" },
+    { parseJson: true }
+  );
+  requireStatus(readyAlias, 200, "readiness alias probe");
+  assertControlPlaneHeaders(readyAlias, "readiness alias probe");
+  assertReadyPayload(readyAlias.json);
 };
 
 export const runDeploymentVerification = async (
@@ -592,6 +614,7 @@ const runSelfTest = async (): Promise<void> => {
   }> = [];
   const mockFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
+    const normalizedPathname = url.pathname.toLowerCase().replace(/\/+$/, "");
     const method = init?.method ?? "GET";
     const requestHeaders = new Headers(init?.headers);
     observedRequests.push({
@@ -628,7 +651,7 @@ const runSelfTest = async (): Promise<void> => {
         );
       }
     }
-    if (url.pathname === "/health") {
+    if (normalizedPathname === "/health") {
       return Response.json(
         {
           ok: true,
@@ -640,7 +663,7 @@ const runSelfTest = async (): Promise<void> => {
         { headers: { "cache-control": "no-store", "surrogate-control": "no-store" } }
       );
     }
-    if (url.pathname === "/ready") {
+    if (normalizedPathname === "/ready") {
       return Response.json(
         {
           ok: true,

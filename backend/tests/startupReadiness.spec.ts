@@ -205,12 +205,24 @@ describe("startup readiness", () => {
       expect(healthBefore.headers.get("surrogate-control")).to.equal("no-store");
       expect(healthBefore.headers.get("x-powered-by")).to.equal(null);
 
+      for (const healthAlias of ["/HEALTH", "/health/"]) {
+        const aliasResponse = await fetch(`http://127.0.0.1:${port}${healthAlias}`);
+        expect(aliasResponse.status).to.equal(200);
+        expect(aliasResponse.headers.get("cache-control")).to.equal("no-store");
+        expect(aliasResponse.headers.get("surrogate-control")).to.equal("no-store");
+      }
+
       const readyBefore = await fetch(`http://127.0.0.1:${port}/ready`);
       expect(readyBefore.status).to.equal(503);
       expect(await readyBefore.json()).to.deep.equal(readiness.snapshot());
       expect(readyBefore.headers.get("cache-control")).to.equal("no-store");
       expect(readyBefore.headers.get("surrogate-control")).to.equal("no-store");
       expect(readyBefore.headers.get("x-powered-by")).to.equal(null);
+
+      const readyAlias = await fetch(`http://127.0.0.1:${port}/Ready/`);
+      expect(readyAlias.status).to.equal(503);
+      expect(readyAlias.headers.get("cache-control")).to.equal("no-store");
+      expect(readyAlias.headers.get("surrogate-control")).to.equal("no-store");
 
       const internalNotFound = await fetch(
         `http://127.0.0.1:${port}/api/v1/internal/not-mounted`
@@ -219,6 +231,13 @@ describe("startup readiness", () => {
       expect(internalNotFound.headers.get("cache-control")).to.equal("no-store");
       expect(internalNotFound.headers.get("surrogate-control")).to.equal("no-store");
       expect(internalNotFound.headers.get("x-powered-by")).to.equal(null);
+
+      const internalAlias = await fetch(
+        `http://127.0.0.1:${port}/api/v1/INTERNAL/not-mounted/`
+      );
+      expect(internalAlias.status).to.equal(404);
+      expect(internalAlias.headers.get("cache-control")).to.equal("no-store");
+      expect(internalAlias.headers.get("surrogate-control")).to.equal("no-store");
 
       await startBackgroundServices(runtimeConfig, readiness, successfulDependencies());
       const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);

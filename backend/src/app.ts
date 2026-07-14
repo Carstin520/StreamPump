@@ -64,11 +64,16 @@ const createJsonMiddleware = (): RequestHandler => {
   };
 };
 
-const isControlPlanePath = (path: string): boolean =>
-  path === "/health" ||
-  path === "/ready" ||
-  path === "/api/v1/internal" ||
-  path.startsWith("/api/v1/internal/");
+const isControlPlanePath = (path: string): boolean => {
+  const normalizedPath = path.toLowerCase().replace(/\/+$/, "");
+
+  return (
+    normalizedPath === "/health" ||
+    normalizedPath === "/ready" ||
+    normalizedPath === "/api/v1/internal" ||
+    normalizedPath.startsWith("/api/v1/internal/")
+  );
+};
 
 const createControlPlaneHeadersMiddleware = (): RequestHandler =>
   (req, res, next) => {
