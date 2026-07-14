@@ -20,6 +20,16 @@ const { Client } = require("pg") as {
 };
 
 type Phase = "pre" | "post";
+export type PostDataMode = "migration-baseline" | "runtime";
+
+export type PostMigrationImpact = {
+  verified_publications: string;
+  feed_eligible_manifests: string;
+  scoped_proposals: string;
+  scoped_proposals_with_publication_truth: string;
+  unverifiable_manifest_anchor_claims: string;
+  proposal_anchor_claims: string;
+};
 
 const expectedPending = new Map<string, string>([
   [
@@ -121,8 +131,56 @@ const assertEqual = (actual: unknown, expected: unknown, label: string): void =>
   }
 };
 
+export const assertPostMigrationDataInvariants = (
+  impact: PostMigrationImpact,
+  mode: PostDataMode
+): void => {
+  const countKeys: Array<keyof PostMigrationImpact> = [
+    "verified_publications",
+    "feed_eligible_manifests",
+    "scoped_proposals",
+    "scoped_proposals_with_publication_truth",
+    "unverifiable_manifest_anchor_claims",
+    "proposal_anchor_claims",
+  ];
+  const counts = Object.fromEntries(
+    countKeys.map((key) => {
+      const value = impact[key];
+      if (!/^\d+$/.test(value)) throw new Error(`invariant failed: ${key} count`);
+      return [key, Number(value)];
+    })
+  ) as Record<keyof PostMigrationImpact, number>;
+
+  if (mode === "migration-baseline") {
+    assertEqual(counts.verified_publications, 0, "post VERIFIED publications");
+    assertEqual(counts.feed_eligible_manifests, 0, "post feed eligibility");
+    assertEqual(
+      counts.scoped_proposals_with_publication_truth,
+      0,
+      "post scoped proposal publication truth"
+    );
+    assertEqual(
+      counts.unverifiable_manifest_anchor_claims,
+      0,
+      "post unverifiable manifest anchor claims"
+    );
+    assertEqual(counts.proposal_anchor_claims, 0, "post proposal anchor claims");
+    return;
+  }
+
+  if (mode !== "runtime") throw new Error("invalid post data mode");
+  if (counts.scoped_proposals_with_publication_truth > counts.scoped_proposals) {
+    throw new Error("invariant failed: scoped proposal publication truth count");
+  }
+};
+
 const safeErrorCode = (error: unknown): string =>
   typeof error === "object" && error && "code" in error ? String(error.code) : "INVARIANT";
+
+const safeErrorDetail = (error: unknown): string | undefined => {
+  const message = error instanceof Error ? error.message : "";
+  return /^(invariant failed:|invalid )/.test(message) ? message : undefined;
+};
 
 export const resolveMigrationsDir = (scriptDirectory: string = __dirname): string => {
   const candidates = [
@@ -153,6 +211,8 @@ const localMigrationChecksums = (): Map<string, string> => {
 const main = async (): Promise<void> => {
   const phase = required("P4_M3_EXPECTED_PHASE") as Phase;
   if (phase !== "pre" && phase !== "post") throw new Error("invalid phase");
+  const postDataMode = (process.env.P4_M3_POST_DATA_MODE?.trim() ||
+    "migration-baseline") as PostDataMode;
 
   const connectionString = required("DIRECT_URL");
   const pooledConnectionString = required("DATABASE_URL");
@@ -344,21 +404,7 @@ const main = async (): Promise<void> => {
         ), md5('')) AS unverifiable_manifest_anchor_digest
     `);
 
-    if (phase === "post") {
-      assertEqual(impact.rows[0].verified_publications, "0", "post VERIFIED publications");
-      assertEqual(impact.rows[0].feed_eligible_manifests, "0", "post feed eligibility");
-      assertEqual(
-        impact.rows[0].scoped_proposals_with_publication_truth,
-        "0",
-        "post scoped proposal publication truth"
-      );
-      assertEqual(
-        impact.rows[0].unverifiable_manifest_anchor_claims,
-        "0",
-        "post unverifiable manifest anchor claims"
-      );
-      assertEqual(impact.rows[0].proposal_anchor_claims, "0", "post proposal anchor claims");
-    }
+    if (phase === "post") assertPostMigrationDataInvariants(impact.rows[0], postDataMode);
 
     let schemaEvidence: Record<string, unknown> | null = null;
     if (phase === "post") {
@@ -430,6 +476,7 @@ const main = async (): Promise<void> => {
     const evidence = {
       ok: true,
       phase,
+      postDataMode: phase === "post" ? postDataMode : null,
       target: {
         database: identity.rows[0].database_name,
         roleSha256,
@@ -466,7 +513,14 @@ const main = async (): Promise<void> => {
     } catch {
       // The connection may have failed before a transaction existed.
     }
-    process.stderr.write(`${JSON.stringify({ ok: false, phase, errorCode: safeErrorCode(error) })}\n`);
+    process.stderr.write(
+      `${JSON.stringify({
+        ok: false,
+        phase,
+        errorCode: safeErrorCode(error),
+        errorDetail: safeErrorDetail(error),
+      })}\n`
+    );
     process.exitCode = 1;
   } finally {
     await client.end().catch(() => undefined);
@@ -475,7 +529,13 @@ const main = async (): Promise<void> => {
 
 if (require.main === module) {
   void main().catch((error) => {
-    process.stderr.write(`${JSON.stringify({ ok: false, errorCode: safeErrorCode(error) })}\n`);
+    process.stderr.write(
+      `${JSON.stringify({
+        ok: false,
+        errorCode: safeErrorCode(error),
+        errorDetail: safeErrorDetail(error),
+      })}\n`
+    );
     process.exitCode = 1;
   });
 }
