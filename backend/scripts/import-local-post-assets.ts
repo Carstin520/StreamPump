@@ -20,7 +20,6 @@ import {
   normalizeContentType,
 } from "../src/services/contentManifestService";
 import {
-  CompletedMultipartPart,
   extensionForMimeType,
   isVideoMimeType,
   r2Service,
@@ -384,19 +383,8 @@ const buildAssetPlans = async (
 };
 
 const uploadSinglePartObject = async (filePath: string, mimeType: string, storageKey: string) => {
-  const upload = await r2Service.generateUploadUrl(storageKey, mimeType);
   const fileBuffer = await fs.readFile(filePath);
-  const response = await fetch(upload.presignedUrl, {
-    method: "PUT",
-    headers: {
-      "content-type": mimeType,
-    },
-    body: fileBuffer,
-  });
-
-  if (!response.ok) {
-    throw new Error(`single-part upload failed (${response.status} ${response.statusText})`);
-  }
+  await r2Service.putVerifiedObject(storageKey, new Uint8Array(fileBuffer), mimeType);
 
   return fileBuffer;
 };
@@ -406,40 +394,12 @@ const uploadMultipartObject = async (
   mimeType: string,
   storageKey: string,
   fileSizeBytes: bigint
-): Promise<CompletedMultipartPart[]> => {
-  const multipartUpload = await r2Service.createMultipartUpload(storageKey, mimeType, fileSizeBytes);
+): Promise<void> => {
   const fileBuffer = await fs.readFile(filePath);
-  const completedParts: CompletedMultipartPart[] = [];
-
-  for (const part of multipartUpload.parts) {
-    const offset = (part.partNumber - 1) * multipartUpload.partSizeBytes;
-    const chunk = fileBuffer.subarray(offset, offset + multipartUpload.partSizeBytes);
-    const response = await fetch(part.presignedUrl, {
-      method: "PUT",
-      body: chunk,
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `multipart upload failed for part ${part.partNumber} (${response.status} ${response.statusText})`
-      );
-    }
-
-    const etag = response.headers.get("etag")?.trim();
-    if (!etag) {
-      throw new Error(
-        "multipart upload response is missing ETag. Ensure the R2 bucket CORS config exposes ETag."
-      );
-    }
-
-    completedParts.push({
-      partNumber: part.partNumber,
-      etag,
-    });
+  if (BigInt(fileBuffer.byteLength) !== fileSizeBytes) {
+    throw new Error("local seed asset size changed after planning");
   }
-
-  await r2Service.completeMultipartUpload(storageKey, multipartUpload.uploadId, completedParts);
-  return completedParts;
+  await r2Service.putVerifiedObject(storageKey, new Uint8Array(fileBuffer), mimeType);
 };
 
 const findExistingImportedManifest = async (
@@ -595,6 +555,10 @@ const importPost = async (
       data: {
         uploadStatus: AssetUploadStatus.UPLOADED,
         cdnUrl: r2Service.buildCanonicalUrl(storageKey),
+        verifiedSha256Hex: assetPlan.sha256Hex,
+        verifiedSizeBytes: assetPlan.fileSizeBytes,
+        storageVerifiedAt: new Date(),
+        storageVerificationError: null,
       },
     });
 

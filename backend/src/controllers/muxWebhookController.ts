@@ -40,15 +40,6 @@ const parseWebhookEvent = (rawBody: string): MuxWebhookEvent => {
   return JSON.parse(rawBody) as MuxWebhookEvent;
 };
 
-const extractSignatureHeader = (req: Request): string => {
-  const signature = req.header("mux-signature");
-  if (!signature) {
-    throw new Error("mux-signature header is required");
-  }
-
-  return signature;
-};
-
 const resolvePlaybackId = (event: MuxWebhookEvent): string | null => {
   const playbackId = event.data?.playback_ids?.[0]?.id;
   if (!playbackId || !playbackId.trim()) {
@@ -75,7 +66,11 @@ export const ingestMuxWebhook = async (req: Request, res: Response) => {
       return;
     }
 
-    const signatureHeader = extractSignatureHeader(req);
+    const signatureHeader = req.header("mux-signature")?.trim();
+    if (!signatureHeader) {
+      res.status(401).json({ error: "mux-signature header is required" });
+      return;
+    }
 
     try {
       muxService.verifyWebhookSignature(rawBody, signatureHeader);

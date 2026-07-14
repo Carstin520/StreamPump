@@ -10,7 +10,21 @@ This runbook keeps the hackathon demo focused on two controlled web3 paths:
 6. Sponsor signs once and submits.
 7. Campaign detail and settlement pages show Solana proof: proposal PDA, transaction signature, manifest hash, content anchor, and track state.
 
-S1 buyout formation is still prepared by seed/operator scripts. The productized live S1 demo path starts from a seeded creator market and graduated/claimable buyout state.
+S1 buyout formation is still prepared by seed/operator scripts. This legacy controlled seeded S1 demo path starts from a seeded creator market and graduated/claimable buyout state; it is not part of the Pilot corridor described below.
+
+## Pilot Boundary (read first)
+
+This build is a **code-verified invite-only Pilot candidate — not deployed production and not live**. Everything below runs on **Solana devnet with a test-USDC mint; no real funds are involved**. H0, H1, and H2 human gates are approved (P2 corridor-truth passed its independent Fable 5 review). The newer **P3** pilot recovery + readiness-gate work (integrated Codex backend base commit `d14a20f` plus follow-up fix `96e9075`, which fails the indexer closed on stalled subscriptions so `/ready` returns 503) is **implemented and verified locally only — not deployed, no live smoke**. The **first Fable 5 review of the initial P3 range (`84c3415..109767f`) found no blocker but 2 major findings, both fixed locally in `96e9075`; the mandatory Fable 5 re-review of the fixed range `84c3415..d783301` is now PASS (2026-07-12, no blocker/major)**. H3 (human review node) is **approved (2026-07-12)**; the human subsequently authorized one commit/push/merge round, and this execution round targets the `codex/post-deadline-phase-0` integration branch instead of production `main` as an operational safety choice to avoid triggering Render/Vercel production — **do not treat P3 as deployed or launched**. The next and only current gate is an explicit **production-mutation approval (P4)** (program extend + upgrade/rollback, Neon restore point + migration, controlled Render/Vercel deploy, Mux webhook, disposable allowlisted-wallet corridor + Track 1 replay smoke). Its two P3 migrations (`20260712170000_chain_ingestion_recovery`, `20260712180000_pilot_operator_events`) were added locally in earlier P3 work and are NOT applied by this work (the actual environment/DB applied state was not inspected); the follow-up fix amended existing P3 schema/migrations without adding a new migration. The demo paths in this runbook are operator/seed-prepared and are a superset of what the Pilot exposes to invited users.
+
+The only corridor open to Pilot users is: **external-wallet auth → content create/upload (R2/Mux) → public feed/post projection → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 fixed-base settlement → campaign proof**. Access is gated by an external real-wallet allowlist; the auth challenge is identical for every valid wallet and the invite check runs only after a valid signature, so the allowlist cannot be probed in advance.
+
+Closed for all Pilot users (seed/operator-only in this runbook, never a Pilot user path): email/social/provider managed wallet and public managed execution, S1 market/buyout/portfolio claim, Track 2 endorsement and fan rewards, Track 3 CPS, daily/engagement rewards, automatic oracle settlement schedulers, and prototype/legacy routes.
+
+P2 corridor-truth (real in this build): content uploads land in a **private R2 origin bucket** and are only promoted to a **distinct public delivery bucket** (`R2_DELIVERY_BUCKET`, required to differ from `R2_BUCKET`) after the backend records **server-observed bytes/MIME/size/SHA-256**, enforces a **serialized monthly quota**, reconciles Mux, and an **operator approves** feed eligibility — a **creator cannot self-verify** their own content. Content and proposal-intent mutations use **durable, DB-backed idempotency keys**. A proposal launches only from a **feed-eligible immutable manifest** with a **positive Track 1**, **creator + sponsor signatures**, and a **confirmed chain-state match**; **Track 2/3 must be zero and are rejected if partially configured**. Manual Track 1 settlement is **evidence-bound, idempotent, lease-fenced, signature-verified**, and the proof **separates anchor/funding/settlement signatures** (historical unprovable anchor-tx signatures were cleared by migration).
+
+**Real production-corridor and Track 1 smoke were NOT executed** in this pass — live Pilot credentials and a live proposal were unavailable. The smoke scripts (`smoke:production-corridor`, `smoke-pilot-track1`) fail closed with explicit blockers; do not call the corridor live or production-ready.
+
+Do not claim: independent third-party publication verification, program-side allowlist enforcement, security audit, production deployment, or real funds.
 
 ## Environment
 
@@ -63,6 +77,18 @@ ORACLE_TRACK3_AUTO_SETTLEMENT_ENABLED=false
 ```
 
 Only set `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=true` and `NEXT_PUBLIC_ENABLE_PREVIEW_SOCIAL_AUTH=true` for local screen recordings where the preview social identities are explicitly part of the script.
+
+P2 adds required content/operator config. Set a **distinct** delivery bucket and an operator key (server-only; never in the frontend), and point the backend at the packaged production IDL:
+
+```bash
+R2_BUCKET=streampump-origin      # private origin (presigned staging + KYB docs)
+R2_DELIVERY_BUCKET=streampump-delivery   # public delivery — MUST differ from R2_BUCKET
+R2_PUBLIC_BASE_URL=...           # bind only to the delivery bucket
+INTERNAL_OPERATOR_API_KEY=...    # >=32 chars; operator publication review + manual Track 1 only
+STREAMPUMP_IDL_PATH=./idl/streampump_core.json   # packaged production IDL under backend root
+INDEXER_ENABLED=true             # P2 .env.example default is now true
+MUX_RECONCILIATION_ENABLED=true  # P2 .env.example default is now true; keep false only for offline recordings
+```
 
 ## Required Checks
 
@@ -208,7 +234,10 @@ npm run dev --prefix app
 See [docs/product-readiness-phase-0.md](docs/product-readiness-phase-0.md) for the frozen post-hackathon readiness matrix.
 See [docs/streamPump-long-term-roadmap.md](docs/streamPump-long-term-roadmap.md) for the long-term product target and gap-closing roadmap.
 
+- This is a Pilot candidate on devnet/test-USDC only; do not present any path as deployed production, live, or handling real funds.
+- The only Pilot-user corridor is external-wallet auth → media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof. S1, Track 2 endorsement, Track 3 CPS, managed/email-social auth, rewards, and prototype routes are closed to Pilot users.
 - Do not claim S1 buyout formation is productized in this build; offers, acceptance, and graduation are seeded/operator-driven.
 - Do not enable Track3 automatic settlement. Track3 CPS still needs a real merchant/reconciliation source.
 - Do not present S2 endorsement or third-party Track3 reconciliation as live integrations.
 - Keep oracle scheduler off for the public demo unless manually testing Track1/Track2 with known seeded data.
+- The seeded devnet smoke below settles Track 2/3 with mocked values for operator verification only; those settlements are not part of the Pilot-user corridor.

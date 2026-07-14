@@ -72,6 +72,24 @@ export type ContentManifestAssetResponse = {
   muxPlaybackUrl: string | null;
   muxLastKnownStatus: string | null;
   processingError: string | null;
+  // Optional Mux ingest diagnostics. Present once the backend serializer ships
+  // them; render as honest processing state, never as a delivery claim.
+  muxWebhookReceivedAt?: string | null;
+  muxReconcileAttempts?: number;
+  muxLastCheckedAt?: string | null;
+  muxReadyAt?: string | null;
+  processingSource?: string | null;
+  objectEtag?: string | null;
+  // Optional storage-verification evidence, populated once the backend has
+  // re-hashed the stored object and confirmed its size against the manifest.
+  verifiedSha256Hex?: string | null;
+  verifiedSizeBytes?: string | null;
+  storageVerifiedAt?: string | null;
+  // Storage-verification failure signal. The backend never returns the raw
+  // error text — only a boolean and a coarse code — so the UI stays honest
+  // without leaking internal diagnostics.
+  hasStorageVerificationError?: boolean;
+  storageVerificationErrorCode?: string | null;
   updatedAt: string;
 };
 
@@ -81,6 +99,14 @@ export type ContentPublicationResponse = {
   externalUrl: string;
   verificationStatus: string;
   verifiedAt: string | null;
+  // Optional operator-review evidence for the publication verification decision.
+  // `verificationSource` distinguishes operator vs automated review; the note is
+  // an operator-authored, human-readable rationale. Present only when reviewed.
+  verificationSource?: string | null;
+  verificationReviewer?: string | null;
+  verificationNote?: string | null;
+  verificationEvidenceDigestHex?: string | null;
+  rejectedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -249,6 +275,26 @@ export type PublicCampaignProofResponse = {
     latestChainTxSignature: string | null;
     oracleSyncStatus: string | null;
     contentPublishedVerifiedAt: string | null;
+    // Optional dedicated on-chain signatures. When present these are honest,
+    // per-stage tx signatures; when absent the UI must render them unavailable
+    // rather than reusing the generic latest chain tx.
+    fundingTxSignature?: string | null;
+    latestSettlementTxSignature?: string | null;
+  };
+  // Optional server-computed integrity checklist. Each flag is a verified truth
+  // assertion; when the whole object is absent the UI must not claim any check.
+  integrity?: {
+    manifestFinalized: boolean;
+    assetsReady: boolean;
+    operatorApprovedPublication: boolean;
+    contentHashMatchesManifest: boolean;
+    contentAnchorMatchesManifest: boolean;
+    // Optional: true only when a dedicated content-anchor tx signature exists on
+    // chain. Absent when the backend does not assert this check; the UI must not
+    // claim anchoring proof from its absence.
+    contentAnchorTransactionPresent?: boolean;
+    track1OnlyBudget: boolean;
+    track1SettlementConfirmed: boolean;
   };
   manifest: {
     manifestId: string;
@@ -260,6 +306,25 @@ export type PublicCampaignProofResponse = {
     currentAnchorPda: string | null;
     currentAnchorTx: string | null;
     publishedAt: string | null;
+    // Optional manifest evidence arrays returned by the backend campaign-proof
+    // serializer. Present only when the backend includes them; render as
+    // supporting evidence, never as a claim when absent.
+    assets?: Array<{
+      assetId: string;
+      assetType: string;
+      orderIndex: number;
+      sha256Hex: string | null;
+      mimeType: string;
+      uploadStatus: string;
+      processingStatus: string;
+    }>;
+    publications?: Array<{
+      publicationId: string;
+      platform: string;
+      externalUrl: string;
+      verificationStatus: string;
+      verifiedAt: string | null;
+    }>;
   } | null;
   endorsementSummary?: {
     endorserCount: number;
@@ -331,6 +396,11 @@ type CreateProposalIntentInput = {
 
 export type PresignManifestAssetsResponse = {
   manifestId: string;
+  // Assets the backend already accepted/verified for this manifest and therefore
+  // omitted from `uploads`. Optional: only present when the backend skips
+  // already-completed assets. When present the UI must treat them as done and
+  // never re-upload them by array position.
+  completedAssets?: ContentManifestAssetResponse[];
   uploads: Array<
     | {
         assetId: string;

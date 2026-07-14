@@ -125,6 +125,10 @@ export const OverviewConsole = ({ persona }: { persona: WorkspacePersona }) => {
   // Pending opportunities = sponsorship intents waiting on the creator.
   const pendingOpps = persona.sponsorshipItems.filter((s) => s.actionOwner === "creator");
   const weeklyViews = persona.viewsTrend.reduce((sum, v) => sum + v, 0);
+  // Live personas carry no fabricated momentum/fans/SPUMP/views metrics — those
+  // projections do not exist yet, so the console shows "—" instead of demo data.
+  const isLive = persona.dataSource === "live";
+  const dash = "—";
 
   return (
     <div className="space-y-4 pb-4">
@@ -145,19 +149,25 @@ export const OverviewConsole = ({ persona }: { persona: WorkspacePersona }) => {
         <div className="h-8 w-px bg-white/[0.08]" />
         <div>
           <p className="text-[length:var(--fs-nano)] font-medium uppercase tracking-[0.16em] text-[#5a6d87]">{t("ws.momentum")}</p>
-          <p className="mt-1 text-[length:var(--fs-caption)] font-bold text-white">{persona.momentum}</p>
+          <p className="mt-1 text-[length:var(--fs-caption)] font-bold text-white">{isLive ? dash : persona.momentum}</p>
         </div>
         <div className="h-8 w-px bg-white/[0.08]" />
         <div className="min-w-[160px] flex-1">
-          <p className="text-[length:var(--fs-nano)] font-medium text-[#5a6d87]">
-            {t("ws.toMilestone", { milestone: persona.nextMilestone })} {persona.milestoneProgress}%
-          </p>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.09]">
-            <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,#67b8ff,#de7a2a)]"
-              style={{ width: `${Math.min(100, persona.milestoneProgress)}%` }}
-            />
-          </div>
+          {isLive ? (
+            <p className="text-[length:var(--fs-nano)] font-medium text-[#5a6d87]">{t("ws.metricsPending")}</p>
+          ) : (
+            <>
+              <p className="text-[length:var(--fs-nano)] font-medium text-[#5a6d87]">
+                {t("ws.toMilestone", { milestone: persona.nextMilestone })} {persona.milestoneProgress}%
+              </p>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.09]">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#67b8ff,#de7a2a)]"
+                  style={{ width: `${Math.min(100, persona.milestoneProgress)}%` }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -194,10 +204,10 @@ export const OverviewConsole = ({ persona }: { persona: WorkspacePersona }) => {
 
       {/* Stats row — real persona data */}
       <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <StatTile label={t("ws.stat.momentum")} value={String(persona.momentum)} accent="#f5b8ab" />
-        <StatTile label={t("ws.stat.views")} value={compactNumber(weeklyViews)} />
-        <StatTile label={t("ws.stat.fans")} value={compactNumber(persona.fans)} />
-        <StatTile label={t("ws.stat.backing")} value={`⚡ ${compactNumber(persona.spumpBacking)}`} />
+        <StatTile label={t("ws.stat.momentum")} value={isLive ? dash : String(persona.momentum)} accent="#f5b8ab" />
+        <StatTile label={t("ws.stat.views")} value={isLive ? dash : compactNumber(weeklyViews)} />
+        <StatTile label={t("ws.stat.fans")} value={isLive ? dash : compactNumber(persona.fans)} />
+        <StatTile label={t("ws.stat.backing")} value={isLive ? dash : `⚡ ${compactNumber(persona.spumpBacking)}`} />
       </section>
 
       {/* Recent content */}

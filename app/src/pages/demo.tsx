@@ -21,7 +21,7 @@ import {
 const demoCards = [
   {
     title: "S1 Market",
-    subtitle: "Seeded creator market with live buy/sell builders when backend and wallet session are configured.",
+    subtitle: "Seeded creator market with buy/sell builders when backend and wallet session are configured. Legacy controlled demo — S1 is closed for Pilot users.",
     readiness: "SEEDED_DEMO" as ProductReadinessStatus,
     boundary: "Not open creator onboarding or production rating oracle.",
     stage: "S1_DISCOVERY" as const,
@@ -51,7 +51,7 @@ const demoCards = [
     title: "S2 Workspace",
     subtitle: "Content manifest, proposal intent, bundle signing, and submit path are API/wallet-wired for seeded S2-ready creators.",
     readiness: "SEEDED_DEMO" as ProductReadinessStatus,
-    boundary: "Endorsement and settlement links remain preview/operator surfaces until real burn, claim, and oracle flows are productized.",
+    boundary: "Endorsement and Track 2/3 settlement are not part of the current Pilot and stay closed for Pilot users; these links are legacy preview/operator surfaces only.",
     stage: "S2_ACTIVE" as const,
     creatorId: "neo-park",
     primaryHref: DEMO_S2_WORKSPACE_PATH,
@@ -73,35 +73,58 @@ export default function DemoHubPage() {
       </Head>
       <PageShell>
         <div className="mx-auto max-w-6xl space-y-5">
+          {/* Pilot boundary first: what the current Pilot actually covers, before
+              any of the legacy controlled-demo tracks below. */}
+          <section className="rounded-[16px] border border-[#5fca9f]/25 bg-[linear-gradient(170deg,rgba(14,31,23,0.92)_0%,rgba(10,18,14,0.92)_100%)] px-5 py-5 md:px-6">
+            <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.22em] text-[#8df0c4]">
+              Pilot candidate scope
+            </p>
+            <h1 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-white md:text-3xl">
+              What the Pilot candidate would cover
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#a7c8b6]">
+              StreamPump is a code-verified invite-only Pilot candidate on devnet / test USDC — not deployed, not
+              live, no real funds. Its only in-scope corridor is content upload to the feed and post, creator +
+              sponsor double-signed proposals, manual Track 1 settlement, and on-chain campaign proof. S1 market /
+              buyout, Track 2 / Track 3, rewards, email / social sign-in, managed wallets, and automatic
+              settlement are closed for all Pilot users.
+            </p>
+            <p className="mt-3 max-w-3xl text-xs leading-6 text-[#7fbf9d]">
+              The tracks below are legacy controlled demos — seeded/operator walkthroughs kept for reference.
+              They are not part of the current Pilot and do not represent production capability.
+            </p>
+          </section>
+
           <ProductReadinessBanner
-            description="This hub routes to controlled demo paths. S1 market and S2 launch rely on seeded/devnet readiness; S1 buyout formation is operator-prepared; S2 endorsement and settlement pages remain preview/operator surfaces."
+            description="These are legacy controlled demo tracks, not the current Pilot. S1 market and S2 launch rely on seeded/devnet readiness; S1 buyout formation is operator-prepared. In the current Pilot, settlement is read-only Track 1 evidence with manual operator settlement only — Track 2, Track 3, and S2 endorsement are closed and do not reopen here."
             status="SEEDED_DEMO"
-            title="Demo hub is a boundary map, not a production capability list"
+            title="Legacy controlled demos — a boundary map, not a production capability list"
           />
 
           <section className="rounded-[16px] border border-white/[0.06] bg-[linear-gradient(170deg,rgba(14,19,30,0.92)_0%,rgba(10,14,22,0.92)_100%)] px-5 py-5 md:px-6">
             <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.22em] text-[#67b8ff]">
-              Demo hub
+              Legacy demo hub
             </p>
             <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold tracking-[-0.04em] text-white md:text-3xl">
-                  Controlled demo tracks
-                </h1>
+                <h2 className="text-2xl font-bold tracking-[-0.04em] text-white md:text-3xl">
+                  Legacy controlled demo tracks
+                </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8ea0ba]">
-                  Fixed entry points for what can be shown today, with preview/operator boundaries kept visible.
+                  Fixed entry points for older S1/S2 walkthroughs, kept for reference with preview/operator
+                  boundaries visible. Not part of the current Pilot.
                 </p>
               </div>
               <div className="rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[length:var(--fs-micro)] text-[#9aabc4]">
-                Boundary-first demo
+                Legacy · boundary-first
               </div>
             </div>
           </section>
 
           <section className="grid gap-3 md:grid-cols-3">
             <BoundaryItem
-              label="Live demo baseline"
-              text="S1 buy/sell, S1 portfolio claim, and S2 proposal launch require seeded/devnet state plus backend and wallet readiness."
+              label="Legacy controlled demo baseline"
+              text="S1 buy/sell, S1 portfolio claim, and S2 proposal launch require seeded/devnet state plus backend and wallet readiness. These are legacy controlled demos, not the current Pilot."
             />
             <BoundaryItem
               label="Operator prepared"

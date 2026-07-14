@@ -195,7 +195,7 @@ npm run prisma:migrate:deploy    # Apply production migrations
 
 ### Error Enum
 
-`StreamPumpError` has 84 variants covering: general (math, auth), creator (handle, status, rating), S1 market (balance, caps, tax), S1 buyout (offer state, rage-quit window, holder-counter underflow, discovery-reward eligibility/cap, residual sweep, claim window), proposals (funding, settlement, claim), content (digest mismatch, anchor), users/orgs, SPUMP mint validation, and migration.
+`StreamPumpError` has 87 variants covering: general (math, auth), creator (handle, status, rating), S1 market (balance, caps, tax), S1 buyout (offer state, rage-quit window, holder-counter underflow, discovery-reward eligibility/cap, residual sweep, claim window), proposals (funding, settlement, claim), content (digest mismatch, anchor), users/orgs, SPUMP mint validation, and migration.
 
 ## Product Layers
 

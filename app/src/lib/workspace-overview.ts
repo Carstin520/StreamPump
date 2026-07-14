@@ -2,7 +2,6 @@ import { CreatorSeasonState } from "@/lib/api/types";
 import { WorkspaceOverviewResponse } from "@/lib/api/workspace";
 import { shortenWallet } from "@/lib/formatting";
 import {
-  MOCK_COVERS,
   WorkspaceActionItem,
   WorkspaceContentItem,
   WorkspacePersona,
@@ -13,6 +12,16 @@ import { WORKSPACE_CONTENT_NEW_PATH } from "@/lib/routes";
 
 export const WORKSPACE_DEMO_STAGE: CreatorSeasonState = "S2_ACTIVE";
 export const WORKSPACE_STAGE_ORDER: CreatorSeasonState[] = ["S1_DISCOVERY", "S1_BUYOUT", "S2_ACTIVE"];
+
+// Honest generated placeholder for a content row that has no fetched cover. This
+// is a flat "no preview" panel — never a borrowed /mock fixture image — so the
+// live console does not present seeded demo art as this creator's real media.
+const neutralCoverDataUrl = (seed: string): string => {
+  const hash = Array.from(seed).reduce((value, char) => value + char.charCodeAt(0), 0);
+  const hue = 210 + (hash % 24);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="hsl(${hue} 16% 13%)"/><text x="48" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="hsl(${hue} 12% 55%)">No preview</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 export const isLocalPreviewToken = (token: string) => token.startsWith("preview-local.");
 
@@ -33,7 +42,7 @@ const buildContentItems = (data: WorkspaceOverviewResponse): WorkspaceContentIte
     contentType: manifest.contentType,
     assetCount: manifest.assetCount,
     updatedAtLabel: formatUpdatedAt(manifest.updatedAt),
-    coverSrc: MOCK_COVERS[index % MOCK_COVERS.length],
+    coverSrc: neutralCoverDataUrl(`${manifest.manifestId}:${index}`),
     href: `/workspace/content/${manifest.manifestId}`,
   }));
 
@@ -191,19 +200,27 @@ const buildActions = (
 
 export const buildPersonaFromWorkspace = (data: WorkspaceOverviewResponse): WorkspacePersona => {
   const stage = resolveWorkspaceStage(data.wallet, data);
-  const base = workspacePersonas[stage];
-  const contentFromApi = buildContentItems(data);
-  const contentItems = contentFromApi;
+  const contentItems = buildContentItems(data);
   const sponsorshipItems = buildSponsorshipItems(data);
   const previewContent = contentItems[0];
 
+  // Live view-model: only fields traceable to the workspace projection are
+  // populated. Fabricated persona signals (momentum, fans, SPUMP backing, views
+  // trend, milestone %, system health) are intentionally zeroed/empty so the
+  // console renders "—" rather than seeded demo metrics.
   return {
-    ...base,
     dataSource: "live",
     stage,
     wallet: data.wallet,
     displayName: "Current creator",
-    momentum: Math.max(base.momentum, 55 + contentItems.length * 7 + sponsorshipItems.length * 4),
+    handle: shortenWallet(data.wallet),
+    avatarSrc: "",
+    momentum: 0,
+    fans: 0,
+    spumpBacking: 0,
+    nextMilestone: "",
+    milestoneProgress: 0,
+    viewsTrend: [],
     activeCampaigns: data.proposals.length,
     actions: buildActions(stage, contentItems, sponsorshipItems),
     contentItems,
@@ -220,12 +237,12 @@ export const buildPersonaFromWorkspace = (data: WorkspaceOverviewResponse): Work
       : {
           title: "No live manifest yet",
           subtitle: "Create a manifest to populate this console",
-          coverSrc: MOCK_COVERS[0],
+          coverSrc: neutralCoverDataUrl(`empty:${data.wallet}`),
           statusLabel: "EMPTY",
           tags: ["Live API", "Empty"],
           href: WORKSPACE_CONTENT_NEW_PATH,
         },
-    healthItems: base.healthItems,
+    healthItems: [],
     pipelineDemoFallback: false,
   };
 };

@@ -10,6 +10,7 @@ import { useProposalTransactionFlow } from "@/hooks/useProposalTransactionFlow";
 import { buildClaimEndorsementTransaction, buildEndorseProposalTransaction } from "@/lib/api/proposal";
 import { getS1Portfolio, runManagedWalletAction, S1PortfolioResponse } from "@/lib/api/s1";
 import { getPublicCampaignProof, PublicCampaignProofResponse } from "@/lib/api/workspace";
+import { publicDemoEnabled } from "@/lib/feature-flags";
 import { formatUsdcAtomic } from "@/lib/formatting";
 import { getStoredAuthSession } from "@/lib/auth-session";
 import { useDemoActionFlow } from "@/hooks/useDemoActionFlow";
@@ -372,6 +373,39 @@ export default function EndorsePage() {
       }
     });
   }, [campaign, claimFlow, refreshCampaign, refreshUserEndorsement, router, t, userEndorsement]);
+
+  // P0 truth gate: the demo constants + local endorsement simulator only run
+  // when the public demo flag is on. In production, when no live campaign
+  // projection is loaded we show an honest loading/unavailable state instead of
+  // silently presenting a fixture-backed interactive simulator.
+  if (!isLiveCampaign && !publicDemoEnabled()) {
+    const resolving = !router.isReady || (Boolean(routeProposalId) && !campaignError);
+    return (
+      <>
+        <Head>
+          <title>{`StreamPump | ${t("endorse.pageTitle", { name: creatorName })}`}</title>
+        </Head>
+        <PageShell eyebrow={t("endorse.pageEyebrow")} title={t("endorse.pageTitle", { name: creatorName })}>
+          <div className="space-y-5">
+            <ProductReadinessBanner
+              description={t("endorse.readinessBannerLiveDesc")}
+              status="BACKEND_READY_UI_GAP"
+              title={t("endorse.liveRequiredTitle")}
+            />
+            <section className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-white">
+                {resolving ? t("endorse.liveRequiredLoading") : t("endorse.liveRequiredTitle")}
+              </p>
+              <p className="mx-auto mt-2 max-w-[420px] text-xs leading-6 text-[#8ea0ba]">
+                {t("endorse.liveRequiredBody")}
+                {campaignError ? ` ${t("endorse.apiError", { error: campaignError })}` : ""}
+              </p>
+            </section>
+          </div>
+        </PageShell>
+      </>
+    );
+  }
 
   return (
     <>

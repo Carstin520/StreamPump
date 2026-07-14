@@ -4,6 +4,7 @@
  */
 import { Router } from "express";
 
+import { config } from "../../../config/default";
 import {
   createAuthChallenge,
   createEphemeralSession,
@@ -24,9 +25,13 @@ const router = Router();
 
 router.post("/challenge", createAuthChallenge);
 router.post("/verify", verifyAuthChallenge);
-router.post("/ephemeral-session", createEphemeralSession);
-router.post("/email/request-code", requestEmailLoginCode);
-router.post("/email/verify-code", verifyEmailLoginCode);
+if (config.managedWallet.ephemeralSessionsEnabled) {
+  router.post("/ephemeral-session", createEphemeralSession);
+}
+if (config.pilot.emailAuthEnabled) {
+  router.post("/email/request-code", requestEmailLoginCode);
+  router.post("/email/verify-code", verifyEmailLoginCode);
+}
 router.post("/provider-exchange", exchangeProviderSession);
 router.post("/sponsor/documents/presign", requireSessionAuth, presignSponsorDocumentUpload);
 router.post("/sponsor/register", requireSessionAuth, registerSponsorProfile);

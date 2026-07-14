@@ -17,6 +17,7 @@ import {
   getAnchorService,
 } from "./AnchorService";
 import { prisma } from "./prisma";
+import { buildCampaignIntegrity } from "./campaignIntegrity";
 
 const S1_BONDING_CURVE_K = 1_000n;
 const DEFAULT_S1_RATING_BPS = 10_000n;
@@ -51,6 +52,9 @@ type MarketProofManifest = ContentManifest & {
     muxPlaybackId: string | null;
     uploadStatus: string;
     processingStatus: string;
+    verifiedSha256Hex: string | null;
+    verifiedSizeBytes: bigint | null;
+    storageVerifiedAt: Date | null;
     updatedAt: Date;
   }>;
   publications: ContentPublication[];
@@ -182,6 +186,13 @@ const mapCreatorStage = (
 const mapProofStatus = (proposal: Proposal): CampaignProofStatus => {
   if (proposal.status === ProposalStatus.CANCELLED) return CampaignProofStatus.CANCELLED;
   if (proposal.status === ProposalStatus.VOIDED) return CampaignProofStatus.VOIDED;
+  if (
+    proposal.track1Claimed &&
+    proposal.track2UsdcDeposited === 0n &&
+    proposal.track3UsdcDeposited === 0n
+  ) {
+    return CampaignProofStatus.SETTLED;
+  }
   if (proposal.track2SettledAt && proposal.track3SettledAt) return CampaignProofStatus.SETTLED;
   if (proposal.track2SettledAt || proposal.track3SettledAt || proposal.track1Claimed) {
     return CampaignProofStatus.SETTLING;
@@ -1964,6 +1975,9 @@ const serializeManifestProof = (manifest: MarketProofManifest | null) => {
       muxPlaybackId: asset.muxPlaybackId,
       uploadStatus: asset.uploadStatus,
       processingStatus: asset.processingStatus,
+      verifiedSha256Hex: asset.verifiedSha256Hex,
+      verifiedSizeBytes: asset.verifiedSizeBytes?.toString() ?? null,
+      storageVerifiedAt: asset.storageVerifiedAt?.toISOString() ?? null,
       updatedAt: asset.updatedAt.toISOString(),
     })),
     publications: manifest.publications.map((publication) => ({
@@ -1973,55 +1987,74 @@ const serializeManifestProof = (manifest: MarketProofManifest | null) => {
       externalUrlDigestHex: publication.externalUrlDigestHex,
       verificationStatus: publication.verificationStatus,
       verificationSource: publication.verificationSource,
+      verificationReviewer: publication.verificationReviewer,
+      verificationEvidenceDigestHex: publication.verificationEvidenceDigestHex,
       verifiedAt: publication.verifiedAt?.toISOString() ?? null,
+      rejectedAt: publication.rejectedAt?.toISOString() ?? null,
     })),
   };
 };
 
 export const serializePublicCampaignProof = (
   proposal: PublicCampaignProposal,
-) => ({
-  proposalId: proposal.id,
-  proposalPda: proposal.proposalPda,
-  viewerRole: "PUBLIC",
-  status: proposal.status,
-  proofStatus: proposal.proofStatus ?? mapProofStatus(proposal),
-  creatorWallet: proposal.creatorWallet,
-  sponsorWallet: proposal.sponsorWallet,
-  manifestId: proposal.manifestId,
-  intentId: proposal.intentId,
-  deadlineAt: proposal.deadlineAt.toISOString(),
-  budgetTracks: {
-    track1BaseUsdc: proposal.track1BaseUsdc.toString(),
-    track1Claimed: proposal.track1Claimed,
-    track2MetricType: proposal.track2MetricType,
-    track2TargetValue: proposal.track2TargetValue.toString(),
-    track2MinAchievementBps: proposal.track2MinAchievementBps,
-    track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
-    track2ActualValue: serializeBigInt(proposal.track2ActualValue),
-    track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
-    track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
-    track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
-    track2RewardCapUsdc: (proposal.track2RewardCapUsdc ?? 0n).toString(),
-    track2ResidualTo: proposal.track2ResidualTo ?? 1,
-    track2RewardModelSnapshot: proposal.track2RewardModelSnapshot ?? 0,
-    track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
-    track3CpsPayout: serializeBigInt(proposal.track3CpsPayout),
-    track3DelayDays: proposal.track3DelayDays,
-    track3SettledAt: proposal.track3SettledAt?.toISOString() ?? null,
-  },
-  proof: {
+) => {
+  const integrity = buildCampaignIntegrity({
     contentHashHex: proposal.contentHashHex,
     contentAnchorPda: proposal.contentAnchorPda,
     contentAnchorTx: proposal.contentAnchorTx,
-    latestChainTxSignature: proposal.onChainTxSignature,
-    oracleSyncStatus: proposal.oracleSyncStatus,
-    contentPublishedVerifiedAt: proposal.contentPublishedVerifiedAt?.toISOString() ?? null,
-  },
-  manifest: serializeManifestProof(proposal.manifest),
-  createdAt: proposal.createdAt.toISOString(),
-  updatedAt: proposal.updatedAt.toISOString(),
-});
+    track1Claimed: proposal.track1Claimed,
+    track2UsdcDeposited: proposal.track2UsdcDeposited,
+    track3UsdcDeposited: proposal.track3UsdcDeposited,
+    latestSettlementTxSignature: proposal.latestSettlementTxSignature,
+    manifest: proposal.manifest,
+  });
+
+  return {
+    proposalId: proposal.id,
+    proposalPda: proposal.proposalPda,
+    viewerRole: "PUBLIC",
+    status: proposal.status,
+    proofStatus: proposal.proofStatus ?? mapProofStatus(proposal),
+    creatorWallet: proposal.creatorWallet,
+    sponsorWallet: proposal.sponsorWallet,
+    manifestId: proposal.manifestId,
+    intentId: proposal.intentId,
+    deadlineAt: proposal.deadlineAt.toISOString(),
+    budgetTracks: {
+      track1BaseUsdc: proposal.track1BaseUsdc.toString(),
+      track1Claimed: proposal.track1Claimed,
+      track2MetricType: proposal.track2MetricType,
+      track2TargetValue: proposal.track2TargetValue.toString(),
+      track2MinAchievementBps: proposal.track2MinAchievementBps,
+      track2UsdcDeposited: proposal.track2UsdcDeposited.toString(),
+      track2ActualValue: serializeBigInt(proposal.track2ActualValue),
+      track2SettledAt: proposal.track2SettledAt?.toISOString() ?? null,
+      track2InitialFanPool: (proposal.track2InitialFanPool ?? 0n).toString(),
+      track2InitialSpumpStaked: (proposal.track2InitialSpumpStaked ?? 0n).toString(),
+      track2RewardCapUsdc: (proposal.track2RewardCapUsdc ?? 0n).toString(),
+      track2ResidualTo: proposal.track2ResidualTo ?? 1,
+      track2RewardModelSnapshot: proposal.track2RewardModelSnapshot ?? 0,
+      track3UsdcDeposited: proposal.track3UsdcDeposited.toString(),
+      track3CpsPayout: serializeBigInt(proposal.track3CpsPayout),
+      track3DelayDays: proposal.track3DelayDays,
+      track3SettledAt: proposal.track3SettledAt?.toISOString() ?? null,
+    },
+    proof: {
+      contentHashHex: proposal.contentHashHex,
+      contentAnchorPda: proposal.contentAnchorPda,
+      contentAnchorTx: proposal.contentAnchorTx,
+      fundingTxSignature: proposal.fundingTxSignature,
+      latestSettlementTxSignature: proposal.latestSettlementTxSignature,
+      latestChainTxSignature: proposal.onChainTxSignature,
+      oracleSyncStatus: proposal.oracleSyncStatus,
+      contentPublishedVerifiedAt: proposal.contentPublishedVerifiedAt?.toISOString() ?? null,
+    },
+    integrity,
+    manifest: serializeManifestProof(proposal.manifest),
+    createdAt: proposal.createdAt.toISOString(),
+    updatedAt: proposal.updatedAt.toISOString(),
+  };
+};
 
 export const getPublicCampaignProof = async (id: string) => {
   const proposal = await prisma.proposal.findFirst({
@@ -2049,6 +2082,9 @@ export const getPublicCampaignProof = async (id: string) => {
               muxPlaybackId: true,
               uploadStatus: true,
               processingStatus: true,
+              verifiedSha256Hex: true,
+              verifiedSizeBytes: true,
+              storageVerifiedAt: true,
               updatedAt: true,
             },
           },

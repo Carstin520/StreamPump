@@ -66,6 +66,7 @@ describe("streampump-core Phase 1 launch flow", function () {
         track3DelayDays: 45,
         deadline,
         nonce: ctx.bn(0),
+        maxEndorsementSpump: ctx.bn(0),
       })
       .accounts({
         creator: ctx.creatorS2.publicKey,
@@ -152,6 +153,7 @@ describe("streampump-core Phase 1 launch flow", function () {
           track3DelayDays: 45,
           deadline,
           nonce: ctx.bn(0),
+          maxEndorsementSpump: ctx.bn(0),
         })
         .accounts({
           creator: ctx.creatorS2.publicKey,
@@ -192,6 +194,7 @@ describe("streampump-core Phase 1 launch flow", function () {
         track3DelayDays: 45,
         deadline,
         nonce: ctx.bn(0),
+        maxEndorsementSpump: ctx.bn(0),
       })
       .accounts({
         creator: ctx.creatorS2.publicKey,
@@ -276,6 +279,7 @@ describe("streampump-core Phase 1 launch flow", function () {
         track3DelayDays: 45,
         deadline,
         nonce: ctx.bn(0),
+        maxEndorsementSpump: ctx.bn(0),
       })
       .accounts({
         creator: ctx.creatorS2.publicKey,

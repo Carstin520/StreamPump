@@ -96,18 +96,7 @@ const uploadSinglePartObject = async (
   mimeType: string,
   storageKey: string,
 ) => {
-  const upload = await r2Service.generateUploadUrl(storageKey, mimeType);
-  const response = await fetch(upload.presignedUrl, {
-    method: "PUT",
-    headers: {
-      "content-type": mimeType,
-    },
-    body: new Uint8Array(fileBuffer),
-  });
-
-  if (!response.ok) {
-    throw new Error(`cover upload failed (${response.status} ${response.statusText})`);
-  }
+  await r2Service.putVerifiedObject(storageKey, new Uint8Array(fileBuffer), mimeType);
 
   return fileBuffer;
 };
@@ -189,6 +178,10 @@ const main = async () => {
       processingStatus: AssetProcessingStatus.READY,
       processingSource: AssetProcessingSource.CLIENT_COMPLETE,
       processingError: null,
+      verifiedSha256Hex: sha256,
+      verifiedSizeBytes: BigInt(fileBuffer.byteLength),
+      storageVerifiedAt: new Date(),
+      storageVerificationError: null,
     },
   });
 

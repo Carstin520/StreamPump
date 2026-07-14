@@ -127,9 +127,9 @@ const resolveCanonicalUrl = (objectKey: string | null | undefined) => {
 };
 
 const resolvePublicOriginUrl = async (storageKey: string) => {
-  if (config.storage.origin.publicFeedUseSignedUrls) {
+  if (config.storage.delivery.publicFeedUseSignedUrls) {
     try {
-      return await r2Service.generateDownloadUrl(storageKey, 60 * 60);
+      return await r2Service.generateVerifiedDownloadUrl(storageKey, 60 * 60);
     } catch (_error) {
       return null;
     }
@@ -141,7 +141,7 @@ const resolvePublicOriginUrl = async (storageKey: string) => {
   }
 
   try {
-    return await r2Service.generateDownloadUrl(storageKey, 60 * 60);
+    return await r2Service.generateVerifiedDownloadUrl(storageKey, 60 * 60);
   } catch (_error) {
     return null;
   }
@@ -150,9 +150,9 @@ const resolvePublicOriginUrl = async (storageKey: string) => {
 const resolvePublicImageVariantUrl = async (storageKey: string) => {
   const variantKey = buildDisplayVariantKey(storageKey);
 
-  if (config.storage.origin.publicFeedUseSignedUrls) {
+  if (config.storage.delivery.publicFeedUseSignedUrls) {
     try {
-      return await r2Service.generateDownloadUrl(variantKey, 60 * 60);
+      return await r2Service.generateVerifiedDownloadUrl(variantKey, 60 * 60);
     } catch (_error) {
       return null;
     }
@@ -164,7 +164,7 @@ const resolvePublicImageVariantUrl = async (storageKey: string) => {
   }
 
   try {
-    return await r2Service.generateDownloadUrl(variantKey, 60 * 60);
+    return await r2Service.generateVerifiedDownloadUrl(variantKey, 60 * 60);
   } catch (_error) {
     return null;
   }

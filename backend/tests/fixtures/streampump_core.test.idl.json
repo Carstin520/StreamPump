@@ -1,0 +1,10 @@
+{
+  "address": "FYphzoVLs1MB7aqHbGeT2DjqwTz1d6yyhtKXzvmjiDmp",
+  "metadata": {
+    "name": "streampump_core",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Minimal test-only IDL for pure PDA and transaction helper tests"
+  },
+  "instructions": []
+}

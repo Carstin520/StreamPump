@@ -66,6 +66,8 @@ router.post(
       id: parseNonEmptyString(req.params.id, "id"),
       decision,
       rejectReason: req.body.rejectReason ? String(req.body.rejectReason).trim() : null,
+      reviewerWallet: parseNonEmptyString(req.operatorIdentity, "operatorIdentity"),
+      note: req.body.note ? String(req.body.note).trim() : null,
     });
 
     ok(res, sponsor);

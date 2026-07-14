@@ -16,7 +16,12 @@ fi
 
 anchor build "$@"
 
-if [ -f "$CARGO_TARGET_DIR/deploy/streampump_core.so" ]; then
+ARTIFACT_PATH="$CARGO_TARGET_DIR/deploy/streampump_core.so"
+if [ -f "$ARTIFACT_PATH" ]; then
   mkdir -p target/deploy
-  cp "$CARGO_TARGET_DIR/deploy/streampump_core.so" target/deploy/streampump_core.so
+  ARTIFACT_DIR="$(cd "$(dirname "$ARTIFACT_PATH")" && pwd)"
+  DEPLOY_DIR="$(cd target/deploy && pwd)"
+  if [ "$ARTIFACT_DIR/streampump_core.so" != "$DEPLOY_DIR/streampump_core.so" ]; then
+    cp "$ARTIFACT_PATH" target/deploy/streampump_core.so
+  fi
 fi

@@ -24,25 +24,18 @@ export const exchangeProviderSession = (input: ExchangeProviderSessionInput) =>
 
 // Demo-day scan entry: provision a per-user ephemeral managed-wallet session from
 // the backend wallet pool (B0 contract: POST /auth/ephemeral-session {subject} →
-// atomically assigns one pre-funded managed wallet). Until that endpoint ships we
-// fall back to the existing (shared) platform-wallet provider-exchange so /try
-// still works locally — the fallback is single-wallet and NOT safe for 100
-// concurrent; the real per-user path comes from the pool endpoint.
-export const provisionEphemeralSession = async (subject: string): Promise<AuthSessionRecord> => {
-  try {
-    return await apiClient.post<AuthSessionRecord>("/auth/ephemeral-session", {
-      body: { subject },
-      timeoutMs: 15000,
-    });
-  } catch (_error) {
-    return exchangeProviderSession({
-      provider: "EMAIL",
-      providerSubject: subject,
-      email: subject,
-      displayName: "Demo Guest",
-    });
-  }
-};
+// atomically assigns one pre-funded managed wallet).
+//
+// P0 truth gate: this is the REAL call only. It intentionally has no catch-all
+// fallback to the shared preview provider-exchange — a failed real call must
+// surface an honest error and must never silently downgrade the visitor's
+// identity onto a shared platform wallet. The explicit, demo-flag-gated preview
+// fallback lives in the (demo-only) /try page, not in this shared helper.
+export const provisionEphemeralSession = (subject: string): Promise<AuthSessionRecord> =>
+  apiClient.post<AuthSessionRecord>("/auth/ephemeral-session", {
+    body: { subject },
+    timeoutMs: 15000,
+  });
 
 export const requestEmailLoginCode = (email: string) =>
   apiClient.post<EmailAuthChallengeRecord>("/auth/email/request-code", {

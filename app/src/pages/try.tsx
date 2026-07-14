@@ -1,9 +1,11 @@
 import Head from "next/head";
+import type { GetStaticProps } from "next";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 
-import { provisionEphemeralSession } from "@/lib/api/auth";
+import { exchangeProviderSession, provisionEphemeralSession } from "@/lib/api/auth";
 import { storeAuthSession } from "@/lib/auth-session";
+import { previewProviderExchangeEnabled, publicDemoEnabled } from "@/lib/feature-flags";
 import { useI18n } from "@/lib/i18n";
 import { EXPLORE_PATH, TRENDING_PATH } from "@/lib/routes";
 
@@ -12,12 +14,17 @@ import { EXPLORE_PATH, TRENDING_PATH } from "@/lib/routes";
  * mobile-first welcome (no app sidebar) that explains the loop and drops the
  * visitor into the experience.
  *
+ * P0 truth gate: this is a SEEDED_DEMO surface. It is only reachable when
+ * NEXT_PUBLIC_ENABLE_PUBLIC_DEMO is on — getStaticProps returns a 404 otherwise,
+ * so the route is unavailable in production by default.
+ *
  * The "start" CTA provisions a per-user ephemeral managed-wallet session from
  * the backend pool (provisionEphemeralSession → POST /auth/ephemeral-session),
  * applies an admission jitter (NEXT_PUBLIC_DEMO_ADMISSION_JITTER_MS) to avoid a
  * thundering herd at scale, stores the session, then routes into the experience.
- * Until the pool endpoint ships, provisionEphemeralSession falls back to the
- * existing shared platform-wallet path so this still works locally.
+ * If the pool endpoint is unavailable, the visitor sees an honest error unless
+ * the explicit preview provider-exchange flag is also on, in which case an
+ * explicitly-labeled shared guest wallet is used (never a silent identity swap).
  */
 
 const STEP_KEYS = [
@@ -43,7 +50,21 @@ export default function TryPage() {
         await new Promise((resolve) => setTimeout(resolve, Math.random() * jitterMs));
       }
       const subject = `demo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@streampump.local`;
-      const session = await provisionEphemeralSession(subject);
+      const session = await provisionEphemeralSession(subject).catch((ephemeralError) => {
+        // Explicit, doubly-gated preview fallback (public-demo build + preview
+        // provider-exchange flag). This seats the guest on a shared platform
+        // wallet — labeled SEEDED_DEMO on this page — and is NOT a silent
+        // identity swap: with the flag off, the real failure is surfaced.
+        if (!previewProviderExchangeEnabled()) {
+          throw ephemeralError;
+        }
+        return exchangeProviderSession({
+          provider: "EMAIL",
+          providerSubject: subject,
+          email: subject,
+          displayName: "Demo Guest",
+        });
+      });
       storeAuthSession(session);
       await router.push(EXPLORE_PATH);
     } catch (err) {
@@ -141,10 +162,24 @@ export default function TryPage() {
             ) : null}
           </div>
 
-          {/* Readiness label */}
-          <p className="mt-auto pt-8 text-center text-[length:var(--fs-nano)] text-[#5a6d87]">{t("try.readiness")}</p>
+          {/* Readiness label — this surface is always SEEDED_DEMO, never LIVE. */}
+          <div className="mt-auto flex flex-col items-center gap-2 pt-8">
+            <span className="rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-2.5 py-1 font-mono text-[length:var(--fs-nano)] font-semibold text-[#f3c66e]">
+              SEEDED_DEMO
+            </span>
+            <p className="text-center text-[length:var(--fs-nano)] text-[#5a6d87]">{t("try.readiness")}</p>
+          </div>
         </div>
       </main>
     </>
   );
 }
+
+// P0 truth gate: the /try scan-landing is a public demo surface. Keep it fully
+// unavailable (real 404) unless NEXT_PUBLIC_ENABLE_PUBLIC_DEMO is explicitly on.
+export const getStaticProps: GetStaticProps = async () => {
+  if (!publicDemoEnabled()) {
+    return { notFound: true };
+  }
+  return { props: {} };
+};

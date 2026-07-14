@@ -6,6 +6,11 @@ import { expect } from "chai";
 import {
   ProposalIntentStatus,
   BundleStatus,
+  AssetProcessingStatus,
+  AssetType,
+  AssetUploadStatus,
+  PublicationVerificationStatus,
+  SponsorVerificationStatus,
   Track2MetricType,
 } from "@prisma/client";
 import {
@@ -17,13 +22,23 @@ import {
 
 import {
   buildProposalIntentSemantics,
+  confirmedLaunchMismatchFields,
   extractTransactionSignature,
   isBundleReusable,
+  resolveLaunchContentAnchorTx,
   serializeIntent,
 } from "../src/controllers/proposalIntentShared";
-import { createProposalIntent } from "../src/controllers/proposalIntentController";
+import {
+  assertManifestReadyForProposalIntent,
+  assessSponsorApprovalForUse,
+  assertSponsorApprovedForFinalSubmit,
+  createProposalIntent,
+  getProposalIntentReadiness,
+  resolveProposalIntentReadiness,
+} from "../src/controllers/proposalIntentController";
 import { config } from "../config/default";
 import { prisma } from "../src/services/prisma";
+import { buildPilotTestSponsorReviewNote } from "../src/services/sponsorProfile";
 
 const createMockResponse = () => {
   const response = {
@@ -43,6 +58,216 @@ const createMockResponse = () => {
 };
 
 describe("proposalIntentController helpers", () => {
+  it("keeps PILOT TEST ONLY sponsor approval scoped to its invited run id", () => {
+    const sponsorWallet = Keypair.generate().publicKey.toBase58();
+    const originalInviteWallets = [...config.pilot.inviteWallets];
+    config.pilot.inviteWallets.splice(0, config.pilot.inviteWallets.length, sponsorWallet);
+    const profile = {
+      status: SponsorVerificationStatus.APPROVED,
+      wallet: sponsorWallet,
+      companyName: "PILOT TEST ONLY - Disposable Sponsor",
+      registrationNumber: "PILOT-TEST-ONLY-p4m6-test",
+      reviewEvents: [{
+        newStatus: SponsorVerificationStatus.APPROVED,
+        note: buildPilotTestSponsorReviewNote({ runId: "p4m6-test", wallet: sponsorWallet }),
+      }],
+    };
+    try {
+      expect(assessSponsorApprovalForUse(profile, null).approved).to.equal(false);
+      expect(assessSponsorApprovalForUse(profile, "wrong-run").approved).to.equal(false);
+      expect(assessSponsorApprovalForUse(profile, "p4m6-test")).to.deep.include({
+        approved: true,
+        classification: "PILOT_TEST_ONLY",
+      });
+    } finally {
+      config.pilot.inviteWallets.splice(
+        0,
+        config.pilot.inviteWallets.length,
+        ...originalInviteWallets
+      );
+    }
+  });
+
+  it("returns chain and database sourced readiness without mutating either source", async () => {
+    const creatorWallet = Keypair.generate().publicKey.toBase58();
+    const sponsorWallet = Keypair.generate().publicKey.toBase58();
+    let creatorReads = 0;
+    let sponsorReads = 0;
+    const result = await resolveProposalIntentReadiness({
+      creatorWallet,
+      sponsorWallet,
+      deps: {
+        fetchCreatorProfile: async () => {
+          creatorReads += 1;
+          return { level: 2, status: "S2_ACTIVE" };
+        },
+        fetchSponsorProfile: async () => {
+          sponsorReads += 1;
+          return { status: SponsorVerificationStatus.APPROVED };
+        },
+      },
+    });
+
+    expect(result).to.deep.include({ ready: true, blockers: [] });
+    expect(result.creator).to.include({ source: "SOLANA_CHAIN", ready: true, level: 2 });
+    expect(result.sponsor).to.include({ source: "DATABASE", ready: true });
+    expect({ creatorReads, sponsorReads }).to.deep.equal({ creatorReads: 1, sponsorReads: 1 });
+  });
+
+  it("reports both readiness blockers without leaking profile documents", async () => {
+    const creatorWallet = Keypair.generate().publicKey.toBase58();
+    const sponsorWallet = Keypair.generate().publicKey.toBase58();
+    const result = await resolveProposalIntentReadiness({
+      creatorWallet,
+      sponsorWallet,
+      deps: {
+        fetchCreatorProfile: async () => ({ level: 1, status: "S1_ACTIVE" }),
+        fetchSponsorProfile: async () => ({ status: SponsorVerificationStatus.PENDING_REVIEW }),
+      },
+    });
+
+    expect(result.ready).to.equal(false);
+    expect(result.blockers.map((blocker) => blocker.code)).to.deep.equal([
+      "CREATOR_NOT_S2_READY",
+      "SPONSOR_KYB_NOT_APPROVED",
+    ]);
+    expect(JSON.stringify(result)).not.to.include("businessLicense");
+  });
+
+  it("forbids a readiness lookup by a wallet outside the creator/sponsor pair", async () => {
+    const response = createMockResponse();
+    await getProposalIntentReadiness({
+      auth: { wallet: Keypair.generate().publicKey.toBase58(), source: "session" },
+      query: {
+        creatorWallet: Keypair.generate().publicKey.toBase58(),
+        sponsorWallet: Keypair.generate().publicKey.toBase58(),
+      },
+    } as any, response as any);
+
+    expect(response.statusCode).to.equal(403);
+    expect(response.body.error.code).to.equal("FORBIDDEN");
+  });
+
+  it("requires feed eligibility, verified delivery, operator approval, and a positive Track 1 budget", () => {
+    const readyManifest = {
+      isPublicFeedEligible: true,
+      assets: [{
+        assetType: AssetType.IMAGE,
+        uploadStatus: AssetUploadStatus.UPLOADED,
+        processingStatus: AssetProcessingStatus.READY,
+        sha256Hex: "a".repeat(64),
+        fileSizeBytes: 42n,
+        verifiedSha256Hex: "a".repeat(64),
+        verifiedSizeBytes: 42n,
+        storageVerifiedAt: new Date(),
+        muxPlaybackId: null,
+      }],
+      publications: [{
+        verificationStatus: PublicationVerificationStatus.VERIFIED,
+        verificationSource: "OPERATOR_APPROVED",
+        verificationReviewer: "operator-wallet",
+        verificationEvidenceDigestHex: "b".repeat(64),
+        verifiedAt: new Date(),
+      }],
+    };
+    expect(() => assertManifestReadyForProposalIntent({
+      manifest: readyManifest,
+      track1BaseUsdc: 1n,
+      track2UsdcDeposited: 0n,
+      track3UsdcDeposited: 0n,
+    })).not.to.throw();
+    expect(() => assertManifestReadyForProposalIntent({
+      manifest: readyManifest,
+      track1BaseUsdc: 0n,
+      track2UsdcDeposited: 0n,
+      track3UsdcDeposited: 0n,
+    })).to.throw().with.property("code", "TRACK1_BASE_USDC_REQUIRED");
+    expect(() => assertManifestReadyForProposalIntent({
+      manifest: { ...readyManifest, isPublicFeedEligible: false },
+      track1BaseUsdc: 1n,
+      track2UsdcDeposited: 0n,
+      track3UsdcDeposited: 0n,
+    })).to.throw().with.property("code", "MANIFEST_NOT_PUBLIC_FEED_ELIGIBLE");
+  });
+
+  it("rechecks sponsor approval at final submission", () => {
+    expect(() => assertSponsorApprovedForFinalSubmit({
+      status: SponsorVerificationStatus.APPROVED,
+    })).not.to.throw();
+    expect(() => assertSponsorApprovedForFinalSubmit({
+      status: SponsorVerificationStatus.PENDING,
+    })).to.throw().with.property("code", "SPONSOR_KYB_NOT_APPROVED");
+  });
+
+  it("compares confirmed chain truth against every locked launch field", () => {
+    const creator = Keypair.generate().publicKey;
+    const sponsor = Keypair.generate().publicKey;
+    const anchor = Keypair.generate().publicKey.toBase58();
+    const intent: any = {
+      creatorWallet: creator.toBase58(),
+      sponsorWallet: sponsor.toBase58(),
+      lockedManifestHashHex: "a".repeat(64),
+      deadlineUnix: 1_900_000_000n,
+      nonce: 7n,
+      track1BaseUsdc: 100n,
+      track2MetricType: "VIEWS",
+      track2TargetValue: 0n,
+      track2MinAchievementBps: 0,
+      track2UsdcDeposited: 0n,
+      track3UsdcDeposited: 0n,
+      track3DelayDays: 0,
+      maxEndorsementSpump: 0n,
+    };
+    const onChain: any = {
+      creator,
+      sponsor,
+      contentHashHex: "a".repeat(64),
+      contentAnchorPda: anchor,
+      contentKind: "SHORT_VIDEO",
+      deadlineUnix: 1_900_000_000n,
+      nonce: 7n,
+      track1BaseUsdc: 100n,
+      track2MetricType: "VIEWS",
+      track2TargetValue: 0n,
+      track2MinAchievementBps: 0,
+      track2UsdcDeposited: 0n,
+      track3UsdcDeposited: 0n,
+      track3DelayDays: 0,
+      maxEndorsementSpump: 0n,
+      status: "FUNDED",
+    };
+    expect(confirmedLaunchMismatchFields({
+      intent,
+      manifestContentType: "SHORT_VIDEO",
+      expectedContentAnchorPda: anchor,
+      onChain,
+    })).to.deep.equal([]);
+    expect(confirmedLaunchMismatchFields({
+      intent,
+      manifestContentType: "SHORT_VIDEO",
+      expectedContentAnchorPda: anchor,
+      onChain: { ...onChain, track3UsdcDeposited: 1n, status: "OPEN" },
+    })).to.have.members(["track3UsdcDeposited", "status"]);
+  });
+
+  it("never relabels a funding transaction as an existing content anchor transaction", () => {
+    expect(resolveLaunchContentAnchorTx({
+      existingContentAnchorPda: "existing-anchor",
+      existingContentAnchorTx: "original-anchor-signature",
+      launchTxSignature: "funding-signature",
+    })).to.equal("original-anchor-signature");
+    expect(resolveLaunchContentAnchorTx({
+      existingContentAnchorPda: "existing-anchor",
+      existingContentAnchorTx: null,
+      launchTxSignature: "funding-signature",
+    })).to.equal(null);
+    expect(resolveLaunchContentAnchorTx({
+      existingContentAnchorPda: null,
+      existingContentAnchorTx: null,
+      launchTxSignature: "anchor-and-funding-signature",
+    })).to.equal("anchor-and-funding-signature");
+  });
+
   it("requires sponsor KYB even when S1 mock API is enabled", async () => {
     const creatorWallet = Keypair.generate().publicKey.toBase58();
     const sponsorWallet = Keypair.generate().publicKey.toBase58();

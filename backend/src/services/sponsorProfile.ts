@@ -20,6 +20,7 @@ import { HttpError } from "../controllers/http";
 import { prisma } from "./prisma";
 
 const MAX_SPONSOR_DOCUMENT_BYTES = 12 * 1024 * 1024;
+export const PILOT_TEST_SPONSOR_CLASSIFICATION = "PILOT_TEST_ONLY_NOT_REAL_KYB";
 
 const normalizeWallet = (wallet: string): string => new PublicKey(wallet).toBase58();
 
@@ -169,6 +170,8 @@ export const reviewSponsorProfile = async (params: {
   id: string;
   decision: "APPROVED" | "REJECTED";
   rejectReason?: string | null;
+  reviewerWallet: string;
+  note?: string | null;
 }) => {
   const approved = params.decision === "APPROVED";
   const rejectReason = params.rejectReason?.trim() || null;
@@ -177,15 +180,41 @@ export const reviewSponsorProfile = async (params: {
     throw new Error("rejectReason is required when rejecting a sponsor");
   }
 
-  return prisma.sponsorProfile.update({
-    where: { id: params.id },
-    data: {
-      status: approved
-        ? SponsorVerificationStatus.APPROVED
-        : SponsorVerificationStatus.REJECTED,
-      rejectReason: approved ? null : rejectReason,
-      approvedAt: approved ? new Date() : null,
-    },
+  const reviewerWallet = params.reviewerWallet.trim();
+  if (!reviewerWallet) throw new Error("reviewerWallet is required");
+  const note = params.note?.trim() || null;
+  const existing = await prisma.sponsorProfile.findUnique({ where: { id: params.id } });
+  if (!existing) throw new HttpError(404, "SPONSOR_NOT_FOUND", "sponsor profile not found");
+  const nextStatus = approved
+    ? SponsorVerificationStatus.APPROVED
+    : SponsorVerificationStatus.REJECTED;
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.sponsorProfile.update({
+      where: { id: params.id },
+      data: {
+        status: nextStatus,
+        rejectReason: approved ? null : rejectReason,
+        approvedAt: approved ? new Date() : null,
+      },
+    });
+    await tx.sponsorReviewEvent.create({
+      data: {
+        sponsorProfileId: existing.id,
+        reviewerWallet,
+        previousStatus: existing.status,
+        newStatus: nextStatus,
+        reason: approved ? null : rejectReason,
+        note,
+        documentSnapshot: {
+          wallet: existing.wallet,
+          companyName: existing.companyName,
+          registrationNumber: existing.registrationNumber,
+          businessLicenseKey: existing.businessLicenseKey,
+        },
+      },
+    });
+    return updated;
   });
 };
 
@@ -194,4 +223,46 @@ export const getSponsorProfileByWallet = (wallet: string) =>
     where: {
       wallet: normalizeWallet(wallet),
     },
+    include: {
+      reviewEvents: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: {
+          reviewerWallet: true,
+          newStatus: true,
+          note: true,
+          createdAt: true,
+        },
+      },
+    },
   });
+
+export const buildPilotTestSponsorReviewNote = (params: {
+  runId: string;
+  wallet: string;
+}): string => JSON.stringify({
+  classification: PILOT_TEST_SPONSOR_CLASSIFICATION,
+  runId: params.runId,
+  wallet: normalizeWallet(params.wallet),
+  realKyb: false,
+  reusableOutsideRun: false,
+});
+
+export const parsePilotTestSponsorReviewNote = (
+  note: string | null | undefined
+): { runId: string; wallet: string } | null => {
+  if (!note) return null;
+  try {
+    const parsed = JSON.parse(note) as Record<string, unknown>;
+    if (
+      parsed.classification !== PILOT_TEST_SPONSOR_CLASSIFICATION ||
+      parsed.realKyb !== false ||
+      parsed.reusableOutsideRun !== false ||
+      typeof parsed.runId !== "string" ||
+      typeof parsed.wallet !== "string"
+    ) return null;
+    return { runId: parsed.runId, wallet: normalizeWallet(parsed.wallet) };
+  } catch {
+    return null;
+  }
+};

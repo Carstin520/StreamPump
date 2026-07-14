@@ -6,6 +6,7 @@ import { Router } from "express";
 
 import {
   reconcileMuxAsset,
+  requeueMuxAsset,
   runMuxReconciliation,
 } from "../../controllers/internalMuxController";
 import { requireInternalOperatorAuth } from "../../middleware/internalOperatorAuth";
@@ -16,5 +17,6 @@ router.use(requireInternalOperatorAuth);
 
 router.post("/reconcile/run-once", runMuxReconciliation);
 router.post("/assets/:assetId/reconcile", reconcileMuxAsset);
+router.post("/assets/:assetId/requeue", requeueMuxAsset);
 
 export default router;

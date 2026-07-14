@@ -34,6 +34,7 @@ import {
 } from "@/lib/api/s1";
 import { exchangeProviderSession } from "@/lib/api/auth";
 import { clearStoredAuthSession, getStoredAuthSession, storeAuthSession } from "@/lib/auth-session";
+import { publicDemoEnabled } from "@/lib/feature-flags";
 import { type Locale, useI18n } from "@/lib/i18n";
 import {
   DEMO_PATH,
@@ -924,6 +925,9 @@ function PortfolioSourceNotice({
 function PortfolioPage() {
   const { t } = useI18n();
   const wallet = useWallet();
+  // Public demo affordances (the seeded "platform wallet" preview-exchange
+  // shortcut) are gated so they never appear in a production build by default.
+  const demoAffordancesEnabled = publicDemoEnabled();
   const [activeTab, setActiveTab] = useState<LiveTab>("Portfolio");
   const [portfolio, setPortfolio] = useState<S1PortfolioResponse | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
@@ -980,6 +984,12 @@ function PortfolioPage() {
   }, []);
 
   const loadDemoPortfolio = useCallback(async () => {
+    // P0 truth gate: this seats the visitor on a shared platform-managed wallet
+    // via the preview provider-exchange path, so it may only run under the
+    // explicit public demo flag. It is never a silent fallback.
+    if (!publicDemoEnabled()) {
+      return;
+    }
     // Platform-wallet session: the assigned managed wallet IS the session wallet,
     // so useManagedWallet() reports a managed (custodial) session and can execute
     // seeded devnet claims through /s1/managed/execute without a wallet adapter.
@@ -1074,20 +1084,30 @@ function PortfolioPage() {
               </p>
             ) : null}
 
-            {/* Platform-wallet path: browse without connecting; own wallet only at withdrawal. */}
-            <div className="mx-auto max-w-md rounded-[16px] border border-[#de402a]/25 bg-[#de402a]/[0.06] p-4 text-left">
-              <p className="text-[length:var(--fs-caption)] font-semibold text-white">{t("portfolio.platform.title")}</p>
-              <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#c8d2e3]">{t("portfolio.platform.body")}</p>
-              <button
-                className="mt-3 w-full rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2.5 text-[length:var(--fs-caption)] font-bold text-white transition hover:brightness-110"
-                onClick={loadDemoPortfolio}
-                type="button"
-              >
-                {t("portfolio.platform.cta")}
-              </button>
-              <p className="mt-2 text-[length:var(--fs-nano)] text-[#9aabc4]">{t("portfolio.platform.withdrawNote")}</p>
-            </div>
-            <p className="text-[length:var(--fs-micro)] text-[#5a6d87]">{t("portfolio.platform.orConnect")}</p>
+            {/* Platform-wallet path (SEEDED_DEMO): browse without connecting via
+                the preview provider-exchange. Gated to public demo builds only. */}
+            {demoAffordancesEnabled ? (
+              <>
+                <div className="mx-auto max-w-md rounded-[16px] border border-[#de402a]/25 bg-[#de402a]/[0.06] p-4 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[length:var(--fs-caption)] font-semibold text-white">{t("portfolio.platform.title")}</p>
+                    <span className="shrink-0 rounded-full border border-[#f3b33e]/30 bg-[#2a1f0b] px-2 py-0.5 font-mono text-[length:var(--fs-nano)] font-semibold text-[#f3c66e]">
+                      SEEDED_DEMO
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#c8d2e3]">{t("portfolio.platform.body")}</p>
+                  <button
+                    className="mt-3 w-full rounded-full bg-[linear-gradient(180deg,#f05540_0%,#de402a_100%)] py-2.5 text-[length:var(--fs-caption)] font-bold text-white transition hover:brightness-110"
+                    onClick={loadDemoPortfolio}
+                    type="button"
+                  >
+                    {t("portfolio.platform.cta")}
+                  </button>
+                  <p className="mt-2 text-[length:var(--fs-nano)] text-[#9aabc4]">{t("portfolio.platform.withdrawNote")}</p>
+                </div>
+                <p className="text-[length:var(--fs-micro)] text-[#5a6d87]">{t("portfolio.platform.orConnect")}</p>
+              </>
+            ) : null}
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <WalletMultiButton className="!rounded-full !text-sm" />
@@ -1108,9 +1128,11 @@ function PortfolioPage() {
               <div className="mt-2">
                 <DemoHolderHints />
               </div>
-              <div className="mt-2">
-                <PortfolioDemoLinks onLoadDemo={loadDemoPortfolio} />
-              </div>
+              {demoAffordancesEnabled ? (
+                <div className="mt-2">
+                  <PortfolioDemoLinks onLoadDemo={loadDemoPortfolio} />
+                </div>
+              ) : null}
             </div>
           </div>
         ) : fallbackReason ? (

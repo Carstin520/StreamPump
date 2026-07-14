@@ -97,6 +97,8 @@ StreamPump is built on four convictions that avoid every one of these traps:
 | 🛡️ **Anti-Speculation Guardrails** | Non-transferable token, daily buy caps, dynamic exit tax, delayed ratings, endorsement caps |
 | 🎞️ **Real Media Pipeline** | Cloudflare R2 storage + Mux video processing + publication verification before public feed |
 
+> **Boundary — these are protocol/code capabilities, not current Pilot availability.** The invite-only Pilot candidate is devnet/test-USDC only and is **not deployed, not live, no real funds**. The only lane open to Pilot users is external-wallet auth → media → feed → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 → campaign proof. S1 discovery/buyout, the fan endorsement pool, Track 2/3 settlement, and managed/email-social wallets exist in code but are **closed for all Pilot users** (see [Current Status](#-current-status)).
+
 ---
 
 ## 📸 Screenshots
@@ -208,23 +210,47 @@ Every core mechanism depends on a specific Solana capability — this is not a m
 
 ## 📍 Current Status
 
-StreamPump is a serious prototype with a **verified end-to-end production corridor** (authenticated creator → media upload → public feed → proposal → dual-signature launch → on-chain campaign proof). Several surfaces remain controlled-demo or operator-gated, and readiness labels are kept honest.
+StreamPump is currently a **code-verified invite-only Pilot candidate — not a deployed production system and not live.** H0, H1, and H2 human gates are approved. The latest **P3** pilot recovery + readiness-gate work (integrated Codex backend commit `d14a20f` plus this frontend/docs truth pass) is **implemented and verified locally only — not deployed, migrations added locally but not applied by this work, no live/real-credential smoke. Its mandatory Fable 5 re-review is now PASS (2026-07-12, no blocker/major); H3 is approved (2026-07-12); the human subsequently authorized one commit/push/merge round, which targets the `codex/post-deadline-phase-0` integration branch rather than production `main` as an operational safety choice to avoid triggering Render/Vercel production — the next gate is an explicit production-mutation approval (P4).** All chain activity targets **Solana devnet with a test-USDC mint; no real funds are ever involved.** The end-to-end corridor (external-wallet creator → media upload → public feed → proposal → dual-signature launch → backend relay → manual Track 1 → on-chain campaign proof) is code-verified on devnet, not deployed. Readiness labels are kept honest.
+
+### Invite-Only Pilot (P1) — candidate, not a live launch
+
+Access is gated by an **external real-wallet allowlist**. The auth challenge is identical in shape for every valid wallet, and the invite check runs **only after a valid signature** — the allowlist cannot be probed in advance.
+
+**Open in the Pilot corridor:** external wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay of the fully signed transaction; manual Track 1 fixed-base settlement; campaign proof as projection/on-chain evidence (PDA, tx signature, manifest hash, content anchor).
+
+**Closed for all Pilot users:** email/social/provider managed-wallet auth and public managed execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic oracle settlement schedulers; prototype/legacy routes.
+
+**Content truth (P2).** Uploads land in a **private R2 origin bucket** used only for presigned staging and KYB docs; a **distinct public delivery bucket** (`R2_DELIVERY_BUCKET`, required to differ from `R2_BUCKET`) holds only verified/trusted media. The backend records **server-observed bytes, MIME, size, and SHA-256** for each asset, enforces a **serialized monthly upload quota**, runs **Mux reconciliation**, then promotes verified assets to delivery and cleans up the origin copy. A **creator cannot self-verify** their own content — **operator approval is required** before feed eligibility.
+
+**API idempotency (P2).** Content and proposal-intent mutations are guarded by **durable, database-backed idempotency keys**, so retried mutations replay the stored result instead of duplicating on-chain or DB effects.
+
+**Proposal truth (P2).** A proposal can only launch from a **feed-eligible, immutable manifest** with a **positive Track 1 budget** and **both creator and sponsor signatures**, and the backend confirms the **on-chain state matches** the stored terms. **Track 2 and Track 3 must be zero**; a proposal with a partially configured Track 2/3 is **rejected**.
+
+**Track 1 settlement truth (P2).** Manual Track 1 operator settlement is **evidence-bound, idempotent, lease-fenced, and signature-verified**; the campaign proof **separates anchor, funding, and settlement signatures**. Historical, unprovable anchor-tx signatures were **cleared by migration** rather than presented as proof.
+
+**Not claimed** (do not represent these as done): independent third-party publication verification; program-side allowlist enforcement; security audit; production deployment; real funds.
+
+**Production-listen gate (fail-closed).** In production the backend refuses to start unless every active RPC reports the full Solana devnet genesis hash, the configured program account exists and is `executable`, and on-chain `ProtocolConfig.usdcMint` exactly equals `PILOT_EXPECTED_USDC_MINT`. Governing env: `PILOT_INVITE_ONLY`, `PILOT_INVITE_WALLETS`, `PILOT_EXPECTED_USDC_MINT`, `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`. New P2 runtime/config: `R2_DELIVERY_BUCKET` (must differ from `R2_BUCKET`), an internal `INTERNAL_OPERATOR_API_KEY` operator key, `INDEXER_ENABLED`/`MUX_RECONCILIATION_ENABLED` gates, and a **packaged production IDL** shipped under the backend root (`STREAMPUMP_IDL_PATH=./idl/streampump_core.json`).
+
+**Verification.** P0 safety fixes (`5a7f355..6ee771e`) passed a Fable 5 review; human gate **H0 approved**. P1 backend hardening (`b393bac`) passed Fable 5 review; human gate **H1 approved**. **P2 (`d78815b..e0b6028`) passed an independent Fable 5 review (PASS, 2026-07-12, no blocker/major finding) and human gate H2 is approved — implemented and verified locally, but not deployed and not live for real funds; no deploy, migration application, real-credential smoke, or readiness promotion has occurred.** **P3** (pilot recovery + readiness gates, integrated Codex backend base commit `d14a20f` plus follow-up fix `96e9075`) adds `/health` liveness plus a distinct `/ready` (503 until DB + enabled Indexer + enabled Mux are ready), a preflight that requires the manual Track 1 Oracle signer to equal on-chain `ProtocolConfig.oracleAuthority`, audited operator-only chain replay / publication reopen-revoke / Mux requeue / no-resend Track 1 reconcile, and safe creator manifest diagnostics with `isPublicFeedEligible`. The follow-up fix `96e9075` hardens the indexer to fail closed: startup now requires a real public `onSlotChange` notification plus `getSlot`, and at runtime a stalled slot heartbeat (90s) or an RPC probe failure downgrades the readiness Indexer signal to FAILED so `/ready` returns 503; ordered signature backfill marks a signature terminal-`PRUNED` on its third bounded NOT_FOUND (operator replay can reset it to PROCESSING and later SYNCED). The **first Fable 5 review of the initial P3 range (`84c3415..109767f`) found no blocker but 2 major findings; both were fixed locally in `96e9075`. The mandatory Fable 5 re-review of the fixed range `84c3415..d783301` is now PASS (2026-07-12, no blocker/major remains). Fable's own Bash test rerun was permission-denied, so its PASS verdict rests on code/test inspection plus the orchestrator's already-executed evidence below — do not imply Fable itself executed the test suite.** H3 (human review node) is now approved (2026-07-12); the human subsequently authorized one commit/push/merge round, which targets the `codex/post-deadline-phase-0` integration branch rather than production `main` as an operational safety choice to avoid triggering Render/Vercel production; the next and only current gate is an explicit production-mutation approval (P4). Its two P3 migrations (`20260712170000_chain_ingestion_recovery`, `20260712180000_pilot_operator_events`) were **added locally in earlier P3 work and are NOT applied by this work** (the actual environment/DB applied state was not inspected); the follow-up fix amended the existing P3 schema/migrations rather than adding a new migration. P3 backend verification (post-fix): Prisma validate PASS; backend build PASS; focused suite **20/20**; **full backend 187/187 pass**; the exact production-IDL verifier (**35 instructions / 13 accounts / 66 types / 87 errors**); Anchor build plus the P2 Track1-only local-chain suite (**3 passing**); app lint and production build **PASS**; `git diff --check` is run after edits. P2 was verified locally: Prisma generate + validate; backend build; **150 backend tests**; the production-IDL verifier (**35 instructions / 13 accounts / 66 types / 87 errors**); Anchor build; **12 key local chain tests**; app lint + build; and `git diff --check`. The final Opus UI truth fix (`5ad0065`) corrects onboarding external-wallet/Track 1 copy, carries no preview/seeded badge, and removes portfolio/rewards from normal Pilot navigation (legacy routes remain labeled and direct-link only). Browser-verified in the in-app Browser on `/onboarding` and `/campaigns/not-a-pda` at desktop and 390px mobile: clean console, no framework overlay or horizontal overflow, external-wallet login navigation works, and the campaign error is fail-closed with no local fallback. **Real production-corridor and Track 1 smoke were NOT executed** because live Pilot credentials and a live proposal were unavailable — the smoke scripts fail closed with explicit blockers, so the corridor is **not** yet called live or production-ready. The Fable 5 review recorded two non-gating observations: (1) hosted platforms outside the recognized Render/Cloud Run/Railway markers still rely on `NODE_ENV=production` or an explicit `PILOT_INVITE_ONLY` to enter the production-gated path; and (2) monthly upload-quota attribution keys off asset `createdAt`, so cross-month re-presign attribution is approximate.
+
+**Next gate:** P2 and P3 are both Fable-5-reviewed (**P3 re-review PASS on 2026-07-12, no blocker/major**) and **human gates H0/H1/H2/H3 are all approved (H3 on 2026-07-12).** H3 was approved by the human; the human subsequently authorized one commit/push/merge round, and this execution round targets the `codex/post-deadline-phase-0` integration branch instead of production `main` as an operational safety choice to avoid triggering Render/Vercel production. The **next and only current gate is an explicit production-mutation approval (P4)** covering program extend (3,088 bytes) + controlled upgrade/rollback, a Neon restore point + migration application, controlled Render/Vercel deployment, Mux webhook setup, and a disposable allowlisted-wallet corridor + Track 1 replay smoke — devnet/test-USDC only, no real funds. Remaining external launch blockers stand: a real dedicated devnet RPC, a formal freeze/approval of the identified Pilot test-USDC mint, a real deployment chain preflight, a deployed-corridor + Track 1 smoke with live credentials, and external security audit + legal review.
+
+**Remaining blockers before a real Pilot launch:** a real dedicated devnet RPC; a formal freeze/approval of the identified Pilot test-USDC mint; a real deployment chain preflight; a deployed-corridor + Track 1 smoke with live credentials; and external security audit + legal review.
 
 | Area | Readiness | What's real now |
 |---|---|---|
-| **Production corridor** | ✅ Verified E2E | Auth → R2/Mux media → feed → proposal intent → dual sign → Solana → campaign proof |
-| **S1 market buy/sell** | `SEEDED_DEMO` | Live buy/sell against seeded devnet state with wallet session |
-| **S1 portfolio / claim** | `SEEDED_DEMO` | Claim USDC from a graduated buyout position |
-| **S1 buyout lifecycle** | `BACKEND_READY_UI_GAP` + `OPERATOR_REQUIRED` | Full chain + builder support; workspace UI still preview |
-| **S2 proposal launch** | `SEEDED_DEMO` | Full corridor verified |
-| **S2 endorsement** | `SEEDED_DEMO` + `BACKEND_READY_UI_GAP` | On-chain burn + backend build/submit for seeded proposals |
-| **Settlement Track 1/2** | `OPERATOR_REQUIRED` | Operable against controlled data |
-| **Settlement Track 3 (CPS)** | `MOCK_PREVIEW` + `OPERATOR_REQUIRED` | Gated — requires a real merchant/reconciliation provider |
-| **Managed wallet signing** | In progress | Backend custodial signing path implemented; production needs KMS + program deploy |
-| **Rewards** | `MOCK_PREVIEW` | Managed daily-claim path wired; missions still preview |
+| **Pilot corridor (invite-only)** | Code-verified on devnet · not deployed | External-wallet auth → R2/Mux media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof |
+| **S1 market / portfolio / buyout** | Closed for Pilot (`SEEDED_DEMO` in code) | Buy/sell/claim/buyout code exists against seeded devnet state but is disabled for Pilot users |
+| **S2 proposal launch** | Code-verified on devnet | Dual-sign launch corridor verified; the only money-flow open in the Pilot |
+| **S2 endorsement** | Closed for Pilot (`BACKEND_READY_UI_GAP` in code) | On-chain burn + backend builders exist for seeded proposals but are disabled for Pilot users |
+| **Settlement Track 1 (manual)** | `OPERATOR_REQUIRED` | Pilot allows the manual fixed-base payout only; no automatic settlement |
+| **Settlement Track 2/3 (CPS)** | Closed for Pilot | Track 2 endorsement + Track 3 CPS disabled for Pilot users; Track 3 still needs a real merchant/reconciliation provider |
+| **Managed wallet / email-social auth** | Closed for Pilot | Disabled for all Pilot users; external real wallets only |
+| **Rewards** | Closed for Pilot | Daily/engagement/fan rewards disabled for Pilot users |
 | **Operator tooling** | `OPERATOR_REQUIRED` | Internal routes exist; no dashboards yet |
 
-> ⚠️ The Anchor program is **not audited**. Do not deploy with real funds. The new chain guards and reward behavior require program deployment before they are live on-chain.
+> ⚠️ The Anchor program is **not audited** and **not deployed for production**. This build is an invite-only Pilot candidate on devnet/test-USDC only — **not live and no real funds**. The new chain guards and reward behavior require program deployment before they are live on-chain.
 
 ### Compliance & token posture (design in progress)
 
@@ -320,7 +346,9 @@ cargo check            # lighter type check
 
 ## 🎬 Demo Path
 
-The live demo is intentionally scoped to two controlled flows:
+> These are **legacy controlled demos** — seeded/operator walkthroughs kept for reference on devnet/test-USDC. They are a superset of the invite-only Pilot corridor and are not, by themselves, current Pilot availability, deployed, or live.
+
+The legacy controlled demo is intentionally scoped to two controlled flows:
 
 ```text
 S1 controlled demo
@@ -393,15 +421,22 @@ Details in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render
 
 ## 🗺 Roadmap
 
-Near-term priorities:
+Present priorities (invite-only Pilot candidate — devnet/test-USDC, not deployed, not live). H0, H1, H2, and H3 are all approved (H3 on 2026-07-12); the human subsequently authorized one commit/push/merge round, and this execution round targets the `codex/post-deadline-phase-0` integration branch instead of production `main` as an operational safety choice to avoid triggering Render/Vercel production. The next gate is an explicit production-mutation approval (P4):
 
-- Harden the verified production corridor (auth → media → feed → proposal → campaign proof).
-- Finish production auth identity verification and managed-wallet hardening (KMS/Vault, SOL budget, recovery).
-- Productize the S1 buyout formation UI after the controlled S1 demo path stabilizes.
-- Complete S2 endorsement claim UX and the fan reward ledger.
-- Add operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
-- Build the loyalty/Fan Badge layer and `SPUMP` sinks (cheer, boost, tier claims) — see [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
-- Run a broader security review before any real-money deployment.
+- **P2 gate sequence (historical, complete):** (1) held the fixed P2 commit range `d78815b..e0b6028`, (2) obtained an independent **Fable 5** review on it — **PASS on 2026-07-12, no blocker/major finding**, (3) no blocker/major finding was raised, so no rerun was required, then (4) **human gate H2 is approved**.
+- **P3 gate sequence (next):** the integrated Codex backend `d14a20f` plus follow-up fix `96e9075` and this frontend/docs pass are verified locally only. (1) The first independent **Fable 5** review of the initial range `84c3415..109767f` found no blocker but 2 majors, (2) both were fixed in `96e9075`, (3) the mandatory **Fable 5** re-review of the fixed range `84c3415..d783301` is now **PASS on 2026-07-12, no blocker/major**, so (4) **human review node H3 is approved (2026-07-12)**; the human subsequently authorized one commit/push/merge round, and this execution round targets the `codex/post-deadline-phase-0` integration branch instead of production `main` as an operational safety choice to avoid triggering Render/Vercel production. The next and only current gate is an explicit **production-mutation approval (P4)** (program extend + upgrade/rollback, Neon restore point + migration, controlled Render/Vercel deploy, Mux webhook, disposable allowlisted-wallet corridor + Track 1 replay smoke); the agent halts and hands off to a human there.
+- Stand up a real dedicated devnet RPC and decide the Pilot test-USDC mint (the production IDL artifact is now packaged under the backend root).
+- Run a real deployment chain preflight and a deployed-corridor + Track 1 smoke with live Pilot credentials.
+- Complete external security audit + legal review before any real-money or public launch.
+
+Post-Pilot backlog (closed for all Pilot users — each needs a later H gate plus its own audit/legal/provider prerequisites):
+
+- Production auth identity verification and managed/email-social wallet hardening (KMS/Vault, SOL budget, recovery).
+- S1 self-serve market and buyout formation UI after the closed S1 lane is audited.
+- S2 Track 2 endorsement claim UX and the fan reward ledger.
+- Track 3 CPS / automatic settlement once a real merchant/reconciliation provider exists.
+- Operator dashboards for oracle, fraud review, reconciliation, and settlement monitoring.
+- The loyalty/Fan Badge layer and `SPUMP` sinks (cheer, boost, tier claims) — see [docs/protocol/fan-loyalty-and-spump-economy.md](docs/protocol/fan-loyalty-and-spump-economy.md).
 
 ---
 

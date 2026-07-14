@@ -26,7 +26,6 @@ import {
   getContentManifestById,
   ManifestAssetKind,
   presignManifestAssets,
-  verifyContentPublication,
 } from "@/lib/api/workspace";
 import { ContentManifestStatus } from "@/lib/api/types";
 import { formatIsoLabel, shortenWallet } from "@/lib/formatting";
@@ -50,8 +49,22 @@ type UploadStage = "selected" | "hashing" | "presigning" | "uploading" | "comple
 type UploadQueueItem = { file: File; key: string; message: string; stage: UploadStage };
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
+// Pilot scope: ordinary proposal intents submit Track 1 base pay only. Track 2
+// performance budgets and Track 3 CPS are not part of the invite-only devnet/
+// test-USDC corridor and are always submitted as zero terms.
+const TRACK2_PILOT_CLOSED_METRIC = "VIEWS" as const;
+const TRACK2_PILOT_CLOSED_TARGET = "0";
+const TRACK2_PILOT_CLOSED_BPS = 0;
+const TRACK2_PILOT_CLOSED_USDC = "0";
 const TRACK3_OPERATOR_GATED_USDC = "0";
 const TRACK3_OPERATOR_GATED_DELAY_DAYS = 0;
+
+// Publication platforms. STREAMPUMP is the internal canonical destination: it
+// publishes against the manifest's own `internalCanonicalUrl` and then waits for
+// operator verification. External platforms are limited to the exact set the
+// backend supports and require the creator to paste an HTTPS link.
+const INTERNAL_PLATFORM = "STREAMPUMP";
+const EXTERNAL_PLATFORMS = ["X", "INSTAGRAM", "TIKTOK", "YOUTUBE", "XIAOHONGSHU"] as const;
 
 const CONTENT_DETAIL_READINESS_DESCRIPTION =
   "This page reads live content manifests and can resume asset upload, finalize content, record publication URLs, and create proposal intents. It still depends on authenticated session state, R2/Mux/backend configuration, and seeded S2 creator readiness; failed asset cleanup and webhook reconciliation are not fully productized.";
@@ -88,7 +101,11 @@ const isMuxAssetReady = (a: ManifestAssetRecord) =>
 const hasAssetIssue = (a: ManifestAssetRecord) => {
   const statuses = [a.uploadStatus, a.processingStatus, a.ingestStatus, a.deliveryStatus]
     .map((status) => status?.toUpperCase?.() ?? "");
-  return Boolean(a.processingError) || statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"));
+  return (
+    Boolean(a.processingError) ||
+    Boolean(a.hasStorageVerificationError) ||
+    statuses.some((status) => status.includes("FAILED") || status.includes("ERROR"))
+  );
 };
 const isAssetWaiting = (a: ManifestAssetRecord) => {
   if (hasAssetIssue(a)) return false;
@@ -107,6 +124,17 @@ const resolveRenderableAssetUrl = (a: ManifestAssetRecord) => {
   if (isRenderableUrl(a.preferredPlaybackUrl)) return a.preferredPlaybackUrl;
   if (isRenderableUrl(a.originUrl)) return a.originUrl;
   return null;
+};
+
+// Public-feed / proposal-intent eligibility. Trusts the backend flag when set,
+// otherwise falls back to the same evidence the backend gates on: every asset
+// delivery-ready (backend storage verification + Mux ready) and at least one
+// operator-verified publication.
+const isManifestPublicFeedEligible = (d: ContentManifestDetailResponse) => {
+  if (typeof d.isPublicFeedEligible === "boolean") return d.isPublicFeedEligible;
+  const assetsReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
+  const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
+  return assetsReady && hasVerifiedPublication;
 };
 
 const sha256Hex = async (file: File) => {
@@ -185,20 +213,15 @@ export default function ManifestDetailPage() {
   const { t } = useI18n();
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [busyAction, setBusyAction] = useState<"upload" | "finalize" | "publication" | "intent" | null>(null);
-  const [verifyingPublicationId, setVerifyingPublicationId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
-  const [publicationPlatform, setPublicationPlatform] = useState("XIAOHONGSHU");
+  const [publicationPlatform, setPublicationPlatform] = useState(INTERNAL_PLATFORM);
   const [publicationUrl, setPublicationUrl] = useState("");
   const [publicationPostId, setPublicationPostId] = useState("");
   const [sponsorWallet, setSponsorWallet] = useState("");
   const [deadlineInput, setDeadlineInput] = useState(defaultDeadlineInput);
   const [track1BaseUsdc, setTrack1BaseUsdc] = useState("500");
-  const [track2MetricType, setTrack2MetricType] = useState<"VIEWS" | "CLICKS" | "SAVES">("VIEWS");
-  const [track2TargetValue, setTrack2TargetValue] = useState("10000");
-  const [track2MinAchievementBps, setTrack2MinAchievementBps] = useState("7000");
-  const [track2BudgetUsdc, setTrack2BudgetUsdc] = useState("1000");
   const [activeSection, setActiveSection] = useState<"assets" | "publish" | "sponsor">("assets");
 
   const loginHref = buildLoginHrefFromRouter(router, WORKSPACE_PATH);
@@ -250,14 +273,27 @@ export default function ManifestDetailPage() {
     setBusyAction("upload");
     try {
       const existingCount = state.kind === "ready" ? state.data.assets.length : 0;
+      // Match each presigned upload back to its selected file by orderIndex,
+      // never by array position — the backend may omit already-completed assets
+      // from `uploads` (surfaced via `completedAssets`).
+      const fileByOrderIndex = new Map<number, File>();
       const inputs = await Promise.all(selectedFiles.map(async (f, i) => {
         updateUploadItem(`${f.name}-${f.size}-${f.lastModified}`, { message: "计算哈希中", stage: "hashing" });
-        return { assetType: resolveAssetType(f), orderIndex: existingCount + i, sha256Hex: await sha256Hex(f), mimeType: f.type.toLowerCase(), fileSizeBytes: String(f.size) };
+        const orderIndex = existingCount + i;
+        fileByOrderIndex.set(orderIndex, f);
+        return { assetType: resolveAssetType(f), orderIndex, sha256Hex: await sha256Hex(f), mimeType: f.type.toLowerCase(), fileSizeBytes: String(f.size) };
       }));
       setUploadQueue((items) => items.map((i) => ({ ...i, message: "请求上传签名", stage: "presigning" })));
       const response = await presignManifestAssets(token, manifestId, inputs);
-      for (const [idx, upload] of response.uploads.entries()) {
-        const f = selectedFiles[idx];
+      // Assets the backend already verified are skipped from `uploads`; show them
+      // as completed in the queue without re-uploading.
+      for (const completed of response.completedAssets ?? []) {
+        const f = fileByOrderIndex.get(completed.orderIndex);
+        if (f) updateUploadItem(`${f.name}-${f.size}-${f.lastModified}`, { message: "已上传", stage: "uploaded" });
+      }
+      for (const upload of response.uploads) {
+        const f = fileByOrderIndex.get(upload.orderIndex);
+        if (!f) throw new Error(`上传缺少对应文件 (orderIndex ${upload.orderIndex})`);
         const key = `${f.name}-${f.size}-${f.lastModified}`;
         updateUploadItem(key, { message: `上传中 (${upload.uploadStrategy})`, stage: "uploading" });
         if (upload.uploadStrategy === "MULTIPART") {
@@ -303,34 +339,35 @@ export default function ManifestDetailPage() {
 
   const handleCreatePublication = async () => {
     const token = getAccessToken();
-    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
+    const manifest = state.kind === "ready" ? state.data : null;
     if (!token) { handleAuthFailure(); return; }
-    const url = publicationUrl.trim();
-    if (!url) { setActionMessage("请输入发布链接"); return; }
-    try { new URL(url); } catch { setActionMessage("无效的链接格式"); return; }
+    if (!manifest) { setActionMessage(t("content.finalizeFirst")); return; }
+    const manifestId = manifest.manifestId;
+    const isInternal = publicationPlatform === INTERNAL_PLATFORM;
+    // STREAMPUMP publishes against the manifest's own canonical URL — the creator
+    // never types it. External platforms require a creator-supplied HTTPS link.
+    let url: string;
+    let externalPostId: string | null;
+    if (isInternal) {
+      const internalUrl = manifest.internalCanonicalUrl?.trim();
+      if (!internalUrl) { setActionMessage(t("content.internalUrlPending")); return; }
+      url = internalUrl;
+      externalPostId = null;
+    } else {
+      url = publicationUrl.trim();
+      if (!url) { setActionMessage(t("content.externalLinkRequired")); return; }
+      if (!url.toLowerCase().startsWith("https://")) { setActionMessage(t("content.externalHttpsRequired")); return; }
+      try { new URL(url); } catch { setActionMessage(t("content.invalidLink")); return; }
+      externalPostId = publicationPostId.trim() || null;
+    }
     setBusyAction("publication");
     try {
-      await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId: publicationPostId.trim() || null });
+      await createContentPublication(token, { manifestId, platform: publicationPlatform, externalUrl: url, externalPostId });
       await refreshManifest(token, manifestId);
-      setPublicationUrl(""); setPublicationPostId("");
-      setActionMessage("发布记录已创建，等待验证和媒体交付就绪后进入 public feed");
+      if (!isInternal) { setPublicationUrl(""); setPublicationPostId(""); }
+      setActionMessage(t("content.publicationRecorded"));
     } catch (error) { handleApiError(error, "发布失败"); }
     finally { setBusyAction(null); }
-  };
-
-  const handleVerifyPublication = async (publicationId: string) => {
-    const token = getAccessToken();
-    const manifestId = state.kind === "ready" ? state.data.manifestId : "";
-    if (!token) { handleAuthFailure(); return; }
-    if (!manifestId) return;
-    setVerifyingPublicationId(publicationId);
-    try {
-      await verifyContentPublication(token, publicationId);
-      const next = await refreshManifest(token, manifestId);
-      const eligible = next.isPublicFeedEligible ? "，已进入 public feed eligibility" : "，等待媒体交付就绪后进入 public feed";
-      setActionMessage(`发布验证已完成${eligible}`);
-    } catch (error) { handleApiError(error, "验证发布失败"); }
-    finally { setVerifyingPublicationId(null); }
   };
 
   const handleCreateProposalIntent = async () => {
@@ -338,9 +375,22 @@ export default function ManifestDetailPage() {
     const manifest = state.kind === "ready" ? state.data : null;
     if (!token) { handleAuthFailure(); return; }
     if (!manifest || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(manifest.status)) { setActionMessage("请先完善内容"); return; }
+    // A proposal intent can only open once the content is public-feed eligible:
+    // backend storage verification + Mux ready + operator-approved publication.
+    if (!isManifestPublicFeedEligible(manifest)) { setActionMessage(t("content.intentBlockedEligibility")); return; }
     if (!sponsorWallet.trim()) { setActionMessage("请输入赞助商钱包"); return; }
     const dMs = new Date(deadlineInput).getTime();
     if (!Number.isFinite(dMs) || dMs <= Date.now()) { setActionMessage("截止日期须在未来"); return; }
+    let track1BaseUsdcAtomic: string;
+    try {
+      track1BaseUsdcAtomic = toUsdcAtomicString(track1BaseUsdc);
+    } catch {
+      setActionMessage("USDC 格式无效");
+      return;
+    }
+    // Track 1 base pay must be a strictly positive amount — a zero-budget intent
+    // is never a valid Pilot corridor proposal.
+    if (BigInt(track1BaseUsdcAtomic) <= 0n) { setActionMessage(t("content.track1Positive")); return; }
     setBusyAction("intent");
     try {
       const creatorMarket = await getCreatorMarketProfile(manifest.creatorWallet);
@@ -351,10 +401,12 @@ export default function ManifestDetailPage() {
 
       const intent = await createProposalIntent(token, {
         manifestId: manifest.manifestId, creatorWallet: manifest.creatorWallet, sponsorWallet: sponsorWallet.trim(),
-        deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: toUsdcAtomicString(track1BaseUsdc),
-        track2MetricType, track2TargetValue: track2TargetValue.trim(), track2MinAchievementBps: Number(track2MinAchievementBps),
-        track2UsdcDeposited: toUsdcAtomicString(track2BudgetUsdc),
-        track3UsdcDeposited: toUsdcAtomicString(TRACK3_OPERATOR_GATED_USDC),
+        deadlineUnix: String(Math.floor(dMs / 1000)), track1BaseUsdc: track1BaseUsdcAtomic,
+        // Track 2/3 are closed in the Pilot corridor: submit zero terms only.
+        track2MetricType: TRACK2_PILOT_CLOSED_METRIC, track2TargetValue: TRACK2_PILOT_CLOSED_TARGET,
+        track2MinAchievementBps: TRACK2_PILOT_CLOSED_BPS,
+        track2UsdcDeposited: TRACK2_PILOT_CLOSED_USDC,
+        track3UsdcDeposited: TRACK3_OPERATOR_GATED_USDC,
         track3DelayDays: TRACK3_OPERATOR_GATED_DELAY_DAYS,
       });
       setActionMessage("合作意向已创建");
@@ -403,12 +455,22 @@ export default function ManifestDetailPage() {
   const assetsWaiting = d.assets.filter(isAssetWaiting);
   const assetsDeliveryReady = d.assets.length > 0 && d.assets.every(isAssetDeliveryReady);
   const hasVerifiedPublication = d.publications.some((pub) => pub.verificationStatus === "VERIFIED");
-  const isPublicFeedEligible = Boolean(d.isPublicFeedEligible) || (assetsDeliveryReady && hasVerifiedPublication);
+  const hasRejectedPublication = d.publications.some((pub) => pub.verificationStatus === "REJECTED");
+  const isPublicFeedEligible = isManifestPublicFeedEligible(d);
   const publicFeedBlockedReason = !hasVerifiedPublication
-    ? "Awaiting verified publication"
+    ? t("content.feed.blockedPublication")
     : !assetsDeliveryReady
-      ? "Assets still processing"
-      : "Backend eligibility flag pending";
+      ? t("content.feed.blockedAssets")
+      : t("content.feed.blockedFlag");
+  // Immutable-content signal: once a manifest is finalized its asset set and
+  // manifest hash can no longer change; only publications/intents proceed.
+  const isFinalizedImmutable = ["READY", "LOCKED", "ANCHORED", "PUBLISHED"].includes(d.status);
+  // Operator handoff is warranted when self-recovery is exhausted: an asset is
+  // in a hard-failure state, or a publication was operator-rejected.
+  const needsOperatorHandoff = assetsWithIssues.length > 0 || hasRejectedPublication;
+  const isInternalPublication = publicationPlatform === INTERNAL_PLATFORM;
+  const canSubmitProposalIntent =
+    ["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && isPublicFeedEligible;
 
   const previewPanel = (
     <aside className="space-y-4">
@@ -434,13 +496,20 @@ export default function ManifestDetailPage() {
         </div>
       )}
 
+      {isFinalizedImmutable && (
+        <div className="liquid-card card-radius border border-[#67b8ff]/15 p-4">
+          <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.finalized.title")}</p>
+          <p className="mt-2 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{t("content.finalized.body")}</p>
+        </div>
+      )}
+
       {d.publications.length > 0 && (
         <div className="liquid-card card-radius p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.published")}</p>
               <p className={`mt-1 text-[length:var(--fs-micro)] font-semibold ${isPublicFeedEligible ? "text-[#65ecaf]" : "text-[#8ea0ba]"}`}>
-                {isPublicFeedEligible ? "Public Feed Eligible" : publicFeedBlockedReason}
+                {isPublicFeedEligible ? t("content.feed.eligible") : publicFeedBlockedReason}
               </p>
             </div>
             <span className={`rounded-full border px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
@@ -448,7 +517,7 @@ export default function ManifestDetailPage() {
                 ? "border-[#65ecaf]/30 bg-[#65ecaf]/10 text-[#8df0c4]"
                 : "border-white/10 bg-white/[0.04] text-[#8ea0ba]"
             }`}>
-              {isPublicFeedEligible ? "Eligible" : "Pending"}
+              {isPublicFeedEligible ? t("content.feed.eligibleTag") : t("content.feed.pendingTag")}
             </span>
           </div>
           {d.publications.map((pub) => (
@@ -458,21 +527,37 @@ export default function ManifestDetailPage() {
                 <span className={`rounded-full px-2 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.12em] ${
                   pub.verificationStatus === "VERIFIED"
                     ? "bg-[#65ecaf]/10 text-[#8df0c4]"
-                    : "bg-[#f3b33e]/10"
+                    : pub.verificationStatus === "REJECTED"
+                      ? "bg-[#f67263]/10 text-[#f6a99e]"
+                      : "bg-[#f3b33e]/10"
                 }`}>
                   {pub.verificationStatus}
                 </span>
               </div>
               <p className="mt-0.5 truncate text-[length:var(--fs-micro)] text-[#5a6b82]">{pub.externalUrl}</p>
+              {/* Operator-review evidence for the verification decision. Every row
+                  is rendered only when the backend actually returns it, so an
+                  unreviewed publication never shows a fabricated reviewer. */}
+              {pub.verificationStatus === "VERIFIED" && (
+                <div className="mt-2 space-y-1">
+                  {pub.verificationSource ? <PubEvidenceRow label={t("content.pub.reviewSource")} value={pub.verificationSource} /> : null}
+                  {pub.verificationReviewer ? <PubEvidenceRow label={t("content.pub.reviewer")} value={pub.verificationReviewer} /> : null}
+                  {pub.verificationEvidenceDigestHex ? <PubEvidenceRow label={t("content.pub.evidenceDigest")} mono value={`${pub.verificationEvidenceDigestHex.slice(0, 8)}...${pub.verificationEvidenceDigestHex.slice(-6)}`} /> : null}
+                  {pub.verifiedAt ? <PubEvidenceRow label={t("content.pub.verifiedAt")} value={formatIsoLabel(pub.verifiedAt)} /> : null}
+                  {pub.verificationNote ? <p className="text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{pub.verificationNote}</p> : null}
+                </div>
+              )}
               {pub.verificationStatus === "PENDING" ? (
-                <button
-                  className="mt-2 rounded-full border border-[#65ecaf]/25 bg-[#113222] px-3 py-1 text-[length:var(--fs-micro)] font-semibold text-[#b9f7d4] transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-60"
-                  disabled={busyAction !== null || verifyingPublicationId !== null}
-                  onClick={() => void handleVerifyPublication(pub.publicationId)}
-                  type="button"
-                >
-                  {verifyingPublicationId === pub.publicationId ? "Verifying..." : "Verify Publication"}
-                </button>
+                <p className="mt-2 rounded-lg border border-[#f3b33e]/20 bg-[#2a1f0b]/40 px-2.5 py-1.5 text-[length:var(--fs-micro)] leading-5 text-[#f3c66e]">
+                  {t("content.publicationPendingOperator")}
+                </p>
+              ) : null}
+              {pub.verificationStatus === "REJECTED" ? (
+                <div className="mt-2 rounded-lg border border-[#f67263]/20 bg-[#2a1210]/40 px-2.5 py-1.5">
+                  <p className="text-[length:var(--fs-micro)] leading-5 text-[#f6a99e]">{t("content.pub.rejectedHint")}</p>
+                  {pub.rejectedAt ? <p className="mt-1 text-[length:var(--fs-nano)] text-[#8ea0ba]">{t("content.pub.rejectedAt")}: {formatIsoLabel(pub.rejectedAt)}</p> : null}
+                  {pub.verificationNote ? <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#8ea0ba]">{pub.verificationNote}</p> : null}
+                </div>
               ) : null}
             </div>
           ))}
@@ -568,6 +653,29 @@ export default function ManifestDetailPage() {
               </div>
             )}
 
+            {needsOperatorHandoff && (
+              <div className="rounded-2xl border border-[#f67263]/20 bg-[#2a1210]/30 px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#f6a99e]">{t("content.operator.title")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.operator.body")}</p>
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2">
+                  <span className="text-[length:var(--fs-micro)] text-[#7486a1]">{t("content.operator.contentId")}</span>
+                  <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{d.manifestId}</span>
+                </div>
+              </div>
+            )}
+
+            {d.assets.length > 0 && (
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.diag.title")}</p>
+                <p className="mt-1 text-[length:var(--fs-micro)] leading-5 text-[#6b7d96]">{t("content.diag.subtitle")}</p>
+                <div className="mt-3 space-y-2">
+                  {d.assets.map((asset) => (
+                    <AssetDiagnostics asset={asset} key={asset.assetId} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <label className="block cursor-pointer">
               <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.02] p-6 transition hover:border-[#de402a]/30">
                 <UploadIcon className="h-6 w-6 text-[#6b7d96]" />
@@ -622,20 +730,47 @@ export default function ManifestDetailPage() {
             <div className="space-y-3">
               <label className="block space-y-1.5">
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.publishPlatform")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPlatform(e.target.value.toUpperCase())} value={publicationPlatform} />
+                <select
+                  className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                  onChange={(e) => setPublicationPlatform(e.target.value)}
+                  value={publicationPlatform}
+                >
+                  <option value={INTERNAL_PLATFORM}>{t("content.platformStreampump")}</option>
+                  {EXTERNAL_PLATFORMS.map((platform) => (
+                    <option key={platform} value={platform}>{platform}</option>
+                  ))}
+                </select>
               </label>
-              <label className="block space-y-1.5">
-                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
-                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
-              </label>
+              {isInternalPublication ? (
+                <>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("content.internalCanonicalUrl")}</span>
+                    <input
+                      className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-[#8ea0ba] outline-none"
+                      readOnly
+                      value={d.internalCanonicalUrl ?? t("content.internalUrlNotReady")}
+                    />
+                  </label>
+                  <p className="rounded-xl border border-[#67b8ff]/20 bg-[#0d1b2a]/50 px-3 py-2 text-[length:var(--fs-micro)] leading-5 text-[#a8c6e6]">
+                    {t("content.internalPublishHint")}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalLink")}</span>
+                    <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" inputMode="url" onChange={(e) => setPublicationUrl(e.target.value)} placeholder="https://..." value={publicationUrl} />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.externalPostId")}</span>
+                    <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setPublicationPostId(e.target.value)} value={publicationPostId} />
+                  </label>
+                </>
+              )}
             </div>
             <button
               className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || (isInternalPublication && !d.internalCanonicalUrl)}
               onClick={() => void handleCreatePublication()}
               type="button"
             >
@@ -654,6 +789,17 @@ export default function ManifestDetailPage() {
                 {t("workspace.sponsorshipAfterDraft")}
               </div>
             )}
+            {["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status) && !isPublicFeedEligible && (
+              <div className="rounded-2xl border tone-state-warning px-4 py-3">
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">{t("content.intentEligibilityTitle")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.intentEligibilityBody")}</p>
+                <ul className="mt-2 space-y-1 text-[length:var(--fs-micro)] text-[#9aabc4]">
+                  <li>· {t("content.intentReqStorage")}</li>
+                  <li>· {t("content.intentReqMux")}</li>
+                  <li>· {t("content.intentReqOperator")}</li>
+                </ul>
+              </div>
+            )}
             <div className="space-y-3">
               <label className="block space-y-1.5">
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.sponsorWallet")}</span>
@@ -663,38 +809,18 @@ export default function ManifestDetailPage() {
                 <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.deadline")}</span>
                 <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setDeadlineInput(e.target.value)} type="datetime-local" value={deadlineInput} />
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.performanceBudget")} (USDC)</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2BudgetUsdc(e.target.value)} value={track2BudgetUsdc} />
-                </label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.metricType")}</span>
-                  <select className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2MetricType(e.target.value as "VIEWS" | "CLICKS" | "SAVES")} value={track2MetricType}>
-                    <option value="VIEWS">{t("workspace.views")}</option><option value="CLICKS">{t("workspace.clicks")}</option><option value="SAVES">{t("workspace.saves")}</option>
-                  </select>
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.targetValue")}</span>
-                  <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack2TargetValue(e.target.value)} value={track2TargetValue} />
-                </label>
-              </div>
+              <label className="block space-y-1.5">
+                <span className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em] text-[#7486a1]">{t("workspace.basePay")} (USDC)</span>
+                <input className="input-glass w-full rounded-2xl px-4 py-2.5 text-sm text-white outline-none" onChange={(e) => setTrack1BaseUsdc(e.target.value)} value={track1BaseUsdc} />
+              </label>
               <div className="rounded-2xl border tone-state-warning px-4 py-3">
-                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">Track 3 CPS operator-gated</p>
-                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">
-                  Ordinary proposal creation now submits Track 3 as 0 USDC / 0 days. CPS requires merchant reconciliation and remains disabled outside controlled operator workflows.
-                </p>
+                <p className="text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.18em]">{t("content.track23ClosedTitle")}</p>
+                <p className="mt-1 text-xs leading-5 text-[#9aabc4]">{t("content.track23ClosedBody")}</p>
               </div>
             </div>
             <button
               className="glass-button-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:opacity-40"
-              disabled={busyAction !== null || !["READY", "ANCHORED", "PUBLISHED", "LOCKED"].includes(d.status)}
+              disabled={busyAction !== null || !canSubmitProposalIntent}
               onClick={() => void handleCreateProposalIntent()}
               type="button"
             >
@@ -741,6 +867,111 @@ function HashRow({ label, value }: { label: string; value: string | null | undef
     <div className="flex items-center justify-between gap-2">
       <span className="text-[length:var(--fs-micro)] text-[#5a6b82]">{label}</span>
       <span className="font-mono text-[length:var(--fs-micro)] text-[#93a2bb]">{display}</span>
+    </div>
+  );
+}
+
+function PubEvidenceRow({ label, value, mono }: { label: string; mono?: boolean; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{label}</span>
+      <span className={`text-[length:var(--fs-nano)] text-[#93a2bb] ${mono ? "font-mono" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+const formatBytes = (value: string | null | undefined) => {
+  const n = value ? Number(value) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${n} B`;
+};
+
+// Per-asset truth panel. Storage verification (backend re-hash + size check) and
+// Mux ingest are shown as independent states — a verified upload is never
+// conflated with a ready delivery, and raw error text is never surfaced.
+function AssetDiagnostics({ asset }: { asset: ManifestAssetRecord }) {
+  const { t } = useI18n();
+  const isVideo = asset.assetType === "VIDEO";
+  const storageState: "failed" | "ok" | "pending" = asset.hasStorageVerificationError
+    ? "failed"
+    : asset.storageVerifiedAt || asset.verifiedSha256Hex
+      ? "ok"
+      : "pending";
+  const storageLabel =
+    storageState === "failed" ? t("content.diag.storageFailed") : storageState === "ok" ? t("content.diag.storageOk") : t("content.diag.storagePending");
+  const storageTone =
+    storageState === "failed" ? "text-[#f67263]" : storageState === "ok" ? "text-[#65ecaf]" : "text-[#8ea0ba]";
+  const size = formatBytes(asset.verifiedSizeBytes);
+
+  const muxState = !isVideo
+    ? "na"
+    : asset.ingestStatus === "READY"
+      ? "ready"
+      : asset.ingestStatus === "ERRORED"
+        ? "errored"
+        : asset.ingestStatus === "QUEUED"
+          ? "queued"
+          : "processing";
+  const muxLabel =
+    muxState === "na"
+      ? t("content.diag.notApplicable")
+      : muxState === "ready"
+        ? t("content.diag.muxReady")
+        : muxState === "errored"
+          ? t("content.diag.muxErrored")
+          : muxState === "queued"
+            ? t("content.diag.muxQueued")
+            : t("content.diag.muxProcessing");
+  const muxTone =
+    muxState === "ready" ? "text-[#65ecaf]" : muxState === "errored" ? "text-[#f67263]" : muxState === "na" ? "text-[#5a6b82]" : "text-[#f3b33e]";
+
+  return (
+    <div className="rounded-xl bg-white/[0.03] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[length:var(--fs-micro)] text-[#8ea0ba]">{asset.assetType} #{asset.orderIndex + 1}</span>
+        {asset.verifiedSha256Hex ? (
+          <span className="font-mono text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.sha")} {asset.verifiedSha256Hex.slice(0, 8)}…</span>
+        ) : null}
+      </div>
+      <div className="mt-2 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.storage")}</span>
+          <span className={`text-[length:var(--fs-nano)] font-semibold ${storageTone}`}>{storageLabel}</span>
+        </div>
+        {size ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.size")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{size}</span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.mux")}</span>
+          <span className={`text-[length:var(--fs-nano)] font-semibold ${muxTone}`}>{muxLabel}</span>
+        </div>
+        {isVideo && typeof asset.muxReconcileAttempts === "number" && asset.muxReconcileAttempts > 0 ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.muxAttempts")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{asset.muxReconcileAttempts}</span>
+          </div>
+        ) : null}
+        {isVideo && asset.muxLastCheckedAt ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.muxLastChecked")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{formatIsoLabel(asset.muxLastCheckedAt)}</span>
+          </div>
+        ) : null}
+        {isVideo && asset.muxWebhookReceivedAt ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[length:var(--fs-nano)] text-[#5a6b82]">{t("content.diag.webhookReceived")}</span>
+            <span className="text-[length:var(--fs-nano)] text-[#93a2bb]">{formatIsoLabel(asset.muxWebhookReceivedAt)}</span>
+          </div>
+        ) : null}
+      </div>
+      {storageState === "failed" ? (
+        <p className="mt-2 text-[length:var(--fs-nano)] leading-4 text-[#f6a99e]">{t("content.diag.storageFailedHint")}</p>
+      ) : null}
     </div>
   );
 }

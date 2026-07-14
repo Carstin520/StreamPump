@@ -14,9 +14,12 @@ class MuxReconciliationScheduler {
   private task: ScheduledTask | null = null;
   private running = false;
 
-  start(): void {
-    if (!config.mux.reconciliation.enabled || this.task) {
-      return;
+  start(): boolean {
+    if (!config.mux.reconciliation.enabled) {
+      return false;
+    }
+    if (this.task) {
+      return true;
     }
 
     this.task = cron.schedule(config.mux.reconciliation.cron, () => {
@@ -30,6 +33,8 @@ class MuxReconciliationScheduler {
     if (config.mux.reconciliation.runOnBoot) {
       this.runOnceInBackground();
     }
+
+    return true;
   }
 
   stop(): void {
@@ -70,6 +75,6 @@ class MuxReconciliationScheduler {
 
 const scheduler = new MuxReconciliationScheduler();
 
-export const startMuxReconciliationScheduler = () => scheduler.start();
+export const startMuxReconciliationScheduler = (): boolean => scheduler.start();
 export const stopMuxReconciliationScheduler = () => scheduler.stop();
 export const runMuxReconciliationOnce = () => scheduler.runOnce();

@@ -10,6 +10,13 @@ declare global {
         sessionId: string | null;
         source: "session" | "legacy-header";
       };
+      idempotency?: {
+        recordId: string;
+        leaseToken: string;
+        resourceType: string | null;
+        resourceId: string | null;
+      };
+      operatorIdentity?: string;
     }
   }
 }

@@ -84,6 +84,8 @@ export interface CreateFundedProposalParams {
   track2Target: bigint;
   /** Minimum achievement basis points to pass cliff (e.g. 5000 = 50%) / 通过悬崖门槛的最低达成基点（如 5000 = 50%） */
   track2MinAchievementBps: number;
+  /** Optional Track 2 endorsement cap; zero uses the protocol hard ceiling / 可选 Track 2 背书上限；零值使用协议硬上限 */
+  maxEndorsementSpump?: bigint;
   /** Optional: CPS return-window delay in days (default 45) / 可选：CPS 退货窗口延迟天数（默认 45） */
   track3DelayDays?: number;
   /** Optional: seconds from now until proposal deadline (default 3) / 可选：从现在到提案截止的秒数（默认 3） */
@@ -888,6 +890,7 @@ const buildContext = async (): Promise<TestContext> => {
         track3DelayDays: params.track3DelayDays ?? 45,       // CPS delay / CPS 延迟天数
         deadline,                                            // Proposal deadline / 提案截止时间
         nonce: bn(0),                                        // PDA nonce / PDA nonce
+        maxEndorsementSpump: bn(params.maxEndorsementSpump ?? 0n),
       })
       .accounts({
         creator: params.creator.publicKey,

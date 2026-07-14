@@ -37,6 +37,7 @@ describe("streampump-core expired open proposal guardrails", function () {
         track3DelayDays: 45,
         deadline,
         nonce: ctx.bn(0),
+        maxEndorsementSpump: ctx.bn(0),
       })
       .accounts({
         creator: ctx.creatorS2.publicKey,

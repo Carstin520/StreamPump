@@ -3,10 +3,18 @@ import {
   AssetType,
   AssetUploadStatus,
   ContentManifestStatus,
+  Prisma,
+  ProposalStatus,
   PublicationVerificationStatus,
 } from "@prisma/client";
 
 import { prisma } from "./prisma";
+import { config } from "../../config/default";
+
+export const trustedPublicationVerificationWhere = (inviteOnly: boolean) => ({
+  verificationStatus: PublicationVerificationStatus.VERIFIED,
+  ...(inviteOnly ? { verificationSource: "OPERATOR_APPROVED" } : {}),
+});
 
 export const isAssetPublicDeliveryReady = (asset: {
   assetType: AssetType;
@@ -25,10 +33,43 @@ export const isAssetPublicDeliveryReady = (asset: {
   return asset.processingStatus === AssetProcessingStatus.READY;
 };
 
-const nextManifestStatusAfterPublication = (
-  currentStatus: ContentManifestStatus
-): ContentManifestStatus =>
-  currentStatus === ContentManifestStatus.READY ? ContentManifestStatus.PUBLISHED : currentStatus;
+export const manifestStatusAfterEligibilitySync = (params: {
+  currentStatus: ContentManifestStatus;
+  publicFeedEligible: boolean;
+  currentAnchorPda: string | null;
+}): ContentManifestStatus => {
+  if (params.publicFeedEligible && params.currentStatus === ContentManifestStatus.READY) {
+    return ContentManifestStatus.PUBLISHED;
+  }
+
+  if (!params.publicFeedEligible && params.currentStatus === ContentManifestStatus.PUBLISHED) {
+    return params.currentAnchorPda
+      ? ContentManifestStatus.ANCHORED
+      : ContentManifestStatus.READY;
+  }
+
+  return params.currentStatus;
+};
+
+export const proposalPublicationEligibilityWhere = (
+  manifestId: string,
+  publicFeedEligible: boolean
+): Prisma.ProposalWhereInput => {
+  if (publicFeedEligible) {
+    return {
+      manifestId,
+      contentPublishedVerifiedAt: null,
+    };
+  }
+
+  return {
+    manifestId,
+    status: {
+      in: [ProposalStatus.OPEN, ProposalStatus.FUNDED],
+    },
+    track1Claimed: false,
+  };
+};
 
 export const syncManifestPublicationEligibility = async (
   manifestId: string
@@ -45,7 +86,7 @@ export const syncManifestPublicationEligibility = async (
       assets: true,
       publications: {
         where: {
-          verificationStatus: PublicationVerificationStatus.VERIFIED,
+          ...trustedPublicationVerificationWhere(config.pilot.inviteOnly),
         },
         orderBy: [
           {
@@ -76,35 +117,39 @@ export const syncManifestPublicationEligibility = async (
   const contentPublishedVerifiedAt = verifiedPublication
     ? (verifiedPublication.verifiedAt ?? verifiedPublication.updatedAt)
     : null;
-  const publicFeedEligible = Boolean(assetsReady && contentPublishedVerifiedAt);
-
-  if (!publicFeedEligible) {
-    return {
-      manifestId,
-      assetsReady,
-      hasVerifiedPublication: Boolean(verifiedPublication),
-      publicFeedEligible: false,
-      contentPublishedVerifiedAt,
-    };
-  }
+  const manifestIsFinalized =
+    Boolean(
+      manifest.manifestHashHex &&
+        manifest.internalCanonicalUrl &&
+        manifest.internalUrlDigestHex
+    ) &&
+    manifest.status !== ContentManifestStatus.DRAFT &&
+    manifest.status !== ContentManifestStatus.UPLOADING &&
+    manifest.status !== ContentManifestStatus.ARCHIVED;
+  const publicFeedEligible = Boolean(
+    manifestIsFinalized && assetsReady && contentPublishedVerifiedAt
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.contentManifest.update({
       where: { id: manifest.id },
       data: {
-        isPublicFeedEligible: true,
-        publishedAt: manifest.publishedAt ?? contentPublishedVerifiedAt,
-        status: nextManifestStatusAfterPublication(manifest.status),
+        isPublicFeedEligible: publicFeedEligible,
+        publishedAt: publicFeedEligible
+          ? (manifest.publishedAt ?? contentPublishedVerifiedAt)
+          : manifest.publishedAt,
+        status: manifestStatusAfterEligibilitySync({
+          currentStatus: manifest.status,
+          publicFeedEligible,
+          currentAnchorPda: manifest.currentAnchorPda,
+        }),
       },
     });
 
     await tx.proposal.updateMany({
-      where: {
-        manifestId: manifest.id,
-        contentPublishedVerifiedAt: null,
-      },
+      where: proposalPublicationEligibilityWhere(manifest.id, publicFeedEligible),
       data: {
-        contentPublishedVerifiedAt,
+        contentPublishedVerifiedAt: publicFeedEligible ? contentPublishedVerifiedAt : null,
       },
     });
   });
@@ -112,8 +157,8 @@ export const syncManifestPublicationEligibility = async (
   return {
     manifestId,
     assetsReady,
-    hasVerifiedPublication: true,
-    publicFeedEligible: true,
+    hasVerifiedPublication: Boolean(verifiedPublication),
+    publicFeedEligible,
     contentPublishedVerifiedAt,
   };
 };
