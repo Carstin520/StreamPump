@@ -53,7 +53,7 @@ Fixed safety caps enforced by the tooling: actor SOL target ≤ 50,000,000 lampo
 
 M6 mutates a hosted runtime, so the corridor and Track 1 smokes both refuse to run unless the deployed backend release identity matches a fixed candidate commit. Complete this stage before any actor preparation.
 
-> **Executed state:** the fixed candidate is `67ec60c7679aca2d7adad24780ae043370c426e3`; it is pushed, CI-green, incrementally Fable-reviewed with no blocker/major, deployed as `dep-d9at6enavr4c73b0rc20`, and serves stable `READY` database/indexer/Mux checks. The numbered procedure below is retained as the audited run sequence; the execution record above is authoritative for current status.
+> **Historical executed M6 state:** the fixed candidate was `67ec60c7679aca2d7adad24780ae043370c426e3`; it was pushed, CI-green, incrementally Fable-reviewed with no blocker/major, deployed as `dep-d9at6enavr4c73b0rc20`, and served stable `READY` database/indexer/Mux checks. The numbered procedure below is retained as the audited run sequence; the execution record above is authoritative for current status.
 
 1. **Commit and push the fixed M6 candidate.** Completed for `67ec60c7679aca2d7adad24780ae043370c426e3`; auto-deploy remains disabled.
 2. **Fable release-review gate.** Completed as the three contiguous exact incremental reviews recorded above. Do not repeat a full-repository review for this frozen candidate.

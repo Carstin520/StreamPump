@@ -589,6 +589,17 @@ const runSelfTest = async (): Promise<void> => {
       assertControlPlaneHeaders(
         {
           status: 200,
+          headers: new Headers({ "cache-control": "no-store" }),
+        },
+        "edge-stale response"
+      ),
+    /Surrogate-Control/
+  );
+  assert.throws(
+    () =>
+      assertControlPlaneHeaders(
+        {
+          status: 200,
           headers: new Headers({
             "cache-control": "no-store",
             "surrogate-control": "no-store",
@@ -701,6 +712,18 @@ const runSelfTest = async (): Promise<void> => {
   assert.equal(result.observations, 2);
   assert.equal(result.elapsedSeconds, 1);
   assert.equal(result.releaseEvidence, "health_payload_and_render_deployment_metadata");
+  for (const path of [
+    "/HEALTH",
+    "/ready/",
+    "/api/v1/internal/content/publications",
+  ]) {
+    assert.ok(
+      observedRequests.some(({ method, path: observedPath }) =>
+        method === "GET" && observedPath === path
+      ),
+      `deployment verification did not request ${path}`
+    );
+  }
   const postRequests = observedRequests.filter(({ method }) => method === "POST");
   assert.equal(postRequests.length, 9);
   assert.ok(postRequests.every(({ body }) => body === "{}"));

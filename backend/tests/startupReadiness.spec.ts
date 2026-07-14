@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { type AddressInfo } from "net";
+import { Keypair } from "@solana/web3.js";
 
 import { config } from "../config/default";
 import { createApp } from "../src/app";
@@ -193,58 +194,90 @@ describe("startup readiness", () => {
     const runtimeConfig = pilotRuntimeConfig();
     readiness.begin(runtimeConfig);
     const server = createApp(readiness).listen(0);
+    const originalOracleAuthoritySecret = process.env.ORACLE_AUTHORITY_SECRET_KEY;
+    process.env.ORACLE_AUTHORITY_SECRET_KEY = JSON.stringify(
+      Array.from(Keypair.generate().secretKey)
+    );
 
     try {
       const { port } = server.address() as AddressInfo;
+      const expectControlPlaneHeaders = (response: Response) => {
+        expect(response.headers.get("cache-control")).to.equal("no-store");
+        expect(response.headers.get("surrogate-control")).to.equal("no-store");
+        expect(response.headers.get("x-powered-by")).to.equal(null);
+      };
       const healthBefore = await fetch(`http://127.0.0.1:${port}/health`);
       const healthPayload = await healthBefore.json();
       expect(healthBefore.status).to.equal(200);
       expect(healthPayload.ok).to.equal(true);
       expect(healthPayload).not.to.have.property("services");
-      expect(healthBefore.headers.get("cache-control")).to.equal("no-store");
-      expect(healthBefore.headers.get("surrogate-control")).to.equal("no-store");
-      expect(healthBefore.headers.get("x-powered-by")).to.equal(null);
+      expectControlPlaneHeaders(healthBefore);
 
       for (const healthAlias of ["/HEALTH", "/health/"]) {
         const aliasResponse = await fetch(`http://127.0.0.1:${port}${healthAlias}`);
         expect(aliasResponse.status).to.equal(200);
-        expect(aliasResponse.headers.get("cache-control")).to.equal("no-store");
-        expect(aliasResponse.headers.get("surrogate-control")).to.equal("no-store");
+        expectControlPlaneHeaders(aliasResponse);
       }
 
       const readyBefore = await fetch(`http://127.0.0.1:${port}/ready`);
       expect(readyBefore.status).to.equal(503);
       expect(await readyBefore.json()).to.deep.equal(readiness.snapshot());
-      expect(readyBefore.headers.get("cache-control")).to.equal("no-store");
-      expect(readyBefore.headers.get("surrogate-control")).to.equal("no-store");
-      expect(readyBefore.headers.get("x-powered-by")).to.equal(null);
+      expectControlPlaneHeaders(readyBefore);
 
       const readyAlias = await fetch(`http://127.0.0.1:${port}/Ready/`);
       expect(readyAlias.status).to.equal(503);
-      expect(readyAlias.headers.get("cache-control")).to.equal("no-store");
-      expect(readyAlias.headers.get("surrogate-control")).to.equal("no-store");
+      expectControlPlaneHeaders(readyAlias);
+
+      for (const internalPath of [
+        "/api/v1/internal/content/publications",
+        "/api/v1/INTERNAL/content/publications/",
+      ]) {
+        const internalResponse = await fetch(`http://127.0.0.1:${port}${internalPath}`);
+        expect(internalResponse.status).to.equal(403);
+        const internalPayload = await internalResponse.json() as {
+          ok: boolean;
+          error?: { code?: string };
+        };
+        expect(internalPayload.ok).to.equal(false);
+        expect(internalPayload.error?.code).to.equal("OPERATOR_AUTH_REQUIRED");
+        expectControlPlaneHeaders(internalResponse);
+      }
 
       const internalNotFound = await fetch(
         `http://127.0.0.1:${port}/api/v1/internal/not-mounted`
       );
       expect(internalNotFound.status).to.equal(404);
-      expect(internalNotFound.headers.get("cache-control")).to.equal("no-store");
-      expect(internalNotFound.headers.get("surrogate-control")).to.equal("no-store");
-      expect(internalNotFound.headers.get("x-powered-by")).to.equal(null);
+      expectControlPlaneHeaders(internalNotFound);
 
       const internalAlias = await fetch(
         `http://127.0.0.1:${port}/api/v1/INTERNAL/not-mounted/`
       );
       expect(internalAlias.status).to.equal(404);
-      expect(internalAlias.headers.get("cache-control")).to.equal("no-store");
-      expect(internalAlias.headers.get("surrogate-control")).to.equal("no-store");
+      expectControlPlaneHeaders(internalAlias);
+
+      for (const ordinaryPath of [
+        "/healthcheck",
+        "/api/v1/internality/example",
+        "/api/v1/internals/example",
+      ]) {
+        const ordinaryResponse = await fetch(`http://127.0.0.1:${port}${ordinaryPath}`);
+        expect(ordinaryResponse.status).to.equal(404);
+        expect(ordinaryResponse.headers.get("cache-control") ?? "").not.to.contain("no-store");
+        expect(ordinaryResponse.headers.get("surrogate-control")).to.equal(null);
+        expect(ordinaryResponse.headers.get("x-powered-by")).to.equal(null);
+      }
 
       await startBackgroundServices(runtimeConfig, readiness, successfulDependencies());
       const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);
       expect(readyAfter.status).to.equal(200);
       expect(await readyAfter.json()).to.deep.equal(readiness.snapshot());
-      expect(readyAfter.headers.get("cache-control")).to.equal("no-store");
+      expectControlPlaneHeaders(readyAfter);
     } finally {
+      if (originalOracleAuthoritySecret === undefined) {
+        delete process.env.ORACLE_AUTHORITY_SECRET_KEY;
+      } else {
+        process.env.ORACLE_AUTHORITY_SECRET_KEY = originalOracleAuthoritySecret;
+      }
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
