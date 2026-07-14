@@ -12,13 +12,13 @@ M6 is a **separate human gate that has now been explicitly approved for executio
 
 ## Execution record (2026-07-14)
 
-M6 completed through the manual Track 1 settlement and same-key replay on the controlled Render runtime `67ec60c7679aca2d7adad24780ae043370c426e3` (`dep-d9at6enavr4c73b0rc20`). GitHub checks and `pilot-chain` passed. Fable coverage is complete through three contiguous, exact incremental ranges instead of a repeated full-repository scan: `80be8eb..a1de424` (14-file release/indexer-gate fix, PASS with 0 blocker/major), `a1de424..5d07748` (five actor-prep files, PASS with 0 blocker/major), and `5d07748..67ec60c` (two presign-lock files, PASS with 0 blocker/major). The reported minors were non-gating and did not change the Pilot boundary. No further Fable rerun is required for this frozen runtime.
+M6 settled and replayed on runtime `67ec60c7679aca2d7adad24780ae043370c426e3` (`dep-d9at6enavr4c73b0rc20`). The H4 cleanup now runs on `88c0debad6ecb7eacfe9e24793951f3794353f4c` (`dep-d9auio7lk1mc73c4r18g`), whose Neon pre-deploy gate separates the historical M3 zero-value baseline from steady-state Pilot data. GitHub checks and `pilot-chain` passed for the M6 runtime. Fable covered the three non-overlapping M6 ranges through `67ec60c`; the runtime-gate fix received a fix-only closure review ending at `88c0deb` with 0 blocker/major/minor. Do not repeat those reviews.
 
 Actor preparation completed at `2026-07-14T06:00:01Z` with ten finalized devnet transactions and zero forbidden-lane instructions. The corridor then completed external-wallet authentication, real R2/Mux media handling, operator publication approval, feed/post proof, Track1-only proposal launch and funding. Evidence: run `p4m6-20260713-a`; manifest `cmrk8utz6000ohw2d7cqnata4`, hash `70d1afea7d30d40ddaa2bf80335e382c5a466c75ef5073e613bee954b81c7c47`; proposal `FPV64F3YL2uCnU1PLfMzUH34WAAvbPFV5ERcJRKGen29`; funding signature `WiWRVEi1n2EGvNzfsP7nccwBfhcRCezQ3CgGbwUuVLUhb7DczrN7uDz8JzdwAyft6ay3MWGHzdy8gggrnte7dEZ`.
 
 After the fixed deadline elapsed naturally, the operator-only Track 1 smoke settled **1,000,000 raw test-USDC** and replayed the same idempotency key. Both responses were `CONFIRMED` with signature `5hjVwnw5QAvApWbNda2okCkN7mkQHcTZfyN6GaPbn4fGzhtU4x5GfVqzqG42F4V8SzEdR1KXQkhTtC3MBVUKrdFV`; `attemptCount=1`; creator balance changed `0 -> 1,000,000 -> 1,000,000`; proof is `SETTLED`; chain/projection mismatches are empty; Track 2 and Track 3 remain zero; automatic settlement remains disabled. Runtime health/readiness/release identity passed before and after.
 
-**Remaining stop condition:** Step 8 is blocked. M4 created the allowlist directly with only the two disposable actors; no non-disposable pre-M6 baseline exists. Removing both would empty the production fail-closed allowlist, and substituting the fee payer, an authority, or an inferred database wallet is forbidden. The two actors therefore remain temporarily allowlisted until a human supplies or approves at least one legitimate non-disposable external Pilot wallet. H4 is **pending**, not passed.
+**Cleanup result:** Step 8 completed. Human-approved external Pilot wallet `GYjkMEZEFHuY4uRZVwE79eeXAGtoneh53gb49X4HqCMH` is the sole allowlist entry; both disposable actors are absent. `/health` remains `INVITE_ONLY_PILOT`, automated settlement is false, `/ready` is `READY`, and all closed-lane flags remain false. H4 is **ready for human review**, not approved; P5/P6 remain unauthorized.
 
 ## Secret handling (applies to every step)
 
@@ -62,7 +62,7 @@ M6 mutates a hosted runtime, so the corridor and Track 1 smokes both refuse to r
 5. **Verify the live release before any mutation.** Completed: matching full release SHA, `INVITE_ONLY_PILOT`, automated settlement off, and database/indexer/Mux `READY` held beyond the 90-second stale window.
 6. **Hold the rollback path ready.** Before M6, `73df4e2c7a6367b5b28871510d8ced095e59be6c` was the historical M5 application target, but it restores a known `/ready` 503 state. The immediately preceding M6 deploy, `5d07748b792addee2385a77cfba0c83db5f25d99`, restores a known production presign failure. Neither is an automatic healthy rollback target. After the finalized settlement, any runtime regression must stop traffic and obtain an explicit application rollback decision; the selected commit and `PILOT_EXPECTED_RELEASE_SHA` must match, Vercel stays unchanged, and no code rollback can reverse the payout or other durable devnet state.
 
-**Historical indexer incident:** the indexer marks itself `READY` only after an initial live slot heartbeat, and the health monitor may restore a `FAILED` indexer to `READY` **only** after both a fresh slot heartbeat and a successful HTTP `getSlot`. The old `73df4e2c` deploy had no working WS slot subscription and served `/ready` 503; the current `67ec60c` runtime has passed the stable readiness gate.
+**Historical indexer incident:** the indexer marks itself `READY` only after an initial live slot heartbeat, and the health monitor may restore a `FAILED` indexer to `READY` **only** after both a fresh slot heartbeat and a successful HTTP `getSlot`. The old `73df4e2c` deploy had no working WS slot subscription and served `/ready` 503; current `88c0deb` includes the `67ec60c` readiness fix and is `READY`.
 
 **Historical Alchemy WS incident:** an initially derived path returned `-32601` for PubSub methods. The operator supplied the provider-supported matching WS endpoint, after which the fixed candidate passed the readiness hold. Do not paste either endpoint into chat, commits, or command output.
 
@@ -123,7 +123,7 @@ Render dashboard → service srv-d79rs0450q8c73fp2lmg → Environment →
   (apply and let the controlled deploy/restart pick it up)
 ```
 
-- **Expected:** after restart, `/health` still reports `INVITE_ONLY_PILOT` with `automatedSettlement: false` and the same fixed `releaseSha`; the two disposable wallets can authenticate; non-listed wallets still receive `403 PILOT_INVITE_REQUIRED`.
+- **Expected:** after restart, `/health` still reports `INVITE_ONLY_PILOT` with `automatedSettlement: false` and the same fixed `releaseSha`; the two disposable wallets can authenticate; a valid signature from a non-listed wallet receives the controller's concealed `401 AUTH_CHALLENGE_INVALID` rather than exposing allowlist membership.
 - **Irreversible state:** none (env edit).
 - **Fail-closed stop:** if the edit would disable invite-only, enable any closed flag, change the release SHA, or leave zero wallets (production config requires `inviteOnly=true` and ≥1 invited wallet). Do not broaden beyond the two fixed disposable wallets.
 
@@ -210,11 +210,11 @@ npm run smoke:pilot-track1
 - **Reconciliation:** reuse the same idempotency key; if the RPC/signature confirmation is ambiguous, treat the recorded signature as the reconciliation key rather than resubmitting.
 - **Fail-closed stop:** a second payout, replay producing a new signature, a release-identity mismatch, missing operation evidence, unverified confirmed/settled state, or any Track 2/Track 3/automatic-settlement activity. Track 2 and Track 3 must remain zero.
 
-## Step 8 — Allowlist restoration (operator dashboard) — BLOCKED / NOT EXECUTED
+## Step 8 — Allowlist restoration — COMPLETED
 
 Remove the two fixed disposable wallets from `PILOT_INVITE_WALLETS` and replace them with at least one human-approved, non-disposable external Pilot wallet **before H4 handoff**. Keep `PILOT_INVITE_ONLY=true`; production config forbids an empty allowlist. Removing the sponsor also revokes its allowlist-scoped PILOT TEST ONLY approval-for-use.
 
-There is no recoverable pre-run baseline: M4 created `PILOT_INVITE_WALLETS` with exactly the disposable creator and sponsor, and current state still contains exactly those two. Removing them now would produce an empty allowlist and fail production startup. Do not guess a replacement or use the fee payer/admin/oracle. Human action is required: supply or approve at least one legitimate, non-disposable external Pilot wallet public key; do not send any private key or secret. Then replace the two disposable wallets with that approved baseline wallet and run the checks below.
+The human supplied `GYjkMEZEFHuY4uRZVwE79eeXAGtoneh53gb49X4HqCMH`; it is distinct from fee payer/admin/oracle/disposable roles and is now the only entry. No private key was requested or read.
 
 ```text
 Render dashboard → service srv-d79rs0450q8c73fp2lmg → Environment →
@@ -222,16 +222,16 @@ Render dashboard → service srv-d79rs0450q8c73fp2lmg → Environment →
   (apply and let the controlled deploy/restart pick it up)
 ```
 
-- **Expected:** after restart, the two disposable wallets receive `403 PILOT_INVITE_REQUIRED`; `/health` still `INVITE_ONLY_PILOT`, `automatedSettlement: false`, same fixed `releaseSha`.
+- **Observed:** both disposable wallets produced locally verified signatures and received `401 AUTH_CHALLENGE_INVALID`. This is the intentional controller-level concealment of `PILOT_INVITE_REQUIRED` after signature verification, preventing allowlist enumeration; service-level policy still denies them. `/health` is `INVITE_ONLY_PILOT`, `automatedSettlement: false`, release `88c0deb`; `/ready` is `READY`.
 - **Fail-closed stop:** if removal would empty the allowlist or disable invite-only. Never leave the disposable wallets invited after the window.
 
-## Step 9 — H4 stop and handoff — PENDING
+## Step 9 — H4 stop and handoff — READY FOR HUMAN REVIEW
 
-Stop here. Settlement evidence is assembled, but H4 cannot be presented as a pass until Step 8 restores a non-empty non-disposable allowlist and proves both actors receive `403 PILOT_INVITE_REQUIRED`.
+Stop here. Settlement/replay and allowlist cleanup evidence are assembled. H4 is ready for human review but is not self-approved.
 
 - H4 is human review only. Completing M6 does **not** authorize P5/P6, public launch, real funds, readiness promotion, external-wallet expansion, or any closed lane.
 - **Fail-closed:** if any step above stopped, do not proceed to H4 as a pass — report the stop condition and reconciliation state. Do not automatically redeploy `5d07748…` or `73df4e2c…`; both have known failures documented above. Any application rollback now requires an explicit human choice with a matching `PILOT_EXPECTED_RELEASE_SHA`; leave Vercel unchanged and never describe a code rollback as reversing the finalized payout.
 
 ## Evidence to retain (no secrets)
 
-Run id and timestamps; fixed candidate release SHA and incremental Fable gate verdicts; disposable creator (`EbsRjCPR6xxFAKsuYN1umb48qhKh1uQ4ngBAzaEqdBF7`) and sponsor (`BfjyjZNmExiApbWTehBPojJvXpHmYk7RpVZxeyQ9kaKW`) public keys and their ATAs; approved SOL/test-USDC amounts and before/after balances; test-USDC supply before/after; proposal PDA, manifest id + hash, publication evidence; Track 1 amount (1,000,000 raw); sponsor `PILOT_TEST_ONLY_NOT_REAL_KYB` classification and run-id/allowlist scope; original and replay settlement signature `5hjVwnw5QAvApWbNda2okCkN7mkQHcTZfyN6GaPbn4fGzhtU4x5GfVqzqG42F4V8SzEdR1KXQkhTtC3MBVUKrdFV`, confirmed/settled status and exactly-once balance proof; campaign proof status; allowlist-cleanup status and blocker. **Never** retain private-key bytes, seeds, database/RPC URLs, operator keys, Mux/R2 secrets, auth tokens, or session cookies.
+Run id and timestamps; exact release/deploy and non-overlapping review coverage; disposable actor public keys and ATAs; approved test amounts and balances; proposal/manifest/publication evidence; exactly-once Track 1 settlement/replay evidence; the sole non-disposable baseline public key; and concealed-denial auth results. **Never** retain private-key bytes, seeds, database/RPC URLs, operator keys, Mux/R2 secrets, auth tokens, or session cookies.
