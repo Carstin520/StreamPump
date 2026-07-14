@@ -159,6 +159,9 @@ const currentUtcMonthStart = (): Date => {
 
 export const R2_UPLOAD_BUDGET_ADVISORY_LOCK = "streampump:r2-monthly-upload-budget:v1";
 
+export const buildR2UploadBudgetLockQuery = () =>
+  Prisma.sql`SELECT 1::int AS "locked" FROM pg_advisory_xact_lock(hashtext(${R2_UPLOAD_BUDGET_ADVISORY_LOCK}))`;
+
 export const acquirePresignLocks = async (params: {
   budgetEnabled: boolean;
   lockBudget: () => Promise<unknown>;
@@ -332,9 +335,7 @@ export const presignManifestAssets = withController(
       // always acquired before the manifest row lock to prevent lock-order inversions.
       await acquirePresignLocks({
         budgetEnabled: monthlyUploadLimitBytes > 0n,
-        lockBudget: () => tx.$queryRaw(
-          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${R2_UPLOAD_BUDGET_ADVISORY_LOCK}))`
-        ),
+        lockBudget: () => tx.$queryRaw(buildR2UploadBudgetLockQuery()),
         lockManifest: () => tx.$queryRaw(
           Prisma.sql`SELECT "id" FROM "ContentManifest" WHERE "id" = ${manifest.id} FOR UPDATE`
         ),

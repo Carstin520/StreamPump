@@ -9,6 +9,8 @@ import {
   acquirePresignLocks,
   assertR2MonthlyUploadBudget,
   assertUniqueAssetOrderIndexes,
+  buildR2UploadBudgetLockQuery,
+  R2_UPLOAD_BUDGET_ADVISORY_LOCK,
 } from "../src/controllers/contentManifestController";
 import { isCreatorAccountProfile } from "../src/middleware/accountRole";
 import {
@@ -205,6 +207,15 @@ describe("invite-only Pilot content truth", () => {
     expect(() =>
       assertR2MonthlyUploadBudget({ totalBytes: 110n, limitBytes: 100n })
     ).to.throw(HttpError);
+  });
+
+  it("selects a supported scalar while acquiring the Postgres advisory budget lock", () => {
+    const query = buildR2UploadBudgetLockQuery();
+    expect(query.sql).to.equal(
+      'SELECT 1::int AS "locked" FROM pg_advisory_xact_lock(hashtext(?))'
+    );
+    expect(query.values).to.deep.equal([R2_UPLOAD_BUDGET_ADVISORY_LOCK]);
+    expect(query.sql).not.to.equal("SELECT pg_advisory_xact_lock(hashtext(?))");
   });
 
   it("copies verified media from private origin to public delivery then deletes staging", async () => {
