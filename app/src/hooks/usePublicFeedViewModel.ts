@@ -60,6 +60,27 @@ const pickState = (posts: PostRecord[]): CreatorMarketRecord["state"] => {
 
 const unique = <T,>(items: T[]) => [...new Set(items)];
 
+const readFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return null;
+};
+
+const normalizeRatingMomentum = (ratingBps: number | null): number => {
+  if (ratingBps === null) return 0;
+  // Protocol ratings span 5,000–20,000 bps. Map that chain range to the
+  // product's 0–100 momentum scale instead of presenting the neutral 10,000 bps
+  // baseline as a misleading 100/100 score.
+  return Math.max(0, Math.min(100, Math.round(((ratingBps - 5_000) / 15_000) * 100)));
+};
+
+const parseAtomicSpump = (value: string): number => {
+  const atomic = Number(value);
+  return Number.isFinite(atomic) ? atomic / 1_000_000 : 0;
+};
+
 // Fabricated sponsor names — only in explicit public demo mode. Production leaves
 // the list empty (UI shows a "sponsor TBD" placeholder) rather than inventing
 // brands that are not real prospects.
@@ -100,18 +121,17 @@ const fallbackTeaser = (
 
 const createCreatorRecord = (posts: PostRecord[], demo: boolean): CreatorMarketRecord => {
   const primaryPost = posts[0];
-  const state = pickState(posts);
+  const projection = primaryPost.creatorMarket;
+  const state = projection?.stage ?? pickState(posts);
   const totalLikesAndSavesCount = posts.reduce((total, post) => total + post.likes + post.saves, 0);
   const derivedTags = unique(posts.flatMap((post) => post.tags)).slice(0, 3);
   const niche = derivedTags.join(" x ") || "Creator";
   const city = primaryPost.location;
   const intro = fallbackIntro(primaryPost.creatorName, derivedTags, niche);
   const teaser = fallbackTeaser(posts.length, derivedTags, state);
-  // Grouping / niche / stage above are derived from real backend posts and stay
-  // in production. Everything below is a fabricated quantitative signal (momentum
-  // heuristic, seeded market projection), so it is gated to public demo mode.
-  // In production these stay 0 and the UI renders "—" through existing
-  // `momentumScore > 0` / holder / graduation conventions.
+  // Content grouping stays available without a market projection. Quantitative
+  // production values below come only from the chain-backed projection; the
+  // content heuristic and seeded market remain explicit demo-only fallbacks.
   const contentMomentumScore = demo
     ? Math.min(72, 24 + posts.length * 12 + derivedTags.length * 4)
     : 0;
@@ -120,11 +140,12 @@ const createCreatorRecord = (posts: PostRecord[], demo: boolean): CreatorMarketR
   const seed = demo
     ? resolveCreatorMarketSeed(primaryPost.creatorId, primaryPost.creatorName)
     : undefined;
+  const ratingBps = readFiniteNumber(projection?.metadata?.s1RatingBps);
 
   return {
     id: primaryPost.creatorId,
     name: primaryPost.creatorName,
-    handle: primaryPost.creatorHandle,
+    handle: projection?.handle ? `@${projection.handle}` : primaryPost.creatorHandle,
     avatarSrc: primaryPost.creatorAvatarSrc,
     heroSrc: primaryPost.coverSrc,
     followingCount: 0,
@@ -134,12 +155,16 @@ const createCreatorRecord = (posts: PostRecord[], demo: boolean): CreatorMarketR
     city,
     intro,
     level: stageLevelLabel(state),
-    momentumScore: seed?.momentumScore ?? contentMomentumScore,
+    momentumScore:
+      seed?.momentumScore ??
+      (projection ? normalizeRatingMomentum(ratingBps) : contentMomentumScore),
     tokenPrice: seed?.tokenPriceSpump ?? 0,
-    supply: 0,
-    graduationProgress: seed?.graduationProgress ?? 0,
-    holderCount: seed?.holderCount ?? 0,
-    buyoutStatus: seed
+    supply: projection ? Number(projection.s1Supply) : 0,
+    graduationProgress:
+      seed?.graduationProgress ??
+      (projection ? Math.max(0, Math.min(100, projection.graduationProgressBps / 100)) : 0),
+    holderCount: seed?.holderCount ?? projection?.holderCount ?? 0,
+    buyoutStatus: seed || projection
       ? stageStatusLabel(state)
       : `${stageStatusLabel(state)} · market projection unavailable`,
     state,
@@ -156,6 +181,11 @@ const createCreatorRecord = (posts: PostRecord[], demo: boolean): CreatorMarketR
     valuationUsd: undefined,
     contentPool:
       posts.slice(0, 3).map((post) => compactPreview(post.title, 28)),
+    currentPriceSpump: projection
+      ? parseAtomicSpump(projection.currentPriceSpump)
+      : undefined,
+    marketProjectionUpdatedAt: projection?.updatedAt,
+    momentumDelta7d: seed?.momentumDelta7d,
   };
 };
 

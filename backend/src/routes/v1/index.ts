@@ -27,9 +27,10 @@ router.use("/account", accountRoutes);
 router.use("/auth", authRoutes);
 router.use("/campaigns", campaignRoutes);
 router.use("/feed", publicFeedRoutes);
-if (config.pilot.s1PublicApiEnabled) {
-  router.use("/market", marketRoutes);
-}
+// Market projections are read-only public truth. S1 transaction builders stay
+// behind S1_PUBLIC_API_ENABLED below, so exposing these GET routes does not open
+// the Pilot trading lane.
+router.use("/market", marketRoutes);
 router.use("/content", contentManifestRoutes);
 router.use("/proposal-intents", proposalIntentRoutes);
 router.use("/proposals", proposalRoutes);

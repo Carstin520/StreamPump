@@ -233,6 +233,19 @@ describe("S1 market projection happy path", () => {
   });
 
   it("projects S1 discovery through buyout, graduation, and claim", async () => {
+    await syncMarketProjectionFromChainInstruction({
+      signature: "register",
+      instructionName: "register_creator",
+      proposalPda: null,
+      entityPda: creatorProfilePda,
+      payload: { creatorProfile: creatorProfilePda },
+    });
+    const registered = creatorMarketProjection.get(creatorProfilePda);
+    expect(registered.creatorWallet).to.equal(creator.toBase58());
+    expect(registered.s1Supply).to.equal(0n);
+    expect(registered.holderCount).to.equal(0);
+    expect(registered.metadataJson.s1RatingBps).to.equal(10_000);
+
     onChainCreator.s1Supply = 525n;
     onChainCreator.s1EarlyCohortSupply = 500n;
     onChainCreator.s1EligibleHolderCount = 21;

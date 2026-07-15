@@ -18,8 +18,7 @@ const ALL_CATEGORIES = "__all__";
 // Join by id or stable display name (feed slugifies CJK names → id won't match).
 const creatorCategory = (creator: CreatorMarketRecord): CreatorCategory | null =>
   resolveCreatorMarketSeed(creator.id, creator.name)?.category ?? null;
-const creatorDelta = (creator: CreatorMarketRecord): number =>
-  resolveCreatorMarketSeed(creator.id, creator.name)?.momentumDelta7d ?? 0;
+const creatorDelta = (creator: CreatorMarketRecord): number => creator.momentumDelta7d ?? 0;
 
 const DerivedBadge = ({ label }: { label: string }) => (
   <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[length:var(--fs-nano)] font-semibold uppercase tracking-[0.14em] text-[#7486a1]">
@@ -27,11 +26,11 @@ const DerivedBadge = ({ label }: { label: string }) => (
   </span>
 );
 
-// Real market projection present? Imported (post-derived) creators carry a
-// content-derived momentum but graduation/holders are 0 until a market
-// projection exists — show "—" rather than fabricate those numbers.
+// A projection timestamp distinguishes a real on-chain zero from missing data.
+// Numeric checks cannot do that because a newly registered creator legitimately
+// starts at zero supply, holders, and graduation progress.
 const hasMarketProjection = (creator: CreatorMarketRecord) =>
-  creator.graduationProgress > 0 || creator.holderCount > 0;
+  Boolean(creator.marketProjectionUpdatedAt);
 
 // Deterministic momentum wave from contentPool length + momentumScore.
 // No Math.random() — a stable sparkline that reads as a signal, not a price.

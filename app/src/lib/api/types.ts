@@ -160,6 +160,25 @@ export type PostRecord = {
   gallerySrcs?: string[];
   hasMultipleImages?: boolean;
   comments: CommentRecord[];
+  creatorMarket?: CreatorMarketProjectionRecord | null;
+};
+
+export type CreatorMarketProjectionRecord = {
+  creatorWallet: string;
+  creatorProfilePda: string;
+  handle: string | null;
+  displayName: string | null;
+  stage: CreatorSeasonState;
+  level: number;
+  s1Supply: string;
+  currentPriceSpump: string;
+  nextPriceSpump: string;
+  supporterPoolSpump: string;
+  holderCount: number;
+  graduationProgressBps: number;
+  metadata: Record<string, unknown> | null;
+  activeCampaignCount: number;
+  updatedAt: string;
 };
 
 export type CreatorMarketRecord = {
@@ -194,6 +213,9 @@ export type CreatorMarketRecord = {
   activityScore?: number;
   valuationUsd?: number;
   contentPool: string[];
+  currentPriceSpump?: number;
+  marketProjectionUpdatedAt?: string;
+  momentumDelta7d?: number;
 };
 
 export type ManifestRecord = {

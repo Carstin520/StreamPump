@@ -15,7 +15,10 @@ import {
 import { config } from "../../config/default";
 import { syncProposalProjectionFromChain } from "./chainProjectionService";
 import { getAnchorService } from "./AnchorService";
-import { syncMarketProjectionFromChainInstruction } from "./marketProjectionService";
+import {
+  backfillMissingRegisteredCreatorMarketProjections,
+  syncMarketProjectionFromChainInstruction,
+} from "./marketProjectionService";
 import { prisma } from "./prisma";
 
 const INDEXER_FETCH_RETRY_DELAY_MS = 1_000;
@@ -904,6 +907,14 @@ export const startIndexer = async (
     }
     await retryIncompleteIngestionAttempts(connection, targetProgram);
     await backfillRecentSignatures(connection, targetProgram);
+    const creatorProjectionRepair = await backfillMissingRegisteredCreatorMarketProjections(
+      config.indexer.backfillLimit
+    );
+    if (creatorProjectionRepair.failed > 0) {
+      console.warn(
+        `[indexer] creator registration projection repair completed with ${creatorProjectionRepair.failed} failures`
+      );
+    }
 
     logSubscriptionId = connection.onLogs(
       targetProgram,
