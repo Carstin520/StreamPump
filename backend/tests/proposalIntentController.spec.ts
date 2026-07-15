@@ -58,10 +58,8 @@ const createMockResponse = () => {
 };
 
 describe("proposalIntentController helpers", () => {
-  it("keeps PILOT TEST ONLY sponsor approval scoped to its invited run id", () => {
+  it("keeps PILOT TEST ONLY sponsor approval scoped to its reviewed wallet and run id", () => {
     const sponsorWallet = Keypair.generate().publicKey.toBase58();
-    const originalInviteWallets = [...config.pilot.inviteWallets];
-    config.pilot.inviteWallets.splice(0, config.pilot.inviteWallets.length, sponsorWallet);
     const profile = {
       status: SponsorVerificationStatus.APPROVED,
       wallet: sponsorWallet,
@@ -72,20 +70,13 @@ describe("proposalIntentController helpers", () => {
         note: buildPilotTestSponsorReviewNote({ runId: "p4m6-test", wallet: sponsorWallet }),
       }],
     };
-    try {
-      expect(assessSponsorApprovalForUse(profile, null).approved).to.equal(false);
-      expect(assessSponsorApprovalForUse(profile, "wrong-run").approved).to.equal(false);
-      expect(assessSponsorApprovalForUse(profile, "p4m6-test")).to.deep.include({
-        approved: true,
-        classification: "PILOT_TEST_ONLY",
-      });
-    } finally {
-      config.pilot.inviteWallets.splice(
-        0,
-        config.pilot.inviteWallets.length,
-        ...originalInviteWallets
-      );
-    }
+    expect(assessSponsorApprovalForUse(profile, null).approved).to.equal(false);
+    expect(assessSponsorApprovalForUse(profile, "wrong-run").approved).to.equal(false);
+    expect(assessSponsorApprovalForUse(profile, "p4m6-test")).to.deep.include({
+      approved: true,
+      classification: "PILOT_TEST_ONLY",
+      walletMatched: true,
+    });
   });
 
   it("returns chain and database sourced readiness without mutating either source", async () => {

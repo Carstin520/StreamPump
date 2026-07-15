@@ -925,7 +925,9 @@ export const verifyContentPublication = withController(
   "VERIFY_PUBLICATION_FAILED",
   async (req, res) => {
     const creatorWallet = requireSessionWallet(req);
-    assertCreatorPublicationVerificationAllowed(config.pilot.inviteOnly);
+    assertCreatorPublicationVerificationAllowed(
+      config.pilot.operatorPublicationReviewRequired
+    );
     const publicationId = parseNonEmptyString(req.params.publicationId, "publicationId");
     const publication = await prisma.contentPublication.findUnique({
       where: { id: publicationId },

@@ -88,7 +88,7 @@ Official references:
 
 ## Verification checklist
 
-1. Set `PILOT_INVITE_ONLY=false`; leave `PILOT_INVITE_WALLETS` empty for public access.
+1. Remove the retired `PILOT_INVITE_ONLY` and `PILOT_INVITE_WALLETS` variables (the backend ignores them) and keep `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true`.
 2. Sign in once with Google and once with Apple.
 3. Confirm `/api/v1/auth/session` reports `GOOGLE` or `APPLE` and a stable provider subject.
 4. Reload and sign in again; the same `AuthIdentity` and managed wallet address must be reused.

@@ -404,7 +404,9 @@ export const finalizeConfirmedLaunchBundle = async (params: {
       manifest: {
         include: {
           publications: {
-            where: trustedPublicationVerificationWhere(config.pilot.inviteOnly),
+            where: trustedPublicationVerificationWhere(
+              config.pilot.operatorPublicationReviewRequired
+            ),
             orderBy: {
               verifiedAt: "desc",
             },

@@ -115,19 +115,18 @@ export const assessSponsorApprovalForUse = (
   const latestReview = profile.reviewEvents?.[0];
   const marker = parsePilotTestSponsorReviewNote(latestReview?.note);
   const wallet = typeof profile.wallet === "string" ? profile.wallet : null;
-  const inviteAllowed = Boolean(wallet && config.pilot.inviteWallets.includes(wallet));
+  const walletMatched = Boolean(marker && wallet === marker.wallet);
   const approved = Boolean(
     marker &&
     latestReview?.newStatus === SponsorVerificationStatus.APPROVED &&
-    wallet === marker.wallet &&
-    pilotRunId === marker.runId &&
-    inviteAllowed
+    walletMatched &&
+    pilotRunId === marker.runId
   );
   return {
     approved,
     classification: "PILOT_TEST_ONLY" as const,
     runIdMatched: Boolean(marker && pilotRunId === marker.runId),
-    inviteAllowed,
+    walletMatched,
   };
 };
 

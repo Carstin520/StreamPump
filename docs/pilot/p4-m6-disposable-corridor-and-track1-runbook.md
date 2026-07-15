@@ -1,12 +1,12 @@
-# P4 M6 — Disposable Allowlisted Corridor and Manual Track 1 Replay Runbook
+# P4 M6 — Historical Disposable Corridor and Manual Track 1 Replay Runbook
 
 Date authored: 2026-07-13 (Asia/Shanghai)
 
 ## Boundary (non-negotiable)
 
-This runbook is for an **invite-only, external-wallet-first, Solana devnet, test-USDC, Track 1‑only, manual/operator-settled controlled technical Pilot**. It is **not** a formal production launch and involves **no real funds**. Every dollar figure below is devnet test-USDC. Do not describe any output as production readiness, real metrics, or a real-funds settlement.
+This is the audited run sequence for the **historical invite-only, external-wallet-first M6 execution**. Current registration is public through Google/Apple or optional wallet login; the old allowlist is retired. The run remains relevant only for its **Solana devnet, test-USDC, Track 1-only, manual/operator-settled** evidence. It is **not** a formal production launch and involves **no real funds**.
 
-Closed and forbidden for this run: S1 lifecycle, Track 2, Track 3/CPS, endorsement, rewards, managed/email/social auth, public managed execution, and **every** automatic settlement scheduler. Track 1 settlement is manual, operator-authenticated, and oracle-signed only.
+Closed and forbidden for the current product boundary: S1 lifecycle, Track 2, Track 3/CPS, endorsement, rewards, withdrawal/transfer, unrestricted public managed execution, and **every** automatic settlement scheduler. Public Google/Apple identity is the only former lane reopened; Track 1 settlement remains manual, operator-authenticated, and oracle-signed only.
 
 M6 is a **separate human gate that has now been explicitly approved for execution.** M2–M5 completed earlier (see [`p4-pre-mutation-checklist.md`](./p4-pre-mutation-checklist.md) and [`p4-rollback-bundle.md`](./p4-rollback-bundle.md)). This document is the approved execution procedure for M6 only. Each mutation group still requires operator confirmation of its own preconditions, and completing M6 only assembles evidence for **H4** — it does not authorize P5/P6, public launch, real funds, readiness promotion, external-wallet expansion, or any closed lane.
 
@@ -18,7 +18,7 @@ Actor preparation completed at `2026-07-14T06:00:01Z` with ten finalized devnet 
 
 After the fixed deadline elapsed naturally, the operator-only Track 1 smoke settled **1,000,000 raw test-USDC** and replayed the same idempotency key. Both responses were `CONFIRMED` with signature `5hjVwnw5QAvApWbNda2okCkN7mkQHcTZfyN6GaPbn4fGzhtU4x5GfVqzqG42F4V8SzEdR1KXQkhTtC3MBVUKrdFV`; `attemptCount=1`; creator balance changed `0 -> 1,000,000 -> 1,000,000`; proof is `SETTLED`; chain/projection mismatches are empty; Track 2 and Track 3 remain zero; automatic settlement remains disabled. Runtime health/readiness/release identity passed before and after.
 
-**Cleanup result:** Step 8 completed. Human-approved external Pilot wallet `GYjkMEZEFHuY4uRZVwE79eeXAGtoneh53gb49X4HqCMH` is the sole allowlist entry; both disposable actors are absent. `/health` remains `INVITE_ONLY_PILOT`, automated settlement is false, `/ready` is `READY`, and all closed-lane flags remain false. H4 is **ready for human review**, not approved; P5/P6 remain unauthorized.
+**Historical cleanup result:** Step 8 completed under the former invite-only policy. That access policy is now superseded: current runtime ignores the old invite variables and reports open access. The H4 evidence below remains a point-in-time record; all financial lanes it kept closed remain closed.
 
 ## Secret handling (applies to every step)
 
@@ -113,19 +113,20 @@ npm run prepare:p4:m6:actors -- \
 - **Reconciliation:** each transaction is recorded with its local signature **before** send and sent exactly once. On an ambiguous RPC response, query the recorded signature — **never blind-resend**. A later run refuses to overwrite the mode-`0600` evidence file and forces operator reconciliation.
 - **Fail-closed stop:** the first failed/unconfirmed/non-finalized transaction, any postflight delta mismatch, any forbidden-lane requirement, or evidence unable to stay mode `0600`. Stop; do not repair by opening a closed lane, substituting fixtures, changing the mint, or rewriting projection truth.
 
-## Step 3 — Add the two fixed disposable wallets to the invite allowlist (operator dashboard)
+## Step 3 — Confirm public access and operator publication review
 
-The allowlist is the Render env var `PILOT_INVITE_WALLETS` (CSV), read into `config.pilot.inviteWallets`. Add **only** the two fixed disposable wallet addresses for the smoke window; keep `PILOT_INVITE_ONLY=true`. The allowlist is a hard gate on the PILOT TEST ONLY sponsor approval check (Step 4), so both wallets must be listed before the corridor runs.
+The former wallet allowlist step is retired. `PILOT_INVITE_ONLY` and `PILOT_INVITE_WALLETS` are ignored by the backend and must not be used to control registration. Before the corridor runs, confirm public access and the independent content-truth gate.
 
 ```text
 Render dashboard → service srv-d79rs0450q8c73fp2lmg → Environment →
-  PILOT_INVITE_WALLETS = <existing baseline wallets>,EbsRjCPR6xxFAKsuYN1umb48qhKh1uQ4ngBAzaEqdBF7,BfjyjZNmExiApbWTehBPojJvXpHmYk7RpVZxeyQ9kaKW
+  remove PILOT_INVITE_ONLY and PILOT_INVITE_WALLETS (optional cleanup; stale values are ignored)
+  PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED = true
   (apply and let the controlled deploy/restart pick it up)
 ```
 
-- **Expected:** after restart, `/health` still reports `INVITE_ONLY_PILOT` with `automatedSettlement: false` and the same fixed `releaseSha`; the two disposable wallets can authenticate; a valid signature from a non-listed wallet receives the controller's concealed `401 AUTH_CHALLENGE_INVALID` rather than exposing allowlist membership.
+- **Expected:** after restart, `/health` reports `PUBLIC_SOCIAL_PILOT` with open access, `automatedSettlement: false`, and the same fixed `releaseSha`; Google/Apple and valid wallet-signature login are available without enrollment approval; creator self-verification still returns `OPERATOR_PUBLICATION_REVIEW_REQUIRED`.
 - **Irreversible state:** none (env edit).
-- **Fail-closed stop:** if the edit would disable invite-only, enable any closed flag, change the release SHA, or leave zero wallets (production config requires `inviteOnly=true` and ≥1 invited wallet). Do not broaden beyond the two fixed disposable wallets.
+- **Fail-closed stop:** if the edit would disable operator publication review, enable any closed financial flag, or change the release SHA. Public registration is not a financial-lane approval.
 
 ## Step 4 — Disposable Track 1‑only corridor (M6 mode)
 
@@ -160,7 +161,7 @@ Notes on the required envs (all enforced by the smoke in M6 mode):
 - `STREAM_PUMP_SMOKE_ACTOR_PREP_EVIDENCE_PATH` is re-validated against this run id, both fixed actor keys, the frozen authority set, the `5Z5MpM3KaM9mb4hXweS7oEuWja5kEJ4Me1Xycu7wBXQJ` mint, and the 1,000,000 raw budget; `PILOT_TX_RPC_URL` (dedicated devnet) and `PILOT_EXPECTED_USDC_MINT` back a read-only sponsor-ATA budget preflight.
 - `STREAM_PUMP_SMOKE_ALLOW_TEST_SPONSOR_PREP=1` requires a separate `STREAM_PUMP_SMOKE_SPONSOR_DOCUMENT_IMAGE_PATH` (independent from the creator media). The readiness lookup sends `x-pilot-run-id: <run id>`; see the sponsor-approval note below.
 
-**Sponsor approval is a persistent PILOT TEST ONLY classification, never real KYB.** The smoke registers the disposable sponsor with `PILOT TEST ONLY`-prefixed company/registration fields and has the operator approve it with an immutable `SponsorReviewEvent` note classified `PILOT_TEST_ONLY_NOT_REAL_KYB` (`realKyb: false`, `reusableOutsideRun: false`). Because those fields start with `PILOT TEST ONLY`/`PILOT-TEST-ONLY`, `assessSponsorApprovalForUse` never treats the sponsor as `KYB_APPROVED`; it counts as approved-for-use only when the **latest** review event is that immutable marker, its wallet matches, the request's `x-pilot-run-id` equals the marker's run id, **and** the wallet is in the `PILOT_INVITE_WALLETS` allowlist. Approval therefore evaporates for any other run id or once the wallet leaves the allowlist — it is a per-run, allowlist-scoped test classification, not durable KYB.
+**Sponsor approval is a persistent PILOT TEST ONLY classification, never real KYB.** The smoke registers the disposable sponsor with `PILOT TEST ONLY`-prefixed company/registration fields and has the operator approve it with an immutable `SponsorReviewEvent` note classified `PILOT_TEST_ONLY_NOT_REAL_KYB` (`realKyb: false`, `reusableOutsideRun: false`). Because those fields start with `PILOT TEST ONLY`/`PILOT-TEST-ONLY`, `assessSponsorApprovalForUse` never treats the sponsor as `KYB_APPROVED`; it counts as approved-for-use only when the **latest** review event is that immutable marker, its wallet matches, and the request's `x-pilot-run-id` equals the marker's run id. Approval therefore evaporates for any other run id — it is a per-run operator-reviewed test classification, not durable KYB or a registration allowlist.
 
 - **Expected:** dedicated devnet RPC + genesis verified; both fixed wallets pass wallet-challenge auth; read-only readiness confirms on-chain `S2_ACTIVE` creator and DB-approved (PILOT TEST ONLY) sponsor; publication operator-approved; a Track1‑only proposal is relayed; public campaign proof returns with PDA, tx signature, and manifest hash. **Record the proposal PDA** for Steps 6–7.
 - **Irreversible state:** the on-chain proposal and its sponsor funding (1,000,000 raw test-USDC) are durable; the deadline is fixed and not advanced.
@@ -210,20 +211,18 @@ npm run smoke:pilot-track1
 - **Reconciliation:** reuse the same idempotency key; if the RPC/signature confirmation is ambiguous, treat the recorded signature as the reconciliation key rather than resubmitting.
 - **Fail-closed stop:** a second payout, replay producing a new signature, a release-identity mismatch, missing operation evidence, unverified confirmed/settled state, or any Track 2/Track 3/automatic-settlement activity. Track 2 and Track 3 must remain zero.
 
-## Step 8 — Allowlist restoration — COMPLETED
+## Step 8 — Historical allowlist restoration — SUPERSEDED
 
-Remove the two fixed disposable wallets from `PILOT_INVITE_WALLETS` and replace them with at least one human-approved, non-disposable external Pilot wallet **before H4 handoff**. Keep `PILOT_INVITE_ONLY=true`; production config forbids an empty allowlist. Removing the sponsor also revokes its allowlist-scoped PILOT TEST ONLY approval-for-use.
+This completed H4-era allowlist step is retained only as historical evidence. The access allowlist is now formally removed; its environment variables are ignored, and no user wallet address should be requested for registration or onboarding.
 
 The human supplied `GYjkMEZEFHuY4uRZVwE79eeXAGtoneh53gb49X4HqCMH`; it is distinct from fee payer/admin/oracle/disposable roles and is now the only entry. No private key was requested or read.
 
 ```text
-Render dashboard → service srv-d79rs0450q8c73fp2lmg → Environment →
-  PILOT_INVITE_WALLETS = <new human-approved non-disposable external Pilot wallet(s) only>
-  (apply and let the controlled deploy/restart pick it up)
+No current operator action. Personal wallet collection belongs only to the future withdrawal flow.
 ```
 
-- **Observed:** both disposable wallets produced locally verified signatures and received `401 AUTH_CHALLENGE_INVALID`. This is the intentional controller-level concealment of `PILOT_INVITE_REQUIRED` after signature verification, preventing allowlist enumeration; service-level policy still denies them. `/health` is `INVITE_ONLY_PILOT`, `automatedSettlement: false`, release `88c0deb`; `/ready` is `READY`.
-- **Fail-closed stop:** if removal would empty the allowlist or disable invite-only. Never leave the disposable wallets invited after the window.
+- **Historical observation:** both disposable wallets produced locally verified signatures and received `401 AUTH_CHALLENGE_INVALID`; `/health` was `INVITE_ONLY_PILOT` at release `88c0deb`. This is evidence of the former policy, not the current login contract.
+- **Current rule:** do not restore or maintain an access allowlist. Keep operator review and all closed financial lanes enforced.
 
 ## Step 9 — H4 stop and handoff — READY FOR HUMAN REVIEW
 
