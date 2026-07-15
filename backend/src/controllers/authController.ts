@@ -26,6 +26,13 @@ import {
   createSponsorDocumentUpload,
   submitSponsorProfile,
 } from "../services/sponsorProfile";
+import {
+  completeSocialAuthorization,
+  createSocialAuthorization,
+  renderSocialCallbackHtml,
+  resolveSocialCallbackTarget,
+  type SocialAuthProvider,
+} from "../services/socialAuth";
 
 const AUTH_RATE_LIMIT_WINDOW_MS = 60_000;
 const AUTH_CHALLENGE_IP_LIMIT = 30;
@@ -34,6 +41,7 @@ const AUTH_CHALLENGE_IP_LIMIT = 30;
 const AUTH_CHALLENGE_WALLET_LIMIT = 60;
 const AUTH_VERIFY_IP_LIMIT = 60;
 const AUTH_VERIFY_WALLET_LIMIT = 12;
+const SOCIAL_AUTH_START_IP_LIMIT = 20;
 
 const assertWalletAuthRateLimits = (params: {
   operation: "challenge" | "verify";
@@ -128,6 +136,14 @@ const parseIdentityProvider = (value: unknown): IdentityProvider => {
         "provider must be one of: GOOGLE, APPLE, EMAIL, PASSKEY, TWITTER"
       );
   }
+};
+
+const parseSocialAuthProvider = (value: unknown): SocialAuthProvider => {
+  const provider = String(value ?? "").trim().toUpperCase();
+  if (provider === "GOOGLE" || provider === "APPLE") {
+    return provider;
+  }
+  throw new HttpError(400, "INVALID_INPUT", "provider must be GOOGLE or APPLE");
 };
 
 const parseBearerToken = (req: Request): string | null => {
@@ -302,6 +318,96 @@ export const exchangeProviderSession = async (req: Request, res: Response) => {
     handleControllerError(res, error, "EXCHANGE_PROVIDER_SESSION_FAILED");
   }
 };
+
+export const startSocialLogin = async (req: Request, res: Response) => {
+  try {
+    assertRateLimit({
+      key: `social-auth:start:ip:${getClientIp(req)}`,
+      limit: SOCIAL_AUTH_START_IP_LIMIT,
+      windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+      code: "AUTH_RATE_LIMITED",
+      message: "too many social authentication attempts",
+    });
+    const requestOrigin = String(req.header("origin") ?? "").trim();
+    if (!requestOrigin) {
+      throw new HttpError(403, "SOCIAL_AUTH_ORIGIN_REQUIRED", "Social login requires an allowed browser origin.");
+    }
+    const authorization = createSocialAuthorization({
+      provider: parseSocialAuthProvider(req.body.provider),
+      requestOrigin,
+    });
+
+    ok(res, {
+      ...authorization,
+      expiresAt: authorization.expiresAt.toISOString(),
+    }, 201);
+  } catch (error) {
+    handleControllerError(res, error, "START_SOCIAL_LOGIN_FAILED");
+  }
+};
+
+const sendSocialCallbackPage = (
+  res: Response,
+  params: {
+    targetOrigin: string | null;
+    message: Record<string, unknown>;
+  }
+): void => {
+  const page = renderSocialCallbackHtml(params);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Security-Policy", page.csp);
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.status(200).type("html").send(page.html);
+};
+
+const completeSocialLoginCallback = async (
+  provider: SocialAuthProvider,
+  input: Record<string, unknown>,
+  res: Response
+): Promise<void> => {
+  const state = String(input.state ?? "").trim();
+  let targetOrigin: string | null = null;
+
+  try {
+    if (state) {
+      targetOrigin = resolveSocialCallbackTarget(provider, state);
+    }
+    if (input.error) {
+      throw new HttpError(401, "SOCIAL_AUTH_CANCELLED", "Social login was cancelled or denied.");
+    }
+
+    const result = await completeSocialAuthorization({
+      provider,
+      code: parseNonEmptyString(input.code, "code"),
+      state: parseNonEmptyString(input.state, "state"),
+      appleUser: input.user,
+    });
+    sendSocialCallbackPage(res, {
+      targetOrigin: result.targetOrigin,
+      message: {
+        type: "streampump-social-auth",
+        ok: true,
+        session: result.session,
+      },
+    });
+  } catch (_error) {
+    sendSocialCallbackPage(res, {
+      targetOrigin,
+      message: {
+        type: "streampump-social-auth",
+        ok: false,
+        error: "Social sign-in could not be completed. Please return to StreamPump and try again.",
+      },
+    });
+  }
+};
+
+export const completeGoogleSocialLogin = async (req: Request, res: Response) =>
+  completeSocialLoginCallback("GOOGLE", req.query as Record<string, unknown>, res);
+
+export const completeAppleSocialLogin = async (req: Request, res: Response) =>
+  completeSocialLoginCallback("APPLE", req.body as Record<string, unknown>, res);
 
 export const createEphemeralSession = async (req: Request, res: Response) => {
   try {

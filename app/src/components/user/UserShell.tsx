@@ -158,12 +158,12 @@ export const UserShell = ({
       </aside>
 
       <div className="relative lg:ml-[280px]">
-        <div className="page-enter mx-auto max-w-[1480px] space-y-6 px-4 pb-24 pt-4 lg:px-6 lg:py-0">
+        <div className="mx-auto max-w-[1480px] space-y-6 px-4 pb-24 pt-4 lg:px-6 lg:py-0">
           <div className="flex justify-end lg:hidden">
             <SettingsMenu />
           </div>
           {header}
-          {children}
+          <div className="page-enter">{children}</div>
         </div>
       </div>
 

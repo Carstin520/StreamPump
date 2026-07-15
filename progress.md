@@ -1,3 +1,77 @@
+# StreamPump Progress Review - 2026-07-14 P4 Pilot H4 Evidence Handoff
+
+## Scope
+- This review records the catch-up from the previously recorded local `progress.md` state to current `codex/post-deadline-phase-0` / `main` `HEAD` `8f33665` (`Merge pull request #9 from Carstin520/codex/p4-pilot-deployment`).
+- Comparison evidence: `git diff --stat --find-renames 5a7f355..8f33665` spans 46 commits and 173 files across CI, frontend Pilot gating, backend runtime safety/recovery, Prisma migrations, IDL packaging, Anchor guard changes, P4 scripts, smoke tooling, and Pilot documentation.
+- The canonical roadmap already contains the detailed July 12-14 ledger rows for P2, P3, P4-A, P4 M2-M6, and H4. This entry updates `progress.md` only; it does not rewrite the roadmap.
+- Product boundary remains controlled technical Pilot on Solana devnet/test-USDC, invite-only, external-wallet-first, Track 1 only, no real funds, and not a formal production launch.
+
+## Completed Work
+- Integrated P0-P4 Pilot hardening into the active checkout, including invite-only runtime gates, production chain preflight, production IDL packaging, DB-backed idempotency, content storage/publication truth, proposal/campaign proof truth, Track 1-only enforcement, operator recovery routes, and CI coverage.
+- Added P4 deployment and rollback tooling for controlled program upgrade, Neon migration verification, Render runtime checks, Mux/R2 validation, disposable external-wallet corridor preparation, and Track 1 smoke/replay assertions.
+- Updated frontend Pilot surfaces to close or label out-of-scope lanes, including managed/email/social auth, S1, Track 2/3, rewards, automatic settlement, and prototype/demo paths.
+- Completed the P4 M6 disposable external-wallet corridor through real R2/Mux/feed/proposal proof, dual-sign Track 1 proposal funding, manual Track 1 settlement, and same-key replay within the approved devnet/test-USDC boundary.
+- Completed H4 allowlist cleanup and runtime-gate stabilization: the sole invite entry is the human-approved external wallet; disposable actors were removed and verified as denied without allowlist enumeration.
+
+## Not Completed Or Blocked
+- H4 is ready for human review but not approved. Stop here unless a human explicitly authorizes the next gate.
+- P5/P6, public launch, real funds, readiness promotion, and closed lanes remain unauthorized.
+- S1, Track 2, Track 3, rewards, managed/email/social auth, public managed execution, and automatic settlement remain closed for Pilot users.
+- External launch blockers remain: security audit, legal review, production policy approvals, and any required environment ownership for future launch steps.
+
+## Backend Alignment
+- Backend now contains the Pilot runtime gates, startup readiness checks, invite policy, chain safety, content publication recovery/review, Mux recovery, proposal-intent recovery, Track 1 settlement/recovery services, operator audit/recovery paths, and internal operator routes required by the controlled Pilot lane.
+- DB workflow state remains product truth for identities, content manifests, proposal intents, idempotency, recovery state, and operator audit records.
+- Financial settlement remains Solana/Anchor truth; backend recovery/replay paths only record or act on confirmed chain evidence inside the controlled Track 1 lane.
+
+## Frontend Alignment
+- Pilot-facing UI copy and routing now preserve the external-wallet-only corridor and close or explicitly label out-of-scope lanes.
+- The normal Pilot corridor is external-wallet auth -> media -> feed/post -> proposal intent -> creator + sponsor dual sign -> backend relay -> manual Track 1 -> campaign proof.
+- Legacy/demo/seeded surfaces still exist where needed, but they remain outside the Pilot user lane and must keep their readiness boundaries.
+
+## Chain Alignment
+- Program/support changes preserve the existing program ID and do not make `SPUMP` transferable.
+- Track 1-only proposal constraints, settlement guards, IDL packaging, and P4 upgrade verification are now represented in the active checkout and roadmap ledger.
+- S1 creator positions remain internal virtual positions, sponsors remain marketing spenders, and no real-funds readiness is claimed.
+
+## Documentation Alignment
+- `docs/streamPump-long-term-roadmap.md` is already canonical and current for the P4 state, including 2026-07-14 H4, 2026-07-14 M6, 2026-07-13 M2-M5, 2026-07-12 P4-A/P3/P2, and 2026-07-11 P1/P0 rows.
+- `README.md`, `README.zh-CN.md`, `DEMO.md`, and `docs/streamPump-page-readiness-goal.md` now describe the invite-only Pilot boundary and closed lanes more conservatively.
+- No roadmap edit was made by this recorder because the canonical ledger already records the readiness, smoke, route/API, and blocker changes.
+
+## Implemented And Verified
+- Implemented/observed paths in this catch-up include:
+  - `.github/workflows/ci.yml`
+  - `backend/idl/streampump_core.json`
+  - `backend/src/services/startupReadiness.ts`
+  - `backend/src/services/pilotChainSafety.ts`
+  - `backend/src/services/pilotInvitePolicy.ts`
+  - `backend/src/services/apiIdempotency.ts`
+  - `backend/src/services/contentStorageVerification.ts`
+  - `backend/src/services/contentPublicationRecoveryService.ts`
+  - `backend/src/services/proposalIntentRecoveryService.ts`
+  - `backend/src/services/track1SettlementService.ts`
+  - `backend/src/services/track1SettlementRecoveryService.ts`
+  - `backend/src/controllers/internalChainController.ts`
+  - `backend/src/controllers/internalContentPublicationController.ts`
+  - `backend/src/controllers/internalSettlementController.ts`
+  - `scripts/p4-verify-deployment.ts`
+  - `scripts/p4-m6-prepare-disposable-corridor.ts`
+  - `scripts/smoke-pilot-track1.ts`
+  - `scripts/verify-production-idl.ts`
+  - `docs/pilot/p4-pre-mutation-checklist.md`
+  - `docs/pilot/p4-m2-controlled-program-upgrade.md`
+  - `docs/pilot/p4-m3-neon-migration.md`
+  - `docs/pilot/p4-m6-disposable-corridor-and-track1-runbook.md`
+  - `docs/pilot/p4-rollback-bundle.md`
+- Roadmap-recorded verification includes: GitHub checks and `pilot-chain` passing; Fable review ranges for M6 passing with zero blocker/major; `/health` returning `INVITE_ONLY_PILOT` with automated settlement off; `/ready` returning `READY`; real R2/Mux/feed/proposal proof; exactly-once manual Track 1 settlement/replay; independent read-only chain verification of the settled proposal; and H4 runtime-gate review passing with zero blocker/major/minor.
+- Recorder verification for this entry:
+  - `git fetch --prune origin` completed.
+  - `git status -sb --untracked-files=all` showed `codex/post-deadline-phase-0...origin/codex/post-deadline-phase-0` with no dirty files before this edit.
+  - `git log -1 --oneline --decorate` showed `8f33665` at `HEAD`, `origin/main`, and `origin/codex/post-deadline-phase-0`.
+  - `rg` found no existing July P4 entry in `progress.md`.
+  - Required canonical context checked: roadmap, pitch script, Phase 0 readiness, README variants, DEMO runbook, and page-readiness goal.
+
 # StreamPump Progress Review - 2026-06-26 Demo Day Managed Wallet Capacity Path
 
 ## Scope

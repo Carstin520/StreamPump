@@ -93,6 +93,26 @@ export const config = {
       process.env.CREATOR_AUTH_ALLOW_PREVIEW_TWITTER,
       false
     ),
+    social: {
+      enabled: env.readBoolean(process.env.SOCIAL_AUTH_ENABLED, false),
+      stateTtlSeconds: env.readNumber(process.env.SOCIAL_AUTH_STATE_TTL_SECONDS, 10 * 60),
+      frontendOrigins: env.readCsv(process.env.SOCIAL_AUTH_FRONTEND_ORIGINS),
+      google: {
+        clientId: env.readString(process.env.GOOGLE_OAUTH_CLIENT_ID, ""),
+        clientSecret: env.readString(process.env.GOOGLE_OAUTH_CLIENT_SECRET, ""),
+        redirectUri: env.readString(process.env.GOOGLE_OAUTH_REDIRECT_URI, ""),
+      },
+      apple: {
+        clientId: env.readString(process.env.APPLE_OAUTH_CLIENT_ID, ""),
+        teamId: env.readString(process.env.APPLE_OAUTH_TEAM_ID, ""),
+        keyId: env.readString(process.env.APPLE_OAUTH_KEY_ID, ""),
+        privateKey: env.readString(process.env.APPLE_OAUTH_PRIVATE_KEY, "").replace(
+          /\\n/g,
+          "\n"
+        ),
+        redirectUri: env.readString(process.env.APPLE_OAUTH_REDIRECT_URI, ""),
+      },
+    },
   },
   managedWallet: {
     publicExecutionEnabled: env.readBoolean(
@@ -262,6 +282,7 @@ export const config = {
 
 export const isManagedWalletEncryptionKeyRequired = (runtimeConfig: typeof config): boolean =>
   runtimeConfig.auth.allowPreviewProviderExchange ||
+  runtimeConfig.auth.social.enabled ||
   runtimeConfig.managedWallet.ephemeralSessionsEnabled ||
   runtimeConfig.managedWallet.publicExecutionEnabled ||
   runtimeConfig.pilot.emailAuthEnabled;
@@ -271,6 +292,7 @@ export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): 
     [runtimeConfig.auth.allowLegacyWalletHeader, "AUTH_ALLOW_LEGACY_WALLET_HEADER"],
     [runtimeConfig.auth.allowPreviewProviderExchange, "AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE"],
     [runtimeConfig.auth.creatorAuthAllowPreviewTwitter, "CREATOR_AUTH_ALLOW_PREVIEW_TWITTER"],
+    [runtimeConfig.auth.social.enabled, "SOCIAL_AUTH_ENABLED"],
     [runtimeConfig.managedWallet.ephemeralSessionsEnabled, "EPHEMERAL_SESSIONS_ENABLED"],
     [
       runtimeConfig.managedWallet.publicExecutionEnabled,

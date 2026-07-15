@@ -2,9 +2,9 @@ import dynamic from "next/dynamic";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { AnimatedFeedBackdrop } from "@/components/shared/AnimatedFeedBackdrop";
+import { LanguageSwitch } from "@/components/shared/LanguageSwitch";
 import { LoginPreviewMode } from "@/lib/api/types";
 import { previewProviderExchangeEnabled, publicDemoEnabled } from "@/lib/feature-flags";
 import { useI18n } from "@/lib/i18n";
@@ -16,19 +16,72 @@ const DynamicAuthOptionsPanel = dynamic(
   { ssr: false },
 );
 
+const WaterRippleBackdrop = dynamic(
+  () => import("@/components/shared/WaterRippleBackdrop").then((mod) => mod.WaterRippleBackdrop),
+  { ssr: false },
+);
+
+const HERO_WORD_KEYS = [
+  "auth.heroWord.creator",
+  "auth.heroWord.fan",
+  "auth.heroWord.sponsor",
+] as const;
+
+const HERO_ROTATE_MS = 2800;
+
 const getPreviewMode = (value: string | string[] | undefined): LoginPreviewMode =>
   value === "switch" ? "switch" : "welcome";
+
+const RotatingHeroWord = ({ words }: { words: string[] }) => {
+  const [[current, previous], setRotation] = useState<[number, number | null]>([0, null]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || words.length <= 1) {
+      return;
+    }
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setRotation(([index]) => [(index + 1) % words.length, index]);
+    }, HERO_ROTATE_MS);
+
+    return () => window.clearInterval(interval);
+  }, [words.length]);
+
+  return (
+    <span className="hero-word-slot" aria-hidden="true">
+      {words.map((word, index) => {
+        const stateClass =
+          index === current
+            ? "hero-word-current"
+            : index === previous
+              ? "hero-word-exit"
+              : "";
+        return (
+          <span className={`hero-word ${stateClass}`.trim()} key={word}>
+            <span className="hero-word-text">{word}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
-  // Mirror AuthOptionsPanel's demo-auth gate: without both flags the Pilot is
-  // external-wallet-only, so the access copy must not promise social/managed entry.
   const demoAuthEnabled = publicDemoEnabled() && previewProviderExchangeEnabled();
   const [previewMode, setPreviewMode] = useState<LoginPreviewMode>(loginPreviewDefaultMode);
   const nextHref = normalizeInternalHref(
     typeof router.query.next === "string" ? router.query.next : null,
   ) ?? WORKSPACE_PATH;
+
+  const heroWords = useMemo(() => HERO_WORD_KEYS.map((key) => t(key)), [t]);
+  const heroLead = t("auth.heroTitleLead");
+  const heroTail = t("auth.heroTitleTail");
 
   useEffect(() => {
     if (!router.isReady) {
@@ -54,9 +107,8 @@ export default function LoginPage() {
       <Head>
         <title>{t("page.login.title")}</title>
       </Head>
-      <main className="relative min-h-screen bg-[#090d14] text-white">
-        <AnimatedFeedBackdrop className="opacity-[0.85]" />
-        <div className="pointer-events-none fixed inset-[8%] z-0 rounded-[54px] border border-white/[0.03] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_36%)] backdrop-blur-[2px]" />
+      <main className="relative min-h-screen overflow-hidden bg-[#090d14] text-white">
+        <WaterRippleBackdrop />
 
         <div className="relative z-[1] flex min-h-screen flex-col px-5 py-5 lg:px-8">
           <div className="flex items-center justify-between">
@@ -68,22 +120,27 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <div className="flex flex-1 items-center justify-center py-10">
-            <div className="w-full max-w-[1040px]">
-              <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]">
-                <div className="hidden px-6 lg:block">
-                  <p className="text-xs uppercase tracking-[0.28em] text-[#7f90ab]">{t("auth.accessEyebrow")}</p>
-                  <h1 className="type-display mt-5 max-w-[520px] font-semibold leading-[0.94] text-white">
-                    {t("auth.accessTitle")}
-                  </h1>
-                  <p className="mt-6 max-w-[440px] text-base leading-8 text-[#95a6bf]">
-                    {t(demoAuthEnabled ? "auth.accessBody" : "auth.accessBodyPilot")}
-                  </p>
-                </div>
+          <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
+            <p className="login-enter login-enter-1 text-[length:var(--fs-overline)] font-medium uppercase tracking-[0.28em] text-[color:var(--text-faint)]">
+              {t("auth.accessEyebrow")}
+            </p>
 
-                <DynamicAuthOptionsPanel mode={previewMode} nextHref={nextHref} onModeChange={handleModeChange} />
-              </div>
+            <h1 className="login-enter login-enter-2 type-display mt-4 max-w-[720px] font-semibold text-[color:var(--text-main)]">
+              <span className="sr-only">{`${heroLead}${heroWords[0] ?? ""}${heroTail}`}</span>
+              <span aria-hidden="true">
+                <span>{heroLead}</span>
+                <RotatingHeroWord words={heroWords} />
+                <span>{heroTail}</span>
+              </span>
+            </h1>
+
+            <div className="login-enter login-enter-3 mt-9 w-full max-w-[420px]">
+              <DynamicAuthOptionsPanel mode={previewMode} nextHref={nextHref} onModeChange={handleModeChange} />
             </div>
+          </div>
+
+          <div className="flex items-center justify-center pb-1">
+            <LanguageSwitch compact />
           </div>
         </div>
       </main>
