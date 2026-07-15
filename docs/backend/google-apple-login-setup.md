@@ -23,6 +23,7 @@ The browser never chooses `providerSubject`, email, or the StreamPump session wa
 ## Backend environment
 
 ```env
+# Retired compatibility value; the backend keeps social auth enabled even if an old hosted value is false.
 SOCIAL_AUTH_ENABLED=true
 SOCIAL_AUTH_STATE_TTL_SECONDS=600
 SOCIAL_AUTH_FRONTEND_ORIGINS=https://app.stream-pump.com
@@ -40,7 +41,7 @@ APPLE_OAUTH_REDIRECT_URI=https://api.example.com/api/v1/auth/social/apple/callba
 MANAGED_WALLET_ENCRYPTION_KEY=<64 hex chars from openssl rand -hex 32>
 ```
 
-The login page always renders Google and Apple alongside wallet login. The Render backend's `SOCIAL_AUTH_ENABLED` setting is the single runtime source of truth, so a separate Vercel build-time feature flag is not required. `SOCIAL_AUTH_FRONTEND_ORIGINS` must contain exact origins only, without paths. Provider redirect URIs must exactly match the values registered in the provider dashboards.
+The login page always renders Google and Apple alongside wallet login, and the backend keeps verified social auth permanently enabled. `SOCIAL_AUTH_ENABLED` is retained only as an ignored compatibility variable, so neither a stale Render value nor a Vercel build-time feature flag can close registration. `SOCIAL_AUTH_FRONTEND_ORIGINS` must contain exact origins only, without paths. Provider redirect URIs must exactly match the values registered in the provider dashboards.
 
 ## Google Cloud setup
 

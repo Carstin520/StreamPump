@@ -214,7 +214,7 @@ StreamPump 目前是一个**已部署的技术 Pilot——仅限 Solana devnet/t
 
 ### 公开身份入口——受控技术部署，无真实资金
 
-生产访问已永久公开：后端会忽略已停用的 `PILOT_INVITE_ONLY` 与 `PILOT_INVITE_WALLETS`。Google/Apple OAuth 由后端验证，并创建或复用稳定的平台托管账号。钱包登录仍要求签名 challenge，但不是注册前提。内容发布仍由独立的 `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` gate 强制 operator 审核。
+生产访问已永久公开：后端会忽略已停用的 `PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS` 与 `SOCIAL_AUTH_ENABLED`。Google/Apple OAuth 永久开启、由后端验证，并创建或复用稳定的平台托管账号；provider 配置不完整时生产启动会 fail-closed。钱包登录仍要求签名 challenge，但不是注册前提。内容发布仍由独立的 `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` gate 强制 operator 审核。
 
 **Pilot 走廊内开放：** 公开 Google/Apple 注册；可选的外部钱包登录；经 R2/Mux 完成的内容创建与上传；公开 feed 与帖子详情投影；proposal intent 创建；创作者 + 赞助方双签；后端 relay；手动 Track 1 固定底价结算；活动凭证。
 

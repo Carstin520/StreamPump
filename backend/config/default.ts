@@ -99,7 +99,9 @@ export const config = {
       false
     ),
     social: {
-      enabled: env.readBoolean(process.env.SOCIAL_AUTH_ENABLED, false),
+      // Public Google/Apple registration is permanent. The legacy enable flag
+      // is ignored so a stale hosted value cannot silently close social auth.
+      enabled: true,
       stateTtlSeconds: env.readNumber(process.env.SOCIAL_AUTH_STATE_TTL_SECONDS, 10 * 60),
       frontendOrigins: env.readCsv(process.env.SOCIAL_AUTH_FRONTEND_ORIGINS),
       google: {
