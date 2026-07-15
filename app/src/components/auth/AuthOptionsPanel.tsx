@@ -29,6 +29,7 @@ import { publicDemoEnabled, previewProviderExchangeEnabled } from "@/lib/feature
 import { useI18n } from "@/lib/i18n";
 import { loginAccounts, loginMethods } from "@/lib/public-data";
 import { WORKSPACE_PATH } from "@/lib/routes";
+import { openSocialLogin } from "@/lib/social-auth";
 
 type AuthOptionsPanelProps = {
   mode: LoginPreviewMode;
@@ -89,6 +90,20 @@ const createPreviewAccessToken = (source: string) =>
 const createPreviewExpiresAt = () =>
   new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+const getSocialLoginErrorMessage = (error: unknown, t: TFunction) => {
+  const message = error instanceof Error ? error.message : "";
+
+  if (/popup was blocked/i.test(message)) {
+    return t("auth.socialPopupBlocked");
+  }
+
+  if (/cancelled/i.test(message)) {
+    return t("auth.socialLoginCancelled");
+  }
+
+  return t("auth.socialLoginFailed");
+};
+
 const createLocalProviderSession = (
   identity: PreviewIdentity,
   wallet = PREVIEW_MANAGED_WALLET,
@@ -147,9 +162,7 @@ export const AuthOptionsPanel = ({
   const [emailValue, setEmailValue] = useState("alex@streampump.local");
   const [emailCode, setEmailCode] = useState("");
   const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<string>(() =>
-    t(demoAuthEnabled ? "auth.initialAction" : "auth.initialActionPilot"),
-  );
+  const [lastAction, setLastAction] = useState("");
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [pendingExternalWalletBind, setPendingExternalWalletBind] = useState(false);
   const [pendingIdentitySession, setPendingIdentitySession] = useState<AuthSessionRecord | null>(null);
@@ -208,6 +221,22 @@ export const AuthOptionsPanel = ({
     setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
     beginWalletChoice(createLocalProviderSession(identity), successLabel);
     setBusyKey(null);
+  };
+
+  const createSocialSession = async (
+    provider: "GOOGLE" | "APPLE",
+    successLabel: string,
+  ) => {
+    setBusyKey(`social-${provider.toLowerCase()}`);
+    setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
+    try {
+      const session = await openSocialLogin(provider);
+      beginWalletChoice(session, successLabel);
+    } catch (error) {
+      setLastAction(getSocialLoginErrorMessage(error, t));
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const completeWalletLogin = useCallback(async () => {
@@ -435,6 +464,14 @@ export const AuthOptionsPanel = ({
       return;
     }
 
+    if (!demoAuthEnabled && (method.id === "google" || method.id === "apple")) {
+      await createSocialSession(
+        method.id === "google" ? "GOOGLE" : "APPLE",
+        getLoginMethodLabel(method.id, t),
+      );
+      return;
+    }
+
     await createPreviewSession(resolveMethodIdentity(method.id), getLoginMethodLabel(method.id, t));
   };
 
@@ -450,10 +487,9 @@ export const AuthOptionsPanel = ({
   };
 
   return (
-    <section className="liquid-panel relative mx-auto w-full max-w-[480px] overflow-hidden border border-white/[0.08] px-6 py-7 shadow-[0_28px_90px_rgba(0,0,0,0.28)]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_64%)]" />
-
-      <div className="relative">
+    <section className="relative mx-auto w-full max-w-[420px] px-1">
+      <div className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[linear-gradient(155deg,rgba(18,27,43,0.86),rgba(9,14,24,0.72))] px-5 py-6 shadow-[0_28px_84px_rgba(0,0,0,0.3)] backdrop-blur-xl sm:px-6">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.28),transparent)]" />
         {/* Account-switch fixtures are a labeled demo affordance: hide the mode
             switcher entirely unless demo auth is enabled. */}
         {demoAuthEnabled ? (
@@ -524,15 +560,9 @@ export const AuthOptionsPanel = ({
         ) : !demoAuthEnabled || mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="type-h1 font-semibold text-white">{t("auth.welcomeBack")}</h2>
-              <p className="mt-3 text-sm text-[#93a3bb]">{t(demoAuthEnabled ? "auth.signInOrCreate" : "auth.signInOrCreatePilot")}</p>
+              <h2 className="type-h3 font-semibold text-white">{t("auth.welcomeBack")}</h2>
+              <p className="mt-3 text-sm text-[#93a3bb]">{t("auth.signInOrCreate")}</p>
             </div>
-
-            {!demoAuthEnabled ? (
-              <p className="card-radius border border-[#8f5824]/40 bg-[#2e1e17]/70 px-4 py-3 text-xs leading-6 text-[#ffd0a6]">
-                {t("auth.pilotWalletNote")}
-              </p>
-            ) : null}
 
             {demoAuthEnabled ? (
             <>
@@ -582,22 +612,33 @@ export const AuthOptionsPanel = ({
             <div className="space-y-3">
               {(demoAuthEnabled
                 ? loginMethods
-                : loginMethods.filter((method) => method.id === "wallet")
+                : loginMethods.filter((method) => method.id !== "email")
               ).map((method) => {
-                const identity = method.id === "wallet" ? null : resolveMethodIdentity(method.id);
+                const isLiveSocialMethod = !demoAuthEnabled && (method.id === "google" || method.id === "apple");
+                const isGoogleMethod = method.id === "google";
+                const isAppleMethod = method.id === "apple";
+                const identity = method.id === "wallet" || isLiveSocialMethod
+                  ? null
+                  : resolveMethodIdentity(method.id);
                 const methodBusy = method.id === "email"
                   ? busyKey === "email" || busyKey === "email-verify"
-                  : busyKey === (identity?.providerSubject ?? "wallet");
-                const socialDisabled = method.id !== "wallet" && method.id !== "email" && !demoAuthEnabled;
+                  : !demoAuthEnabled && (method.id === "google" || method.id === "apple")
+                    ? busyKey === `social-${method.id}`
+                    : busyKey === (identity?.providerSubject ?? "wallet");
 
                 return (
                   <button
-                    className={`card-radius group flex w-full items-center justify-between border px-4 py-4 text-left transition ${
+                    className={`card-radius group flex w-full items-center justify-between border px-4 py-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff8a78]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c121d] ${
                       method.tone === "wallet"
                         ? "border-[#7a4d27] bg-[linear-gradient(180deg,rgba(60,31,18,0.56)_0%,rgba(25,17,13,0.72)_100%)] text-[#ffd0a6] hover:border-[#b06f34]"
-                        : "border-white/[0.08] bg-[#111827]/88 text-white hover:border-white/[0.14] hover:bg-[#151d2b]"
+                        : isGoogleMethod
+                          ? "border-white/[0.1] bg-[#111827]/88 text-white hover:border-[#4285f4]/55 hover:bg-[#111d31]"
+                          : isAppleMethod
+                            ? "border-white/[0.1] bg-[#111827]/88 text-white hover:border-white/30 hover:bg-[#171d29]"
+                            : "border-white/[0.08] bg-[#111827]/88 text-white hover:border-white/[0.14] hover:bg-[#151d2b]"
                     } ${methodBusy ? "cursor-wait opacity-80" : ""}`}
-                    disabled={Boolean(busyKey) || socialDisabled}
+                    data-testid={`auth-method-${method.id}`}
+                    disabled={Boolean(busyKey)}
                     key={method.id}
                     onClick={() => void handleMethod(method)}
                     type="button"
@@ -606,37 +647,22 @@ export const AuthOptionsPanel = ({
                       <span className={`flex h-9 w-9 items-center justify-center rounded-full ${method.tone === "wallet" ? "bg-[#2e1e17]" : "bg-white/[0.07]"}`}>
                         <LoginMethodIcon id={method.id} />
                       </span>
-                      <div>
-                        <p className="text-sm font-medium">{getLoginMethodLabel(method.id, t)}</p>
-                        <p className={`mt-1 text-xs ${method.tone === "wallet" ? "text-[#dca56e]" : "text-[#8193ad]"}`}>
-                          {method.id === "email"
-                            ? emailCodeExpiresAt
-                              ? t("auth.resendEmailCode")
-                              : t("auth.sendEmailCode")
-                            : socialDisabled
-                              ? t("auth.socialDisabledShort")
-                              : getLoginMethodSubtitle(method.id, t, demoAuthEnabled)}
-                        </p>
-                      </div>
+                      <span className="text-sm font-medium">{getLoginMethodLabel(method.id, t)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {method.id === "email" ? (
                         <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
                           OTP
                         </span>
-                      ) : socialDisabled ? (
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#7f90ab]">
-                          {t("auth.envOff")}
+                      ) : methodBusy ? (
+                        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#c6d2e3]">
+                          {t("auth.opening")}
                         </span>
-                      ) : method.id === "wallet" ? (
+                      ) : method.id === "wallet" && (connecting || connected) ? (
                         <span className="rounded-full border border-[#8f5824] bg-[#59341d] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#ffb86d]">
-                          {connecting ? t("auth.walletConnecting") : connected ? t("auth.walletReady") : "Web3"}
+                          {connecting ? t("auth.walletConnecting") : t("auth.walletReady")}
                         </span>
-                      ) : (
-                        <span className="rounded-full border border-[#5fca9f]/20 bg-[#113222] px-2 py-0.5 text-[length:var(--fs-micro)] font-semibold uppercase tracking-[0.16em] text-[#87e7bd]">
-                          {t("auth.ready")}
-                        </span>
-                      )}
+                      ) : null}
                       <ChevronRightIcon className="h-4 w-4 text-white/46 transition group-hover:text-white/86" />
                     </div>
                   </button>
@@ -717,9 +743,11 @@ export const AuthOptionsPanel = ({
           </div>
         )}
 
-        <div className="mt-6 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2 text-xs text-[#7f90ab]">
-          {lastAction}
-        </div>
+        {lastAction ? (
+          <div aria-live="polite" className="mt-6 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2 text-xs text-[#7f90ab]" role="status">
+            {lastAction}
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -732,17 +760,6 @@ const getLoginMethodLabel = (id: LoginMethodRecord["id"], t: TFunction) => {
   if (id === "google") return t("auth.googleLogin");
   if (id === "apple") return t("auth.appleLogin");
   return t("auth.walletLogin");
-};
-
-const getLoginMethodSubtitle = (
-  id: LoginMethodRecord["id"],
-  t: TFunction,
-  demoAuthEnabled: boolean,
-) => {
-  if (id === "email") return t("auth.emailSubtitle");
-  if (id === "google") return t("auth.googleSubtitle");
-  if (id === "apple") return t("auth.appleSubtitle");
-  return t(demoAuthEnabled ? "auth.walletSubtitle" : "auth.walletSubtitlePilot");
 };
 
 const getAccountSessionLabel = (id: string, t: TFunction) => {

@@ -4,6 +4,7 @@ import {
   CurrentSessionRecord,
   EmailAuthChallengeRecord,
   IdentityProvider,
+  SocialAuthStartRecord,
   SponsorDocumentUploadRecord,
   SponsorProfileRecord,
   SponsorType,
@@ -20,6 +21,11 @@ type ExchangeProviderSessionInput = {
 export const exchangeProviderSession = (input: ExchangeProviderSessionInput) =>
   apiClient.post<AuthSessionRecord>("/auth/provider-exchange", {
     body: input,
+  });
+
+export const startSocialLogin = (provider: "GOOGLE" | "APPLE") =>
+  apiClient.post<SocialAuthStartRecord>("/auth/social/start", {
+    body: { provider },
   });
 
 // Demo-day scan entry: provision a per-user ephemeral managed-wallet session from

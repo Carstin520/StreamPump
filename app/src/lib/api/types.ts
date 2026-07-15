@@ -50,6 +50,13 @@ export type EmailAuthChallengeRecord = {
   expiresAt: string;
 };
 
+export type SocialAuthStartRecord = {
+  provider: "GOOGLE" | "APPLE";
+  authorizationUrl: string;
+  popupOrigin: string;
+  expiresAt: string;
+};
+
 export type SponsorDocumentUploadRecord = {
   storageKey: string;
   mimeType: string;
