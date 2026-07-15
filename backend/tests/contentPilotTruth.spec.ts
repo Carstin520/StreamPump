@@ -34,7 +34,7 @@ import {
 } from "../src/services/contentStorageVerification";
 import { R2Service } from "../src/services/R2Service";
 
-describe("invite-only Pilot content truth", () => {
+describe("controlled Pilot content truth", () => {
   const expected = {
     storageKey: "content/manifest/v/1/0-declared.png",
     expectedSha256Hex: "a".repeat(64),
@@ -334,7 +334,7 @@ describe("invite-only Pilot content truth", () => {
     ).to.throw(HttpError);
   });
 
-  it("blocks creator self-verification in invite-only mode", () => {
+  it("blocks creator self-verification when operator review is required", () => {
     expect(() => assertCreatorPublicationVerificationAllowed(true))
       .to.throw(HttpError)
       .with.property("code", "OPERATOR_PUBLICATION_REVIEW_REQUIRED");

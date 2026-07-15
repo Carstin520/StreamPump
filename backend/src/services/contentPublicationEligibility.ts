@@ -11,9 +11,9 @@ import {
 import { prisma } from "./prisma";
 import { config } from "../../config/default";
 
-export const trustedPublicationVerificationWhere = (inviteOnly: boolean) => ({
+export const trustedPublicationVerificationWhere = (operatorReviewRequired: boolean) => ({
   verificationStatus: PublicationVerificationStatus.VERIFIED,
-  ...(inviteOnly ? { verificationSource: "OPERATOR_APPROVED" } : {}),
+  ...(operatorReviewRequired ? { verificationSource: "OPERATOR_APPROVED" } : {}),
 });
 
 export const isAssetPublicDeliveryReady = (asset: {
@@ -86,7 +86,9 @@ export const syncManifestPublicationEligibility = async (
       assets: true,
       publications: {
         where: {
-          ...trustedPublicationVerificationWhere(config.pilot.inviteOnly),
+          ...trustedPublicationVerificationWhere(
+            config.pilot.operatorPublicationReviewRequired
+          ),
         },
         orderBy: [
           {

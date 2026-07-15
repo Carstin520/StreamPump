@@ -84,12 +84,14 @@ export const normalizePublicationTarget = (params: {
   };
 };
 
-export const assertCreatorPublicationVerificationAllowed = (inviteOnly: boolean): void => {
-  if (inviteOnly) {
+export const assertCreatorPublicationVerificationAllowed = (
+  operatorReviewRequired: boolean
+): void => {
+  if (operatorReviewRequired) {
     throw new HttpError(
       403,
       "OPERATOR_PUBLICATION_REVIEW_REQUIRED",
-      "publication verification requires an operator review in the invite-only Pilot"
+      "publication verification requires an operator review in the controlled Pilot"
     );
   }
 };

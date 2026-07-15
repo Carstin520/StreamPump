@@ -62,8 +62,8 @@ describe("Pilot safety gates", () => {
     DATABASE_URL:
       "postgresql://ep-example-pooler.ap-southeast-1.aws.neon.tech/streampump?sslmode=require&connection_limit=5&pool_timeout=5",
     MANAGED_WALLET_ENCRYPTION_KEY: "",
-    PILOT_INVITE_ONLY: "true",
-    PILOT_INVITE_WALLETS: wallet,
+    PILOT_INVITE_ONLY: "false",
+    PILOT_INVITE_WALLETS: "",
     PILOT_EXPECTED_USDC_MINT: Keypair.generate().publicKey.toBase58(),
     SOLANA_IS_DEVNET: "true",
     SOLANA_TX_RPC_ENDPOINT: "https://dedicated-rpc.example.com",
@@ -196,7 +196,7 @@ describe("Pilot safety gates", () => {
     expect(normalizePilotInviteWallets([wallet, ` ${wallet} `])).to.deep.equal([wallet]);
   });
 
-  it("rejects invalid configured invite wallet addresses during config parsing", () => {
+  it("keeps the legacy normalizer strict but ignores retired invite env values", () => {
     expect(() => normalizePilotInviteWallets(["not-a-wallet"])).to.throw(
       /PILOT_INVITE_WALLETS/
     );
@@ -205,8 +205,7 @@ describe("Pilot safety gates", () => {
       NODE_ENV: "development",
       PILOT_INVITE_WALLETS: "not-a-wallet",
     });
-    expect(result.status).not.to.equal(0);
-    expect(`${result.stderr}${result.stdout}`).to.contain("PILOT_INVITE_WALLETS");
+    expect(result.status).to.equal(0);
   });
 
   it("allows public production access without an invite wallet allowlist", () => {
@@ -220,15 +219,26 @@ describe("Pilot safety gates", () => {
     expect(publicAccess.status).to.equal(0);
   });
 
-  it("requires an allowlist only when the legacy invite-only rollback is enabled", () => {
+  it("ignores stale legacy invite-only values in production", () => {
     const wallet = Keypair.generate().publicKey.toBase58();
 
     const empty = runConfigImport({
       ...validProductionEnv(wallet),
       PILOT_INVITE_WALLETS: "",
     });
-    expect(empty.status).not.to.equal(0);
-    expect(`${empty.stderr}${empty.stdout}`).to.contain("PILOT_INVITE_WALLETS");
+    expect(empty.status).to.equal(0);
+  });
+
+  it("requires operator publication review in production", () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    const disabled = runConfigImport({
+      ...validProductionEnv(wallet),
+      PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED: "false",
+    });
+    expect(disabled.status).not.to.equal(0);
+    expect(`${disabled.stderr}${disabled.stdout}`).to.contain(
+      "PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED"
+    );
   });
 
   it("allows verified Google and Apple auth in public production when provider config is complete", () => {
@@ -416,7 +426,7 @@ describe("Pilot safety gates", () => {
     expect(dependencyCalls).to.equal(0);
   });
 
-  it("enforces the same static and chain gates for hosted or explicit Pilot runtimes", async () => {
+  it("enforces static and chain gates for hosted runtimes while ignoring retired invite env", async () => {
     const runtimeConfig = pilotChainRuntimeConfig();
     runtimeConfig.pilot.inviteOnly = true;
     expect(
@@ -426,7 +436,7 @@ describe("Pilot safety gates", () => {
       isPilotRuntimeSafetyRequired(runtimeConfig, "development", {
         PILOT_INVITE_ONLY: "true",
       })
-    ).to.equal(true);
+    ).to.equal(false);
 
     let dependencyCalls = 0;
     const dependencies: PilotChainSafetyDependencies = {
@@ -816,48 +826,30 @@ describe("Pilot safety gates", () => {
     expect(missing.message).not.to.contain("missing secret");
   });
 
-  it("builds a minimal private health payload from the configured access policy", () => {
-    const wallet = Keypair.generate().publicKey.toBase58();
+  it("builds a minimal public-access health payload", () => {
     const original = {
-      inviteOnly: config.pilot.inviteOnly,
-      inviteWallets: config.pilot.inviteWallets,
       scheduler: config.oracle.schedulerEnabled,
       releaseSha: config.app.releaseSha,
       socialAuth: config.auth.social.enabled,
     };
 
     try {
-      config.pilot.inviteOnly = true;
-      config.pilot.inviteWallets = [wallet];
       config.oracle.schedulerEnabled = false;
       config.app.releaseSha = "0123456789abcdef0123456789abcdef01234567";
+      config.auth.social.enabled = false;
 
       expect(buildHealthPayload()).to.deep.equal({
         ok: true,
         releaseSha: "0123456789abcdef0123456789abcdef01234567",
-        mode: "INVITE_ONLY_PILOT",
+        mode: "PUBLIC_PILOT",
         automatedSettlement: false,
         accessPolicy: {
           configured: true,
-          type: "invite_only",
+          type: "open",
         },
       });
-      expect(JSON.stringify(buildHealthPayload())).not.to.contain(wallet);
       expect(buildHealthPayload()).not.to.have.property("publicFeatures");
 
-      config.pilot.inviteWallets = [];
-      expect(buildHealthPayload()).to.deep.equal({
-        ok: true,
-        releaseSha: "0123456789abcdef0123456789abcdef01234567",
-        mode: "INVITE_POLICY_MISCONFIGURED",
-        automatedSettlement: false,
-        accessPolicy: {
-          configured: false,
-          type: "invite_only",
-        },
-      });
-
-      config.pilot.inviteOnly = false;
       config.auth.social.enabled = true;
       expect(buildHealthPayload()).to.deep.equal({
         ok: true,
@@ -870,8 +862,6 @@ describe("Pilot safety gates", () => {
         },
       });
     } finally {
-      config.pilot.inviteOnly = original.inviteOnly;
-      config.pilot.inviteWallets = original.inviteWallets;
       config.oracle.schedulerEnabled = original.scheduler;
       config.app.releaseSha = original.releaseSha;
       config.auth.social.enabled = original.socialAuth;

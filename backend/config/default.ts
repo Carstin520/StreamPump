@@ -260,12 +260,14 @@ export const config = {
       process.env.PROTOTYPE_ROUTES_ENABLED,
       false
     ),
-    inviteOnly: env.readBoolean(
-      process.env.PILOT_INVITE_ONLY,
-      false
-    ),
-    inviteWallets: normalizePilotInviteWallets(
-      env.readCsv(process.env.PILOT_INVITE_WALLETS)
+    // Public account registration is the permanent access policy. The legacy
+    // PILOT_INVITE_* variables are intentionally ignored so stale hosted env
+    // values cannot silently restore the former wallet allowlist boundary.
+    inviteOnly: false,
+    inviteWallets: [] as string[],
+    operatorPublicationReviewRequired: env.readBoolean(
+      process.env.PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED,
+      true
     ),
     expectedUsdcMint: normalizeOptionalPublicKey(
       process.env.PILOT_EXPECTED_USDC_MINT,
@@ -326,14 +328,12 @@ export const isPilotRuntimeSafetyRequired = (
   nodeEnv: string | undefined = process.env.NODE_ENV,
   runtimeEnvironment: NodeJS.ProcessEnv = process.env
 ): boolean => {
-  const explicitPilotRuntime =
-    runtimeEnvironment.PILOT_INVITE_ONLY !== undefined && runtimeConfig.pilot.inviteOnly;
   const hostedRuntime =
     runtimeEnvironment.RENDER === "true" ||
     Boolean(runtimeEnvironment.K_SERVICE) ||
     Boolean(runtimeEnvironment.RAILWAY_ENVIRONMENT);
 
-  return nodeEnv === "production" || explicitPilotRuntime || hostedRuntime;
+  return nodeEnv === "production" || hostedRuntime;
 };
 
 const FULL_GIT_COMMIT_SHA = /^[0-9a-fA-F]{40}$/;
@@ -431,7 +431,7 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
   }
 
   for (const variableName of getEnabledForbiddenPilotFeatures(runtimeConfig)) {
-    failures.push(`${variableName}=true is not allowed in the invite-only Pilot`);
+    failures.push(`${variableName}=true is not allowed in the controlled Pilot`);
   }
 
   if (
@@ -443,9 +443,9 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     );
   }
 
-  if (runtimeConfig.pilot.inviteOnly && runtimeConfig.pilot.inviteWallets.length === 0) {
+  if (!runtimeConfig.pilot.operatorPublicationReviewRequired) {
     failures.push(
-      "PILOT_INVITE_WALLETS must include at least one wallet when PILOT_INVITE_ONLY=true"
+      "PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED must remain true in production"
     );
   }
 

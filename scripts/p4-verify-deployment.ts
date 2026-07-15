@@ -180,10 +180,10 @@ export const assertHealthPayload = (payload: unknown, expectedReleaseSha: string
   const accessPolicy = requireObject(health.accessPolicy, "health accessPolicy");
 
   requireExactValue(health.ok, true, "health.ok");
-  requireExactValue(health.mode, "INVITE_ONLY_PILOT", "health.mode");
+  requireExactValue(health.mode, "PUBLIC_SOCIAL_PILOT", "health.mode");
   requireExactValue(health.automatedSettlement, false, "health.automatedSettlement");
   requireExactValue(accessPolicy.configured, true, "health.accessPolicy.configured");
-  requireExactValue(accessPolicy.type, "invite_only", "health.accessPolicy.type");
+  requireExactValue(accessPolicy.type, "open", "health.accessPolicy.type");
 
   const releaseSha = health.releaseSha;
   if (typeof releaseSha !== "string" || releaseSha.trim() === "") {
@@ -514,10 +514,10 @@ const runSelfTest = async (): Promise<void> => {
   assertHealthPayload(
     {
       ok: true,
-      mode: "INVITE_ONLY_PILOT",
+      mode: "PUBLIC_SOCIAL_PILOT",
       automatedSettlement: false,
       releaseSha: sha,
-      accessPolicy: { configured: true, type: "invite_only" },
+      accessPolicy: { configured: true, type: "open" },
     },
     sha
   );
@@ -527,10 +527,10 @@ const runSelfTest = async (): Promise<void> => {
         assertHealthPayload(
           {
             ok: true,
-            mode: "INVITE_ONLY_PILOT",
+            mode: "PUBLIC_SOCIAL_PILOT",
             automatedSettlement: false,
             releaseSha,
-            accessPolicy: { configured: true, type: "invite_only" },
+            accessPolicy: { configured: true, type: "open" },
           },
           sha
         ),
@@ -542,9 +542,9 @@ const runSelfTest = async (): Promise<void> => {
       assertHealthPayload(
         {
           ok: true,
-          mode: "INVITE_ONLY_PILOT",
+          mode: "PUBLIC_SOCIAL_PILOT",
           automatedSettlement: true,
-          accessPolicy: { configured: true, type: "invite_only" },
+          accessPolicy: { configured: true, type: "open" },
         },
         sha
       ),
@@ -645,10 +645,10 @@ const runSelfTest = async (): Promise<void> => {
         return Response.json(
           {
             ok: true,
-            mode: "INVITE_ONLY_PILOT",
+            mode: "PUBLIC_SOCIAL_PILOT",
             automatedSettlement: false,
             releaseSha: sha,
-            accessPolicy: { configured: true, type: "invite_only" },
+            accessPolicy: { configured: true, type: "open" },
           },
           {
             status: 200,
@@ -666,10 +666,10 @@ const runSelfTest = async (): Promise<void> => {
       return Response.json(
         {
           ok: true,
-          mode: "INVITE_ONLY_PILOT",
+          mode: "PUBLIC_SOCIAL_PILOT",
           automatedSettlement: false,
           releaseSha: sha,
-          accessPolicy: { configured: true, type: "invite_only" },
+          accessPolicy: { configured: true, type: "open" },
         },
         { headers: { "cache-control": "no-store", "surrogate-control": "no-store" } }
       );

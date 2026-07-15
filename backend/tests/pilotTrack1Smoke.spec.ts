@@ -103,9 +103,9 @@ describe("Pilot Track1 smoke assertions", () => {
     assertPilotHealth(
       {
         ok: true,
-        mode: "INVITE_ONLY_PILOT",
+        mode: "PUBLIC_SOCIAL_PILOT",
         automatedSettlement: false,
-        accessPolicy: { configured: true, type: "invite_only" },
+        accessPolicy: { configured: true, type: "open" },
       },
       "before"
     );
@@ -154,9 +154,9 @@ describe("Pilot Track1 smoke assertions", () => {
     assertPilotHealth(
       {
         ok: true,
-        mode: "INVITE_ONLY_PILOT",
+        mode: "PUBLIC_SOCIAL_PILOT",
         automatedSettlement: false,
-        accessPolicy: { configured: true, type: "invite_only" },
+        accessPolicy: { configured: true, type: "open" },
       },
       "after"
     );
@@ -200,9 +200,9 @@ describe("Pilot Track1 smoke assertions", () => {
         assertPilotHealth(
           {
             ok: true,
-            mode: "INVITE_ONLY_PILOT",
+            mode: "PUBLIC_SOCIAL_PILOT",
             automatedSettlement: true,
-            accessPolicy: { configured: true, type: "invite_only" },
+            accessPolicy: { configured: true, type: "open" },
           },
           "after"
         ),

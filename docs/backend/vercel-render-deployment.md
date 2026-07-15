@@ -26,7 +26,7 @@
 当前目标是**公开身份入口的技术 Pilot——无真实资金**。所有链上活动只指向 **Solana devnet 与一枚 test-USDC mint**。本指南是一条通用上云路径；按 Pilot 真值，落地时必须遵守以下约束：
 
 - **仅 devnet。** 不要配置 mainnet RPC。生产环境下后端会在监听前校验每个 active RPC 的完整 Solana devnet genesis hash，不匹配即 fail-closed 拒绝启动。
-- **公开身份 gate。** 设置 `PILOT_INVITE_ONLY=false` 且无需 `PILOT_INVITE_WALLETS`；启用 `SOCIAL_AUTH_ENABLED=true` 并完整配置 Google、Apple、允许的前端 origin 和托管钱包加密密钥。`PILOT_EXPECTED_USDC_MINT` 与 `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS` 仍是链上安全门。
+- **公开身份 gate。** `PILOT_INVITE_ONLY` 与 `PILOT_INVITE_WALLETS` 已停用且被后端忽略；启用 `SOCIAL_AUTH_ENABLED=true` 并完整配置 Google、Apple、允许的前端 origin 和托管钱包加密密钥。内容发布仍由独立的 `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` 强制 operator 审核。`PILOT_EXPECTED_USDC_MINT` 与 `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS` 仍是链上安全门。
 - **关闭与 Pilot 冲突的资金功能。** 真实提现/转账、广泛公开托管执行、S1、Track 2 背书、Track 3 CPS、每日/互动奖励，以及**自动结算调度器（ORACLE）**保持关闭。媒体 corridor 仍需要 Mux webhook/reconciliation，financial projection 仍需要 indexer 同步。
 - **IDL 制品 blocker（已解决）。** 生产 IDL 现已随后端一起打包在 backend 根目录下（`backend/idl/streampump_core.json`），运行时通过 `STREAMPUMP_IDL_PATH=./idl/streampump_core.json` 读取。因此在 Render 的 **Root Directory 设为 `backend`** 时该制品仍在部署产物内，链上 preflight 与已部署走廊 smoke 不再被此路径 blocker 阻塞。请勿再退回旧的 `../target/idl/...` 路径（它位于 `backend` 根目录之外、不会进入部署制品）。
 - **liveness 与 readiness 区分（P3）。** 后端暴露两个探针：`GET /health` 是**始终返回 200 的 liveness**（进程存活即可）；`GET /ready` 是**readiness**，在 DB + 已启用的 Indexer + 已启用的 Mux reconciliation 全部就绪前返回 **503**，就绪后返回 200。二者用途不同：平台的存活/重启探针可指向 `/health`，而"是否可接流量"的就绪判断应参考 `/ready`（例如启动后先轮询 `/ready` 到 200 再放量）。后续修复 `96e9075` 使 indexer fail-closed：启动需真实的公共 `onSlotChange` 通知加 `getSlot`，运行时 slot 心跳停滞（90s）或 RPC 探测失败会将 Indexer readiness 降级为 FAILED，使 `/ready` 回到 503——因此 `/ready` 到 200 是一个会随订阅停滞而回退的运行时信号，放量后仍应持续监控。
@@ -156,8 +156,8 @@ npm run start
 - `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false`
 
 ##### Pilot 公开身份 gate（必填）
-- `PILOT_INVITE_ONLY=false`
-- `PILOT_INVITE_WALLETS=`
+- 删除旧的 `PILOT_INVITE_ONLY` 与 `PILOT_INVITE_WALLETS`（即便残留也会被后端忽略）
+- `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true`
 - `SOCIAL_AUTH_ENABLED=true`
 - `SOCIAL_AUTH_FRONTEND_ORIGINS=https://app.stream-pump.com`
 - Google/Apple OAuth 变量按 [`google-apple-login-setup.md`](google-apple-login-setup.md) 配置完整。
@@ -210,7 +210,7 @@ Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 6
 - `STREAMPUMP_PROGRAM_ID`
   - 生产监听前会在交易 RPC 上确认该账户存在且 `executable=true`。
 - `PILOT_EXPECTED_USDC_MINT=<Pilot test-USDC mint>`
-  - 见上文 invite-only gate：监听前读取链上 `ProtocolConfig.usdcMint` 并要求完全一致，否则 fail-closed。
+  - 见上文链上安全 gate：监听前读取链上 `ProtocolConfig.usdcMint` 并要求完全一致，否则 fail-closed。
 - `STREAMPUMP_IDL_PATH=./idl/streampump_core.json`
   - ✅ 见上文「IDL 制品 blocker（已解决）」：生产 IDL 已打包在 `backend/idl/streampump_core.json`，Root Directory 为 `backend` 时该路径仍在部署制品内。请勿退回 `../target/idl/...`。
 - `ORACLE_AUTHORITY_KEYPAIR_PATH` 或 `ORACLE_AUTHORITY_SECRET_KEY`（仅手动 Track 1 结算用；Pilot 不启用自动调度器）
@@ -326,7 +326,7 @@ https://api.yourdomain.com/api/webhooks/mux
 ### 5.4 Corridor + Track 1 smoke（P3）
 生产走廊/Track 1 smoke 脚本（`smoke:production-corridor`、`smoke-pilot-track1`）在缺少真实凭证时 fail-closed，不会伪造结果。真实执行时需满足：
 1. **稳定的 run id / deadline** —— 走廊使用可复现的 run id 与固定 deadline，使幂等与复跑可对齐（非每次随机）。
-2. **真实的、一次性的、在 allowlist 内的创作者 + 赞助商钱包** —— 两侧都做真实的钱包 auth；使用可丢弃（disposable）且已加入 `PILOT_INVITE_WALLETS` 的钱包，不要用长期主钱包。
+2. **真实的一次性测试创作者 + 赞助商身份** —— 走钱包 smoke 时两侧都做真实签名；可使用 disposable 测试钱包，但不要求登录 allowlist，也不要用长期主钱包。测试 sponsor 仍须由 operator 审核，并与固定 run id 和测试钱包精确绑定。
 3. **可续跑的幂等** —— 重试复用已存的幂等结果，不重复产生链上/DB 副作用。
 4. **公开 proof** —— 走廊结束后校验 `/campaigns/:id/public` 的凭证字段。
 5. **Track 1 smoke 断言 replay** —— 手动 Track 1 结算重复提交须命中 replay（no-resend），且签名者等于链上 `ProtocolConfig.oracleAuthority`。

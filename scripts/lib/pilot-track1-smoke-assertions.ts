@@ -124,14 +124,14 @@ const parseAmount = (value: string, label: string): bigint => {
 export const assertPilotHealth = (health: PilotHealth, phase: "before" | "after"): void => {
   if (
     health.ok !== true ||
-    health.mode !== "INVITE_ONLY_PILOT" ||
+    health.mode !== "PUBLIC_SOCIAL_PILOT" ||
     health.automatedSettlement !== false ||
     health.accessPolicy?.configured !== true ||
-    health.accessPolicy.type !== "invite_only"
+    health.accessPolicy.type !== "open"
   ) {
     fail(
       "PILOT_RUNTIME_BOUNDARY_FAILED",
-      `The ${phase}-mutation health check is not invite-only with automated settlement disabled.`,
+      `The ${phase}-mutation health check is not public-social with automated settlement disabled.`,
       { phase }
     );
   }
