@@ -129,6 +129,7 @@ describe("Pilot safety gates", () => {
       engagement: config.pilot.engagementRewardsEnabled,
       track2: config.oracle.track2AutoSettlementEnabled,
       oracleRunOnBoot: config.oracle.runOnBoot,
+      socialAuth: config.auth.social.enabled,
     };
 
     try {
@@ -136,18 +137,21 @@ describe("Pilot safety gates", () => {
       config.pilot.engagementRewardsEnabled = true;
       config.oracle.track2AutoSettlementEnabled = true;
       config.oracle.runOnBoot = true;
+      config.auth.social.enabled = true;
 
       expect(getEnabledForbiddenPilotFeatures(config)).to.include.members([
         "EPHEMERAL_SESSIONS_ENABLED",
         "ENGAGEMENT_REWARDS_ENABLED",
         "ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED",
         "ORACLE_RUN_ON_BOOT",
+        "SOCIAL_AUTH_ENABLED",
       ]);
     } finally {
       config.managedWallet.ephemeralSessionsEnabled = original.ephemeral;
       config.pilot.engagementRewardsEnabled = original.engagement;
       config.oracle.track2AutoSettlementEnabled = original.track2;
       config.oracle.runOnBoot = original.oracleRunOnBoot;
+      config.auth.social.enabled = original.socialAuth;
     }
   });
 
@@ -319,6 +323,7 @@ describe("Pilot safety gates", () => {
 
     const original = {
       preview: config.auth.allowPreviewProviderExchange,
+      socialAuth: config.auth.social.enabled,
       ephemeral: config.managedWallet.ephemeralSessionsEnabled,
       publicExecution: config.managedWallet.publicExecutionEnabled,
       email: config.pilot.emailAuthEnabled,
@@ -326,6 +331,7 @@ describe("Pilot safety gates", () => {
 
     try {
       config.auth.allowPreviewProviderExchange = false;
+      config.auth.social.enabled = false;
       config.managedWallet.ephemeralSessionsEnabled = false;
       config.managedWallet.publicExecutionEnabled = false;
       config.pilot.emailAuthEnabled = false;
@@ -333,8 +339,12 @@ describe("Pilot safety gates", () => {
 
       config.managedWallet.publicExecutionEnabled = true;
       expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(true);
+      config.managedWallet.publicExecutionEnabled = false;
+      config.auth.social.enabled = true;
+      expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(true);
     } finally {
       config.auth.allowPreviewProviderExchange = original.preview;
+      config.auth.social.enabled = original.socialAuth;
       config.managedWallet.ephemeralSessionsEnabled = original.ephemeral;
       config.managedWallet.publicExecutionEnabled = original.publicExecution;
       config.pilot.emailAuthEnabled = original.email;

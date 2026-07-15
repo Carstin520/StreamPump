@@ -1223,3 +1223,108 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Login page — animated headline + entrance stagger
+   Added for the login visual redesign. The rotating keyword slot, gradient
+   drift, and entrance stagger are driven by React state (see login.tsx); the
+   classes below own the motion + clipping. Reuses --ease-fluid / --dur-*.
+   ------------------------------------------------------------------------- */
+@layer components {
+  /* Rotating keyword slot. inline-grid stacks every word in the same cell so
+     the slot width equals the widest word and the height equals the tallest;
+     overflow clips the vertical in/out travel. */
+  .hero-word-slot {
+    display: inline-grid;
+    overflow: hidden;
+    /* WebKit paints background-clip:text descendants in a pass that escapes
+       overflow/clip-path on non-composited ancestors. clip-path + will-change
+       (own compositing layer) together make the clip stick; verified live. */
+    clip-path: inset(0);
+    will-change: transform;
+    vertical-align: bottom;
+    /* nudge to visually baseline-align the clipped words with the fixed text */
+    padding-bottom: 0.06em;
+  }
+
+  .hero-word {
+    grid-area: 1 / 1;
+    transform: translateY(110%);
+    opacity: 0;
+    /* No transition in the parked state: when a word leaves -exit and returns
+       here it must snap below the slot instantly, not streak back through it. */
+  }
+
+  /* Gradient fill lives on an inner span: WebKit lets background-clip:text
+     escape ancestor overflow/clip-path when the same element also transforms,
+     so the transform (above) and the clipped gradient must be separate boxes. */
+  .hero-word-text {
+    display: inline-block;
+    background: linear-gradient(90deg, #de402a, #ff8a78, #f5f7fb);
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: hero-gradient-drift 6s ease-in-out infinite;
+  }
+
+  .hero-word.hero-word-current,
+  .hero-word.hero-word-exit {
+    transition:
+      transform 500ms var(--ease-fluid),
+      opacity 500ms var(--ease-fluid);
+  }
+
+  .hero-word.hero-word-current {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .hero-word.hero-word-exit {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+
+  /* Entrance stagger: eyebrow -> headline -> subtitle -> auth panel. */
+  .login-enter {
+    opacity: 0;
+    animation: login-enter-fade var(--dur-slow) var(--ease-fluid) both;
+  }
+
+  .login-enter-1 { animation-delay: 40ms; }
+  .login-enter-2 { animation-delay: 120ms; }
+  .login-enter-3 { animation-delay: 200ms; }
+  .login-enter-4 { animation-delay: 280ms; }
+}
+
+@keyframes hero-gradient-drift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes login-enter-fade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Global rule above zeroes durations; make sure entrance content stays
+     visible and the gradient word does not sit at its off-screen start. */
+  .login-enter {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-word.hero-word-current {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
