@@ -123,7 +123,7 @@ describe("Pilot safety gates", () => {
     },
   });
 
-  it("reports every production-forbidden Pilot feature that is enabled", () => {
+  it("reports production-forbidden Pilot features without treating verified social auth as forbidden", () => {
     const original = {
       ephemeral: config.managedWallet.ephemeralSessionsEnabled,
       engagement: config.pilot.engagementRewardsEnabled,
@@ -144,8 +144,8 @@ describe("Pilot safety gates", () => {
         "ENGAGEMENT_REWARDS_ENABLED",
         "ORACLE_TRACK2_AUTO_SETTLEMENT_ENABLED",
         "ORACLE_RUN_ON_BOOT",
-        "SOCIAL_AUTH_ENABLED",
       ]);
+      expect(getEnabledForbiddenPilotFeatures(config)).not.to.include("SOCIAL_AUTH_ENABLED");
     } finally {
       config.managedWallet.ephemeralSessionsEnabled = original.ephemeral;
       config.pilot.engagementRewardsEnabled = original.engagement;
@@ -209,15 +209,19 @@ describe("Pilot safety gates", () => {
     expect(`${result.stderr}${result.stdout}`).to.contain("PILOT_INVITE_WALLETS");
   });
 
-  it("fails fast in production when invite-only is disabled or the allowlist is empty", () => {
+  it("allows public production access without an invite wallet allowlist", () => {
     const wallet = Keypair.generate().publicKey.toBase58();
 
-    const disabled = runConfigImport({
+    const publicAccess = runConfigImport({
       ...validProductionEnv(wallet),
       PILOT_INVITE_ONLY: "false",
+      PILOT_INVITE_WALLETS: "",
     });
-    expect(disabled.status).not.to.equal(0);
-    expect(`${disabled.stderr}${disabled.stdout}`).to.contain("PILOT_INVITE_ONLY=false");
+    expect(publicAccess.status).to.equal(0);
+  });
+
+  it("requires an allowlist only when the legacy invite-only rollback is enabled", () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
 
     const empty = runConfigImport({
       ...validProductionEnv(wallet),
@@ -225,6 +229,38 @@ describe("Pilot safety gates", () => {
     });
     expect(empty.status).not.to.equal(0);
     expect(`${empty.stderr}${empty.stdout}`).to.contain("PILOT_INVITE_WALLETS");
+  });
+
+  it("allows verified Google and Apple auth in public production when provider config is complete", () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    const socialEnv = {
+      ...validProductionEnv(wallet),
+      PILOT_INVITE_ONLY: "false",
+      PILOT_INVITE_WALLETS: "",
+      SOCIAL_AUTH_ENABLED: "true",
+      SOCIAL_AUTH_FRONTEND_ORIGINS: "https://app.example.com",
+      GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+      GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
+      GOOGLE_OAUTH_REDIRECT_URI: "https://api.example.com/api/v1/auth/social/google/callback",
+      APPLE_OAUTH_CLIENT_ID: "com.example.web",
+      APPLE_OAUTH_TEAM_ID: "APPLETEAM1",
+      APPLE_OAUTH_KEY_ID: "APPLEKEY1",
+      APPLE_OAUTH_PRIVATE_KEY: "test-apple-signing-key-material",
+      APPLE_OAUTH_REDIRECT_URI: "https://api.example.com/api/v1/auth/social/apple/callback",
+      MANAGED_WALLET_ENCRYPTION_KEY: "11".repeat(32),
+    };
+
+    const enabled = runConfigImport(socialEnv);
+    expect(enabled.status).to.equal(0);
+
+    const missingProvider = runConfigImport({
+      ...socialEnv,
+      GOOGLE_OAUTH_CLIENT_SECRET: "",
+    });
+    expect(missingProvider.status).not.to.equal(0);
+    expect(`${missingProvider.stderr}${missingProvider.stdout}`).to.contain(
+      "GOOGLE_OAUTH_CLIENT_SECRET"
+    );
   });
 
   it("requires a valid expected Pilot USDC mint in production", () => {
@@ -424,7 +460,7 @@ describe("Pilot safety gates", () => {
     expect(dependencyCalls).to.be.greaterThan(0);
   });
 
-  it("fails closed on hosted Node or release identity drift without echoing supplied values", () => {
+  it("fails closed on an unsupported hosted Node without echoing supplied release values", () => {
     const expectedReleaseSha = "a".repeat(40);
     const deployedReleaseSha = "b".repeat(40);
     const failures = getHostedPilotRuntimeFailures(
@@ -437,20 +473,27 @@ describe("Pilot safety gates", () => {
     );
 
     expect(failures).to.include("Hosted Pilot runtime requires Node.js major 22");
-    expect(failures).to.include(
-      "PILOT_EXPECTED_RELEASE_SHA must exactly match RENDER_GIT_COMMIT"
-    );
     expect(failures.join(" ")).not.to.contain(expectedReleaseSha);
     expect(failures.join(" ")).not.to.contain(deployedReleaseSha);
   });
 
-  it("accepts only an exact full Render release identity on Node 22", () => {
+  it("uses Render's full platform release identity for auto-deploys", () => {
     const releaseSha = "0123456789abcdef0123456789abcdef01234567";
     expect(
       getHostedPilotRuntimeFailures(
         {
           RENDER: "true",
-          PILOT_EXPECTED_RELEASE_SHA: releaseSha,
+          RENDER_GIT_COMMIT: releaseSha,
+        },
+        "22.14.0"
+      )
+    ).to.deep.equal([]);
+
+    expect(
+      getHostedPilotRuntimeFailures(
+        {
+          RENDER: "true",
+          PILOT_EXPECTED_RELEASE_SHA: "stale-manual-pin-is-ignored-on-render",
           RENDER_GIT_COMMIT: releaseSha,
         },
         "22.14.0"
@@ -460,12 +503,11 @@ describe("Pilot safety gates", () => {
     const incomplete = getHostedPilotRuntimeFailures(
       {
         RENDER: "true",
-        PILOT_EXPECTED_RELEASE_SHA: releaseSha.slice(0, 39),
-        RENDER_GIT_COMMIT: releaseSha,
+        RENDER_GIT_COMMIT: releaseSha.slice(0, 39),
       },
       "22.14.0"
     );
-    expect(incomplete.join(" ")).to.contain("complete 40-character hexadecimal");
+    expect(incomplete.join(" ")).to.contain("RENDER_GIT_COMMIT");
   });
 
   it("requires release identity syntax but not Render metadata on other hosted runtimes", () => {
@@ -781,6 +823,7 @@ describe("Pilot safety gates", () => {
       inviteWallets: config.pilot.inviteWallets,
       scheduler: config.oracle.schedulerEnabled,
       releaseSha: config.app.releaseSha,
+      socialAuth: config.auth.social.enabled,
     };
 
     try {
@@ -813,11 +856,25 @@ describe("Pilot safety gates", () => {
           type: "invite_only",
         },
       });
+
+      config.pilot.inviteOnly = false;
+      config.auth.social.enabled = true;
+      expect(buildHealthPayload()).to.deep.equal({
+        ok: true,
+        releaseSha: "0123456789abcdef0123456789abcdef01234567",
+        mode: "PUBLIC_SOCIAL_PILOT",
+        automatedSettlement: false,
+        accessPolicy: {
+          configured: true,
+          type: "open",
+        },
+      });
     } finally {
       config.pilot.inviteOnly = original.inviteOnly;
       config.pilot.inviteWallets = original.inviteWallets;
       config.oracle.schedulerEnabled = original.scheduler;
       config.app.releaseSha = original.releaseSha;
+      config.auth.social.enabled = original.socialAuth;
     }
   });
 

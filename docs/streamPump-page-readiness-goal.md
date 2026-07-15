@@ -13,9 +13,9 @@ Use the repository root of your local StreamPump checkout (do not hard-code an i
 Required branch:
 Work on the current integration/Pilot branch, not main.
 
-main is no longer frozen after hackathon judging, but it is the canonical release branch: keep it deployable and merge only reviewed, verified work. The current product target is a code-verified invite-only Pilot candidate on Solana devnet/test-USDC — not a deployed production system and not live.
+main is the canonical release branch: keep it deployable and merge only reviewed, verified work. The current product target is a technical Pilot on Solana devnet/test-USDC with public Google/Apple registration and optional wallet login — no real funds and not a real-funds production launch.
 
-Current Pilot route truth (respect this when auditing readiness): the only corridor open to Pilot users is external-wallet auth → content create/upload (R2/Mux) → public feed/post projection → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 fixed-base → campaign proof. Closed for all Pilot users: email/social/provider managed wallet, public managed execution, S1, Track 2 endorsement/fan rewards, Track 3 CPS, daily/engagement rewards, automatic settlement, and prototype routes. Do not label any page as production, deployed, live, audited, or handling real funds.
+Current Pilot route truth (respect this when auditing readiness): Google/Apple registration is open to everyone and enters directly through a platform-managed account; wallet login is an optional parallel method. Do not ask for a personal wallet during signup/onboarding; require it only for an explicit future withdrawal/transfer action. The corridor continues through content create/upload (R2/Mux) → public feed/post projection → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 fixed-base → campaign proof. Closed: real withdrawal, unrestricted public managed execution, S1, Track 2 endorsement/fan rewards, Track 3 CPS, daily/engagement rewards, automatic settlement, and prototype routes. Do not label financial lanes as production-ready, audited, or handling real funds.
 
 Preflight:
 1. Run git branch --show-current. Confirm it matches the review/integration branch named by the current task. Do not make unreviewed changes directly on main.

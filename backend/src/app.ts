@@ -88,6 +88,7 @@ const createControlPlaneHeadersMiddleware = (): RequestHandler =>
 export const buildHealthPayload = () => {
   const invitePolicyConfigured =
     config.pilot.inviteOnly && config.pilot.inviteWallets.length > 0;
+  const accessPolicyConfigured = !config.pilot.inviteOnly || invitePolicyConfigured;
 
   return {
     ok: true,
@@ -96,10 +97,12 @@ export const buildHealthPayload = () => {
       ? "INVITE_ONLY_PILOT"
       : config.pilot.inviteOnly
         ? "INVITE_POLICY_MISCONFIGURED"
-        : "OPEN_DEVELOPMENT",
+        : config.auth.social.enabled
+          ? "PUBLIC_SOCIAL_PILOT"
+          : "PUBLIC_PILOT",
     automatedSettlement: config.oracle.schedulerEnabled,
     accessPolicy: {
-      configured: invitePolicyConfigured,
+      configured: accessPolicyConfigured,
       type: config.pilot.inviteOnly ? "invite_only" : "open",
     },
   };

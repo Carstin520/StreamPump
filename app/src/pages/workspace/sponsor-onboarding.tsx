@@ -194,7 +194,7 @@ export default function SponsorOnboardingPage() {
             <section className="rounded-[18px] border border-white/[0.08] bg-[#111827]/90 p-6">
               <h1 className="text-2xl font-semibold text-white">Sponsor 企业认证</h1>
               <p className="mt-3 text-sm leading-6 text-[#9fb0ca]">
-                提交企业认证前需要先完成 StreamPump 登录，并连接一个外部 allowlisted 的 Solana 钱包（Phantom / Solflare）。Pilot 不提供托管账户。
+                提交企业认证前只需先完成 StreamPump 登录。Google / Apple 注册会直接使用平台账号，不要求连接个人钱包。
               </p>
               <Link className="mt-5 inline-flex rounded-full bg-[#de402a] px-5 py-2.5 text-sm font-semibold text-white" href={loginHref}>
                 登录后继续
@@ -285,10 +285,10 @@ export default function SponsorOnboardingPage() {
                   {step === 2 ? (
                     <div className="space-y-4">
                       <div className="rounded-[14px] border border-white/[0.08] bg-white/[0.03] p-4">
-                        <p className="text-sm font-semibold text-white">外部 allowlisted 钱包</p>
+                        <p className="text-sm font-semibold text-white">当前平台账号标识</p>
                         <p className="mt-2 break-all text-sm text-[#9fb0ca]">{session.wallet}</p>
                         <p className="mt-3 text-xs leading-5 text-[#7f90ab]">
-                          该地址即为提交 KYB 时绑定的外部 Solana 钱包。approval 后由 operator 加入 allowlist，才能创建生产 S2 Proposal。Pilot 不提供托管账户或代管私钥。
+                          该地址是平台为当前会话维护的内部账号标识，用于关联 SponsorProfile。这里不会要求或绑定你的个人钱包；提现/转账流程上线后，只有在你主动发起操作时才会要求连接。
                         </p>
                       </div>
                       <TextField label="授权委托书 storageKey（非法人经办时填写）" value={form.powerOfAttorneyKey} onChange={(value) => updateField("powerOfAttorneyKey", value)} />
@@ -299,7 +299,7 @@ export default function SponsorOnboardingPage() {
                     <div className="rounded-[14px] border border-[#65ecaf]/20 bg-[#0e1f17]/45 p-5">
                       <p className="text-lg font-semibold text-[#8df0c4]">已进入审核队列</p>
                       <p className="mt-3 text-sm leading-6 text-[#a7d8c3]">
-                        Operator 审核通过后，该钱包对应的 SponsorProfile 会变为 APPROVED，并解锁生产 S2 Proposal 创建与注资权限。
+                        Operator 审核通过后，当前平台账号对应的 SponsorProfile 会变为 APPROVED。提案创建与注资仍受 devnet、角色和链上安全门控约束。
                       </p>
                     </div>
                   ) : null}

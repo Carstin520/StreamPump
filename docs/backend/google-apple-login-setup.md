@@ -1,6 +1,6 @@
 # Google and Apple login setup
 
-Status: code-complete behind feature flags; provider dashboards and a separately approved identity environment are still required. The current invite-only external-wallet Pilot must keep social auth disabled.
+Status: approved public identity entry. Google and Apple registration are open to everyone when the production provider settings below are configured. The Solana devnet/test-USDC and no-real-funds boundaries remain unchanged.
 
 ## What the implementation does
 
@@ -13,29 +13,23 @@ Google / Apple authorization code
 -> AuthIdentity(provider, providerSubject)
 -> managed wallet session subject
 -> WalletSession + AccountProfile
--> optional signed binding to Phantom / Solflare
+-> direct product entry
 ```
+
+The platform-managed wallet is the account's internal identity/settlement address. The login and onboarding flows do not ask for a user-owned wallet. Phantom/Solflare remains a separate login method; signed wallet binding is deferred until the user explicitly requests withdrawal/transfer.
 
 The browser never chooses `providerSubject`, email, or the StreamPump session wallet. OAuth completion happens in a popup, and the backend posts the completed StreamPump session only to an explicitly allowed frontend origin. Access tokens are not placed in callback URLs.
 
 ## Backend environment
 
-Keep these disabled in the current Pilot:
-
-```env
-SOCIAL_AUTH_ENABLED=false
-```
-
-For a separately approved local/staging identity environment:
-
 ```env
 SOCIAL_AUTH_ENABLED=true
 SOCIAL_AUTH_STATE_TTL_SECONDS=600
-SOCIAL_AUTH_FRONTEND_ORIGINS=http://localhost:3000
+SOCIAL_AUTH_FRONTEND_ORIGINS=https://app.stream-pump.com
 
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
-GOOGLE_OAUTH_REDIRECT_URI=http://localhost:4000/api/v1/auth/social/google/callback
+GOOGLE_OAUTH_REDIRECT_URI=https://api.stream-pump.com/api/v1/auth/social/google/callback
 
 APPLE_OAUTH_CLIENT_ID=com.example.streampump.web
 APPLE_OAUTH_TEAM_ID=...
@@ -94,21 +88,20 @@ Official references:
 
 ## Verification checklist
 
-1. Keep `PILOT_INVITE_ONLY=false` only in an isolated local/staging identity environment; do not open the current Pilot lane.
+1. Set `PILOT_INVITE_ONLY=false`; leave `PILOT_INVITE_WALLETS` empty for public access.
 2. Sign in once with Google and once with Apple.
 3. Confirm `/api/v1/auth/session` reports `GOOGLE` or `APPLE` and a stable provider subject.
 4. Reload and sign in again; the same `AuthIdentity` and managed wallet address must be reused.
 5. Test Apple both with a real email and Hide My Email.
-6. Bind a fresh Phantom/Solflare wallet and verify the wallet challenge signature is still required.
-7. Reject mismatched redirect URIs, audiences, nonces, expired state, cancelled provider flows, disallowed frontend origins, and popup messages from unexpected origins.
-8. Run backend tests/build and the frontend production build, then perform browser smoke on `/login`.
+6. Confirm social login enters the product directly without showing a wallet-choice or wallet-address prompt.
+7. Confirm standalone Phantom/Solflare login still requires a wallet challenge signature.
+8. Reject mismatched redirect URIs, audiences, nonces, expired state, cancelled provider flows, disallowed frontend origins, and popup messages from unexpected origins.
+9. Run backend tests/build and the frontend production build, then perform browser smoke on `/login`.
 
 ## Remaining production gates
 
-- Google OAuth consent/publishing configuration.
-- Apple Services ID, primary App ID, domain/return URL, and `.p8` key setup.
-- Secret-manager configuration and key-rotation ownership.
+- Provider dashboard and secret values must remain valid and owned by an operator.
 - Managed-wallet custody/KMS and recovery review.
 - Account linking policy when the same person uses Google and Apple (never merge by email alone; Apple relay addresses make that unsafe).
 - Apple refresh-token revocation and server-to-server notification handling before account deletion is offered.
-- A separate human approval to reopen social/provider identity; the current external-wallet Pilot intentionally forbids `SOCIAL_AUTH_ENABLED=true`.
+- A real, audited custodial-to-personal withdrawal flow. Until then, do not request a personal wallet during signup or onboarding and do not claim withdrawals are available.

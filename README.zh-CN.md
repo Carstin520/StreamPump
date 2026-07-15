@@ -97,7 +97,7 @@ StreamPump 建立在四个核心信念之上，正好规避了上述每一个陷
 | 🛡️ **反投机护栏** | 非转让 token、每日买入上限、动态退出税、延迟评级、背书上限 |
 | 🎞️ **真实媒体管线** | Cloudflare R2 存储 + Mux 视频处理 + 进入公开 feed 前的发布验证 |
 
-> **边界——以上是协议/代码能力，不代表当前 Pilot 的可用性。** 已部署的受控技术 Pilot 仅运行在 devnet/test-USDC 上，保持邀请制，**不是公开生产上线且无真实资金**。对 Pilot 用户唯一开放的通道是：外部钱包认证 → 媒体 → feed → proposal intent → 创作者 + 赞助方双签 → 后端 relay → 手动 Track 1 → 活动凭证。S1 发现/买断、粉丝背书池、Track 2/3 结算、以及 email/social 托管钱包在代码中存在，但**对所有 Pilot 用户关闭**（见[当前状态](#-当前状态)）。
+> **边界——以上是协议/代码能力，不代表当前 Pilot 的可用性。** Google/Apple 注册和独立钱包登录对所有人开放，但技术 Pilot 仍仅运行在 devnet/test-USDC 上，**无真实资金**。社交注册会创建平台托管账号，不询问个人钱包；只有未来发起提现/转账时才需要连接用户自己的钱包。S1 发现/买断、粉丝背书、Track 2/3 结算、奖励与真实提现仍关闭（见[当前状态](#-当前状态)）。
 
 ---
 
@@ -210,15 +210,15 @@ Anchor 程序提供 **35 个类型安全指令**和 **13 个 PDA 账户类型**�
 
 ## 📍 当前状态
 
-StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana devnet/test-USDC、邀请制、external-wallet-first、Track1-only、无真实资金，且不是公开生产上线。** H0–H5 均已批准。P4 已完成固定 devnet program 升级、26 项 Neon migration（恢复分支继续保留）、固定版本的前后端部署、真实 R2/Mux/feed/proposal 走廊验证、手动 Track 1 恰好一次结算/重放，以及 allowlist 清理。Render 当前运行后端 `88c0debad6ecb7eacfe9e24793951f3794353f4c`（`dep-d9auio7lk1mc73c4r18g`）；Vercel 仍为前端 `097e9805b197398ae1c04cf5bf84f1044b3b2f19`。P5 在 `f72c33d` 完成，alias-path major 已修复，Fable 5 closure 为 0 blocker/major。H5 已批准；P6 只获准进行最终 release-gate 审计整改与发布准备，并必须停在 H6。所有关闭通道仍未获授权。
+StreamPump 目前是一个**已部署的技术 Pilot——仅限 Solana devnet/test-USDC、公开账号入口、Track1-only、无真实资金，且不是真实资金生产上线。** 自 2026-07-15 起，旧邀请制身份边界被正式取代：任何人都可以使用后端验证的 Google/Apple OAuth 注册，外部钱包仍作为并列且可选的登录方式。社交用户通过平台托管账号直接进入，注册和新手引导不会询问个人钱包。真实提现尚未实现，只有在用户主动提现/转账时才应要求连接自己的钱包。
 
-### 邀请制 Pilot——受控技术部署，非公开上线
+### 公开身份入口——受控技术部署，无真实资金
 
-访问由**外部真实钱包白名单**门控。auth challenge 对每一个有效钱包**形态完全相同**，邀请校验**只在有效签名之后**执行——白名单无法被提前探测。
+正常生产访问使用 `PILOT_INVITE_ONLY=false`，无需钱包白名单。Google/Apple OAuth 由后端验证，并创建或复用稳定的平台托管账号。钱包登录仍要求签名 challenge，但不是注册前提。
 
-**Pilot 走廊内开放：** 外部钱包认证；经 R2/Mux 完成的内容创建与上传；公开 feed 与帖子详情投影；proposal intent 创建；创作者 + 赞助方双签；后端 relay 完整签名交易；手动 Track 1 固定底价结算；作为投影/链上证据的活动凭证（PDA、tx 签名、manifest hash、内容锚点）。
+**Pilot 走廊内开放：** 公开 Google/Apple 注册；可选的外部钱包登录；经 R2/Mux 完成的内容创建与上传；公开 feed 与帖子详情投影；proposal intent 创建；创作者 + 赞助方双签；后端 relay；手动 Track 1 固定底价结算；活动凭证。
 
-**对所有 Pilot 用户关闭：** email/social/provider 托管钱包认证与公开托管执行；S1 市场/买断/portfolio 领取；Track 2 背书与粉丝奖励；Track 3 CPS；每日与互动奖励；自动 oracle 结算调度器；prototype/legacy 路由。
+**对所有 Pilot 用户关闭：** 托管账户向个人钱包的提现/转账；不受限的公开托管执行；S1 市场/买断/portfolio 领取；Track 2 背书与粉丝奖励；Track 3 CPS；每日与互动奖励；自动 oracle 结算调度器；prototype/legacy 路由。
 
 **内容真实性（P2）。** 上传先落到**私有 R2 源桶**，仅用于 presigned 暂存与 KYB 文档；一个**独立的公共交付桶**（`R2_DELIVERY_BUCKET`，必须与 `R2_BUCKET` 不同）只保存已验证/受信任的素材。后端记录每个素材的**服务端观测字节、MIME、大小与 SHA-256**，执行**串行化的月度上传配额**，运行 **Mux 对账**，随后将已验证素材提升至交付桶并清理源副本。**创作者无法自我验证**内容——进入 feed 前**必须经过 operator 审批**。
 
@@ -240,17 +240,17 @@ StreamPump 目前是一个**已部署的受控技术 Pilot——仅限 Solana de
 
 | 区域 | Readiness | 当前真实能力 |
 |---|---|---|
-| **Pilot 走廊（邀请制）** | 已部署的受控技术 Pilot · 仅 devnet/test-USDC | 外部钱包认证 → R2/Mux 媒体 → feed → proposal intent → 双签 → 后端 relay → 手动 Track 1 → 活动凭证 |
+| **Pilot 走廊（公开身份）** | 已部署的技术 Pilot · 仅 devnet/test-USDC | Google/Apple 或钱包登录 → R2/Mux 媒体 → feed → proposal intent → 双签 → 后端 relay → 手动 Track 1 → 活动凭证 |
 | **S1 市场 / portfolio / 买断** | Pilot 关闭（代码为 `SEEDED_DEMO`） | 买卖/领取/买断代码针对种子 devnet 状态存在，但对 Pilot 用户禁用 |
 | **S2 proposal 发起** | 已在 devnet 代码验证 | 双签发起走廊已验证；是 Pilot 中唯一开放的资金流 |
 | **S2 背书** | Pilot 关闭（代码为 `BACKEND_READY_UI_GAP`） | 种子 proposal 的链上 burn + 后端 builder 存在，但对 Pilot 用户禁用 |
 | **结算 Track 1（手动）** | `OPERATOR_REQUIRED` | Pilot 仅允许手动固定底价支付；无自动结算 |
 | **结算 Track 2/3（CPS）** | Pilot 关闭 | Track 2 背书 + Track 3 CPS 对 Pilot 用户禁用；Track 3 仍需真实商户/对账提供方 |
-| **托管钱包 / email-social 认证** | Pilot 关闭 | 对所有 Pilot 用户禁用；仅限外部真实钱包 |
+| **托管钱包 / 社交认证** | 公开身份入口 | Google/Apple 创建平台托管账号且不询问个人钱包；提现和广泛托管执行仍关闭 |
 | **奖励** | Pilot 关闭 | 每日/互动/粉丝奖励对 Pilot 用户禁用 |
 | **运营工具** | `OPERATOR_REQUIRED` | 内部路由已具备；尚无后台面板 |
 
-> ⚠️ Anchor 程序**未经审计**、**未部署生产**。此版本是 devnet/test-USDC 上的邀请制 Pilot 候选——**未上线、无真实资金**。新的链上护栏和奖励逻辑需要先部署程序才能在链上生效。
+> ⚠️ Anchor 程序**尚未完成真实资金生产审计**。此版本仍运行在 devnet/test-USDC 上，**无真实资金**。公开登录不会提升任何资金通道的生产 readiness。
 
 ### 合规与代币定性（设计推进中）
 
@@ -346,7 +346,7 @@ cargo check            # 更轻量的类型检查
 
 ## 🎬 Demo 路径
 
-> 以下是**历史受控演示**——运行在 devnet/test-USDC 上、供参考的种子/运营演练。它是邀请制 Pilot 走廊的超集，其本身不代表当前 Pilot 可用性，也不代表已部署或已上线。
+> 以下是**历史受控演示**——运行在 devnet/test-USDC 上、供参考的种子/运营演练。它是当前 Pilot 走廊的超集，其本身不代表当前可用性或真实资金 readiness。
 
 历史受控演示刻意收敛为两条受控流程：
 
@@ -421,11 +421,11 @@ cd backend && npm run prisma:migrate:deploy
 
 ## 🗺 路线图
 
-当前优先级：**P6 最终 release-gate 审计整改与发布准备**；边界仍是邀请制、devnet/test-USDC、external-wallet-first、Track1-only、manual/operator-only、无真实资金。P5 已完成且 H5 已批准；P6 必须通过 exact-range Fable 5 gate，并停在 H6。
+当前优先级：在既有 devnet/test-USDC Pilot 上开放公开身份入口；Google/Apple 注册、可选钱包登录、Track1-only、manual/operator-only、无真实资金。旧邀请制/external-wallet-first 政策已成为历史。
 
 - **P4 门控顺序（历史，已完成）：** 受控 program/Neon/Render/Vercel/Mux 变更、真实一次性钱包走廊、手动 Track 1 恰好一次结算/重放与 allowlist 清理，均在各自 mutation gate 下完成。当前后端为 `88c0deb`，allowlist 仅保留人类批准的外部钱包。
 - **P5 门控顺序（历史，已完成）：** 已接受 commit `f72c33d`；backend build、聚焦 readiness 套件 6/6、deployment-verifier 自测、diff/protected 检查与 Fable 5 fix-only closure 均通过，0 blocker/major。H5 于 2026-07-14 获批。
-- **P6 门控顺序（当前）：** 将已接受的 deployment-verifier 自测加入 CI，冻结 post-H6 exact-SHA 部署/回滚交接，只运行风险对应检查，对 `f72c33d..candidate` 做一次 Fable 5 审查，关闭 blocker/major，然后停在 H6。P6 不包含部署、关闭通道或 readiness 提升。
+- **P6 门控顺序（历史）：** 保留 deployment-verifier 与 exact-SHA 交接工作；其中的邀请制身份假设已被 2026-07-15 公开身份决策取代。
 - **Post-H6 发布交接：** [`docs/pilot/p6-final-audit-and-release-handoff.md`](docs/pilot/p6-final-audit-and-release-handoff.md)。任何 Render 部署前仍需单独的明确 mutation approval。
 
 - **P2 门控顺序（历史，已完成）：** (1) 固定 P2 commit 范围 `d78815b..e0b6028`，(2) 对其取得一次独立的 **Fable 5** 审查——**2026-07-12 PASS，无 blocker/major 问题**，(3) 未提出任何 blocker/major 问题，因此无需重跑，然后 (4) **人工门 H2 已批准**。
@@ -435,7 +435,7 @@ cd backend && npm run prisma:migrate:deploy
 
 Post-Pilot backlog（对所有 Pilot 用户关闭——每项都需要后续 H 门以及各自的审计/法律/供应方前置条件）：
 
-- 生产级身份验证和 email/social 托管钱包硬化（KMS/Vault、SOL 预算、恢复/导出）。
+- 平台托管账号安全硬化与真实签名提现流程（KMS/Vault、SOL 预算、恢复/导出）。
 - 在关闭的 S1 通道通过审计后，产品化 S1 自助市场与买断形成 UI。
 - 完成 S2 Track 2 背书领取体验和粉丝奖励账本。
 - 在存在真实商户/对账提供方后开放 Track 3 CPS / 自动结算。

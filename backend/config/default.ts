@@ -73,7 +73,12 @@ const normalizeOptionalPublicKey = (rawValue: string | undefined, variableName: 
 export const config = {
   app: {
     apiBaseUrl: env.readString(process.env.API_BASE_URL, "http://localhost:4000/api/v1"),
-    releaseSha: env.readString(process.env.PILOT_EXPECTED_RELEASE_SHA, ""),
+    releaseSha: env.readString(
+      process.env.RENDER_GIT_COMMIT ??
+        process.env.RAILWAY_GIT_COMMIT_SHA ??
+        process.env.PILOT_EXPECTED_RELEASE_SHA,
+      ""
+    ),
     // CORS_ALLOWED_ORIGINS / 允许访问后端 API 的前端来源列表
     // CN: 生产环境建议显式填写逗号分隔的前端域名，例如 https://app.example.com。
     // EN: Comma-separated frontend origins allowed to call the backend API in production.
@@ -257,7 +262,7 @@ export const config = {
     ),
     inviteOnly: env.readBoolean(
       process.env.PILOT_INVITE_ONLY,
-      process.env.NODE_ENV === "production"
+      false
     ),
     inviteWallets: normalizePilotInviteWallets(
       env.readCsv(process.env.PILOT_INVITE_WALLETS)
@@ -292,7 +297,6 @@ export const getEnabledForbiddenPilotFeatures = (runtimeConfig: typeof config): 
     [runtimeConfig.auth.allowLegacyWalletHeader, "AUTH_ALLOW_LEGACY_WALLET_HEADER"],
     [runtimeConfig.auth.allowPreviewProviderExchange, "AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE"],
     [runtimeConfig.auth.creatorAuthAllowPreviewTwitter, "CREATOR_AUTH_ALLOW_PREVIEW_TWITTER"],
-    [runtimeConfig.auth.social.enabled, "SOCIAL_AUTH_ENABLED"],
     [runtimeConfig.managedWallet.ephemeralSessionsEnabled, "EPHEMERAL_SESSIONS_ENABLED"],
     [
       runtimeConfig.managedWallet.publicExecutionEnabled,
@@ -356,23 +360,19 @@ export const getHostedPilotRuntimeFailures = (
   }
 
   const expectedReleaseSha = runtimeEnvironment.PILOT_EXPECTED_RELEASE_SHA?.trim() ?? "";
-  if (!FULL_GIT_COMMIT_SHA.test(expectedReleaseSha)) {
+  const isRenderRuntime = runtimeEnvironment.RENDER === "true";
+  if (!isRenderRuntime && !FULL_GIT_COMMIT_SHA.test(expectedReleaseSha)) {
     failures.push(
       "PILOT_EXPECTED_RELEASE_SHA must be a complete 40-character hexadecimal Git commit SHA on hosted Pilot runtimes"
     );
   }
 
-  if (runtimeEnvironment.RENDER === "true") {
+  if (isRenderRuntime) {
     const renderGitCommit = runtimeEnvironment.RENDER_GIT_COMMIT?.trim() ?? "";
     if (!FULL_GIT_COMMIT_SHA.test(renderGitCommit)) {
       failures.push(
         "RENDER_GIT_COMMIT must be a complete 40-character hexadecimal Git commit SHA"
       );
-    } else if (
-      FULL_GIT_COMMIT_SHA.test(expectedReleaseSha) &&
-      expectedReleaseSha !== renderGitCommit
-    ) {
-      failures.push("PILOT_EXPECTED_RELEASE_SHA must exactly match RENDER_GIT_COMMIT");
     }
   }
 
@@ -443,12 +443,36 @@ const validateProductionConfig = (runtimeConfig: typeof config): void => {
     );
   }
 
-  if (!runtimeConfig.pilot.inviteOnly) {
-    failures.push("PILOT_INVITE_ONLY=false is not allowed in production");
+  if (runtimeConfig.pilot.inviteOnly && runtimeConfig.pilot.inviteWallets.length === 0) {
+    failures.push(
+      "PILOT_INVITE_WALLETS must include at least one wallet when PILOT_INVITE_ONLY=true"
+    );
   }
 
-  if (runtimeConfig.pilot.inviteWallets.length === 0) {
-    failures.push("PILOT_INVITE_WALLETS must include at least one wallet in production");
+  if (runtimeConfig.auth.social.enabled) {
+    if (runtimeConfig.auth.social.frontendOrigins.length === 0) {
+      failures.push("SOCIAL_AUTH_FRONTEND_ORIGINS must include at least one frontend origin");
+    }
+    if (
+      !runtimeConfig.auth.social.google.clientId ||
+      !runtimeConfig.auth.social.google.clientSecret ||
+      !runtimeConfig.auth.social.google.redirectUri
+    ) {
+      failures.push(
+        "GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REDIRECT_URI are required when social auth is enabled"
+      );
+    }
+    if (
+      !runtimeConfig.auth.social.apple.clientId ||
+      !runtimeConfig.auth.social.apple.teamId ||
+      !runtimeConfig.auth.social.apple.keyId ||
+      !runtimeConfig.auth.social.apple.privateKey ||
+      !runtimeConfig.auth.social.apple.redirectUri
+    ) {
+      failures.push(
+        "APPLE_OAUTH_CLIENT_ID, APPLE_OAUTH_TEAM_ID, APPLE_OAUTH_KEY_ID, APPLE_OAUTH_PRIVATE_KEY, and APPLE_OAUTH_REDIRECT_URI are required when social auth is enabled"
+      );
+    }
   }
 
   if (!runtimeConfig.pilot.expectedUsdcMint) {
