@@ -89,7 +89,7 @@ export const buildHealthPayload = () => {
   return {
     ok: true,
     releaseSha: config.app.releaseSha || null,
-    mode: config.auth.social.enabled ? "PUBLIC_SOCIAL_PILOT" : "PUBLIC_PILOT",
+    mode: "PUBLIC_SOCIAL_PILOT",
     automatedSettlement: config.oracle.schedulerEnabled,
     accessPolicy: {
       configured: true,

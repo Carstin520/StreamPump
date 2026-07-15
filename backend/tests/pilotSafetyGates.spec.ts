@@ -61,7 +61,17 @@ describe("Pilot safety gates", () => {
     CORS_ALLOWED_ORIGINS: "https://app.example.com",
     DATABASE_URL:
       "postgresql://ep-example-pooler.ap-southeast-1.aws.neon.tech/streampump?sslmode=require&connection_limit=5&pool_timeout=5",
-    MANAGED_WALLET_ENCRYPTION_KEY: "",
+    MANAGED_WALLET_ENCRYPTION_KEY: "11".repeat(32),
+    SOCIAL_AUTH_ENABLED: "false",
+    SOCIAL_AUTH_FRONTEND_ORIGINS: "https://app.example.com",
+    GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+    GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
+    GOOGLE_OAUTH_REDIRECT_URI: "https://api.example.com/api/v1/auth/social/google/callback",
+    APPLE_OAUTH_CLIENT_ID: "com.example.web",
+    APPLE_OAUTH_TEAM_ID: "APPLETEAM1",
+    APPLE_OAUTH_KEY_ID: "APPLEKEY1",
+    APPLE_OAUTH_PRIVATE_KEY: "test-apple-signing-key-material",
+    APPLE_OAUTH_REDIRECT_URI: "https://api.example.com/api/v1/auth/social/apple/callback",
     PILOT_INVITE_ONLY: "false",
     PILOT_INVITE_WALLETS: "",
     PILOT_EXPECTED_USDC_MINT: Keypair.generate().publicKey.toBase58(),
@@ -241,13 +251,13 @@ describe("Pilot safety gates", () => {
     );
   });
 
-  it("allows verified Google and Apple auth in public production when provider config is complete", () => {
+  it("keeps verified Google and Apple auth enabled despite a stale disabled flag", () => {
     const wallet = Keypair.generate().publicKey.toBase58();
     const socialEnv = {
       ...validProductionEnv(wallet),
       PILOT_INVITE_ONLY: "false",
       PILOT_INVITE_WALLETS: "",
-      SOCIAL_AUTH_ENABLED: "true",
+      SOCIAL_AUTH_ENABLED: "false",
       SOCIAL_AUTH_FRONTEND_ORIGINS: "https://app.example.com",
       GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
       GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
@@ -361,11 +371,17 @@ describe("Pilot safety gates", () => {
     }
   });
 
-  it("does not require a managed-wallet encryption key when all managed-wallet features are closed", () => {
+  it("requires a managed-wallet encryption key for permanent social auth", () => {
     const wallet = Keypair.generate().publicKey.toBase58();
-    const productionImport = runConfigImport(validProductionEnv(wallet));
+    const productionImport = runConfigImport({
+      ...validProductionEnv(wallet),
+      MANAGED_WALLET_ENCRYPTION_KEY: "",
+    });
 
-    expect(productionImport.status).to.equal(0);
+    expect(productionImport.status).not.to.equal(0);
+    expect(`${productionImport.stderr}${productionImport.stdout}`).to.contain(
+      "MANAGED_WALLET_ENCRYPTION_KEY"
+    );
 
     const original = {
       preview: config.auth.allowPreviewProviderExchange,
@@ -377,17 +393,15 @@ describe("Pilot safety gates", () => {
 
     try {
       config.auth.allowPreviewProviderExchange = false;
-      config.auth.social.enabled = false;
+      config.auth.social.enabled = true;
       config.managedWallet.ephemeralSessionsEnabled = false;
       config.managedWallet.publicExecutionEnabled = false;
       config.pilot.emailAuthEnabled = false;
-      expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(false);
+      expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(true);
 
       config.managedWallet.publicExecutionEnabled = true;
       expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(true);
       config.managedWallet.publicExecutionEnabled = false;
-      config.auth.social.enabled = true;
-      expect(isManagedWalletEncryptionKeyRequired(config)).to.equal(true);
     } finally {
       config.auth.allowPreviewProviderExchange = original.preview;
       config.auth.social.enabled = original.socialAuth;
@@ -830,27 +844,11 @@ describe("Pilot safety gates", () => {
     const original = {
       scheduler: config.oracle.schedulerEnabled,
       releaseSha: config.app.releaseSha,
-      socialAuth: config.auth.social.enabled,
     };
 
     try {
       config.oracle.schedulerEnabled = false;
       config.app.releaseSha = "0123456789abcdef0123456789abcdef01234567";
-      config.auth.social.enabled = false;
-
-      expect(buildHealthPayload()).to.deep.equal({
-        ok: true,
-        releaseSha: "0123456789abcdef0123456789abcdef01234567",
-        mode: "PUBLIC_PILOT",
-        automatedSettlement: false,
-        accessPolicy: {
-          configured: true,
-          type: "open",
-        },
-      });
-      expect(buildHealthPayload()).not.to.have.property("publicFeatures");
-
-      config.auth.social.enabled = true;
       expect(buildHealthPayload()).to.deep.equal({
         ok: true,
         releaseSha: "0123456789abcdef0123456789abcdef01234567",
@@ -861,10 +859,10 @@ describe("Pilot safety gates", () => {
           type: "open",
         },
       });
+      expect(buildHealthPayload()).not.to.have.property("publicFeatures");
     } finally {
       config.oracle.schedulerEnabled = original.scheduler;
       config.app.releaseSha = original.releaseSha;
-      config.auth.social.enabled = original.socialAuth;
     }
   });
 

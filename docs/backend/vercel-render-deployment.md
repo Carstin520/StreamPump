@@ -26,7 +26,7 @@
 当前目标是**公开身份入口的技术 Pilot——无真实资金**。所有链上活动只指向 **Solana devnet 与一枚 test-USDC mint**。本指南是一条通用上云路径；按 Pilot 真值，落地时必须遵守以下约束：
 
 - **仅 devnet。** 不要配置 mainnet RPC。生产环境下后端会在监听前校验每个 active RPC 的完整 Solana devnet genesis hash，不匹配即 fail-closed 拒绝启动。
-- **公开身份 gate。** `PILOT_INVITE_ONLY` 与 `PILOT_INVITE_WALLETS` 已停用且被后端忽略；启用 `SOCIAL_AUTH_ENABLED=true` 并完整配置 Google、Apple、允许的前端 origin 和托管钱包加密密钥。内容发布仍由独立的 `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` 强制 operator 审核。`PILOT_EXPECTED_USDC_MINT` 与 `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS` 仍是链上安全门。
+- **公开身份 gate。** `PILOT_INVITE_ONLY`、`PILOT_INVITE_WALLETS` 与 `SOCIAL_AUTH_ENABLED` 已停用且被后端忽略；Google/Apple 注册永久开启，生产启动会强制检查两家 provider、允许的前端 origin 和托管钱包加密密钥。内容发布仍由独立的 `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` 强制 operator 审核。`PILOT_EXPECTED_USDC_MINT` 与 `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS` 仍是链上安全门。
 - **关闭与 Pilot 冲突的资金功能。** 真实提现/转账、广泛公开托管执行、S1、Track 2 背书、Track 3 CPS、每日/互动奖励，以及**自动结算调度器（ORACLE）**保持关闭。媒体 corridor 仍需要 Mux webhook/reconciliation，financial projection 仍需要 indexer 同步。
 - **IDL 制品 blocker（已解决）。** 生产 IDL 现已随后端一起打包在 backend 根目录下（`backend/idl/streampump_core.json`），运行时通过 `STREAMPUMP_IDL_PATH=./idl/streampump_core.json` 读取。因此在 Render 的 **Root Directory 设为 `backend`** 时该制品仍在部署产物内，链上 preflight 与已部署走廊 smoke 不再被此路径 blocker 阻塞。请勿再退回旧的 `../target/idl/...` 路径（它位于 `backend` 根目录之外、不会进入部署制品）。
 - **liveness 与 readiness 区分（P3）。** 后端暴露两个探针：`GET /health` 是**始终返回 200 的 liveness**（进程存活即可）；`GET /ready` 是**readiness**，在 DB + 已启用的 Indexer + 已启用的 Mux reconciliation 全部就绪前返回 **503**，就绪后返回 200。二者用途不同：平台的存活/重启探针可指向 `/health`，而"是否可接流量"的就绪判断应参考 `/ready`（例如启动后先轮询 `/ready` 到 200 再放量）。后续修复 `96e9075` 使 indexer fail-closed：启动需真实的公共 `onSlotChange` 通知加 `getSlot`，运行时 slot 心跳停滞（90s）或 RPC 探测失败会将 Indexer readiness 降级为 FAILED，使 `/ready` 回到 503——因此 `/ready` 到 200 是一个会随订阅停滞而回退的运行时信号，放量后仍应持续监控。
@@ -158,7 +158,7 @@ npm run start
 ##### Pilot 公开身份 gate（必填）
 - 删除旧的 `PILOT_INVITE_ONLY` 与 `PILOT_INVITE_WALLETS`（即便残留也会被后端忽略）
 - `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true`
-- `SOCIAL_AUTH_ENABLED=true`
+- 删除旧的 `SOCIAL_AUTH_ENABLED`（即便残留为 false 也会被后端忽略）
 - `SOCIAL_AUTH_FRONTEND_ORIGINS=https://app.stream-pump.com`
 - Google/Apple OAuth 变量按 [`google-apple-login-setup.md`](google-apple-login-setup.md) 配置完整。
 - `PILOT_EXPECTED_USDC_MINT=<Pilot test-USDC mint>`

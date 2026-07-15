@@ -214,7 +214,7 @@ StreamPump is a **deployed technical Pilot on Solana devnet/test-USDC — public
 
 ### Public identity entry — controlled technical deployment, no real funds
 
-Production access is permanently public: the backend ignores the retired `PILOT_INVITE_ONLY` and `PILOT_INVITE_WALLETS` variables. Google/Apple OAuth is verified by the backend and creates or reuses a stable managed account. Wallet login continues to require a signed challenge but is not an enrollment prerequisite. Content publication remains operator-reviewed through the independent `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` gate.
+Production access is permanently public: the backend ignores the retired `PILOT_INVITE_ONLY`, `PILOT_INVITE_WALLETS`, and `SOCIAL_AUTH_ENABLED` variables. Google/Apple OAuth stays enabled, is verified by the backend, and creates or reuses a stable managed account; incomplete provider configuration fails production startup. Wallet login continues to require a signed challenge but is not an enrollment prerequisite. Content publication remains operator-reviewed through the independent `PILOT_OPERATOR_PUBLICATION_REVIEW_REQUIRED=true` gate.
 
 **Open in the Pilot corridor:** public Google/Apple registration; optional external-wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay; manual Track 1 fixed-base settlement; campaign proof.
 
