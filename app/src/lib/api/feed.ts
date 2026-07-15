@@ -1,4 +1,8 @@
-import { CommentRecord, PostRecord } from "@/lib/api/types";
+import {
+  CommentRecord,
+  CreatorMarketProjectionRecord,
+  PostRecord,
+} from "@/lib/api/types";
 import { publicDemoEnabled } from "@/lib/feature-flags";
 import { findLocalEngagementByTitle } from "@/lib/mocks/discover";
 import { apiClient } from "./client";
@@ -24,6 +28,7 @@ type PublicFeedPostApiRecord = {
   creatorWallet: string;
   creatorName: string | null;
   creatorStage: string | null;
+  creatorMarket: CreatorMarketProjectionRecord | null;
   title: string | null;
   excerpt: string | null;
   body: string | null;
@@ -187,7 +192,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
   return {
     id: post.postId,
     type: videoAsset ? "VIDEO" : "IMAGE",
-    creatorId: creatorKey,
+    creatorId: post.creatorWallet.trim() || creatorKey,
     creatorName,
     creatorHandle: `@${creatorKey}`,
     creatorAvatarSrc: createAvatarDataUrl(avatarSeed, creatorName),
@@ -208,6 +213,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     ...(gallerySrcs.length > 0 ? { gallerySrcs } : {}),
     hasMultipleImages: gallerySrcs.length > 1,
     comments: localEngagement?.comments ?? ([] as CommentRecord[]),
+    creatorMarket: post.creatorMarket ?? null,
   };
 };
 

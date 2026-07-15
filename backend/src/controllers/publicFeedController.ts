@@ -14,6 +14,7 @@ import { serializeAsset } from "./contentManifestShared";
 import { buildDisplayVariantKey } from "../services/imageVariants";
 import { config } from "../../config/default";
 import { r2Service } from "../services/R2Service";
+import { serializeCreatorMarketProjection } from "../services/marketProjectionService";
 
 type JsonObject = Record<string, Prisma.JsonValue>;
 
@@ -68,6 +69,8 @@ type PublicManifestRecord = Prisma.ContentManifestGetPayload<{
 }> & {
   assets: PublicAssetRecord[];
 };
+
+type PublicCreatorMarketRecord = Prisma.CreatorMarketProjectionGetPayload<{}>;
 
 const isJsonObject = (value: Prisma.JsonValue | null | undefined): value is JsonObject =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -203,7 +206,10 @@ const serializePublicAsset = async (asset: PublicAssetRecord) => {
   };
 };
 
-const serializePublicFeedPost = async (manifest: PublicManifestRecord) => {
+const serializePublicFeedPost = async (
+  manifest: PublicManifestRecord,
+  creatorMarket: PublicCreatorMarketRecord | null = null
+) => {
   const metadata = readLocalImportMetadata(manifest.metadataJson);
   const assets = await Promise.all(manifest.assets.map(serializePublicAsset));
 
@@ -215,6 +221,7 @@ const serializePublicFeedPost = async (manifest: PublicManifestRecord) => {
     creatorName:
       manifest.creatorDisplayName?.trim() || metadata?.creatorName || null,
     creatorStage: metadata?.creatorStage ?? null,
+    creatorMarket: creatorMarket ? serializeCreatorMarketProjection(creatorMarket) : null,
     title: manifest.title,
     excerpt: manifest.publicExcerpt?.trim() || metadata?.excerpt || null,
     body: manifest.captionText,
@@ -295,8 +302,23 @@ export const listPublicFeedPosts = withController(
       take: limit,
     });
 
+    const creatorWallets = [...new Set(manifests.map((manifest) => manifest.creatorWallet))];
+    const creatorMarkets = creatorWallets.length
+      ? await prisma.creatorMarketProjection.findMany({
+          where: { creatorWallet: { in: creatorWallets } },
+        })
+      : [];
+    const creatorMarketByWallet = new Map(
+      creatorMarkets.map((projection) => [projection.creatorWallet, projection])
+    );
+
     const posts = await Promise.all(
-      manifests.map((manifest) => serializePublicFeedPost(manifest))
+      manifests.map((manifest) =>
+        serializePublicFeedPost(
+          manifest,
+          creatorMarketByWallet.get(manifest.creatorWallet) ?? null
+        )
+      )
     );
 
     res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
@@ -319,7 +341,10 @@ export const getPublicFeedPostById = withController(
       throw new HttpError(404, "POST_NOT_FOUND", "public post not found");
     }
 
-    const post = await serializePublicFeedPost(manifest);
+    const creatorMarket = await prisma.creatorMarketProjection.findUnique({
+      where: { creatorWallet: manifest.creatorWallet },
+    });
+    const post = await serializePublicFeedPost(manifest, creatorMarket);
 
     res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
     ok(res, {

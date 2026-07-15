@@ -113,8 +113,11 @@ type MarketModel = {
 };
 
 const buildMarketModel = (creator: CreatorMarketRecord): MarketModel => {
-  const hasMarketProjection = creator.tokenPrice > 0 && creator.supply > 0;
-  const priceSpump = hasMarketProjection ? Math.round(creator.tokenPrice * SPUMP_PER_USD) : 0;
+  const hasMarketProjection = Boolean(creator.marketProjectionUpdatedAt) ||
+    (creator.tokenPrice > 0 && creator.supply > 0);
+  const priceSpump = hasMarketProjection
+    ? creator.currentPriceSpump ?? Math.round(creator.tokenPrice * SPUMP_PER_USD)
+    : 0;
   const targetPriceSpump = hasMarketProjection
     ? Math.max(priceSpump + 8, Math.round(creator.targetGraduationPrice * SPUMP_PER_USD))
     : 0;
@@ -446,7 +449,8 @@ const MomentumPanel = ({
   market: MarketModel;
 }) => {
   const { t } = useI18n();
-  const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
+  const hasMarketProjection = Boolean(creator.marketProjectionUpdatedAt) ||
+    (market.priceSpump > 0 && market.supply > 0);
   const momentumPoints = useMemo(
     () => buildMomentumPoints(creator.momentumScore, creator.contentPool.length),
     [creator.momentumScore, creator.contentPool.length],
@@ -548,7 +552,8 @@ const BuyPanel = ({
   const { t } = useI18n();
   const [pulse, setPulse] = useState(false);
   const disabled = market.state !== "S1_DISCOVERY";
-  const hasMarketProjection = market.priceSpump > 0 && market.supply > 0;
+  const hasMarketProjection = Boolean(creator.marketProjectionUpdatedAt) ||
+    (market.priceSpump > 0 && market.supply > 0);
   const previewDisabled = disabled || !hasMarketProjection;
   const liveCreatorWallet = resolveCreatorWalletForRoute(creator.id);
   const currentHolding = 0;

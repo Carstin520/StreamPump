@@ -791,6 +791,14 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
   const observedAt = new Date();
   const event = { signature: params.signature, observedAt };
 
+  if (params.instructionName === "register_creator") {
+    const creatorProfilePda = readString(eventData, "creatorProfile") ?? params.entityPda;
+    if (creatorProfilePda) {
+      await refreshCreatorMarketProjectionByProfilePda(creatorProfilePda, event);
+    }
+    return;
+  }
+
   if (params.instructionName === "anchor_content_hash") {
     const contentAnchorPda = readString(eventData, "contentAnchor") ?? params.entityPda;
     const urlDigestHex = readString(eventData, "urlDigest");
@@ -1607,6 +1615,59 @@ export const syncMarketProjectionFromChainInstruction = async (params: ChainProj
   if (params.proposalPda) {
     await refreshProposalProofStatus(params.proposalPda, params.signature);
   }
+};
+
+export const backfillMissingRegisteredCreatorMarketProjections = async (limit = 60) => {
+  const registrationEvents = await prisma.chainEvent.findMany({
+    where: {
+      instructionName: "register_creator",
+      entityPda: { not: null },
+    },
+    orderBy: { observedAt: "desc" },
+    take: Math.min(Math.max(limit, 1), 240),
+    select: {
+      entityPda: true,
+      observedAt: true,
+      signature: true,
+    },
+  });
+  const profilePdas = [...new Set(
+    registrationEvents
+      .map((event) => event.entityPda)
+      .filter((value): value is string => Boolean(value))
+  )];
+  if (profilePdas.length === 0) {
+    return { failed: 0, projected: 0, skipped: 0 };
+  }
+
+  const existing = await prisma.creatorMarketProjection.findMany({
+    where: { creatorProfilePda: { in: profilePdas } },
+    select: { creatorProfilePda: true },
+  });
+  const existingPdas = new Set(existing.map((projection) => projection.creatorProfilePda));
+  const eventByPda = new Map(
+    registrationEvents
+      .filter((event): event is typeof event & { entityPda: string } => Boolean(event.entityPda))
+      .map((event) => [event.entityPda, event])
+  );
+  const missingPdas = profilePdas.filter((profilePda) => !existingPdas.has(profilePda));
+  const results = await Promise.allSettled(
+    missingPdas.map((profilePda) => {
+      const event = eventByPda.get(profilePda);
+      return refreshCreatorMarketProjectionByProfilePda(profilePda, {
+        signature: event?.signature,
+        observedAt: event?.observedAt,
+      });
+    })
+  );
+
+  return {
+    failed: results.filter((result) => result.status === "rejected").length,
+    projected: results.filter(
+      (result) => result.status === "fulfilled" && result.value !== null
+    ).length,
+    skipped: existingPdas.size,
+  };
 };
 
 export const serializeCreatorMarketProjection = (
