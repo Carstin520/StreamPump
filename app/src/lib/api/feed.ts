@@ -213,7 +213,7 @@ const mapFeedPostToPostRecord = (post: PublicFeedPostApiRecord): PostRecord => {
     ...(gallerySrcs.length > 0 ? { gallerySrcs } : {}),
     hasMultipleImages: gallerySrcs.length > 1,
     comments: localEngagement?.comments ?? ([] as CommentRecord[]),
-    creatorMarket: post.creatorMarket,
+    creatorMarket: post.creatorMarket ?? null,
   };
 };
 
