@@ -50,7 +50,7 @@ type UploadQueueItem = { file: File; key: string; message: string; stage: Upload
 
 const ACCEPTED_UPLOAD_TYPES = ["video/mp4", "video/quicktime", "image/jpeg", "image/png", "image/webp", "image/heic"];
 // Pilot scope: ordinary proposal intents submit Track 1 base pay only. Track 2
-// performance budgets and Track 3 CPS are not part of the invite-only devnet/
+// performance budgets and Track 3 CPS are not part of the current devnet/
 // test-USDC corridor and are always submitted as zero terms.
 const TRACK2_PILOT_CLOSED_METRIC = "VIEWS" as const;
 const TRACK2_PILOT_CLOSED_TARGET = "0";

@@ -97,7 +97,7 @@ StreamPump is built on four convictions that avoid every one of these traps:
 | 🛡️ **Anti-Speculation Guardrails** | Non-transferable token, daily buy caps, dynamic exit tax, delayed ratings, endorsement caps |
 | 🎞️ **Real Media Pipeline** | Cloudflare R2 storage + Mux video processing + publication verification before public feed |
 
-> **Boundary — these are protocol/code capabilities, not current Pilot availability.** The deployed controlled technical Pilot is devnet/test-USDC only, invite-only, and **not a public production launch; no real funds**. The only lane open to Pilot users is external-wallet auth → media → feed → proposal intent → creator + sponsor dual sign → backend relay → manual Track 1 → campaign proof. S1 discovery/buyout, the fan endorsement pool, Track 2/3 settlement, and managed/email-social wallets exist in code but are **closed for all Pilot users** (see [Current Status](#-current-status)).
+> **Boundary — these are protocol/code capabilities, not current Pilot availability.** Public Google/Apple registration and standalone wallet login are open, but the deployed technical Pilot remains on devnet/test-USDC with **no real funds**. Social registration creates a platform-managed account and does not request a personal wallet; a user-owned wallet is required only for a future withdrawal/transfer action. S1 discovery/buyout, fan endorsement, Track 2/3 settlement, rewards, and real withdrawals remain closed (see [Current Status](#-current-status)).
 
 ---
 
@@ -210,15 +210,15 @@ Every core mechanism depends on a specific Solana capability — this is not a m
 
 ## 📍 Current Status
 
-StreamPump is a **deployed controlled technical Pilot on Solana devnet/test-USDC — invite-only, external-wallet-first, Track1-only, no real funds, and not a public production launch.** H0–H5 are approved. P4 upgraded the fixed devnet program, applied all 26 Neon migrations with the recovery branch retained, deployed the backend and frontend under pinned release identities, verified the real R2/Mux/feed/proposal corridor, settled and replayed manual Track 1 exactly once, and restored the allowlist to the sole human-approved external wallet. Render is live at backend `88c0debad6ecb7eacfe9e24793951f3794353f4c` (`dep-d9auio7lk1mc73c4r18g`); Vercel remains at frontend `097e9805b197398ae1c04cf5bf84f1044b3b2f19`. P5 completed at `f72c33d` after its alias-path major was fixed and Fable 5 closure returned 0 blocker/major. H5 is approved; P6 is authorized only for final release-gate audit remediation and release preparation and must stop at H6. Every closed lane remains unauthorized.
+StreamPump is a **deployed technical Pilot on Solana devnet/test-USDC — public account entry, Track1-only, no real funds, and not a real-funds production launch.** As of 2026-07-15, the former invite-only identity boundary is superseded: anyone may register with server-verified Google/Apple OAuth, and external-wallet authentication remains an optional parallel login method. Social users enter directly through their platform-managed account; signup and onboarding do not ask for a personal wallet. Real withdrawal is not implemented and is the first point at which a user-owned wallet should be requested.
 
-### Invite-Only Pilot — controlled technical deployment, not a public launch
+### Public identity entry — controlled technical deployment, no real funds
 
-Access is gated by an **external real-wallet allowlist**. The auth challenge is identical in shape for every valid wallet, and the invite check runs **only after a valid signature** — the allowlist cannot be probed in advance.
+Normal production access uses `PILOT_INVITE_ONLY=false` with no wallet allowlist. Google/Apple OAuth is verified by the backend and creates or reuses a stable managed account. Wallet login continues to require a signed challenge but is not an enrollment prerequisite.
 
-**Open in the Pilot corridor:** external wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay of the fully signed transaction; manual Track 1 fixed-base settlement; campaign proof as projection/on-chain evidence (PDA, tx signature, manifest hash, content anchor).
+**Open in the Pilot corridor:** public Google/Apple registration; optional external-wallet authentication; content creation and upload through R2/Mux to completion; public feed and post-detail projection; proposal intent creation; creator + sponsor dual signature; backend relay; manual Track 1 fixed-base settlement; campaign proof.
 
-**Closed for all Pilot users:** email/social/provider managed-wallet auth and public managed execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic oracle settlement schedulers; prototype/legacy routes.
+**Closed for all Pilot users:** custodial-to-personal withdrawal/transfer; unrestricted public managed-wallet execution; S1 market/buyout/portfolio claim; Track 2 endorsement and fan rewards; Track 3 CPS; daily and engagement rewards; automatic oracle settlement schedulers; prototype/legacy routes.
 
 **Content truth (P2).** Uploads land in a **private R2 origin bucket** used only for presigned staging and KYB docs; a **distinct public delivery bucket** (`R2_DELIVERY_BUCKET`, required to differ from `R2_BUCKET`) holds only verified/trusted media. The backend records **server-observed bytes, MIME, size, and SHA-256** for each asset, enforces a **serialized monthly upload quota**, runs **Mux reconciliation**, then promotes verified assets to delivery and cleans up the origin copy. A **creator cannot self-verify** their own content — **operator approval is required** before feed eligibility.
 
@@ -240,17 +240,17 @@ Access is gated by an **external real-wallet allowlist**. The auth challenge is 
 
 | Area | Readiness | What's real now |
 |---|---|---|
-| **Pilot corridor (invite-only)** | Deployed controlled technical Pilot · devnet/test-USDC only | External-wallet auth → R2/Mux media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof |
+| **Pilot corridor (public identity)** | Deployed technical Pilot · devnet/test-USDC only | Google/Apple or wallet login → R2/Mux media → feed → proposal intent → dual sign → backend relay → manual Track 1 → campaign proof |
 | **S1 market / portfolio / buyout** | Closed for Pilot (`SEEDED_DEMO` in code) | Buy/sell/claim/buyout code exists against seeded devnet state but is disabled for Pilot users |
 | **S2 proposal launch** | Code-verified on devnet | Dual-sign launch corridor verified; the only money-flow open in the Pilot |
 | **S2 endorsement** | Closed for Pilot (`BACKEND_READY_UI_GAP` in code) | On-chain burn + backend builders exist for seeded proposals but are disabled for Pilot users |
 | **Settlement Track 1 (manual)** | `OPERATOR_REQUIRED` | Pilot allows the manual fixed-base payout only; no automatic settlement |
 | **Settlement Track 2/3 (CPS)** | Closed for Pilot | Track 2 endorsement + Track 3 CPS disabled for Pilot users; Track 3 still needs a real merchant/reconciliation provider |
-| **Managed wallet / email-social auth** | Closed for Pilot | Disabled for all Pilot users; external real wallets only |
+| **Managed wallet / social auth** | Public identity entry | Google/Apple creates a managed account; no personal wallet prompt. Withdrawal and broad managed execution remain closed |
 | **Rewards** | Closed for Pilot | Daily/engagement/fan rewards disabled for Pilot users |
 | **Operator tooling** | `OPERATOR_REQUIRED` | Internal routes exist; no dashboards yet |
 
-> ⚠️ The Anchor program is **not audited** and **not deployed for production**. This build is an invite-only Pilot candidate on devnet/test-USDC only — **not live and no real funds**. The new chain guards and reward behavior require program deployment before they are live on-chain.
+> ⚠️ The Anchor program is **not audited for real-funds production**. This build remains on devnet/test-USDC with **no real funds**. Public login does not promote any financial lane to production readiness.
 
 ### Compliance & token posture (design in progress)
 
@@ -346,7 +346,7 @@ cargo check            # lighter type check
 
 ## 🎬 Demo Path
 
-> These are **legacy controlled demos** — seeded/operator walkthroughs kept for reference on devnet/test-USDC. They are a superset of the invite-only Pilot corridor and are not, by themselves, current Pilot availability, deployed, or live.
+> These are **legacy controlled demos** — seeded/operator walkthroughs kept for reference on devnet/test-USDC. They are a superset of the current Pilot corridor and are not, by themselves, current Pilot availability or real-funds readiness.
 
 The legacy controlled demo is intentionally scoped to two controlled flows:
 
@@ -421,11 +421,11 @@ Details in [docs/backend/vercel-render-deployment.md](docs/backend/vercel-render
 
 ## 🗺 Roadmap
 
-Present priority: **P6 final release-gate audit remediation and release preparation**, still invite-only, devnet/test-USDC, external-wallet-first, Track1-only, manual/operator-only, and no real funds. P5 is complete and H5 is approved; P6 must pass its exact-range Fable 5 gate and stop at H6.
+Present priority: **public identity entry on the existing devnet/test-USDC Pilot**, with Google/Apple registration, optional wallet login, Track1-only manual/operator settlement, and no real funds. The former invite-only/external-wallet-first policy is historical.
 
 - **P4 gate sequence (historical, complete):** controlled program/Neon/Render/Vercel/Mux mutations, a real disposable-wallet corridor, exactly-once manual Track 1 settlement/replay, and allowlist cleanup completed under separate mutation gates. Current backend is `88c0deb`; the sole invite is the human-approved external wallet.
 - **P5 gate sequence (historical, complete):** accepted commit `f72c33d`; backend build, focused readiness suite 6/6, deployment-verifier self-test, diff/protected checks, and Fable 5 fix-only closure passed with 0 blocker/major. H5 was approved on 2026-07-14.
-- **P6 gate sequence (current):** add the accepted deployment-verifier self-test to CI, freeze a post-H6 exact-SHA deployment/rollback handoff, run only risk-corresponding checks, review `f72c33d..candidate` once with Fable 5, close blocker/major findings, then stop at H6. No deployment, closed lane, or readiness promotion is part of P6.
+- **P6 gate sequence (historical):** preserved release-verifier and exact-SHA handoff work; its invite-only identity assumption is superseded by the 2026-07-15 public identity decision.
 - **Post-H6 release handoff:** [`docs/pilot/p6-final-audit-and-release-handoff.md`](docs/pilot/p6-final-audit-and-release-handoff.md). A separate explicit mutation approval is required before any Render deployment.
 
 - **P2 gate sequence (historical, complete):** (1) held the fixed P2 commit range `d78815b..e0b6028`, (2) obtained an independent **Fable 5** review on it — **PASS on 2026-07-12, no blocker/major finding**, (3) no blocker/major finding was raised, so no rerun was required, then (4) **human gate H2 is approved**.
@@ -435,7 +435,7 @@ Present priority: **P6 final release-gate audit remediation and release preparat
 
 Post-Pilot backlog (closed for all Pilot users — each needs a later H gate plus its own audit/legal/provider prerequisites):
 
-- Production auth identity verification and managed/email-social wallet hardening (KMS/Vault, SOL budget, recovery).
+- Managed-account custody hardening and a real signed withdrawal flow (KMS/Vault, SOL budget, recovery).
 - S1 self-serve market and buyout formation UI after the closed S1 lane is audited.
 - S2 Track 2 endorsement claim UX and the fan reward ledger.
 - Track 3 CPS / automatic settlement once a real merchant/reconciliation provider exists.

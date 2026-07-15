@@ -83,11 +83,11 @@ export default function DemoHubPage() {
               What the Pilot candidate would cover
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[#a7c8b6]">
-              StreamPump is a code-verified invite-only Pilot candidate on devnet / test USDC — not deployed, not
-              live, no real funds. Its only in-scope corridor is content upload to the feed and post, creator +
-              sponsor double-signed proposals, manual Track 1 settlement, and on-chain campaign proof. S1 market /
-              buyout, Track 2 / Track 3, rewards, email / social sign-in, managed wallets, and automatic
-              settlement are closed for all Pilot users.
+              StreamPump is a technical Pilot on devnet / test USDC with no real funds. Google and Apple
+              registration are public, wallet login is optional, and signup does not request a personal wallet.
+              The in-scope corridor continues through content upload, creator + sponsor double-signed proposals,
+              manual Track 1 settlement, and on-chain campaign proof. S1 market / buyout, Track 2 / Track 3,
+              rewards, withdrawals, and automatic settlement remain closed.
             </p>
             <p className="mt-3 max-w-3xl text-xs leading-6 text-[#7fbf9d]">
               The tracks below are legacy controlled demos — seeded/operator walkthroughs kept for reference.

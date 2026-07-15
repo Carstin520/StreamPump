@@ -4,6 +4,8 @@ Date: 2026-05-13
 
 This document freezes the post-hackathon product boundary. It compares the pitch promise with the current implementation so the next development phases can proceed without overstating demo-only or operator-driven paths.
 
+> Historical snapshot: the 2026-07-15 public identity decision supersedes this document's auth row. Google/Apple registration is now intended for everyone, wallet login is optional, and no personal wallet should be requested before an explicit withdrawal/transfer action. Other financial/readiness boundaries in this snapshot remain unchanged unless the current roadmap says otherwise.
+
 ## Status Legend
 
 | Status | Meaning |

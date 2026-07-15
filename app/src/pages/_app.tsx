@@ -26,7 +26,7 @@ const ClientProviders = dynamic(
 
 /**
  * P0 closed-lane guard. These routes expose on-chain fund actions and stay
- * invite-only while the public pilot is closed. Matched against `router.pathname`
+ * closed while their financial/product gates remain in place. Matched against `router.pathname`
  * (the Pages Router route pattern, known synchronously on first render) so the
  * gated page component never mounts and none of its effects run. `publicDemoEnabled`
  * reopens them for explicitly-labeled demo builds. The read-only campaign

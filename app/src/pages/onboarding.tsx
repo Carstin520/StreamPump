@@ -108,15 +108,11 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function WalletIcon() {
+function AccountIcon() {
   return (
     <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-      <path
-        d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2v-1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M16 12a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0116 0" strokeLinecap="round" />
     </svg>
   );
 }
@@ -188,11 +184,11 @@ const OnboardingReadinessNotice = ({
   );
 };
 
-/** Presentational orientation block: invite-only Pilot corridor + 3 concept rows */
+/** Presentational orientation block: public account entry + 3 concept rows */
 function PilotOrientationBlock() {
   const { t } = useI18n();
   const concepts = [
-    { emoji: "🔗", label: t("onboarding.walletLabel"), desc: t("onboarding.walletDesc") },
+    { emoji: "👤", label: t("onboarding.walletLabel"), desc: t("onboarding.walletDesc") },
     { emoji: "🎬", label: t("onboarding.corridorLabel"), desc: t("onboarding.corridorDesc") },
     { emoji: "🔍", label: t("onboarding.proofLabel"), desc: t("onboarding.proofDesc") },
   ] as const;
@@ -403,7 +399,7 @@ export default function OnboardingPage() {
                       className="glass-button-primary mt-8 flex w-full items-center justify-center gap-2.5 px-6 py-3.5 text-[length:var(--fs-sm)] font-semibold"
                       href={buildLoginHref({ nextPath: "/onboarding" })}
                     >
-                      <WalletIcon />
+                      <AccountIcon />
                       {t("onboarding.signInToContinue")}
                     </Link>
                   ) : (
@@ -413,7 +409,7 @@ export default function OnboardingPage() {
                       onClick={goNext}
                       type="button"
                     >
-                      <WalletIcon />
+                      <AccountIcon />
                       {t("onboarding.continueWithSession")}
                     </button>
                   )}

@@ -73,8 +73,8 @@ const ACCOUNT_IDENTITIES: Record<string, PreviewIdentity | null> = {
 
 /**
  * P0 truth gate: every non-wallet identity path (email OTP, Google/Apple social
- * preview, account-switch fixtures, local sessions, and the platform managed-wallet
- * choice) is a labeled demo affordance. It may only run when BOTH the public-demo
+ * preview, account-switch fixtures, and local sessions) is a labeled demo
+ * affordance. It may only run when BOTH the public-demo
  * master switch and the preview provider-exchange flag are on. There is no implicit
  * NODE_ENV=development fallback: production/default login exposes only wallet
  * challenge + signature, and a failed real wallet auth never mints a local session.
@@ -164,8 +164,6 @@ export const AuthOptionsPanel = ({
   const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState("");
   const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
-  const [pendingExternalWalletBind, setPendingExternalWalletBind] = useState(false);
-  const [pendingIdentitySession, setPendingIdentitySession] = useState<AuthSessionRecord | null>(null);
   const [showAccounts, setShowAccounts] = useState(false);
 
   const currentAccount = useMemo(
@@ -195,20 +193,14 @@ export const AuthOptionsPanel = ({
     [emailValue],
   );
 
-  const beginWalletChoice = useCallback((session: AuthSessionRecord, successLabel: string) => {
-    setPendingIdentitySession(session);
-    setLastAction(`${successLabel} 已验证，请选择托管账户或绑定自己的钱包。`);
-  }, []);
-
-  const completeWithManagedWallet = useCallback(() => {
-    if (!pendingIdentitySession) {
-      return;
-    }
-
-    storeAuthSession(pendingIdentitySession);
-    setLastAction("已使用平台托管账户进入产品。");
-    void router.push(nextHref);
-  }, [nextHref, pendingIdentitySession, router]);
+  const completeIdentityLogin = useCallback((session: AuthSessionRecord, successLabel: string) => {
+    storeAuthSession(session);
+    setLastAction(t("auth.identitySessionReady", { label: successLabel }));
+    const destination = session.accessToken.startsWith("preview-local.")
+      ? resolveLocalPreviewRedirectHref(nextHref)
+      : nextHref;
+    void router.push(destination);
+  }, [nextHref, router, t]);
 
   const createPreviewSession = async (identity: PreviewIdentity, successLabel: string) => {
     if (!demoAuthEnabled) {
@@ -219,7 +211,7 @@ export const AuthOptionsPanel = ({
     // Fully-local preview: build a mock identity session with no network call.
     setBusyKey(identity.providerSubject);
     setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
-    beginWalletChoice(createLocalProviderSession(identity), successLabel);
+    completeIdentityLogin(createLocalProviderSession(identity), successLabel);
     setBusyKey(null);
   };
 
@@ -231,7 +223,7 @@ export const AuthOptionsPanel = ({
     setLastAction(t("auth.providerSessionCreating", { label: successLabel }));
     try {
       const session = await openSocialLogin(provider);
-      beginWalletChoice(session, successLabel);
+      completeIdentityLogin(session, successLabel);
     } catch (error) {
       setLastAction(getSocialLoginErrorMessage(error, t));
     } finally {
@@ -296,70 +288,6 @@ export const AuthOptionsPanel = ({
     }
   }, [demoAuthEnabled, nextHref, publicKey, router, signMessage, t]);
 
-  const completeExternalWalletBind = useCallback(async () => {
-    if (!pendingIdentitySession) {
-      return;
-    }
-
-    if (!publicKey) {
-      setPendingExternalWalletBind(true);
-      setVisible(true);
-      setLastAction("请选择并连接要绑定的 Phantom/Solflare 钱包。");
-      return;
-    }
-
-    const walletAddress = publicKey.toBase58();
-    setBusyKey("wallet-bind");
-    setPendingExternalWalletBind(false);
-    setLastAction("正在绑定外部钱包...");
-
-    try {
-      if (!signMessage || pendingIdentitySession.accessToken.startsWith("preview-local.")) {
-        if (!demoAuthEnabled) {
-          setLastAction("External wallet binding preview is disabled by environment variables.");
-          return;
-        }
-        const localWalletSession: AuthSessionRecord = {
-          ...createLocalWalletSession(walletAddress),
-          identity: pendingIdentitySession.identity
-            ? {
-                ...pendingIdentitySession.identity,
-                managedWalletAddress: walletAddress,
-              }
-            : null,
-        };
-        storeAuthSession(localWalletSession);
-        setLastAction("外部钱包已绑定到本地预览会话。");
-        void router.push(resolveLocalPreviewRedirectHref(nextHref));
-        return;
-      }
-
-      const challenge = await createWalletAuthChallenge(walletAddress);
-      const signatureBytes = await signMessage(new TextEncoder().encode(challenge.message));
-      const session = await verifyWalletAuthChallenge(
-        {
-          wallet: walletAddress,
-          nonce: challenge.nonce,
-          signature: bytesToBase64(signatureBytes),
-        },
-        pendingIdentitySession.accessToken,
-      );
-
-      storeAuthSession(session);
-      setLastAction("外部钱包已完成签名绑定。");
-      void router.push(nextHref);
-    } catch (error) {
-      if (isUserRejectedWalletRequest(error)) {
-        setLastAction(t("auth.walletRejected"));
-        return;
-      }
-
-      setLastAction(error instanceof Error ? error.message : "外部钱包绑定失败。");
-    } finally {
-      setBusyKey(null);
-    }
-  }, [demoAuthEnabled, nextHref, pendingIdentitySession, publicKey, router, setVisible, signMessage, t]);
-
   useEffect(() => {
     if (!pendingWalletLogin || !connected || !publicKey || busyKey) {
       return;
@@ -367,14 +295,6 @@ export const AuthOptionsPanel = ({
 
     void completeWalletLogin();
   }, [busyKey, completeWalletLogin, connected, pendingWalletLogin, publicKey]);
-
-  useEffect(() => {
-    if (!pendingExternalWalletBind || !connected || !publicKey || busyKey) {
-      return;
-    }
-
-    void completeExternalWalletBind();
-  }, [busyKey, completeExternalWalletBind, connected, pendingExternalWalletBind, publicKey]);
 
   const handleWalletLogin = async () => {
     if (!connected || !publicKey) {
@@ -436,7 +356,7 @@ export const AuthOptionsPanel = ({
 
     if (demoAuthEnabled) {
       // Local mock verify — accept any code and build a local email identity session.
-      beginWalletChoice(createLocalProviderSession(resolveMethodIdentity("email")), "邮箱 OTP");
+      completeIdentityLogin(createLocalProviderSession(resolveMethodIdentity("email")), "邮箱 OTP");
       return;
     }
 
@@ -445,7 +365,7 @@ export const AuthOptionsPanel = ({
 
     try {
       const session = await verifyEmailLoginCode({ email, code });
-      beginWalletChoice(session, "邮箱 OTP");
+      completeIdentityLogin(session, "邮箱 OTP");
     } catch (error) {
       setLastAction(error instanceof Error ? error.message : t("auth.emailCodeFailed"));
     } finally {
@@ -517,47 +437,7 @@ export const AuthOptionsPanel = ({
           </div>
         ) : null}
 
-        {pendingIdentitySession ? (
-          <div className="space-y-5">
-            <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#87e7bd]">
-                Identity verified
-              </p>
-              <h2 className="type-h2 mt-3 font-semibold text-white">选择钱包模式</h2>
-              <p className="mt-3 text-sm leading-6 text-[#93a3bb]">
-                使用平台分配的托管账户可立即浏览和互动；绑定 Phantom/Solflare 会把这个登录身份映射到你的自有钱包。
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                className="card-radius flex w-full items-center justify-between border border-[#5fca9f]/25 bg-[#113222] px-4 py-4 text-left transition hover:border-[#87e7bd]/45 disabled:cursor-wait disabled:opacity-70"
-                disabled={Boolean(busyKey)}
-                onClick={completeWithManagedWallet}
-                type="button"
-              >
-                <span>
-                  <span className="block text-sm font-semibold text-[#b9f7d4]">使用平台托管账户</span>
-                  <span className="mt-1 block text-xs text-[#7bc59f]">推荐给普通 Viewer，无需单独签名即可入网</span>
-                </span>
-                <ChevronRightIcon className="h-4 w-4 text-[#b9f7d4]" />
-              </button>
-
-              <button
-                className="card-radius flex w-full items-center justify-between border border-[#8f5824] bg-[#2e1e17] px-4 py-4 text-left text-[#ffd0a6] transition hover:border-[#b06f34] disabled:cursor-wait disabled:opacity-70"
-                disabled={Boolean(busyKey)}
-                onClick={() => void completeExternalWalletBind()}
-                type="button"
-              >
-                <span>
-                  <span className="block text-sm font-semibold">连接自己的 Solana 钱包</span>
-                  <span className="mt-1 block text-xs text-[#dca56e]">适合后续签名、创作者准入或 Sponsor 管理钱包</span>
-                </span>
-                <WalletIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ) : !demoAuthEnabled || mode === "welcome" ? (
+        {!demoAuthEnabled || mode === "welcome" ? (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="type-h3 font-semibold text-white">{t("auth.welcomeBack")}</h2>

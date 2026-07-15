@@ -23,11 +23,11 @@
 
 ## Pilot 部署边界（先读）
 
-当前目标是**经代码验证的邀请制 Pilot 候选版本——未部署生产、未上线、无真实资金**。所有链上活动只指向 **Solana devnet 与一枚 test-USDC mint**。本指南是一条通用上云路径；按 Pilot 真值，落地时必须遵守以下约束：
+当前目标是**公开身份入口的技术 Pilot——无真实资金**。所有链上活动只指向 **Solana devnet 与一枚 test-USDC mint**。本指南是一条通用上云路径；按 Pilot 真值，落地时必须遵守以下约束：
 
 - **仅 devnet。** 不要配置 mainnet RPC。生产环境下后端会在监听前校验每个 active RPC 的完整 Solana devnet genesis hash，不匹配即 fail-closed 拒绝启动。
-- **邀请制 gate 必填。** 生产 Pilot 必须设置 `PILOT_INVITE_ONLY=true`、`PILOT_INVITE_WALLETS`（至少一个外部真实钱包）、`PILOT_EXPECTED_USDC_MINT`（Pilot test-USDC mint 真值）、`PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS`。后端在监听前会读取链上 `ProtocolConfig.usdcMint` 并要求与 `PILOT_EXPECTED_USDC_MINT` 完全一致，且要求配置的 program 账户存在且 `executable`。
-- **关闭与 Pilot 冲突的功能。** email/social/provider 托管钱包、公开托管执行、S1、Track 2 背书、Track 3 CPS、每日/互动奖励，以及**自动结算调度器（ORACLE）**对所有 Pilot 用户关闭。Pilot 禁止的是 ORACLE 自动结算调度器（`ORACLE_SCHEDULER_ENABLED` / `ORACLE_RUN_ON_BOOT` / Track2 / Track3 自动结算均为 `false`），而**不是** indexer 或 Mux reconciliation：媒体 corridor 需要 Mux webhook/reconciliation 的可见性，financial projection 需要 indexer 保持同步。因此 Pilot 建议 `INDEXER_ENABLED=true`；在配置真实 R2/Mux 之后建议 `MUX_RECONCILIATION_ENABLED=true`、`MUX_RECONCILIATION_RUN_ON_BOOT=true`。Pilot 中的 Track 1 结算由运营人工执行。
+- **公开身份 gate。** 设置 `PILOT_INVITE_ONLY=false` 且无需 `PILOT_INVITE_WALLETS`；启用 `SOCIAL_AUTH_ENABLED=true` 并完整配置 Google、Apple、允许的前端 origin 和托管钱包加密密钥。`PILOT_EXPECTED_USDC_MINT` 与 `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS` 仍是链上安全门。
+- **关闭与 Pilot 冲突的资金功能。** 真实提现/转账、广泛公开托管执行、S1、Track 2 背书、Track 3 CPS、每日/互动奖励，以及**自动结算调度器（ORACLE）**保持关闭。媒体 corridor 仍需要 Mux webhook/reconciliation，financial projection 仍需要 indexer 同步。
 - **IDL 制品 blocker（已解决）。** 生产 IDL 现已随后端一起打包在 backend 根目录下（`backend/idl/streampump_core.json`），运行时通过 `STREAMPUMP_IDL_PATH=./idl/streampump_core.json` 读取。因此在 Render 的 **Root Directory 设为 `backend`** 时该制品仍在部署产物内，链上 preflight 与已部署走廊 smoke 不再被此路径 blocker 阻塞。请勿再退回旧的 `../target/idl/...` 路径（它位于 `backend` 根目录之外、不会进入部署制品）。
 - **liveness 与 readiness 区分（P3）。** 后端暴露两个探针：`GET /health` 是**始终返回 200 的 liveness**（进程存活即可）；`GET /ready` 是**readiness**，在 DB + 已启用的 Indexer + 已启用的 Mux reconciliation 全部就绪前返回 **503**，就绪后返回 200。二者用途不同：平台的存活/重启探针可指向 `/health`，而"是否可接流量"的就绪判断应参考 `/ready`（例如启动后先轮询 `/ready` 到 200 再放量）。后续修复 `96e9075` 使 indexer fail-closed：启动需真实的公共 `onSlotChange` 通知加 `getSlot`，运行时 slot 心跳停滞（90s）或 RPC 探测失败会将 Indexer readiness 降级为 FAILED，使 `/ready` 回到 503——因此 `/ready` 到 200 是一个会随订阅停滞而回退的运行时信号，放量后仍应持续监控。
 
@@ -135,7 +135,7 @@ npm run start
 /health
 ```
 
-> **release SHA 锚定（Pilot 必需）。** Hosted Pilot 要求完整的 `PILOT_EXPECTED_RELEASE_SHA` **完全等于** Render 注入的 `RENDER_GIT_COMMIT`。P4 历史部署来自 `codex/p4-pilot-deployment`；后续只允许部署对应人工 H gate 已接受的完整 commit SHA，auto-deploy 必须受控/关闭，`main` 或未固定的分支 head 永远不得部署。P6 后的精确 preflight、postflight 与 rollback 契约见 [`docs/pilot/p6-final-audit-and-release-handoff.md`](../pilot/p6-final-audit-and-release-handoff.md)。
+> **release SHA 真值。** Render 自动部署只使用平台注入的完整 `RENDER_GIT_COMMIT` 作为 `/health.releaseSha` 与发布身份真值。旧的 `PILOT_EXPECTED_RELEASE_SHA` 在 Render 上被忽略，应从环境变量中移除；它仅供没有平台 commit metadata 的其他托管环境使用。
 
 > **只读 Neon gate 指纹。** Render 还必须设置 `P4_EXPECTED_NEON_DATABASE=neondb`、`P4_EXPECTED_NEON_HOST_SHA256=a6c67cc9e5f1f9b94812efdeb7bbba5c558e475d183fa35d0f740f6ef4a2a678`、`P4_EXPECTED_NEON_ROLE_SHA256=6f198191100386e1f0c093fc1c902c0520c6382059d75fb4743ec1ec75cc7842`。这些是目标绑定指纹，不是数据库凭据；缺失或不匹配时 pre-deploy 必须失败。
 >
@@ -155,18 +155,20 @@ npm run start
 - `AUTH_ALLOW_LEGACY_WALLET_HEADER=false`
 - `AUTH_ALLOW_PREVIEW_PROVIDER_EXCHANGE=false`
 
-##### Pilot invite-only gate（Pilot 必填）
-- `PILOT_INVITE_ONLY=true`
-- `PILOT_INVITE_WALLETS=<外部真实钱包地址,逗号分隔>`
-  - 至少一个有效 Solana 钱包地址；challenge 对所有有效钱包同形，邀请校验只在签名后执行。
+##### Pilot 公开身份 gate（必填）
+- `PILOT_INVITE_ONLY=false`
+- `PILOT_INVITE_WALLETS=`
+- `SOCIAL_AUTH_ENABLED=true`
+- `SOCIAL_AUTH_FRONTEND_ORIGINS=https://app.stream-pump.com`
+- Google/Apple OAuth 变量按 [`google-apple-login-setup.md`](google-apple-login-setup.md) 配置完整。
 - `PILOT_EXPECTED_USDC_MINT=<Pilot test-USDC mint>`
   - 后端监听前会读取链上 `ProtocolConfig.usdcMint` 并要求完全一致。
 - `PILOT_CHAIN_PREFLIGHT_TIMEOUT_MS=10000`
 
-> Pilot 关闭 email/social/provider 托管钱包与公开托管执行。下面的 email/托管钱包变量属于未来托管钱包阶段，不是 Pilot 路径；除非该阶段真正启用，否则不要为 Pilot 打开它们。
+> Google/Apple 注册会创建平台托管账号，但不开放不受限的资金执行。真实提现尚未实现，注册与 onboarding 不得要求个人钱包。
 
 - `MANAGED_WALLET_ENCRYPTION_KEY=...`
-  - 仅在托管钱包阶段启用时需要；必须是 64 位 hex（32 bytes）。
+  - 开启 Google/Apple 时必填；必须是 64 位 hex（32 bytes）。
   - 本地生成命令：
     ```bash
     openssl rand -hex 32
@@ -182,7 +184,7 @@ npm run start
 Invalid production configuration: MANAGED_WALLET_ENCRYPTION_KEY must be set to 64 hex chars
 ```
 
-说明 build 已经成功，失败发生在 `npm run start` 的生产配置校验阶段。若托管钱包阶段已启用，处理方式是给同一个 Render backend service 增加 `MANAGED_WALLET_ENCRYPTION_KEY`，值必须是 `openssl rand -hex 32` 生成的 64 位 hex，然后重新部署；不要为了让服务启动而删除这条校验，托管钱包私钥必须用这个 key 加密。注意：邀请制 Pilot 关闭 email/provider 托管钱包，因此 Pilot 阶段不应触发托管钱包分配。
+说明 build 已经成功，失败发生在 `npm run start` 的生产配置校验阶段。给同一个 Render backend service 增加 `MANAGED_WALLET_ENCRYPTION_KEY`，值必须是 `openssl rand -hex 32` 生成的 64 位 hex，然后重新部署；不要为了让服务启动而删除这条校验，社交注册创建的托管钱包私钥必须用这个 key 加密。
 
 #### Database
 - `DATABASE_URL`
@@ -346,15 +348,15 @@ https://api.yourdomain.com/api/webhooks/mux
    - `app.yourdomain.com`
    - `api.yourdomain.com`
 
-## Pilot 部署顺序（受控）
+## Pilot 部署顺序
 
-这是**邀请制 devnet / test-USDC / 仅 Track 1 的技术 Pilot**，不是生产上线、也不提供真实资金可用性。按此顺序执行：
+这是**公开身份入口、devnet / test-USDC / 仅 Track 1 的技术 Pilot**，不提供真实资金可用性。按此顺序执行：
 
-1. 确认 Render auto-deploy 已关闭，且精确候选 commit 已通过对应人工 H gate；`PILOT_EXPECTED_RELEASE_SHA` 完全等于 Render `RENDER_GIT_COMMIT`。P4 之后的候选还必须遵守 [`docs/pilot/p6-final-audit-and-release-handoff.md`](../pilot/p6-final-audit-and-release-handoff.md) 的单次 mutation 与 rollback 契约。
-2. 用该精确 commit 部署 Render 候选；只读预部署校验（`npm run verify:p4:neon:post`）必须证明恰好 26 个已应用迁移与全部 M3 后不变量，且**不应用任何迁移**。
-3. `/health` 返回 200 且带 invite-only/manual-settlement 运行时真值；`/ready` 就绪（DB + indexer + Mux）并**稳定超过 90 秒**。
-4. CORS allow/deny 通过、provider exchange 返回 403、prototype/S1/email/ephemeral/Track2 等封闭路由关闭、operator endpoint 未鉴权返回 403。
-5. **仅在 Render 通过后**，将 Vercel 固定到 Node 22，再用该精确 approved commit 促发 Vercel Production promotion，并做浏览器/API smoke。
+1. Render 跟踪 `main` 并开启 auto-deploy；移除旧的固定 `PILOT_EXPECTED_RELEASE_SHA`。平台注入的 `RENDER_GIT_COMMIT` 是唯一发布真值，遗留 pin 即使暂未删除也不会再阻断部署。
+2. 合并已验证 commit 后等待自动部署；只读预部署校验不得应用迁移。
+3. `/health` 返回 200、`releaseSha` 等于 main commit、`mode=PUBLIC_SOCIAL_PILOT`、`accessPolicy.type=open`；`/ready` 就绪（DB + indexer + Mux）。
+4. Google/Apple `/api/v1/auth/social/start` 均返回授权 URL；CORS allow/deny 通过；prototype/S1/email/ephemeral/Track2 等封闭路由保持关闭，operator endpoint 未鉴权返回 403。
+5. 对 `/login` 完成桌面/移动端浏览器 smoke，并确认社交验证后直接进入、不出现钱包绑定选择。
 
 （上述通用小节保留作参考；Pilot 落地以本受控顺序与 [`docs/pilot/p4-pre-mutation-checklist.md`](../pilot/p4-pre-mutation-checklist.md) 的 M4 gate 为准。）
 
