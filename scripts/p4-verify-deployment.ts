@@ -211,6 +211,16 @@ export const assertReadyPayload = (payload: unknown): void => {
   );
 };
 
+export const assertMarketOverviewPayload = (payload: unknown): void => {
+  const response = requireObject(payload, "market overview response");
+  const data = requireObject(response.data, "market overview data");
+
+  requireExactValue(response.ok, true, "market overview ok");
+  if (!Number.isInteger(data.creatorCount) || Number(data.creatorCount) < 0) {
+    fail("market overview creatorCount must be a non-negative integer");
+  }
+};
+
 const readBoundedJson = async (response: Response, label: string): Promise<unknown> => {
   const declaredLength = Number(response.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BYTES) {
@@ -358,9 +368,11 @@ const verifyClosedSurfaces = async (
     fetchImpl,
     config.apiOrigin,
     "/api/v1/market/overview",
-    { method: "GET" }
+    { method: "GET" },
+    { parseJson: true }
   );
-  requireStatus(s1MarketRead, 404, "S1 market read probe");
+  requireStatus(s1MarketRead, 200, "S1 market read probe");
+  assertMarketOverviewPayload(s1MarketRead.json);
 
   const closedRoutes = [
     ["prototype write", "/api/prototype/videos/upload"],
@@ -698,6 +710,9 @@ const runSelfTest = async (): Promise<void> => {
           headers: { "cache-control": "no-store", "surrogate-control": "no-store" },
         }
       );
+    }
+    if (url.pathname === "/api/v1/market/overview") {
+      return Response.json({ ok: true, data: { creatorCount: 9 } });
     }
     return new Response(undefined, { status: 404 });
   }) as FetchLike;
